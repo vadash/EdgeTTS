@@ -29,7 +29,7 @@ settingsButton.addEventListener('click', e => lite_mod())
 rate.addEventListener('input', e => rate_str.textContent = rate.value >= 0 ? `+${rate.value}%` : `${rate.value}%`)
 pitch.addEventListener('input', e => pitch_str.textContent = pitch.value >= 0 ? `+${pitch.value}Hz` : `${pitch.value}Hz`)
 max_threads.addEventListener('input', e => max_threads_int.textContent = max_threads.value)
-mergefiles.addEventListener('input', e => mergefiles_str.textContent = mergefiles.value == 100 ? "ВСЕ" : `${mergefiles.value} шт.`)
+mergefiles.addEventListener('input', e => mergefiles_str.textContent = mergefiles.value == 100 ? "ALL" : `${mergefiles.value} count.`)
 window.addEventListener('beforeunload', function(event) { save_settings() });
 
 
@@ -95,9 +95,9 @@ fileInputLex.addEventListener('change', (event) => {
 			lexx = reader.result.split("\n")
 		}
 		reader.readAsText(file)
-		fileButtonLex.textContent = "Загружен"
+		fileButtonLex.textContent = "Loaded"
 	} else {
-		fileButtonLex.textContent = "Загрузить"
+		fileButtonLex.textContent = "Load"
 	}
 })
 
@@ -112,7 +112,7 @@ fileInput.addEventListener('change', (event) => {
 	}
 	
 	if (event.target.files.length == 0) {
-		fileButton.textContent = "Открыть"
+		fileButton.textContent = "Open"
 		stat_info.textContent = ""//"Открыто"
 	}
 	
@@ -121,7 +121,7 @@ fileInput.addEventListener('change', (event) => {
 		stat_str.textContent = "0 / 0"
 		
 		if (file) {
-			fileButton.textContent = "Обработка..."
+			fileButton.textContent = "Processing..."
 			const reader = new FileReader()
 			reader.onload = () => {
 				book_loaded = true
@@ -138,12 +138,12 @@ fileInput.addEventListener('change', (event) => {
 				} else if ( file_name_toLowerCase.endsWith('.zip') ) {
 					convertZipToTxt(file)
 				}
-				fileButton.textContent = "Открыты"
+				fileButton.textContent = "Opened"
 			}
 			
 			reader.readAsText(file)
 		} else {
-			fileButton.textContent = "Открыть"
+			fileButton.textContent = "Open"
 		}
 	}
 
@@ -174,7 +174,7 @@ function lite_mod() {
 			let tmp_ind = 0
 			for (let part of book.all_sentences) {
 				tmp_ind += 1
-				textArea.value += "Часть " + tmp_ind + ":\n" + part + "\n\n"
+				textArea.value += "Part " + tmp_ind + ":\n" + part + "\n\n"
 			}
 		}
 		
@@ -208,9 +208,9 @@ function get_text(_filename, _text, is_file) {
 	for (let part of book.all_sentences) {
 		tmp_ind += 1
 		if ( is_file == true && textArea.style.display != 'none') {
-			textArea.value += "Часть " + tmp_ind + ":\n" + part + "\n\n"
+			textArea.value += "Part " + tmp_ind + ":\n" + part + "\n\n"
 		}
-		statArea.value += "Часть " + (tmp_ind).toString().padStart(4, '0') + ": Открыта\n"
+		statArea.value += "Part " + (tmp_ind).toString().padStart(4, '0') + ": Open\n"
 	}
 	stat_info.textContent = ""//"Открыто"
 	stat_str.textContent = `0 / ${book.all_sentences.length}`
@@ -273,7 +273,7 @@ function add_edge_tts(merge) {
 function get_audio() {
 	clear_old_run()
 	run_work = true
-	stat_info.textContent = "Обработано"
+	stat_info.textContent = "Processed"
 	const stat_count = stat_str.textContent.split(' / ');
 	stat_str.textContent = "0 / " + stat_count[1]
 	const merge = (mergefiles.value == 1) ? false : true;
