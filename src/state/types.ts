@@ -4,10 +4,13 @@ export interface VoiceOption {
   locale: string;
   name: string;
   fullValue: string;
+  gender: 'male' | 'female';
 }
 
 export interface AppSettings {
   voice: string;
+  narratorVoice: string;
+  voicePoolLocale: string;
   rate: number;
   pitch: number;
   maxThreads: number;
@@ -68,4 +71,39 @@ declare global {
   interface Window {
     showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
   }
+}
+
+// Multi-voice types
+export type SpeakerType = 'narrator' | 'character';
+
+export interface DialogueSegment {
+  text: string;
+  speaker: string;           // 'narrator' or character name
+  speakerType: SpeakerType;
+  gender: 'male' | 'female' | 'unknown';
+  originalIndex: number;
+}
+
+export interface CharacterInfo {
+  name: string;
+  gender: 'male' | 'female' | 'unknown';
+  occurrences: number;
+  assignedVoice?: string;
+}
+
+export interface ParsedDialogue {
+  segments: DialogueSegment[];
+  characters: Map<string, CharacterInfo>;
+}
+
+export interface VoiceAnnotatedChunk {
+  text: string;
+  voice: string;
+  partIndex: number;
+  speaker: string;
+}
+
+export interface VoicePool {
+  male: string[];
+  female: string[];
 }

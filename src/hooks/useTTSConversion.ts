@@ -1,12 +1,14 @@
 // useTTSConversion - Custom hook orchestrating the full TTS conversion workflow
 
 import { useCallback } from 'preact/hooks';
-import { TextProcessor } from '../services/TextProcessor';
+import { TextProcessor, ProcessedBookWithVoices } from '../services/TextProcessor';
 import { TTSWorkerPool, PoolTask } from '../services/TTSWorkerPool';
 import { AudioMerger } from '../services/AudioMerger';
 import type { TTSConfig, ProcessedBook } from '../state/types';
 import {
   voice,
+  narratorVoice,
+  voicePoolLocale,
   rate,
   pitch,
   maxThreads,
@@ -68,13 +70,24 @@ export function useTTSConversion() {
     isProcessing.value = true;
 
     try {
-      // Step 1: Process text
-      addStatusLine('Processing text...');
+      // Step 1: Process text with multi-voice support
+      addStatusLine('Processing text and detecting dialogue...');
 
-      let book: ProcessedBook;
+      let processedBook: ProcessedBookWithVoices;
 
       if (existingBook && existingBook.allSentences.length > 0) {
-        book = existingBook;
+        // Use existing book but wrap it for compatibility
+        processedBook = {
+          ...existingBook,
+          chunks: existingBook.allSentences.map((text, index) => ({
+            text,
+            voice: narratorVoice.value,
+            partIndex: index,
+            speaker: 'narrator',
+          })),
+          characters: new Map(),
+          voiceAssignments: new Map(),
+        };
       } else {
         const processor = new TextProcessor({
           fileName: extractFilename(text),
@@ -83,18 +96,25 @@ export function useTTSConversion() {
           caseSensitive: lexxRegister.value,
           pointsSelect: pointsSelect.value,
           pointsType: pointsType.value,
+          narratorVoice: narratorVoice.value,
+          voicePoolLocale: voicePoolLocale.value,
         });
-        book = processor.getProcessedBook();
+        processedBook = processor.processWithVoices();
       }
 
-      if (book.allSentences.length === 0) {
+      if (processedBook.chunks.length === 0) {
         addStatusLine('No sentences to convert after processing');
         isProcessing.value = false;
         return;
       }
 
-      totalCount.value = book.allSentences.length;
-      addStatusLine(`Found ${book.allSentences.length} sentences to convert`);
+      // Log detected characters
+      if (processedBook.characters.size > 0) {
+        addStatusLine(`Detected ${processedBook.characters.size} character(s): ${Array.from(processedBook.characters.keys()).join(', ')}`);
+      }
+
+      totalCount.value = processedBook.chunks.length;
+      addStatusLine(`Found ${processedBook.chunks.length} chunks to convert`);
 
       // Step 2: Create worker pool
       const config = buildTTSConfig();
@@ -124,8 +144,8 @@ export function useTTSConversion() {
             const merger = new AudioMerger(mergeFiles.value);
             const mergedFiles = merger.merge(
               audioMap,
-              book.allSentences.length,
-              book.fileNames
+              processedBook.chunks.length,
+              processedBook.fileNames
             );
 
             if (mergedFiles.length === 0) {
@@ -152,21 +172,22 @@ export function useTTSConversion() {
         },
       });
 
-      // Step 4: Queue all tasks
-      const tasks: PoolTask[] = book.allSentences.map((sentence, index) => {
-        // Determine which file this sentence belongs to
-        let filename = book.fileNames[0]?.[0] ?? 'audio';
-        for (const [name, boundaryIndex] of book.fileNames) {
-          if (index >= boundaryIndex && boundaryIndex > 0) {
+      // Step 4: Queue all tasks with voice information
+      const tasks: PoolTask[] = processedBook.chunks.map((chunk) => {
+        // Determine which file this chunk belongs to
+        let filename = processedBook.fileNames[0]?.[0] ?? 'audio';
+        for (const [name, boundaryIndex] of processedBook.fileNames) {
+          if (chunk.partIndex >= boundaryIndex && boundaryIndex > 0) {
             filename = name;
           }
         }
 
         return {
-          partIndex: index,
-          text: sentence,
+          partIndex: chunk.partIndex,
+          text: chunk.text,
           filename: filename,
-          filenum: String(index + 1).padStart(4, '0'),
+          filenum: String(chunk.partIndex + 1).padStart(4, '0'),
+          voice: chunk.voice, // Include voice for multi-voice support
         };
       });
 

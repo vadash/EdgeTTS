@@ -1,0 +1,2158 @@
+
+╭─── Claude Code v2.0.52 ──────────────────────────────────────────────────────╮
+│      + tweakcc v3.1.2            │ Tips for getting started                  │
+│                                  │ ✔ Run /init to create a CLAUDE.md file w… │
+│           Welcome back!          │ ───────────────────────────────────────── │
+│                                  │ Recent activity                           │
+│              ▐▛███▜▌             │ No recent activity                        │
+│             ▝▜█████▛▘            │                                           │
+│               ▘▘ ▝▝              │                                           │
+│                                  │                                           │
+│   Opus 4.5 · API Usage Billing   │                                           │
+│       C:\projects\EdgeTTS        │                                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+┃ ✓ tweakcc patches are applied
+┃   * system prompts: 48013 fewer chars than original
+
+  /model to try Opus 4.5
+
+> /clear 
+  ⎿  (no content)
+
+> I want to modify this app/site so its do multi voice reading. Narrator 
+gets one voice, every char gets unique and its male/female gender. Suggest 
+what approach should I use and alternatives for my task 
+
+∴ Thinking…
+
+  The user wants to add multi-voice reading capability to their Edge TTS web 
+  app. This means:
+  1. A narrator voice for narration
+  2. Different voices for different characters in the text
+  3. Gender-appropriate voices for characters
+
+  This is a significant feature that requires understanding:
+  1. How the current TTS system works
+  2. How text is currently processed and split
+  3. How to detect/parse character dialogue
+  4. How to assign and manage multiple voices
+
+  Let me explore the codebase to understand the current architecture before 
+  proposing solutions.
+
+● I'll explore the codebase to understand the current architecture and then
+  propose approaches for multi-voice reading.
+
+● 3 Explore agents finished (ctrl+o to expand)
+   ├─ Explore TTS services · 16 tool uses · 29.6k tokens
+   │  ⎿ Done
+   ├─ Explore text processing · 19 tool uses · 23.1k tokens
+   │  ⎿ Done
+   └─ Explore state and voices · 22 tool uses · 28.1k tokens
+      ⎿ Done
+
+> continue 
+
+∴ Thinking…
+
+  The user wants me to continue. I have good information from the two completed 
+  explore agents. Let me also check the voice data to understand gender 
+  information, then ask clarifying questions about the user's requirements.
+
+● Read(src\components\VoiceSelector\voices.ts)
+  ⎿  Read 100 lines
+
+∴ Thinking…
+
+  Good, I can see the voice structure. Voices follow naming conventions where 
+  names like "Dmitry", "William", "Andrew" are male, while "Svetlana", "Ava", 
+  "Emma" are female. The gender isn't explicitly stored but can be inferred from
+   names.
+
+  Now I have a good understanding of:
+  1. TTS Services: Single voice per request, SSML-based, concurrent WebSocket 
+  workers
+  2. Text Processing: No dialogue detection, simple chunking by size/punctuation
+  3. Voices: 340+ voices, gender inferrable from names, no explicit gender 
+  metadata
+
+  For multi-voice reading, I need to clarify with the user:
+  1. How to detect dialogue vs narration
+  2. How to identify character names/speakers
+  3. Source of character gender information
+  4. Single language or multi-language support needed
+
+  Let me ask clarifying questions.
+
+● I now have a clear picture. The current system:
+  - Uses single voice for all text
+  - No dialogue/speaker detection exists
+  - 340+ voices available (gender inferrable from names like "DmitryNeural"
+  = male, "SvetlanaNeural" = female)
+  - Text is chunked by size/punctuation without metadata
+
+  Need to clarify your requirements:
+                                                                           
+● User answered Claude's questions:
+  ⎿  · How should dialogue be detected in your text files? → Both formats
+     · How should character names and genders be determined? → AI detection
+     · What language are your books primarily in? → Mixed/Other
+
+∴ Thinking…
+
+  User wants:
+  1. Dialogue detection: Both quotation marks and em-dash
+  2. Character identification: AI detection (heuristics to guess speaker from 
+  context)
+  3. Language: Mixed/Other (multi-language support)
+
+  This is complex - AI detection for speakers requires either:
+  - LLM integration (external API calls)
+  - Local heuristic-based detection (pattern matching)
+  - Hybrid approach
+
+  For a purely client-side app, true AI detection would need either:
+  1. External LLM API (Claude, GPT) - costs money, needs API keys
+  2. Local models (transformers.js, WebLLM) - heavy, slow in browser
+  3. Heuristic pattern matching - imperfect but fast and free
+
+  Let me ask about the AI approach preference.
+
+● AI detection for character identification is the most complex part. Need
+  to clarify the approach:
+                                                                           
+● User answered Claude's questions:
+  ⎿  · How should AI detection work for identifying speakers? → Lets start 
+     with rule based for RU/EN and later extend if needed
+     · What to do when a character's gender/identity cannot be determined? →
+      Random voice
+
+∴ Thinking…
+
+  Now I have clear requirements:
+  
+  1. Dialogue detection: Both quotes ("") and em-dash (—)
+  2. Speaker identification: Rule-based heuristics for RU/EN
+  3. Language: Multi-language (mixed)
+  4. Unknown characters: Random voice from pool
+  
+  Let me now launch a Plan agent to create a detailed implementation plan.
+
+● Now I have clear requirements. Let me create a detailed plan.
+
+● Plan(Plan multi-voice feature)
+  ⎿  Done (17 tool uses · 43.2k tokens · 3m 26s)                           
+
+∴ Thinking…
+
+  I have a comprehensive plan from the Plan agent. Now I need to:
+  1. Write the plan to the plan file
+  2. Ask any final clarifying questions if needed
+  3. Call ExitPlanMode
+
+  Let me write the plan file and ask one final question about implementation 
+  priority.
+
+● Updated plan
+  ⎿  /plan to preview · ~\.claude\plans\encapsulated-whistling-puffin.md
+
+∴ Thinking…
+
+  Plan file is written. Let me ask one final question about scope and then call 
+  ExitPlanMode.
+
+● Plan written. One final question before we proceed:
+                                                                           
+● User answered Claude's questions:
+  ⎿  · How should we approach the implementation scope? → It will replace 
+     default UI. verything will be milti voice. We start with MVP. DO we 
+     need to label voices for this? I dont want to use ALL the voices. You 
+     can convert them all then I will remove voices I dont want, right?
+
+∴ Thinking…
+
+  User clarified:
+  1. Multi-voice will replace the default UI (not be an optional toggle) - 
+  everything multi-voice
+  2. MVP first
+  3. For voices: I should label all voices with gender, user will then remove 
+  ones they don't want from the list
+
+  So the approach simplifies:
+  - No toggle needed - always multi-voice
+  - Add gender labels to voices.ts 
+  - User edits the list after I convert it
+
+  Let me update the plan to reflect this.
+
+● Got it. Key changes:
+  1. Multi-voice is default - no toggle, replaces current single-voice mode
+  2. MVP approach - core functionality first
+  3. Voice labeling - I'll add gender labels to all 340+ voices in
+  voices.ts, you edit out unwanted ones
+
+  Updating plan:
+
+● Updated plan
+  ⎿  /plan to preview · ~\.claude\plans\encapsulated-whistling-puffin.md
+
+∴ Thinking…
+
+  Now I need to update the voices.ts section and the VoicePoolBuilder section to
+   reflect the new approach - I'll add gender labels directly to the voices 
+  array.
+
+● Updated plan
+  ⎿  /plan to preview · ~\.claude\plans\encapsulated-whistling-puffin.md
+
+∴ Thinking…
+
+  I need to fix the duplicate section numbering (two "### 4.") and update the 
+  implementation order. Let me also simplify the state management section since 
+  there's no toggle needed.
+
+● Updated plan
+  ⎿  /plan to preview · ~\.claude\plans\encapsulated-whistling-puffin.md
+
+∴ Thinking…
+
+  Good. Now let me update the state management section to remove the toggle 
+  since multi-voice is always on.
+
+● Updated plan
+  ⎿  /plan to preview · ~\.claude\plans\encapsulated-whistling-puffin.md
+
+∴ Thinking…
+
+  Good. Now let me update the implementation order to be simpler for MVP and 
+  reflect that we'll add gender labels to all voices.
+
+● Updated plan
+  ⎿  /plan to preview · ~\.claude\plans\encapsulated-whistling-puffin.md
+
+∴ Thinking…
+
+  The plan is now updated for MVP approach. Let me now exit plan mode to get 
+  user approval.
+
+● Plan updated for MVP approach. Key points:
+
+  1. voices.ts - I'll add gender: 'male' | 'female' to all 340+ voices, you
+  edit out unwanted ones
+  2. Always multi-voice - no toggle, replaces default behavior
+  3. Minimal UI - just narrator voice selector for MVP
+  4. 12 steps total for MVP implementation
+
+  Ready to proceed?
+                                                                           
+● User approved Claude's plan
+  ⎿  Plan saved to: ~\.claude\plans\encapsulated-whistling-puffin.md · /plan
+      to edit
+     Multi-Voice Reading Implementation Plan
+
+     Summary
+
+     Replace single-voice mode with multi-voice: narrator gets one voice, 
+     detected characters get unique gender-appropriate voices. Rule-based 
+     dialogue detection for both quotation marks and em-dash (Russian) 
+     formats.
+
+     Requirements
+
+     - Dialogue detection: Both "..." quotes and — ... em-dash
+     - Speaker identification: Rule-based heuristics (RU/EN patterns like 
+     "said John", "сказал Иван")
+     - Voice assignment: Gender-appropriate voices, unknown chars get random
+      voice
+     - Languages: Mixed RU/EN support
+     - MVP approach: Core parsing + assignment first, minimal UI
+     - Always multi-voice: No toggle - replaces default behavior
+
+     ---
+     New Services
+
+     1. src/services/DialogueParser.ts
+
+     Parses text into dialogue segments with speaker attribution.
+
+     interface DialogueSegment {
+       text: string;
+       speaker: string;         // 'narrator' or character name
+       speakerType: 'narrator' | 'character';
+       gender: 'male' | 'female' | 'unknown';
+     }
+
+     interface ParsedDialogue {
+       segments: DialogueSegment[];
+       characters: Map<string, CharacterInfo>;
+     }
+
+     Detection patterns:
+     - EN quotes: 
+     /"([^"]+)"(?:\s*,?\s*(?:said|replied|asked|whispered)\s+(\w+))?/gi
+     - RU em-dash: /(?:^|\n)\s*[—]\s*([^—]+)(?:[—]\s*(?:сказал[аи]?|ответил[
+     аи]?|спросил[аи]?)\s+(\p{L}+))?/giu
+     - Attribution phrases near dialogue for context
+
+     2. src/services/GenderInference.ts
+
+     Name-to-gender mapping with databases and heuristics.
+
+     // Russian names database + heuristics (names ending -а/-я = female)
+     // English names database
+     export function inferGender(name: string, language: 'ru' | 'en'): 
+     'male' | 'female' | 'unknown';
+
+     3. Update src/components/VoiceSelector/voices.ts
+
+     Add gender labels to all 340+ voices. User will edit file to remove 
+     unwanted voices.
+
+     New structure:
+     interface VoiceOption {
+       locale: string;
+       name: string;
+       fullValue: string;
+       gender: 'male' | 'female';  // NEW
+     }
+
+     export const voices: VoiceOption[] = [
+       { locale: 'ru-RU', name: 'DmitryNeural', fullValue: 'ru-RU, 
+     DmitryNeural', gender: 'male' },
+       { locale: 'ru-RU', name: 'SvetlanaNeural', fullValue: 'ru-RU, 
+     SvetlanaNeural', gender: 'female' },
+       // ... all 340+ voices labeled
+     ];
+
+     4. src/services/VoicePoolBuilder.ts
+
+     Simple filter by gender from labeled voices.
+
+     export function buildVoicePool(locale?: string): VoicePool {
+       const filtered = locale ? voices.filter(v => 
+     v.locale.startsWith(locale)) : voices;
+       return {
+         male: filtered.filter(v => v.gender === 'male').map(v => 
+     v.fullValue),
+         female: filtered.filter(v => v.gender === 'female').map(v => 
+     v.fullValue),
+       };
+     }
+
+     5. src/services/VoiceAssigner.ts
+
+     Assigns unique voices to characters.
+
+     class VoiceAssigner {
+       assignVoice(character: string, gender: 'male' | 'female' | 
+     'unknown'): string;
+       getVoiceForCharacter(character: string): string;
+       getNarratorVoice(): string;
+     }
+
+     ---
+     Modified Files
+
+     src/state/appState.ts
+
+     New signals (no toggle needed - always multi-voice):
+     export const narratorVoice = signal<string>('ru-RU, DmitryNeural');
+     export const voicePoolLocale = signal<string>('ru-RU');
+
+     src/state/types.ts
+
+     New interfaces:
+     interface VoiceAnnotatedChunk {
+       text: string;
+       voice: string;
+       partIndex: number;
+       speaker: string;
+     }
+
+     src/services/TextProcessor.ts
+
+     Add processWithVoices() method that:
+     1. Uses DialogueParser to parse text
+     2. Uses VoiceAssigner to assign voices
+     3. Returns chunks with voice annotations
+
+     src/services/TTSWorkerPool.ts
+
+     Extend PoolTask with optional voice field:
+     interface PoolTask {
+       // ...existing
+       voice?: string;  // Per-task voice override
+     }
+
+     Update spawnWorker to use task-specific voice when provided.
+
+     src/hooks/useTTSConversion.ts
+
+     Add multi-voice branch:
+     1. Check multiVoiceEnabled
+     2. Use extended TextProcessor
+     3. Build voice-annotated tasks
+     4. Apply user overrides from characterVoiceOverrides
+
+     ---
+     New UI Components
+
+     src/components/MultiVoice/MultiVoiceSettings.tsx
+
+     - Toggle for multi-voice mode
+     - Narrator voice selector
+     - Voice pool locale selector
+
+     src/components/MultiVoice/CharacterVoiceManager.tsx
+
+     - Table of detected characters
+     - Shows: name, inferred gender, occurrence count, assigned voice
+     - Dropdown to override voice per character
+
+     Integrate into SettingsPanel.tsx
+
+     Add multi-voice section in advanced settings area.
+
+     ---
+     Implementation Order (MVP)
+
+     Phase 1: Voice Setup
+
+     1. Add gender field to VoiceOption type in src/state/types.ts
+     2. Label all 340+ voices with gender in voices.ts (user edits out 
+     unwanted)
+     3. Create VoicePoolBuilder.ts - filter voices by gender/locale
+
+     Phase 2: Dialogue Detection
+
+     4. Create DialogueParser.ts with RU/EN patterns
+     5. Create GenderInference.ts with name databases
+
+     Phase 3: Voice Assignment
+
+     6. Create VoiceAssigner.ts - character-to-voice mapping
+     7. Add narratorVoice signal to appState.ts
+
+     Phase 4: Pipeline Integration
+
+     8. Extend TextProcessor with multi-voice processing
+     9. Update TTSWorkerPool for per-task voice
+     10. Update useTTSConversion hook
+
+     Phase 5: Minimal UI
+
+     11. Add narrator voice selector to existing UI
+     12. Test with RU and EN texts
+
+     ---
+     Key Challenges & Solutions
+
+     | Challenge                                | Solution                  
+                                       |
+     |------------------------------------------|---------------------------
+     ----------------------------------|
+     | Ambiguous speaker (alternating dialogue) | Track conversation 
+     context, alternate between last speakers |
+     | More characters than voices              | Reuse voices with lowest 
+     occurrence                         |
+     | Chunk boundaries vs dialogue boundaries  | DialogueParser produces 
+     segments that respect chunking      |
+
+     ---
+     Critical Files to Read Before Implementation
+
+     - src/services/TextProcessor.ts - understand current chunking
+     - src/services/TTSWorkerPool.ts - understand task flow
+     - src/hooks/useTTSConversion.ts - main orchestration
+     - src/state/appState.ts - state patterns
+     - src/components/VoiceSelector/voices.ts - voice data structure
+
+
+∴ Thinking…
+
+  The user approved the plan. Now I should start implementing. Let me set up a 
+  todo list and begin with Phase 1: Voice Setup.
+
+∴ Thinking…
+
+  Now let me start implementing. First, I need to read the current types.ts to 
+  add the gender field to VoiceOption.
+
+● Read(src\state\types.ts)
+  ⎿  Read 72 lines
+
+∴ Thinking…
+
+  Good. I need to:
+  1. Add gender to VoiceOption
+  2. Add new interfaces for multi-voice: DialogueSegment, CharacterInfo, 
+  VoiceAnnotatedChunk, etc.Let me update types.ts.
+
+● Update(src\state\types.ts)
+  ⎿  Updated src\state\types.ts with 1 addition
+        4      locale: string;
+        5      name: string;
+        6      fullValue: string;
+        7 +    gender: 'male' | 'female';
+        8    }
+        9    
+       10    export interface AppSettings {
+
+∴ Thinking…
+
+  Good. Now I need to add new interfaces for multi-voice support. Let me add 
+  them at the end of the file.
+
+● Update(src\state\types.ts)
+  ⎿  Updated src\state\types.ts with 35 additions                     
+        70        showDirectoryPicker?: () => 
+             Promise<FileSystemDirectoryHandle>;
+        71      }
+        72    }
+        73 +  
+        74 +  // Multi-voice types
+        75 +  export type SpeakerType = 'narrator' | 'character';
+        76 +  
+        77 +  export interface DialogueSegment {
+        78 +    text: string;
+        79 +    speaker: string;           // 'narrator' or character 
+           + name
+        80 +    speakerType: SpeakerType;
+        81 +    gender: 'male' | 'female' | 'unknown';
+        82 +    originalIndex: number;
+        83 +  }
+        84 +  
+        85 +  export interface CharacterInfo {
+        86 +    name: string;
+        87 +    gender: 'male' | 'female' | 'unknown';
+        88 +    occurrences: number;
+        89 +    assignedVoice?: string;
+        90 +  }
+        91 +  
+        92 +  export interface ParsedDialogue {
+        93 +    segments: DialogueSegment[];
+        94 +    characters: Map<string, CharacterInfo>;
+        95 +  }
+        96 +  
+        97 +  export interface VoiceAnnotatedChunk {
+        98 +    text: string;
+        99 +    voice: string;
+       100 +    partIndex: number;
+       101 +    speaker: string;
+       102 +  }
+       103 +  
+       104 +  export interface VoicePool {
+       105 +    male: string[];
+       106 +    female: string[];
+       107 +  }
+
+∴ Thinking…
+
+  Good. Now I need to update voices.ts with gender labels for all 340+ voices. 
+  Let me read the full voices.ts file first.
+
+∴ Thinking…
+
+  Now let me read the full voices.ts file to understand all the voices and add 
+  gender labels.
+
+● Read(src\components\VoiceSelector\voices.ts)
+  ⎿  Read 411 lines
+
+∴ Thinking…
+
+  Now I need to completely rewrite voices.ts with gender labels. I need to 
+  convert from the current format that uses parseVoice to use explicit objects 
+  with gender. This is a large file - 340+ voices. Let me create the new format 
+  with all voices labeled by gender.
+
+  I'll need to determine the gender of each voice based on the name. Most voice 
+  names follow patterns:
+  - Names ending in 'a' are typically female (Svetlana, Amina, Laila, etc.)
+  - Names like Dmitry, William, Andrew, etc. are male
+
+  Let me create the complete list with gender labels.
+
+● This is a large file. I'll rewrite it with gender labels for all voices:
+
+● Write(src\components\VoiceSelector\voices.ts)
+  ⎿  Updated src\components\VoiceSelector\voices.ts with 410 additions and 
+     410 removals
+         1 -  import type { VoiceOption } from '../../state/types';
+         2 -  
+         3 -  // Extract locale and name from full value like "ru-RU, 
+           - DmitryNeural"
+         4 -  function parseVoice(fullValue: string): VoiceOption {
+         5 -    const [locale, name] = fullValue.split(', ');
+         6 -    return { locale, name, fullValue };
+         7 -  }
+         8 -  
+         9 -  export const voices: VoiceOption[] = [
+        10 -    // Russian (prioritized)
+        11 -    'ru-RU, DmitryNeural',
+        12 -    'ru-RU, SvetlanaNeural',
+        13 -    // Multilingual
+        14 -    'en-AU, WilliamMultilingualNeural',
+        15 -    'en-US, AndrewMultilingualNeural',
+        16 -    'en-US, AvaMultilingualNeural',
+        17 -    'en-US, BrianMultilingualNeural',
+        18 -    'en-US, EmmaMultilingualNeural',
+        19 -    'fr-FR, VivienneMultilingualNeural',
+        20 -    'fr-FR, RemyMultilingualNeural',
+        21 -    'de-DE, SeraphinaMultilingualNeural',
+        22 -    'de-DE, FlorianMultilingualNeural',
+        23 -    'it-IT, GiuseppeMultilingualNeural',
+        24 -    'ko-KR, HyunsuMultilingualNeural',
+        25 -    'pt-BR, ThalitaMultilingualNeural',
+        26 -    // Afrikaans
+        27 -    'af-ZA, AdriNeural',
+        28 -    'af-ZA, WillemNeural',
+        29 -    // Albanian
+        30 -    'sq-AL, AnilaNeural',
+        31 -    'sq-AL, IlirNeural',
+        32 -    // Amharic
+        33 -    'am-ET, AmehaNeural',
+        34 -    'am-ET, MekdesNeural',
+        35 -    // Arabic
+        36 -    'ar-DZ, AminaNeural',
+        37 -    'ar-DZ, IsmaelNeural',
+        38 -    'ar-BH, AliNeural',
+        39 -    'ar-BH, LailaNeural',
+        40 -    'ar-EG, SalmaNeural',
+        41 -    'ar-EG, ShakirNeural',
+        42 -    'ar-IQ, BasselNeural',
+        43 -    'ar-IQ, RanaNeural',
+        44 -    'ar-JO, SanaNeural',
+        45 -    'ar-JO, TaimNeural',
+        46 -    'ar-KW, FahedNeural',
+        47 -    'ar-KW, NouraNeural',
+        48 -    'ar-LB, LaylaNeural',
+        49 -    'ar-LB, RamiNeural',
+        50 -    'ar-LY, ImanNeural',
+        51 -    'ar-LY, OmarNeural',
+        52 -    'ar-MA, JamalNeural',
+        53 -    'ar-MA, MounaNeural',
+        54 -    'ar-OM, AbdullahNeural',
+        55 -    'ar-OM, AyshaNeural',
+        56 -    'ar-QA, AmalNeural',
+        57 -    'ar-QA, MoazNeural',
+        58 -    'ar-SA, HamedNeural',
+        59 -    'ar-SA, ZariyahNeural',
+        60 -    'ar-SY, AmanyNeural',
+        61 -    'ar-SY, LaithNeural',
+        62 -    'ar-TN, HediNeural',
+        63 -    'ar-TN, ReemNeural',
+        64 -    'ar-AE, FatimaNeural',
+        65 -    'ar-AE, HamdanNeural',
+        66 -    'ar-YE, MaryamNeural',
+        67 -    'ar-YE, SalehNeural',
+        68 -    // Azerbaijani
+        69 -    'az-AZ, BabekNeural',
+        70 -    'az-AZ, BanuNeural',
+        71 -    // Bengali
+        72 -    'bn-BD, NabanitaNeural',
+        73 -    'bn-BD, PradeepNeural',
+        74 -    'bn-IN, BashkarNeural',
+        75 -    'bn-IN, TanishaaNeural',
+        76 -    // Bosnian
+        77 -    'bs-BA, VesnaNeural',
+        78 -    'bs-BA, GoranNeural',
+        79 -    // Bulgarian
+        80 -    'bg-BG, BorislavNeural',
+        81 -    'bg-BG, KalinaNeural',
+        82 -    // Burmese
+        83 -    'my-MM, NilarNeural',
+        84 -    'my-MM, ThihaNeural',
+        85 -    // Catalan
+        86 -    'ca-ES, EnricNeural',
+        87 -    'ca-ES, JoanaNeural',
+        88 -    // Chinese
+        89 -    'zh-HK, HiuGaaiNeural',
+        90 -    'zh-HK, HiuMaanNeural',
+        91 -    'zh-HK, WanLungNeural',
+        92 -    'zh-CN, XiaoxiaoNeural',
+        93 -    'zh-CN, XiaoyiNeural',
+        94 -    'zh-CN, YunjianNeural',
+        95 -    'zh-CN, YunxiNeural',
+        96 -    'zh-CN, YunxiaNeural',
+        97 -    'zh-CN, YunyangNeural',
+        98 -    'zh-CN-liaoning, XiaobeiNeural',
+        99 -    'zh-TW, HsiaoChenNeural',
+       100 -    'zh-TW, YunJheNeural',
+       101 -    'zh-TW, HsiaoYuNeural',
+       102 -    'zh-CN-shaanxi, XiaoniNeural',
+       103 -    // Croatian
+       104 -    'hr-HR, GabrijelaNeural',
+       105 -    'hr-HR, SreckoNeural',
+       106 -    // Czech
+       107 -    'cs-CZ, AntoninNeural',
+       108 -    'cs-CZ, VlastaNeural',
+       109 -    // Danish
+       110 -    'da-DK, ChristelNeural',
+       111 -    'da-DK, JeppeNeural',
+       112 -    // Dutch
+       113 -    'nl-BE, ArnaudNeural',
+       114 -    'nl-BE, DenaNeural',
+       115 -    'nl-NL, ColetteNeural',
+       116 -    'nl-NL, FennaNeural',
+       117 -    'nl-NL, MaartenNeural',
+       118 -    // English
+       119 -    'en-AU, NatashaNeural',
+       120 -    'en-CA, ClaraNeural',
+       121 -    'en-CA, LiamNeural',
+       122 -    'en-HK, YanNeural',
+       123 -    'en-HK, SamNeural',
+       124 -    'en-IN, NeerjaExpressiveNeural',
+       125 -    'en-IN, NeerjaNeural',
+       126 -    'en-IN, PrabhatNeural',
+       127 -    'en-IE, ConnorNeural',
+       128 -    'en-IE, EmilyNeural',
+       129 -    'en-KE, AsiliaNeural',
+       130 -    'en-KE, ChilembaNeural',
+       131 -    'en-NZ, MitchellNeural',
+       132 -    'en-NZ, MollyNeural',
+       133 -    'en-NG, AbeoNeural',
+       134 -    'en-NG, EzinneNeural',
+       135 -    'en-PH, JamesNeural',
+       136 -    'en-PH, RosaNeural',
+       137 -    'en-US, AvaNeural',
+       138 -    'en-US, AndrewNeural',
+       139 -    'en-US, EmmaNeural',
+       140 -    'en-US, BrianNeural',
+       141 -    'en-SG, LunaNeural',
+       142 -    'en-SG, WayneNeural',
+       143 -    'en-ZA, LeahNeural',
+       144 -    'en-ZA, LukeNeural',
+       145 -    'en-TZ, ElimuNeural',
+       146 -    'en-TZ, ImaniNeural',
+       147 -    'en-GB, LibbyNeural',
+       148 -    'en-GB, MaisieNeural',
+       149 -    'en-GB, RyanNeural',
+       150 -    'en-GB, SoniaNeural',
+       151 -    'en-GB, ThomasNeural',
+       152 -    'en-US, AnaNeural',
+       153 -    'en-US, AriaNeural',
+       154 -    'en-US, ChristopherNeural',
+       155 -    'en-US, EricNeural',
+       156 -    'en-US, GuyNeural',
+       157 -    'en-US, JennyNeural',
+       158 -    'en-US, MichelleNeural',
+       159 -    'en-US, RogerNeural',
+       160 -    'en-US, SteffanNeural',
+       161 -    // Estonian
+       162 -    'et-EE, AnuNeural',
+       163 -    'et-EE, KertNeural',
+       164 -    // Filipino
+       165 -    'fil-PH, AngeloNeural',
+       166 -    'fil-PH, BlessicaNeural',
+       167 -    // Finnish
+       168 -    'fi-FI, HarriNeural',
+       169 -    'fi-FI, NooraNeural',
+       170 -    // French
+       171 -    'fr-BE, CharlineNeural',
+       172 -    'fr-BE, GerardNeural',
+       173 -    'fr-CA, ThierryNeural',
+       174 -    'fr-CA, AntoineNeural',
+       175 -    'fr-CA, JeanNeural',
+       176 -    'fr-CA, SylvieNeural',
+       177 -    'fr-FR, DeniseNeural',
+       178 -    'fr-FR, EloiseNeural',
+       179 -    'fr-FR, HenriNeural',
+       180 -    'fr-CH, ArianeNeural',
+       181 -    'fr-CH, FabriceNeural',
+       182 -    // Galician
+       183 -    'gl-ES, RoiNeural',
+       184 -    'gl-ES, SabelaNeural',
+       185 -    // Georgian
+       186 -    'ka-GE, EkaNeural',
+       187 -    'ka-GE, GiorgiNeural',
+       188 -    // German
+       189 -    'de-AT, IngridNeural',
+       190 -    'de-AT, JonasNeural',
+       191 -    'de-DE, AmalaNeural',
+       192 -    'de-DE, ConradNeural',
+       193 -    'de-DE, KatjaNeural',
+       194 -    'de-DE, KillianNeural',
+       195 -    'de-CH, JanNeural',
+       196 -    'de-CH, LeniNeural',
+       197 -    // Greek
+       198 -    'el-GR, AthinaNeural',
+       199 -    'el-GR, NestorasNeural',
+       200 -    // Gujarati
+       201 -    'gu-IN, DhwaniNeural',
+       202 -    'gu-IN, NiranjanNeural',
+       203 -    // Hebrew
+       204 -    'he-IL, AvriNeural',
+       205 -    'he-IL, HilaNeural',
+       206 -    // Hindi
+       207 -    'hi-IN, MadhurNeural',
+       208 -    'hi-IN, SwaraNeural',
+       209 -    // Hungarian
+       210 -    'hu-HU, NoemiNeural',
+       211 -    'hu-HU, TamasNeural',
+       212 -    // Icelandic
+       213 -    'is-IS, GudrunNeural',
+       214 -    'is-IS, GunnarNeural',
+       215 -    // Indonesian
+       216 -    'id-ID, ArdiNeural',
+       217 -    'id-ID, GadisNeural',
+       218 -    // Inuktitut
+       219 -    'iu-Latn-CA, SiqiniqNeural',
+       220 -    'iu-Latn-CA, TaqqiqNeural',
+       221 -    'iu-Cans-CA, SiqiniqNeural',
+       222 -    'iu-Cans-CA, TaqqiqNeural',
+       223 -    // Irish
+       224 -    'ga-IE, ColmNeural',
+       225 -    'ga-IE, OrlaNeural',
+       226 -    // Italian
+       227 -    'it-IT, DiegoNeural',
+       228 -    'it-IT, ElsaNeural',
+       229 -    'it-IT, IsabellaNeural',
+       230 -    // Japanese
+       231 -    'ja-JP, KeitaNeural',
+       232 -    'ja-JP, NanamiNeural',
+       233 -    // Javanese
+       234 -    'jv-ID, DimasNeural',
+       235 -    'jv-ID, SitiNeural',
+       236 -    // Kannada
+       237 -    'kn-IN, GaganNeural',
+       238 -    'kn-IN, SapnaNeural',
+       239 -    // Kazakh
+       240 -    'kk-KZ, AigulNeural',
+       241 -    'kk-KZ, DauletNeural',
+       242 -    // Khmer
+       243 -    'km-KH, PisethNeural',
+       244 -    'km-KH, SreymomNeural',
+       245 -    // Korean
+       246 -    'ko-KR, InJoonNeural',
+       247 -    'ko-KR, SunHiNeural',
+       248 -    // Lao
+       249 -    'lo-LA, ChanthavongNeural',
+       250 -    'lo-LA, KeomanyNeural',
+       251 -    // Latvian
+       252 -    'lv-LV, EveritaNeural',
+       253 -    'lv-LV, NilsNeural',
+       254 -    // Lithuanian
+       255 -    'lt-LT, LeonasNeural',
+       256 -    'lt-LT, OnaNeural',
+       257 -    // Macedonian
+       258 -    'mk-MK, AleksandarNeural',
+       259 -    'mk-MK, MarijaNeural',
+       260 -    // Malay
+       261 -    'ms-MY, OsmanNeural',
+       262 -    'ms-MY, YasminNeural',
+       263 -    // Malayalam
+       264 -    'ml-IN, MidhunNeural',
+       265 -    'ml-IN, SobhanaNeural',
+       266 -    // Maltese
+       267 -    'mt-MT, GraceNeural',
+       268 -    'mt-MT, JosephNeural',
+       269 -    // Marathi
+       270 -    'mr-IN, AarohiNeural',
+       271 -    'mr-IN, ManoharNeural',
+       272 -    // Mongolian
+       273 -    'mn-MN, BataaNeural',
+       274 -    'mn-MN, YesuiNeural',
+       275 -    // Nepali
+       276 -    'ne-NP, HemkalaNeural',
+       277 -    'ne-NP, SagarNeural',
+       278 -    // Norwegian
+       279 -    'nb-NO, FinnNeural',
+       280 -    'nb-NO, PernilleNeural',
+       281 -    // Pashto
+       282 -    'ps-AF, GulNawazNeural',
+       283 -    'ps-AF, LatifaNeural',
+       284 -    // Persian
+       285 -    'fa-IR, DilaraNeural',
+       286 -    'fa-IR, FaridNeural',
+       287 -    // Polish
+       288 -    'pl-PL, MarekNeural',
+       289 -    'pl-PL, ZofiaNeural',
+       290 -    // Portuguese
+       291 -    'pt-BR, AntonioNeural',
+       292 -    'pt-BR, FranciscaNeural',
+       293 -    'pt-PT, DuarteNeural',
+       294 -    'pt-PT, RaquelNeural',
+       295 -    // Romanian
+       296 -    'ro-RO, AlinaNeural',
+       297 -    'ro-RO, EmilNeural',
+       298 -    // Serbian
+       299 -    'sr-RS, NicholasNeural',
+       300 -    'sr-RS, SophieNeural',
+       301 -    // Sinhala
+       302 -    'si-LK, SameeraNeural',
+       303 -    'si-LK, ThiliniNeural',
+       304 -    // Slovak
+       305 -    'sk-SK, LukasNeural',
+       306 -    'sk-SK, ViktoriaNeural',
+       307 -    // Slovenian
+       308 -    'sl-SI, PetraNeural',
+       309 -    'sl-SI, RokNeural',
+       310 -    // Somali
+       311 -    'so-SO, MuuseNeural',
+       312 -    'so-SO, UbaxNeural',
+       313 -    // Spanish
+       314 -    'es-AR, ElenaNeural',
+       315 -    'es-AR, TomasNeural',
+       316 -    'es-BO, MarceloNeural',
+       317 -    'es-BO, SofiaNeural',
+       318 -    'es-CL, CatalinaNeural',
+       319 -    'es-CL, LorenzoNeural',
+       320 -    'es-CO, GonzaloNeural',
+       321 -    'es-CO, SalomeNeural',
+       322 -    'es-ES, XimenaNeural',
+       323 -    'es-CR, JuanNeural',
+       324 -    'es-CR, MariaNeural',
+       325 -    'es-CU, BelkysNeural',
+       326 -    'es-CU, ManuelNeural',
+       327 -    'es-DO, EmilioNeural',
+       328 -    'es-DO, RamonaNeural',
+       329 -    'es-EC, AndreaNeural',
+       330 -    'es-EC, LuisNeural',
+       331 -    'es-SV, LorenaNeural',
+       332 -    'es-SV, RodrigoNeural',
+       333 -    'es-GQ, JavierNeural',
+       334 -    'es-GQ, TeresaNeural',
+       335 -    'es-GT, AndresNeural',
+       336 -    'es-GT, MartaNeural',
+       337 -    'es-HN, CarlosNeural',
+       338 -    'es-HN, KarlaNeural',
+       339 -    'es-MX, DaliaNeural',
+       340 -    'es-MX, JorgeNeural',
+       341 -    'es-NI, FedericoNeural',
+       342 -    'es-NI, YolandaNeural',
+       343 -    'es-PA, MargaritaNeural',
+       344 -    'es-PA, RobertoNeural',
+       345 -    'es-PY, MarioNeural',
+       346 -    'es-PY, TaniaNeural',
+       347 -    'es-PE, AlexNeural',
+       348 -    'es-PE, CamilaNeural',
+       349 -    'es-PR, KarinaNeural',
+       350 -    'es-PR, VictorNeural',
+       351 -    'es-ES, AlvaroNeural',
+       352 -    'es-ES, ElviraNeural',
+       353 -    'es-US, AlonsoNeural',
+       354 -    'es-US, PalomaNeural',
+       355 -    'es-UY, MateoNeural',
+       356 -    'es-UY, ValentinaNeural',
+       357 -    'es-VE, PaolaNeural',
+       358 -    'es-VE, SebastianNeural',
+       359 -    // Sundanese
+       360 -    'su-ID, JajangNeural',
+       361 -    'su-ID, TutiNeural',
+       362 -    // Swahili
+       363 -    'sw-KE, RafikiNeural',
+       364 -    'sw-KE, ZuriNeural',
+       365 -    'sw-TZ, DaudiNeural',
+       366 -    'sw-TZ, RehemaNeural',
+       367 -    // Swedish
+       368 -    'sv-SE, MattiasNeural',
+       369 -    'sv-SE, SofieNeural',
+       370 -    // Tamil
+       371 -    'ta-IN, PallaviNeural',
+       372 -    'ta-IN, ValluvarNeural',
+       373 -    'ta-MY, KaniNeural',
+       374 -    'ta-MY, SuryaNeural',
+       375 -    'ta-SG, AnbuNeural',
+       376 -    'ta-SG, VenbaNeural',
+       377 -    'ta-LK, KumarNeural',
+       378 -    'ta-LK, SaranyaNeural',
+       379 -    // Telugu
+       380 -    'te-IN, MohanNeural',
+       381 -    'te-IN, ShrutiNeural',
+       382 -    // Thai
+       383 -    'th-TH, NiwatNeural',
+       384 -    'th-TH, PremwadeeNeural',
+       385 -    // Turkish
+       386 -    'tr-TR, EmelNeural',
+       387 -    'tr-TR, AhmetNeural',
+       388 -    // Ukrainian
+       389 -    'uk-UA, OstapNeural',
+       390 -    'uk-UA, PolinaNeural',
+       391 -    // Urdu
+       392 -    'ur-IN, GulNeural',
+       393 -    'ur-IN, SalmanNeural',
+       394 -    'ur-PK, AsadNeural',
+       395 -    'ur-PK, UzmaNeural',
+       396 -    // Uzbek
+       397 -    'uz-UZ, MadinaNeural',
+       398 -    'uz-UZ, SardorNeural',
+       399 -    // Vietnamese
+       400 -    'vi-VN, HoaiMyNeural',
+       401 -    'vi-VN, NamMinhNeural',
+       402 -    // Welsh
+       403 -    'cy-GB, AledNeural',
+       404 -    'cy-GB, NiaNeural',
+       405 -    // Zulu
+       406 -    'zu-ZA, ThandoNeural',
+       407 -    'zu-ZA, ThembaNeural',
+       408 -  ].map(parseVoice);
+       409 -  
+       410 -  export default voices;
+         1 +  import type { VoiceOption } from '../../state/types';
+         2 +  
+         3 +  // Voice definition helper
+         4 +  function v(fullValue: string, gender: 'male' | 'female'
+           +  ): VoiceOption {
+         5 +    const [locale, name] = fullValue.split(', ');
+         6 +    return { locale, name, fullValue, gender };
+         7 +  }
+         8 +  
+         9 +  export const voices: VoiceOption[] = [
+        10 +    // Russian (prioritized)
+        11 +    v('ru-RU, DmitryNeural', 'male'),
+        12 +    v('ru-RU, SvetlanaNeural', 'female'),
+        13 +    // Multilingual
+        14 +    v('en-AU, WilliamMultilingualNeural', 'male'),
+        15 +    v('en-US, AndrewMultilingualNeural', 'male'),
+        16 +    v('en-US, AvaMultilingualNeural', 'female'),
+        17 +    v('en-US, BrianMultilingualNeural', 'male'),
+        18 +    v('en-US, EmmaMultilingualNeural', 'female'),
+        19 +    v('fr-FR, VivienneMultilingualNeural', 'female'),
+        20 +    v('fr-FR, RemyMultilingualNeural', 'male'),
+        21 +    v('de-DE, SeraphinaMultilingualNeural', 'female'),
+        22 +    v('de-DE, FlorianMultilingualNeural', 'male'),
+        23 +    v('it-IT, GiuseppeMultilingualNeural', 'male'),
+        24 +    v('ko-KR, HyunsuMultilingualNeural', 'male'),
+        25 +    v('pt-BR, ThalitaMultilingualNeural', 'female'),
+        26 +    // Afrikaans
+        27 +    v('af-ZA, AdriNeural', 'female'),
+        28 +    v('af-ZA, WillemNeural', 'male'),
+        29 +    // Albanian
+        30 +    v('sq-AL, AnilaNeural', 'female'),
+        31 +    v('sq-AL, IlirNeural', 'male'),
+        32 +    // Amharic
+        33 +    v('am-ET, AmehaNeural', 'male'),
+        34 +    v('am-ET, MekdesNeural', 'female'),
+        35 +    // Arabic
+        36 +    v('ar-DZ, AminaNeural', 'female'),
+        37 +    v('ar-DZ, IsmaelNeural', 'male'),
+        38 +    v('ar-BH, AliNeural', 'male'),
+        39 +    v('ar-BH, LailaNeural', 'female'),
+        40 +    v('ar-EG, SalmaNeural', 'female'),
+        41 +    v('ar-EG, ShakirNeural', 'male'),
+        42 +    v('ar-IQ, BasselNeural', 'male'),
+        43 +    v('ar-IQ, RanaNeural', 'female'),
+        44 +    v('ar-JO, SanaNeural', 'female'),
+        45 +    v('ar-JO, TaimNeural', 'male'),
+        46 +    v('ar-KW, FahedNeural', 'male'),
+        47 +    v('ar-KW, NouraNeural', 'female'),
+        48 +    v('ar-LB, LaylaNeural', 'female'),
+        49 +    v('ar-LB, RamiNeural', 'male'),
+        50 +    v('ar-LY, ImanNeural', 'female'),
+        51 +    v('ar-LY, OmarNeural', 'male'),
+        52 +    v('ar-MA, JamalNeural', 'male'),
+        53 +    v('ar-MA, MounaNeural', 'female'),
+        54 +    v('ar-OM, AbdullahNeural', 'male'),
+        55 +    v('ar-OM, AyshaNeural', 'female'),
+        56 +    v('ar-QA, AmalNeural', 'female'),
+        57 +    v('ar-QA, MoazNeural', 'male'),
+        58 +    v('ar-SA, HamedNeural', 'male'),
+        59 +    v('ar-SA, ZariyahNeural', 'female'),
+        60 +    v('ar-SY, AmanyNeural', 'female'),
+        61 +    v('ar-SY, LaithNeural', 'male'),
+        62 +    v('ar-TN, HediNeural', 'male'),
+        63 +    v('ar-TN, ReemNeural', 'female'),
+        64 +    v('ar-AE, FatimaNeural', 'female'),
+        65 +    v('ar-AE, HamdanNeural', 'male'),
+        66 +    v('ar-YE, MaryamNeural', 'female'),
+        67 +    v('ar-YE, SalehNeural', 'male'),
+        68 +    // Azerbaijani
+        69 +    v('az-AZ, BabekNeural', 'male'),
+        70 +    v('az-AZ, BanuNeural', 'female'),
+        71 +    // Bengali
+        72 +    v('bn-BD, NabanitaNeural', 'female'),
+        73 +    v('bn-BD, PradeepNeural', 'male'),
+        74 +    v('bn-IN, BashkarNeural', 'male'),
+        75 +    v('bn-IN, TanishaaNeural', 'female'),
+        76 +    // Bosnian
+        77 +    v('bs-BA, VesnaNeural', 'female'),
+        78 +    v('bs-BA, GoranNeural', 'male'),
+        79 +    // Bulgarian
+        80 +    v('bg-BG, BorislavNeural', 'male'),
+        81 +    v('bg-BG, KalinaNeural', 'female'),
+        82 +    // Burmese
+        83 +    v('my-MM, NilarNeural', 'female'),
+        84 +    v('my-MM, ThihaNeural', 'male'),
+        85 +    // Catalan
+        86 +    v('ca-ES, EnricNeural', 'male'),
+        87 +    v('ca-ES, JoanaNeural', 'female'),
+        88 +    // Chinese
+        89 +    v('zh-HK, HiuGaaiNeural', 'female'),
+        90 +    v('zh-HK, HiuMaanNeural', 'female'),
+        91 +    v('zh-HK, WanLungNeural', 'male'),
+        92 +    v('zh-CN, XiaoxiaoNeural', 'female'),
+        93 +    v('zh-CN, XiaoyiNeural', 'female'),
+        94 +    v('zh-CN, YunjianNeural', 'male'),
+        95 +    v('zh-CN, YunxiNeural', 'male'),
+        96 +    v('zh-CN, YunxiaNeural', 'male'),
+        97 +    v('zh-CN, YunyangNeural', 'male'),
+        98 +    v('zh-CN-liaoning, XiaobeiNeural', 'female'),
+        99 +    v('zh-TW, HsiaoChenNeural', 'female'),
+       100 +    v('zh-TW, YunJheNeural', 'male'),
+       101 +    v('zh-TW, HsiaoYuNeural', 'female'),
+       102 +    v('zh-CN-shaanxi, XiaoniNeural', 'female'),
+       103 +    // Croatian
+       104 +    v('hr-HR, GabrijelaNeural', 'female'),
+       105 +    v('hr-HR, SreckoNeural', 'male'),
+       106 +    // Czech
+       107 +    v('cs-CZ, AntoninNeural', 'male'),
+       108 +    v('cs-CZ, VlastaNeural', 'female'),
+       109 +    // Danish
+       110 +    v('da-DK, ChristelNeural', 'female'),
+       111 +    v('da-DK, JeppeNeural', 'male'),
+       112 +    // Dutch
+       113 +    v('nl-BE, ArnaudNeural', 'male'),
+       114 +    v('nl-BE, DenaNeural', 'female'),
+       115 +    v('nl-NL, ColetteNeural', 'female'),
+       116 +    v('nl-NL, FennaNeural', 'female'),
+       117 +    v('nl-NL, MaartenNeural', 'male'),
+       118 +    // English
+       119 +    v('en-AU, NatashaNeural', 'female'),
+       120 +    v('en-CA, ClaraNeural', 'female'),
+       121 +    v('en-CA, LiamNeural', 'male'),
+       122 +    v('en-HK, YanNeural', 'female'),
+       123 +    v('en-HK, SamNeural', 'male'),
+       124 +    v('en-IN, NeerjaExpressiveNeural', 'female'),
+       125 +    v('en-IN, NeerjaNeural', 'female'),
+       126 +    v('en-IN, PrabhatNeural', 'male'),
+       127 +    v('en-IE, ConnorNeural', 'male'),
+       128 +    v('en-IE, EmilyNeural', 'female'),
+       129 +    v('en-KE, AsiliaNeural', 'female'),
+       130 +    v('en-KE, ChilembaNeural', 'male'),
+       131 +    v('en-NZ, MitchellNeural', 'male'),
+       132 +    v('en-NZ, MollyNeural', 'female'),
+       133 +    v('en-NG, AbeoNeural', 'male'),
+       134 +    v('en-NG, EzinneNeural', 'female'),
+       135 +    v('en-PH, JamesNeural', 'male'),
+       136 +    v('en-PH, RosaNeural', 'female'),
+       137 +    v('en-US, AvaNeural', 'female'),
+       138 +    v('en-US, AndrewNeural', 'male'),
+       139 +    v('en-US, EmmaNeural', 'female'),
+       140 +    v('en-US, BrianNeural', 'male'),
+       141 +    v('en-SG, LunaNeural', 'female'),
+       142 +    v('en-SG, WayneNeural', 'male'),
+       143 +    v('en-ZA, LeahNeural', 'female'),
+       144 +    v('en-ZA, LukeNeural', 'male'),
+       145 +    v('en-TZ, ElimuNeural', 'male'),
+       146 +    v('en-TZ, ImaniNeural', 'female'),
+       147 +    v('en-GB, LibbyNeural', 'female'),
+       148 +    v('en-GB, MaisieNeural', 'female'),
+       149 +    v('en-GB, RyanNeural', 'male'),
+       150 +    v('en-GB, SoniaNeural', 'female'),
+       151 +    v('en-GB, ThomasNeural', 'male'),
+       152 +    v('en-US, AnaNeural', 'female'),
+       153 +    v('en-US, AriaNeural', 'female'),
+       154 +    v('en-US, ChristopherNeural', 'male'),
+       155 +    v('en-US, EricNeural', 'male'),
+       156 +    v('en-US, GuyNeural', 'male'),
+       157 +    v('en-US, JennyNeural', 'female'),
+       158 +    v('en-US, MichelleNeural', 'female'),
+       159 +    v('en-US, RogerNeural', 'male'),
+       160 +    v('en-US, SteffanNeural', 'male'),
+       161 +    // Estonian
+       162 +    v('et-EE, AnuNeural', 'female'),
+       163 +    v('et-EE, KertNeural', 'male'),
+       164 +    // Filipino
+       165 +    v('fil-PH, AngeloNeural', 'male'),
+       166 +    v('fil-PH, BlessicaNeural', 'female'),
+       167 +    // Finnish
+       168 +    v('fi-FI, HarriNeural', 'male'),
+       169 +    v('fi-FI, NooraNeural', 'female'),
+       170 +    // French
+       171 +    v('fr-BE, CharlineNeural', 'female'),
+       172 +    v('fr-BE, GerardNeural', 'male'),
+       173 +    v('fr-CA, ThierryNeural', 'male'),
+       174 +    v('fr-CA, AntoineNeural', 'male'),
+       175 +    v('fr-CA, JeanNeural', 'male'),
+       176 +    v('fr-CA, SylvieNeural', 'female'),
+       177 +    v('fr-FR, DeniseNeural', 'female'),
+       178 +    v('fr-FR, EloiseNeural', 'female'),
+       179 +    v('fr-FR, HenriNeural', 'male'),
+       180 +    v('fr-CH, ArianeNeural', 'female'),
+       181 +    v('fr-CH, FabriceNeural', 'male'),
+       182 +    // Galician
+       183 +    v('gl-ES, RoiNeural', 'male'),
+       184 +    v('gl-ES, SabelaNeural', 'female'),
+       185 +    // Georgian
+       186 +    v('ka-GE, EkaNeural', 'female'),
+       187 +    v('ka-GE, GiorgiNeural', 'male'),
+       188 +    // German
+       189 +    v('de-AT, IngridNeural', 'female'),
+       190 +    v('de-AT, JonasNeural', 'male'),
+       191 +    v('de-DE, AmalaNeural', 'female'),
+       192 +    v('de-DE, ConradNeural', 'male'),
+       193 +    v('de-DE, KatjaNeural', 'female'),
+       194 +    v('de-DE, KillianNeural', 'male'),
+       195 +    v('de-CH, JanNeural', 'male'),
+       196 +    v('de-CH, LeniNeural', 'female'),
+       197 +    // Greek
+       198 +    v('el-GR, AthinaNeural', 'female'),
+       199 +    v('el-GR, NestorasNeural', 'male'),
+       200 +    // Gujarati
+       201 +    v('gu-IN, DhwaniNeural', 'female'),
+       202 +    v('gu-IN, NiranjanNeural', 'male'),
+       203 +    // Hebrew
+       204 +    v('he-IL, AvriNeural', 'male'),
+       205 +    v('he-IL, HilaNeural', 'female'),
+       206 +    // Hindi
+       207 +    v('hi-IN, MadhurNeural', 'male'),
+       208 +    v('hi-IN, SwaraNeural', 'female'),
+       209 +    // Hungarian
+       210 +    v('hu-HU, NoemiNeural', 'female'),
+       211 +    v('hu-HU, TamasNeural', 'male'),
+       212 +    // Icelandic
+       213 +    v('is-IS, GudrunNeural', 'female'),
+       214 +    v('is-IS, GunnarNeural', 'male'),
+       215 +    // Indonesian
+       216 +    v('id-ID, ArdiNeural', 'male'),
+       217 +    v('id-ID, GadisNeural', 'female'),
+       218 +    // Inuktitut
+       219 +    v('iu-Latn-CA, SiqiniqNeural', 'female'),
+       220 +    v('iu-Latn-CA, TaqqiqNeural', 'male'),
+       221 +    v('iu-Cans-CA, SiqiniqNeural', 'female'),
+       222 +    v('iu-Cans-CA, TaqqiqNeural', 'male'),
+       223 +    // Irish
+       224 +    v('ga-IE, ColmNeural', 'male'),
+       225 +    v('ga-IE, OrlaNeural', 'female'),
+       226 +    // Italian
+       227 +    v('it-IT, DiegoNeural', 'male'),
+       228 +    v('it-IT, ElsaNeural', 'female'),
+       229 +    v('it-IT, IsabellaNeural', 'female'),
+       230 +    // Japanese
+       231 +    v('ja-JP, KeitaNeural', 'male'),
+       232 +    v('ja-JP, NanamiNeural', 'female'),
+       233 +    // Javanese
+       234 +    v('jv-ID, DimasNeural', 'male'),
+       235 +    v('jv-ID, SitiNeural', 'female'),
+       236 +    // Kannada
+       237 +    v('kn-IN, GaganNeural', 'male'),
+       238 +    v('kn-IN, SapnaNeural', 'female'),
+       239 +    // Kazakh
+       240 +    v('kk-KZ, AigulNeural', 'female'),
+       241 +    v('kk-KZ, DauletNeural', 'male'),
+       242 +    // Khmer
+       243 +    v('km-KH, PisethNeural', 'male'),
+       244 +    v('km-KH, SreymomNeural', 'female'),
+       245 +    // Korean
+       246 +    v('ko-KR, InJoonNeural', 'male'),
+       247 +    v('ko-KR, SunHiNeural', 'female'),
+       248 +    // Lao
+       249 +    v('lo-LA, ChanthavongNeural', 'male'),
+       250 +    v('lo-LA, KeomanyNeural', 'female'),
+       251 +    // Latvian
+       252 +    v('lv-LV, EveritaNeural', 'female'),
+       253 +    v('lv-LV, NilsNeural', 'male'),
+       254 +    // Lithuanian
+       255 +    v('lt-LT, LeonasNeural', 'male'),
+       256 +    v('lt-LT, OnaNeural', 'female'),
+       257 +    // Macedonian
+       258 +    v('mk-MK, AleksandarNeural', 'male'),
+       259 +    v('mk-MK, MarijaNeural', 'female'),
+       260 +    // Malay
+       261 +    v('ms-MY, OsmanNeural', 'male'),
+       262 +    v('ms-MY, YasminNeural', 'female'),
+       263 +    // Malayalam
+       264 +    v('ml-IN, MidhunNeural', 'male'),
+       265 +    v('ml-IN, SobhanaNeural', 'female'),
+       266 +    // Maltese
+       267 +    v('mt-MT, GraceNeural', 'female'),
+       268 +    v('mt-MT, JosephNeural', 'male'),
+       269 +    // Marathi
+       270 +    v('mr-IN, AarohiNeural', 'female'),
+       271 +    v('mr-IN, ManoharNeural', 'male'),
+       272 +    // Mongolian
+       273 +    v('mn-MN, BataaNeural', 'male'),
+       274 +    v('mn-MN, YesuiNeural', 'female'),
+       275 +    // Nepali
+       276 +    v('ne-NP, HemkalaNeural', 'female'),
+       277 +    v('ne-NP, SagarNeural', 'male'),
+       278 +    // Norwegian
+       279 +    v('nb-NO, FinnNeural', 'male'),
+       280 +    v('nb-NO, PernilleNeural', 'female'),
+       281 +    // Pashto
+       282 +    v('ps-AF, GulNawazNeural', 'male'),
+       283 +    v('ps-AF, LatifaNeural', 'female'),
+       284 +    // Persian
+       285 +    v('fa-IR, DilaraNeural', 'female'),
+       286 +    v('fa-IR, FaridNeural', 'male'),
+       287 +    // Polish
+       288 +    v('pl-PL, MarekNeural', 'male'),
+       289 +    v('pl-PL, ZofiaNeural', 'female'),
+       290 +    // Portuguese
+       291 +    v('pt-BR, AntonioNeural', 'male'),
+       292 +    v('pt-BR, FranciscaNeural', 'female'),
+       293 +    v('pt-PT, DuarteNeural', 'male'),
+       294 +    v('pt-PT, RaquelNeural', 'female'),
+       295 +    // Romanian
+       296 +    v('ro-RO, AlinaNeural', 'female'),
+       297 +    v('ro-RO, EmilNeural', 'male'),
+       298 +    // Serbian
+       299 +    v('sr-RS, NicholasNeural', 'male'),
+       300 +    v('sr-RS, SophieNeural', 'female'),
+       301 +    // Sinhala
+       302 +    v('si-LK, SameeraNeural', 'male'),
+       303 +    v('si-LK, ThiliniNeural', 'female'),
+       304 +    // Slovak
+       305 +    v('sk-SK, LukasNeural', 'male'),
+       306 +    v('sk-SK, ViktoriaNeural', 'female'),
+       307 +    // Slovenian
+       308 +    v('sl-SI, PetraNeural', 'female'),
+       309 +    v('sl-SI, RokNeural', 'male'),
+       310 +    // Somali
+       311 +    v('so-SO, MuuseNeural', 'male'),
+       312 +    v('so-SO, UbaxNeural', 'female'),
+       313 +    // Spanish
+       314 +    v('es-AR, ElenaNeural', 'female'),
+       315 +    v('es-AR, TomasNeural', 'male'),
+       316 +    v('es-BO, MarceloNeural', 'male'),
+       317 +    v('es-BO, SofiaNeural', 'female'),
+       318 +    v('es-CL, CatalinaNeural', 'female'),
+       319 +    v('es-CL, LorenzoNeural', 'male'),
+       320 +    v('es-CO, GonzaloNeural', 'male'),
+       321 +    v('es-CO, SalomeNeural', 'female'),
+       322 +    v('es-ES, XimenaNeural', 'female'),
+       323 +    v('es-CR, JuanNeural', 'male'),
+       324 +    v('es-CR, MariaNeural', 'female'),
+       325 +    v('es-CU, BelkysNeural', 'female'),
+       326 +    v('es-CU, ManuelNeural', 'male'),
+       327 +    v('es-DO, EmilioNeural', 'male'),
+       328 +    v('es-DO, RamonaNeural', 'female'),
+       329 +    v('es-EC, AndreaNeural', 'female'),
+       330 +    v('es-EC, LuisNeural', 'male'),
+       331 +    v('es-SV, LorenaNeural', 'female'),
+       332 +    v('es-SV, RodrigoNeural', 'male'),
+       333 +    v('es-GQ, JavierNeural', 'male'),
+       334 +    v('es-GQ, TeresaNeural', 'female'),
+       335 +    v('es-GT, AndresNeural', 'male'),
+       336 +    v('es-GT, MartaNeural', 'female'),
+       337 +    v('es-HN, CarlosNeural', 'male'),
+       338 +    v('es-HN, KarlaNeural', 'female'),
+       339 +    v('es-MX, DaliaNeural', 'female'),
+       340 +    v('es-MX, JorgeNeural', 'male'),
+       341 +    v('es-NI, FedericoNeural', 'male'),
+       342 +    v('es-NI, YolandaNeural', 'female'),
+       343 +    v('es-PA, MargaritaNeural', 'female'),
+       344 +    v('es-PA, RobertoNeural', 'male'),
+       345 +    v('es-PY, MarioNeural', 'male'),
+       346 +    v('es-PY, TaniaNeural', 'female'),
+       347 +    v('es-PE, AlexNeural', 'male'),
+       348 +    v('es-PE, CamilaNeural', 'female'),
+       349 +    v('es-PR, KarinaNeural', 'female'),
+       350 +    v('es-PR, VictorNeural', 'male'),
+       351 +    v('es-ES, AlvaroNeural', 'male'),
+       352 +    v('es-ES, ElviraNeural', 'female'),
+       353 +    v('es-US, AlonsoNeural', 'male'),
+       354 +    v('es-US, PalomaNeural', 'female'),
+       355 +    v('es-UY, MateoNeural', 'male'),
+       356 +    v('es-UY, ValentinaNeural', 'female'),
+       357 +    v('es-VE, PaolaNeural', 'female'),
+       358 +    v('es-VE, SebastianNeural', 'male'),
+       359 +    // Sundanese
+       360 +    v('su-ID, JajangNeural', 'male'),
+       361 +    v('su-ID, TutiNeural', 'female'),
+       362 +    // Swahili
+       363 +    v('sw-KE, RafikiNeural', 'male'),
+       364 +    v('sw-KE, ZuriNeural', 'female'),
+       365 +    v('sw-TZ, DaudiNeural', 'male'),
+       366 +    v('sw-TZ, RehemaNeural', 'female'),
+       367 +    // Swedish
+       368 +    v('sv-SE, MattiasNeural', 'male'),
+       369 +    v('sv-SE, SofieNeural', 'female'),
+       370 +    // Tamil
+       371 +    v('ta-IN, PallaviNeural', 'female'),
+       372 +    v('ta-IN, ValluvarNeural', 'male'),
+       373 +    v('ta-MY, KaniNeural', 'female'),
+       374 +    v('ta-MY, SuryaNeural', 'male'),
+       375 +    v('ta-SG, AnbuNeural', 'male'),
+       376 +    v('ta-SG, VenbaNeural', 'female'),
+       377 +    v('ta-LK, KumarNeural', 'male'),
+       378 +    v('ta-LK, SaranyaNeural', 'female'),
+       379 +    // Telugu
+       380 +    v('te-IN, MohanNeural', 'male'),
+       381 +    v('te-IN, ShrutiNeural', 'female'),
+       382 +    // Thai
+       383 +    v('th-TH, NiwatNeural', 'male'),
+       384 +    v('th-TH, PremwadeeNeural', 'female'),
+       385 +    // Turkish
+       386 +    v('tr-TR, EmelNeural', 'female'),
+       387 +    v('tr-TR, AhmetNeural', 'male'),
+       388 +    // Ukrainian
+       389 +    v('uk-UA, OstapNeural', 'male'),
+       390 +    v('uk-UA, PolinaNeural', 'female'),
+       391 +    // Urdu
+       392 +    v('ur-IN, GulNeural', 'female'),
+       393 +    v('ur-IN, SalmanNeural', 'male'),
+       394 +    v('ur-PK, AsadNeural', 'male'),
+       395 +    v('ur-PK, UzmaNeural', 'female'),
+       396 +    // Uzbek
+       397 +    v('uz-UZ, MadinaNeural', 'female'),
+       398 +    v('uz-UZ, SardorNeural', 'male'),
+       399 +    // Vietnamese
+       400 +    v('vi-VN, HoaiMyNeural', 'female'),
+       401 +    v('vi-VN, NamMinhNeural', 'male'),
+       402 +    // Welsh
+       403 +    v('cy-GB, AledNeural', 'male'),
+       404 +    v('cy-GB, NiaNeural', 'female'),
+       405 +    // Zulu
+       406 +    v('zu-ZA, ThandoNeural', 'female'),
+       407 +    v('zu-ZA, ThembaNeural', 'male'),
+       408 +  ];
+       409 +  
+       410 +  export default voices;
+
+∴ Thinking…
+
+  Now I'll create the VoicePoolBuilder service. Let me update the todo and 
+  create the file.
+
+∴ Thinking…
+
+  Now let me create the VoicePoolBuilder service.
+
+● Write(src\services\VoicePoolBuilder.ts)
+  ⎿  Wrote 1 lines to src\services\VoicePoolBuilder.ts                  
+     import { voices } from '../components/VoiceSelector/voices';
+     import type { VoicePool } from '../state/types';
+     /**
+      * Builds a voice pool filtered by locale and separated by gender
+      */
+     export function buildVoicePool(locale?: string): VoicePool {
+       const filtered = locale
+         ? voices.filter(v => v.locale.startsWith(locale.split('-')[0]))
+         : voices;
+
+∴ Thinking…
+
+  Good. Now let me create the GenderInference service with name databases, then 
+  the DialogueParser.
+
+∴ Thinking…
+
+  Now let me create the GenderInference service with name databases for Russian 
+  and English.
+
+● Write(src\services\GenderInference.ts)
+  ⎿  Wrote 1 lines to src\services\GenderInference.ts                      
+     /**
+      * Gender inference from character names for Russian and English
+      */
+     // Common Russian male names
+     const RUSSIAN_MALE_NAMES = new Set([
+       'Александр', 'Алексей', 'Анатолий', 'Андрей', 'Антон', 'Аркадий',
+     'Артём', 'Артем',
+       'Борис', 'Вадим', 'Валентин', 'Валерий', 'Василий', 'Виктор',
+     'Виталий', 'Владимир',
+       'Владислав', 'Вячеслав', 'Геннадий', 'Георгий', 'Григорий', 'Даниил',
+      'Денис', 'Дмитрий',
+       'Евгений', 'Егор', 'Иван', 'Игорь', 'Илья', 'Кирилл', 'Константин',
+     'Лев', 'Леонид',
+
+∴ Thinking…
+
+  Good. Now let me create the DialogueParser service.
+
+∴ Thinking…
+
+  Now let me create the DialogueParser service. This is the most complex part - 
+  detecting dialogue and speaker attribution.
+
+● Write(src\services\DialogueParser.ts)
+  ⎿  Wrote 1 lines to src\services\DialogueParser.ts                       
+     /**
+      * DialogueParser - Detects dialogue and speaker attribution in text
+      * Supports both quotation marks ("...") and em-dash (—) Russian-style 
+     dialogue
+      */
+     import { inferGender, extractFirstName } from './GenderInference';
+     import type { DialogueSegment, CharacterInfo, ParsedDialogue } from
+     '../state/types';
+     export interface DialogueParserOptions {
+       language?: 'ru' | 'en' | 'auto';
+
+
+∴ Thinking…
+
+  Good. Now let me create the VoiceAssigner service.
+
+∴ Thinking…
+
+  Now creating the VoiceAssigner service.
+
+● Write(src\services\VoiceAssigner.ts)
+  ⎿  Wrote 1 lines to src\services\VoiceAssigner.ts                        
+     /**
+      * VoiceAssigner - Assigns unique voices to characters based on gender
+      */
+     import { buildVoicePool, getRandomVoice } from './VoicePoolBuilder';
+     import type { VoicePool, CharacterInfo } from '../state/types';
+     export interface VoiceAssignment {
+       character: string;
+       voice: string;
+
+∴ Thinking…
+
+  Now let me update the appState with narratorVoice signal and then modify the 
+  existing services to support per-task voice.
+
+∴ Thinking…
+
+  Let me read the current appState.ts to add the narrator voice signal.
+
+● Read(src\state\appState.ts)
+  ⎿  Read 99 lines
+
+∴ Thinking…
+
+  Now I need to add the narrator voice signal and also update AppSettings type 
+  to include it. Let me also update types.ts to include narratorVoice in 
+  AppSettings.
+
+● Update(src\state\appState.ts)
+  ⎿  Updated src\state\appState.ts with 2 additions                     
+        3    
+        4    // Settings State
+        5    export const voice = signal<string>('ru-RU, DmitryNeural');
+        6 +  export const narratorVoice = signal<string>('ru-RU, 
+          + DmitryNeural');
+        7 +  export const voicePoolLocale = signal<string>('ru-RU');
+        8    export const rate = signal<number>(0);
+        9    export const pitch = signal<number>(0);
+       10    export const maxThreads = signal<number>(20);
+
+∴ Thinking…
+
+  Now update saveSettings and loadSettings to include narratorVoice and 
+  voicePoolLocale.
+
+● Update(src\state\appState.ts)
+  ⎿  Updated src\state\appState.ts with 2 additions     
+       55    export function saveSettings(): void {
+       56      const settings: AppSettings = {
+       57        voice: voice.value,
+       58 +      narratorVoice: narratorVoice.value,
+       59 +      voicePoolLocale: voicePoolLocale.value,
+       60        rate: rate.value,
+       61        pitch: pitch.value,
+       62        maxThreads: maxThreads.value,
+
+∴ Thinking…
+
+  Now update loadSettings as well.
+
+● Update(src\state\appState.ts)
+  ⎿  Updated src\state\appState.ts with 2 additions                      
+       76        if (saved) {
+       77          const settings: AppSettings = JSON.parse(saved);
+       78          voice.value = settings.voice ?? 'ru-RU, DmitryNeural';
+       79 +        narratorVoice.value = settings.narratorVoice ?? 
+          + 'ru-RU, DmitryNeural';
+       80 +        voicePoolLocale.value = settings.voicePoolLocale ?? 
+          + 'ru-RU';
+       81          rate.value = settings.rate ?? 0;
+       82          pitch.value = settings.pitch ?? 0;
+       83          maxThreads.value = settings.maxThreads ?? 20;
+
+∴ Thinking…
+
+  Now I need to update the AppSettings type in types.ts to include the new 
+  fields.
+
+● Update(src\state\types.ts)
+  ⎿  Updated src\state\types.ts with 2 additions
+        9    
+       10    export interface AppSettings {
+       11      voice: string;
+       12 +    narratorVoice: string;
+       13 +    voicePoolLocale: string;
+       14      rate: number;
+       15      pitch: number;
+       16      maxThreads: number;
+
+∴ Thinking…
+
+  Now let me update the TTSWorkerPool to support per-task voice. Let me read the
+   current file.
+
+∴ Thinking…
+
+  Let me read the TTSWorkerPool to understand its current structure.
+
+● Read(src\services\TTSWorkerPool.ts)
+  ⎿  Read 178 lines
+
+∴ Thinking…
+
+  Now I need to add the voice field to PoolTask and modify spawnWorker to use 
+  task-specific voice when provided.
+
+● Update(src\services\TTSWorkerPool.ts)
+  ⎿  Updated src\services\TTSWorkerPool.ts with 1 addition           
+        9      text: string;
+       10      filename: string;
+       11      filenum: string;
+       12 +    voice?: string; // Per-task voice override (fullValue 
+          + format, e.g., "ru-RU, DmitryNeural")
+       13    }
+       14    
+       15    export interface WorkerPoolOptions {
+
+∴ Thinking…
+
+  Now modify the spawnWorker method to use task-specific voice when provided.
+
+● Update(src\services\TTSWorkerPool.ts)
+  ⎿  Updated src\services\TTSWorkerPool.ts with 6 additions and 1 removal
+       79      }
+       80    
+       81      private spawnWorker(task: PoolTask, retryCount: number): 
+            void {
+       82 +      // Use task-specific voice if provided, otherwise use 
+          + default config voice
+       83 +      const taskConfig: TTSConfig = task.voice
+       84 +        ? { ...this.config, voice: `Microsoft Server Speech 
+          + Text to Speech Voice (${task.voice})` }
+       85 +        : this.config;
+       86 +  
+       87        const workerOptions: TTSWorkerOptions = {
+       88          indexPart: task.partIndex,
+       89          filename: task.filename,
+       90          filenum: task.filenum,
+       91 -        config: this.config,
+       91 +        config: taskConfig,
+       92          text: task.text,
+       93          saveToDir: null, // Don't save individual files - 
+            we'll merge them
+       94          onStatusUpdate: (update) => {
+
+∴ Thinking…
+
+  Now let me read the TextProcessor to understand how to extend it with 
+  multi-voice processing.
+
+∴ Thinking…
+
+  Let me read the TextProcessor to understand its current structure.
+
+● Read(src\services\TextProcessor.ts)
+  ⎿  Read 203 lines
+
+∴ Thinking…
+
+  Now I need to extend TextProcessor to support multi-voice processing. The 
+  approach will be:
+  1. Add a new method processWithVoices() that uses DialogueParser
+  2. This method will parse dialogue, assign voices, and return voice-annotated 
+  chunks
+
+  Let me add this functionality.
+
+● Update(src\services\TextProcessor.ts)
+  ⎿  Updated src\services\TextProcessor.ts with 13 additions and 1 removal
+        2    // Migrated from processing_file.js
+        3    
+        4    import { TEXT_PROCESSING } from '../utils/constants';
+        5 -  import type { ProcessedBook } from '../state/types';
+        5 +  import type { ProcessedBook, 
+          +  VoiceAnnotatedChunk, CharacterInfo, VoicePool 
+          +  } from '../state/types';
+        6 +  import { DialogueParser } from './DialogueParser';
+        7 +  import { VoiceAssigner } from './VoiceAssigner';
+        8 +  import { buildVoicePool } from './VoicePoolBuilder';
+        9    
+       10    export interface TextProcessorOptions {
+       11      fileName: string;
+     ...
+       13      pointsType: 'V1' | 'V2' | 'V3';
+       14      firstStringsLength?: number;
+       15      lastStringsLength?: number;
+       16 +    // Multi-voice options
+       17 +    narratorVoice?: string;
+       18 +    voicePoolLocale?: string;
+       19    }
+       20    
+       21 +  export interface ProcessedBookWithVoices extends 
+          + ProcessedBook {
+       22 +    chunks: VoiceAnnotatedChunk[];
+       23 +    characters: Map<string, CharacterInfo>;
+       24 +    voiceAssignments: Map<string, string>;
+       25 +  }
+       26 +  
+       27    export class TextProcessor {
+       28      private fileNames: Array<[string, number]>;
+       29      private firstStringsLength: number;
+
+∴ Thinking…
+
+  Now I need to add the narratorVoice and voicePoolLocale properties and the 
+  processWithVoices method.
+
+● Update(src\services\TextProcessor.ts)
+  ⎿  Updated src\services\TextProcessor.ts with 2 additions
+       35      private caseSensitive: boolean;
+       36      private pointsSelect: string;
+       37      private pointsType: 'V1' | 'V2' | 'V3';
+       38 +    private narratorVoice: string;
+       39 +    private voicePoolLocale: string;
+       40    
+       41      fullText: string;
+       42      allSentences: string[];
+
+∴ Thinking…
+
+  Now I need to update the constructor to initialize narratorVoice and 
+  voicePoolLocale.
+
+● Update(src\services\TextProcessor.ts)
+  ⎿  Updated src\services\TextProcessor.ts with 2 additions            
+       49        this.caseSensitive = options.caseSensitive;
+       50        this.pointsSelect = options.pointsSelect;
+       51        this.pointsType = options.pointsType;
+       52 +      this.narratorVoice = options.narratorVoice ?? 'ru-RU, 
+          + DmitryNeural';
+       53 +      this.voicePoolLocale = options.voicePoolLocale ?? 
+          + 'ru-RU';
+       54        this.fullText = options.text;
+       55    
+       56        const preSentences = 
+            this.applyDictionary(this.fullText);
+
+∴ Thinking…
+
+  Now I need to add the processWithVoices() method. Let me add it after 
+  getProcessedBook().
+
+● Read(src\services\TextProcessor.ts)
+  ⎿  Read 30 lines
+
+∴ Thinking…
+
+  Now let me add the processWithVoices method after getProcessedBook().
+
+● Update(src\services\TextProcessor.ts)
+  ⎿  Updated src\services\TextProcessor.ts with 70 additions             
+       204        };
+       205      }
+       206    
+       207 +    /**
+       208 +     * Process text with multi-voice support
+       209 +     * Parses dialogue, assigns voices to characters, returns
+           +  voice-annotated chunks
+       210 +     */
+       211 +    processWithVoices(): ProcessedBookWithVoices {
+       212 +      // Parse dialogue from full text
+       213 +      const parser = new DialogueParser({ language: 'auto' 
+           + });
+       214 +      const parsed = parser.parse(this.fullText);
+       215 +  
+       216 +      // Create voice assigner
+       217 +      const voicePool = buildVoicePool(this.voicePoolLocale);
+       218 +      const assigner = new VoiceAssigner({
+       219 +        narratorVoice: this.narratorVoice,
+       220 +        locale: this.voicePoolLocale,
+       221 +        voicePool,
+       222 +      });
+       223 +  
+       224 +      // Assign voices to all characters
+       225 +      assigner.assignVoicesFromCharacters(parsed.characters);
+       226 +  
+       227 +      // Convert segments to voice-annotated chunks
+       228 +      // We need to respect the sentence chunking from 
+           + allSentences but add voice info
+       229 +      const chunks: VoiceAnnotatedChunk[] = [];
+       230 +  
+       231 +      // Simple approach: map each segment to a chunk with 
+           + voice
+       232 +      // For more complex chunking, we'd need to merge small 
+           + segments
+       233 +      let partIndex = 0;
+       234 +      for (const segment of parsed.segments) {
+       235 +        // Apply dictionary processing to segment text
+       236 +        const processedLines = 
+           + this.applyDictionary(segment.text);
+       237 +        const processedText = processedLines.join('\n');
+       238 +  
+       239 +        if (!this.containsPronounceableChars(processedText)) 
+           + {
+       240 +          continue; // Skip non-pronounceable segments
+       241 +        }
+       242 +  
+       243 +        // Split into chunks if text is too long
+       244 +        const segmentChunks = 
+           + this.splitIntoSections(processedLines);
+       245 +  
+       246 +        for (const chunkText of segmentChunks) {
+       247 +          if (!this.containsPronounceableChars(chunkText)) {
+       248 +            continue;
+       249 +          }
+       250 +  
+       251 +          // Get voice for this segment
+       252 +          const voice = segment.speakerType === 'narrator'
+       253 +            ? this.narratorVoice
+       254 +            : assigner.getVoiceForCharacter(segment.speaker, 
+           + segment.gender);
+       255 +  
+       256 +          chunks.push({
+       257 +            text: chunkText,
+       258 +            voice,
+       259 +            partIndex,
+       260 +            speaker: segment.speaker,
+       261 +          });
+       262 +  
+       263 +          partIndex++;
+       264 +        }
+       265 +      }
+       266 +  
+       267 +      return {
+       268 +        fileNames: this.fileNames,
+       269 +        allSentences: chunks.map(c => c.text),
+       270 +        fullText: this.fullText,
+       271 +        chunks,
+       272 +        characters: parsed.characters,
+       273 +        voiceAssignments: assigner.getAllAssignments(),
+       274 +      };
+       275 +    }
+       276 +  
+       277      private isPunctuation(str: string): boolean {
+       278        return str.length === 1 && /\p{P}/u.test(str);
+       279      }
+
+∴ Thinking…
+
+  Now let me update the todo and then modify the useTTSConversion hook to use 
+  multi-voice processing.
+
+∴ Thinking…
+
+  Now let me read the useTTSConversion hook to update it for multi-voice 
+  processing.
+
+● Read(src\hooks\useTTSConversion.ts)
+  ⎿  Read 211 lines
+
+∴ Thinking…
+
+  Now I need to update the useTTSConversion hook to use multi-voice processing. 
+  The key changes are:
+
+  1. Import narratorVoice and voicePoolLocale from appState
+  2. Use processWithVoices() instead of getProcessedBook()
+  3. Include voice in the tasks when creating PoolTask objects
+
+  Let me update the hook.
+
+● Update(src\hooks\useTTSConversion.ts)
+  ⎿  Updated src\hooks\useTTSConversion.ts with 3 additions and 1 removal
+        1    // useTTSConversion - Custom hook orchestrating the full TTS
+             conversion workflow
+        2    
+        3    import { useCallback } from 'preact/hooks';
+        4 -  import { TextProcessor } from '../services/TextProcessor';
+        4 +  import { TextProcessor, ProcessedBookWithVoices 
+          +  } from '../services/TextProcessor';
+        5    import { TTSWorkerPool, PoolTask } from 
+            '../services/TTSWorkerPool';
+        6    import { AudioMerger } from '../services/AudioMerger';
+        7    import type { TTSConfig, ProcessedBook } from 
+            '../state/types';
+        8    import {
+        9      voice,
+       10 +    narratorVoice,
+       11 +    voicePoolLocale,
+       12      rate,
+       13      pitch,
+       14      maxThreads,
+
+∴ Thinking…
+
+  Now I need to update the startConversion function to use processWithVoices() 
+  and include voice in tasks.
+
+● Update(src\hooks\useTTSConversion.ts)
+  ⎿  Updated src\hooks\useTTSConversion.ts with 38 additions and 19 removal
+
+       70        isProcessing.value = true;
+       71    
+       72        try {
+       73 -        // Step 1: Process text
+       74 -        addStatusLine('Processing text...');
+       73 +        // Step 1: Process text with multi-voice support
+       74 +        addStatusLine('Processing text and detecting dialogue
+          +  ...');
+       75    
+       76 -        let book: ProcessedBook;
+       76 +        let processedBook: ProcessedBookWithVoices;
+       77    
+       78          if (existingBook && existingBook.allSentences.length >
+             0) {
+       79 -          book = existingBook;
+       79 +          // Use existing book but wrap it for compatibility
+       80 +          processedBook = {
+       81 +            ...existingBook,
+       82 +            chunks: existingBook.allSentences.map((text, 
+          + index) => ({
+       83 +              text,
+       84 +              voice: narratorVoice.value,
+       85 +              partIndex: index,
+       86 +              speaker: 'narrator',
+       87 +            })),
+       88 +            characters: new Map(),
+       89 +            voiceAssignments: new Map(),
+       90 +          };
+       91          } else {
+       92            const processor = new TextProcessor({
+       93              fileName: extractFilename(text),
+     ...
+        85              caseSensitive: lexxRegister.value,
+        86              pointsSelect: pointsSelect.value,
+        87              pointsType: pointsType.value,
+        88 +            narratorVoice: narratorVoice.value,
+        89 +            voicePoolLocale: voicePoolLocale.value,
+        90            });
+        91 -          book = processor.getProcessedBook();
+        91 +          processedBook = processor.processWithVoices();
+        92          }
+        93    
+        94 -        if (book.allSentences.length === 0) {
+        94 +        if (processedBook.chunks.length === 0) {
+        95            addStatusLine('No sentences to convert after 
+             processing');
+        96            isProcessing.value = false;
+        97            return;
+        98          }
+        99    
+       100 -        totalCount.value = book.allSentences.length;
+       101 -        addStatusLine(`Found ${book.allSentences.length} 
+           - sentences to convert`);
+       100 +        // Log detected characters
+       101 +        if (processedBook.characters.size > 0) {
+       102 +          addStatusLine(`Detected 
+           + ${processedBook.characters.size} character(s): 
+           + ${Array.from(processedBook.characters.keys()).join(', ')}`);
+       103 +        }
+       104    
+       105 +        totalCount.value = processedBook.chunks.length;
+       106 +        addStatusLine(`Found ${processedBook.chunks.length} 
+           + chunks to convert`);
+       107 +  
+       108          // Step 2: Create worker pool
+       109          const config = buildTTSConfig();
+       110          const audioMap = new Map<number, Uint8Array>();
+     ...
+       126                const merger = new 
+             AudioMerger(mergeFiles.value);
+       127                const mergedFiles = merger.merge(
+       128                  audioMap,
+       129 -                book.allSentences.length,
+       130 -                book.fileNames
+       129 +                processedBook.chunks.length,
+       130 +                processedBook.fileNames
+       131                );
+       132    
+       133                if (mergedFiles.length === 0) {
+     ...
+       154            },
+       155          });
+       156    
+       157 -        // Step 4: Queue all tasks
+       158 -        const tasks: PoolTask[] = book.allSentences.map((
+           -  sentence, index) => {
+       159 -          // Determine which file this sentence belongs to
+       160 -          let filename = book.fileNames[0]?.[0] ?? 'audio';
+       161 -          for (const [name, boundaryIndex] of book
+           -  .fileNames) {
+       162 -            if (index
+           -   >= boundaryIndex && boundaryIndex > 0) {
+       157 +        // Step 4: Queue all tasks with voice information
+       158 +        const tasks: PoolTask[] = processedBook.chunks.map((
+           +  chunk) => {
+       159 +          // Determine which file this chunk belongs to
+       160 +          let filename = processedBook
+           +  .fileNames[0]?.[0] ?? 'audio';
+       161 +          for (const [name, boundaryIndex] of processedBook
+           +  .fileNames) {
+       162 +            if (chunk.partIndex
+           +   >= boundaryIndex && boundaryIndex > 0) {
+       163                filename = name;
+       164              }
+       165            }
+       166    
+       167            return {
+       168 -            partIndex: index,
+       169 -            text: sentence,
+       168 +            partIndex: chunk.partIndex,
+       169 +            text: chunk.text,
+       170              filename: filename,
+       171 -            filenum: String(index + 1).padStart(4, '0'),
+       171 +            filenum: String(chunk.partIndex
+           +   + 1).padStart(4, '0'),
+       172 +            voice: chunk.voice, // Include voice for 
+           + multi-voice support
+       173            };
+       174          });
+       175    
+
+∴ Thinking…
+
+  Now let me update the todo and add a narrator voice selector to the UI. Let me
+   first look at the current SettingsPanel or VoiceSelector components.
+
+∴ Thinking…
+
+  Let me look at the VoiceSelector component to see how it's structured.
+
+● Read(src\components\VoiceSelector\VoiceSelector.tsx)
+  ⎿  Read 21 lines
+
+∴ Thinking…
+
+  I need to update the VoiceSelector to be a narrator voice selector. Let me 
+  update it.
+
+● Update(src\components\VoiceSelector\VoiceSelector.tsx)
+  ⎿  Updated src\components\VoiceSelector\VoiceSelector.tsx with 19        
+     additions and 14 removals
+        1 -  import { voice } from '../../state/appState';
+        1 +  import { narratorVoice } from '../../state/appState';
+        2    import voices from './voices';
+        3    
+        4    export function VoiceSelector() {
+        5      return (
+        6 -      <select
+        7 -        class="voices"
+        8 -        id="voices"
+        9 -        value={voice.value}
+       10 -        onChange={(e) => voice.value = (e.target as 
+          - HTMLSelectElement).value}
+       11 -        style={{ width: '80%', borderRadius: '10px' }}
+       12 -      >
+       13 -        {voices.map((v) => (
+       14 -          <option key={v.fullValue} value={v.fullValue}>
+       15 -            {v.fullValue}
+       16 -          </option>
+       17 -        ))}
+       18 -      </select>
+        6 +      <div>
+        7 +        <label style={{ display: 'block', marginBottom: '5px',
+          +  fontSize: '12px', color: '#666' }}>
+        8 +          Narrator Voice:
+        9 +        </label>
+       10 +        <select
+       11 +          class="voices"
+       12 +          id="voices"
+       13 +          value={narratorVoice.value}
+       14 +          onChange={(e) => narratorVoice.value = (e.target as 
+          + HTMLSelectElement).value}
+       15 +          style={{ width: '80%', borderRadius: '10px' }}
+       16 +        >
+       17 +          {voices.map((v) => (
+       18 +            <option key={v.fullValue} value={v.fullValue}>
+       19 +              {v.fullValue} ({v.gender})
+       20 +            </option>
+       21 +          ))}
+       22 +        </select>
+       23 +      </div>
+       24      );
+       25    }
+
+∴ Thinking…
+
+  Now let me run the type check to see if there are any TypeScript errors.
+
+● Bash(cd /c/projects/EdgeTTS && npm run type-check 2>&1) timeout: 1m 0s
+  ⎿  Error: Exit code 2
+
+     > edge-tts-web@2.0.0 type-check
+     > tsc --noEmit
+
+     src/services/DialogueParser.ts(71,56): error TS2345: Argument of type '"ru" 
+     | "en" | undefined' is not assignable to parameter of type '"ru" | "en"'.
+       Type 'undefined' is not assignable to type '"ru" | "en"'.
+
+
+∴ Thinking…
+
+  There's a TypeScript error in DialogueParser. Let me fix it.
+
+● Read(src\services\DialogueParser.ts)
+  ⎿  Read 30 lines
+
+∴ Thinking…
+
+  The issue is that this.options.language could be undefined when it's not 
+  'auto'. Let me fix this by adding a fallback.
+
+● Update(src\services\DialogueParser.ts)
+  ⎿  Updated src\services\DialogueParser.ts with 1 addition and 1 removal
+       63        let lastMatchEnd = 0;
+       64    
+       65        // Detect language
+       66 -      const language = this.options.language === 'auto'
+       66 +      const language: 'ru' | 'en' 
+          +  = this.options.language === 'auto' || !this.options.language
+       67          ? this.detectLanguage(text)
+       68          : this.options.language;
+       69    
+
+∴ Thinking…
+
+  Let me run the type check again.
+
+● Bash(cd /c/projects/EdgeTTS && npm run type-check 2>&1) timeout: 1m 0s
+  ⎿  > edge-tts-web@2.0.0 type-check
+     > tsc --noEmit
+
+∴ Thinking…
+
+  Type check passes. Let me also run a build to make sure everything compiles.
+
+● Bash(cd /c/projects/EdgeTTS && npm run build 2>&1)
+  ⎿  > edge-tts-web@2.0.0 build    
+     > webpack --mode production
+     … +56 lines (ctrl+o to expand)
+
+∴ Thinking…
+
+  Build succeeded with only warnings about asset size (the RU.lexx dictionary 
+  file). Let me update the todo and summarize what was implemented.
+
+● Build successful. Let me update the todos and summarize:
+
+∴ Thinking…
+
+  MVP implementation is complete. Let me give a summary of what was implemented.
+
+● Multi-Voice Implementation Complete
+
+  New files created:
+  - src/services/DialogueParser.ts - Detects dialogue (quotes + em-dash) and
+   speaker attribution
+  - src/services/GenderInference.ts - RU/EN name databases + heuristics
+  - src/services/VoicePoolBuilder.ts - Filters voices by gender/locale
+  - src/services/VoiceAssigner.ts - Assigns unique voices to characters
+
+  Modified files:
+  - src/state/types.ts - Added gender to VoiceOption, new multi-voice types
+  - src/components/VoiceSelector/voices.ts - All 340+ voices labeled with
+  gender
+  - src/state/appState.ts - Added narratorVoice, voicePoolLocale signals
+  - src/services/TTSWorkerPool.ts - Per-task voice support
+  - src/services/TextProcessor.ts - processWithVoices() method
+  - src/hooks/useTTSConversion.ts - Uses multi-voice processing
+  - src/components/VoiceSelector/VoiceSelector.tsx - Now selects narrator
+  voice
+
+  How it works:
+  1. Text is parsed for dialogue (quotes "..." and em-dash —)
+  2. Speaker attribution detected from patterns like "said John" / "сказал
+  Иван"
+  3. Character gender inferred from name databases + heuristics
+  4. Each character assigned a unique gender-appropriate voice
+  5. Each text chunk sent to TTS with its specific voice
+
+  Run npm run dev to test. The voice selector now picks the narrator voice,
+  and characters detected in dialogue automatically get different voices.
+
+
+

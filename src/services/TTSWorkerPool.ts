@@ -9,6 +9,7 @@ export interface PoolTask {
   text: string;
   filename: string;
   filenum: string;
+  voice?: string; // Per-task voice override (fullValue format, e.g., "ru-RU, DmitryNeural")
 }
 
 export interface WorkerPoolOptions {
@@ -78,11 +79,16 @@ export class TTSWorkerPool {
   }
 
   private spawnWorker(task: PoolTask, retryCount: number): void {
+    // Use task-specific voice if provided, otherwise use default config voice
+    const taskConfig: TTSConfig = task.voice
+      ? { ...this.config, voice: `Microsoft Server Speech Text to Speech Voice (${task.voice})` }
+      : this.config;
+
     const workerOptions: TTSWorkerOptions = {
       indexPart: task.partIndex,
       filename: task.filename,
       filenum: task.filenum,
-      config: this.config,
+      config: taskConfig,
       text: task.text,
       saveToDir: null, // Don't save individual files - we'll merge them
       onStatusUpdate: (update) => {

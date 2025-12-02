@@ -3,6 +3,8 @@ import type { ProcessedBook, TTSWorker, AppSettings } from './types';
 
 // Settings State
 export const voice = signal<string>('ru-RU, DmitryNeural');
+export const narratorVoice = signal<string>('ru-RU, DmitryNeural');
+export const voicePoolLocale = signal<string>('ru-RU');
 export const rate = signal<number>(0);
 export const pitch = signal<number>(0);
 export const maxThreads = signal<number>(20);
@@ -53,6 +55,8 @@ const SETTINGS_KEY = 'edgetts_settings';
 export function saveSettings(): void {
   const settings: AppSettings = {
     voice: voice.value,
+    narratorVoice: narratorVoice.value,
+    voicePoolLocale: voicePoolLocale.value,
     rate: rate.value,
     pitch: pitch.value,
     maxThreads: maxThreads.value,
@@ -72,6 +76,8 @@ export function loadSettings(): void {
     if (saved) {
       const settings: AppSettings = JSON.parse(saved);
       voice.value = settings.voice ?? 'ru-RU, DmitryNeural';
+      narratorVoice.value = settings.narratorVoice ?? 'ru-RU, DmitryNeural';
+      voicePoolLocale.value = settings.voicePoolLocale ?? 'ru-RU';
       rate.value = settings.rate ?? 0;
       pitch.value = settings.pitch ?? 0;
       maxThreads.value = settings.maxThreads ?? 20;
