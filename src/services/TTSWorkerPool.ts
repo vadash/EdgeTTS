@@ -31,7 +31,9 @@ const INITIAL_DELAY = 10000; // 10 seconds
 const SECOND_DELAY = 30000; // 30 seconds
 const DELAY_MULTIPLIER = 3;
 const MAX_DELAY = 600000; // 10 minutes
-const WORKER_START_DELAY = 500; // 500 ms seconds delay between starting workers
+const THREADS_PER_MINUTE = 60; // 1 thread per second
+const START_DELAY = 60000 / THREADS_PER_MINUTE; // 1000ms
+const ERROR_COOLDOWN = 10000; // 10 seconds - no new threads after any error
 
 function getRetryDelay(retryCount: number): number {
   if (retryCount === 0) return INITIAL_DELAY; // 10s
@@ -49,6 +51,7 @@ export class TTSWorkerPool {
   private totalTasks = 0;
   private completedCount = 0;
   private isProcessingQueue = false;
+  private lastErrorTime = 0;
 
   private maxWorkers: number;
   private config: TTSConfig;
@@ -86,12 +89,19 @@ export class TTSWorkerPool {
     this.isProcessingQueue = true;
 
     while (this.activeWorkers.size < this.maxWorkers && this.queue.length > 0) {
+      // Check error cooldown - wait if we had a recent error
+      const timeSinceError = Date.now() - this.lastErrorTime;
+      if (this.lastErrorTime > 0 && timeSinceError < ERROR_COOLDOWN) {
+        const waitTime = ERROR_COOLDOWN - timeSinceError;
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+
       const task = this.queue.shift()!;
       this.spawnWorker(task, 0);
 
       // Wait before starting next worker (if there are more to start)
       if (this.queue.length > 0 && this.activeWorkers.size < this.maxWorkers) {
-        await new Promise((resolve) => setTimeout(resolve, WORKER_START_DELAY));
+        await new Promise((resolve) => setTimeout(resolve, START_DELAY));
       }
     }
 
@@ -137,6 +147,7 @@ export class TTSWorkerPool {
   }
 
   private handleWorkerError(partIndex: number, error: Error, retryCount: number): void {
+    this.lastErrorTime = Date.now(); // Record error for cooldown
     const worker = this.activeWorkers.get(partIndex);
     this.activeWorkers.delete(partIndex);
 
