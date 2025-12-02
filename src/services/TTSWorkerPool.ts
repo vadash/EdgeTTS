@@ -30,6 +30,7 @@ interface ActiveWorker {
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 3000, 5000]; // Exponential backoff
+const WORKER_START_DELAY = 2000; // 2 seconds delay between starting workers
 
 export class TTSWorkerPool {
   private queue: PoolTask[] = [];
@@ -38,6 +39,7 @@ export class TTSWorkerPool {
   private failedTasks: Set<number> = new Set();
   private totalTasks = 0;
   private completedCount = 0;
+  private isProcessingQueue = false;
 
   private maxWorkers: number;
   private config: TTSConfig;
@@ -71,11 +73,22 @@ export class TTSWorkerPool {
     this.processQueue();
   }
 
-  private processQueue(): void {
+  private async processQueue(): Promise<void> {
+    // Prevent multiple concurrent queue processing loops
+    if (this.isProcessingQueue) return;
+    this.isProcessingQueue = true;
+
     while (this.activeWorkers.size < this.maxWorkers && this.queue.length > 0) {
       const task = this.queue.shift()!;
       this.spawnWorker(task, 0);
+
+      // Wait before starting next worker (if there are more to start)
+      if (this.queue.length > 0 && this.activeWorkers.size < this.maxWorkers) {
+        await new Promise((resolve) => setTimeout(resolve, WORKER_START_DELAY));
+      }
     }
+
+    this.isProcessingQueue = false;
   }
 
   private spawnWorker(task: PoolTask, retryCount: number): void {

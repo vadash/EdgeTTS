@@ -309,7 +309,7 @@ export function useTTSConversion() {
             addStatusLine('✅ Complete!');
           }
         } catch (err) {
-          addStatusLine(`Merge error: ${(err as Error).message}`);
+          addStatusLine(`❌ Save error: ${(err as Error).message}`);
         }
 
         isProcessing.value = false;

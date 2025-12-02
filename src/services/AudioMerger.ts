@@ -174,32 +174,32 @@ export class AudioMerger {
   }
 
   /**
-   * Save merged files to directory or trigger downloads
+   * Save merged files to directory (no download fallback)
    */
   async saveMergedFiles(
     files: MergedFile[],
     directoryHandle?: FileSystemDirectoryHandle | null
   ): Promise<void> {
-    // Verify directory handle permissions if available
-    if (directoryHandle) {
-      try {
-        const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
-        if (permission !== 'granted') {
-          console.warn('Directory permission denied, falling back to downloads');
-          directoryHandle = null;
-        }
-      } catch (err) {
-        console.warn('Directory permission check failed:', err);
-        directoryHandle = null;
+    // Directory handle is REQUIRED - no fallback to downloads
+    if (!directoryHandle) {
+      throw new Error('Directory handle required. Please select a save folder.');
+    }
+
+    // Verify directory handle permissions
+    try {
+      const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
+      if (permission !== 'granted') {
+        throw new Error('Directory permission denied. Please grant access to save files.');
       }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('permission')) {
+        throw err;
+      }
+      throw new Error(`Directory permission check failed: ${(err as Error).message}`);
     }
 
     for (const file of files) {
-      if (directoryHandle) {
-        await this.saveToDirectory(file, directoryHandle);
-      } else {
-        this.downloadFile(file);
-      }
+      await this.saveToDirectory(file, directoryHandle);
     }
   }
 
@@ -207,30 +207,13 @@ export class AudioMerger {
     file: MergedFile,
     directoryHandle: FileSystemDirectoryHandle
   ): Promise<void> {
-    try {
-      // Extract folder name from filename (remove extension and part number)
-      const folderName = file.filename.replace(/\s+\d{4}\.mp3$/, '').replace(/\.mp3$/, '');
+    // Extract folder name from filename (remove extension and part number)
+    const folderName = file.filename.replace(/\s+\d{4}\.mp3$/, '').replace(/\.mp3$/, '');
 
-      const folderHandle = await directoryHandle.getDirectoryHandle(folderName, { create: true });
-      const fileHandle = await folderHandle.getFileHandle(file.filename, { create: true });
-      const writableStream = await fileHandle.createWritable();
-      await writableStream.write(file.blob);
-      await writableStream.close();
-    } catch (err) {
-      console.error('Error saving merged file:', err);
-      // Fallback to download
-      this.downloadFile(file);
-    }
-  }
-
-  private downloadFile(file: MergedFile): void {
-    const url = URL.createObjectURL(file.blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = file.filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const folderHandle = await directoryHandle.getDirectoryHandle(folderName, { create: true });
+    const fileHandle = await folderHandle.getFileHandle(file.filename, { create: true });
+    const writableStream = await fileHandle.createWritable();
+    await writableStream.write(file.blob);
+    await writableStream.close();
   }
 }
