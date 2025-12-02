@@ -27,9 +27,19 @@ interface ActiveWorker {
   retryCount: number;
 }
 
-const MAX_RETRIES = 3;
-const RETRY_DELAYS = [1000, 3000, 5000]; // Exponential backoff
+const INITIAL_DELAY = 10000; // 10 seconds
+const SECOND_DELAY = 30000; // 30 seconds
+const DELAY_MULTIPLIER = 3;
+const MAX_DELAY = 600000; // 10 minutes
 const WORKER_START_DELAY = 500; // 500 ms seconds delay between starting workers
+
+function getRetryDelay(retryCount: number): number {
+  if (retryCount === 0) return INITIAL_DELAY; // 10s
+  if (retryCount === 1) return SECOND_DELAY; // 30s
+  // For retry 2+: 30s * 3^(retryCount-1), capped at 10 min
+  const delay = SECOND_DELAY * Math.pow(DELAY_MULTIPLIER, retryCount - 1);
+  return Math.min(delay, MAX_DELAY);
+}
 
 export class TTSWorkerPool {
   private queue: PoolTask[] = [];
@@ -130,32 +140,19 @@ export class TTSWorkerPool {
     const worker = this.activeWorkers.get(partIndex);
     this.activeWorkers.delete(partIndex);
 
-    if (retryCount < MAX_RETRIES && worker) {
-      // Retry with exponential backoff
-      const delay = RETRY_DELAYS[retryCount] ?? 5000;
+    if (worker) {
+      // Infinite retry with exponential backoff (10s, 30s, x3 until 10min max)
+      const delay = getRetryDelay(retryCount);
+      const delaySec = Math.round(delay / 1000);
       this.onStatusUpdate?.({
         partIndex,
-        message: `Part ${String(partIndex + 1).padStart(4, '0')}: Retrying (${retryCount + 1}/${MAX_RETRIES})...`,
+        message: `Part ${String(partIndex + 1).padStart(4, '0')}: Error, retrying in ${delaySec}s...`,
         isComplete: false,
       });
 
       setTimeout(() => {
         this.spawnWorker(worker.task, retryCount + 1);
       }, delay);
-    } else {
-      // Max retries exceeded - skip this chunk
-      this.failedTasks.add(partIndex);
-      this.completedCount++;
-
-      this.onStatusUpdate?.({
-        partIndex,
-        message: `Part ${String(partIndex + 1).padStart(4, '0')}: FAILED - Skipped`,
-        isComplete: true,
-      });
-
-      this.onTaskError?.(partIndex, error);
-      this.checkCompletion();
-      this.processQueue();
     }
   }
 
