@@ -12,6 +12,7 @@ export interface LLMVoiceServiceOptions {
   apiUrl: string;
   model: string;
   narratorVoice: string;
+  directoryHandle?: FileSystemDirectoryHandle | null;
 }
 
 export interface ProgressCallback {
@@ -24,6 +25,8 @@ export interface ProgressCallback {
 export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
   private abortController: AbortController | null = null;
+  private pass1Logged = false;
+  private pass2Logged = false;
 
   constructor(options: LLMVoiceServiceOptions) {
     this.options = options;
@@ -40,6 +43,22 @@ export class LLMVoiceService {
   }
 
   /**
+   * Save log file to logs folder
+   */
+  private async saveLog(filename: string, content: object): Promise<void> {
+    if (!this.options.directoryHandle) return;
+    try {
+      const logsFolder = await this.options.directoryHandle.getDirectoryHandle('logs', { create: true });
+      const fileHandle = await logsFolder.getFileHandle(filename, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(JSON.stringify(content, null, 2));
+      await writable.close();
+    } catch (e) {
+      console.warn('Failed to save log:', e);
+    }
+  }
+
+  /**
    * Pass 1: Extract characters from text blocks (sequential)
    */
   async extractCharacters(
@@ -48,6 +67,7 @@ export class LLMVoiceService {
   ): Promise<LLMCharacter[]> {
     const allCharacters: LLMCharacter[] = [];
     this.abortController = new AbortController();
+    this.pass1Logged = false;
 
     for (let i = 0; i < blocks.length; i++) {
       if (this.abortController.signal.aborted) {
@@ -61,7 +81,9 @@ export class LLMVoiceService {
 
       const response = await this.callLLMWithRetry(
         this.buildPass1Prompt(blockText),
-        (result) => this.validatePass1Response(result)
+        (result) => this.validatePass1Response(result),
+        [],
+        'pass1'
       );
 
       const parsed = JSON.parse(response) as Pass1Response;
@@ -85,6 +107,7 @@ export class LLMVoiceService {
     let completed = 0;
 
     this.abortController = new AbortController();
+    this.pass2Logged = false;
 
     // Process blocks in batches
     for (let i = 0; i < blocks.length; i += MAX_CONCURRENT) {
@@ -128,7 +151,9 @@ export class LLMVoiceService {
 
     const response = await this.callLLMWithRetry(
       this.buildPass2Prompt(characterList, numberedSentences, block.sentenceStartIndex),
-      (result) => this.validatePass2Response(result, block, characterVoiceMap)
+      (result) => this.validatePass2Response(result, block, characterVoiceMap),
+      [],
+      'pass2'
     );
 
     const parsed = JSON.parse(response) as Pass2Response;
@@ -239,14 +264,15 @@ Tag the speaker for each sentence. Return JSON only.`;
   private async callLLMWithRetry(
     prompt: { system: string; user: string },
     validate: (response: string) => LLMValidationResult,
-    previousErrors: string[] = []
+    previousErrors: string[] = [],
+    pass: 'pass1' | 'pass2' = 'pass1'
   ): Promise<string> {
     const delays = [1000, 3000, 5000, 10000, 30000, 60000, 120000, 300000, 600000];
     let attempt = 0;
 
     while (true) {
       try {
-        const response = await this.callLLM(prompt, previousErrors);
+        const response = await this.callLLM(prompt, previousErrors, pass);
         const validation = validate(response);
 
         if (validation.valid) {
@@ -278,7 +304,8 @@ Tag the speaker for each sentence. Return JSON only.`;
    */
   private async callLLM(
     prompt: { system: string; user: string },
-    previousErrors: string[] = []
+    previousErrors: string[] = [],
+    pass: 'pass1' | 'pass2' = 'pass1'
   ): Promise<string> {
     const messages: Array<{ role: string; content: string }> = [
       { role: 'system', content: prompt.system },
@@ -293,18 +320,27 @@ Tag the speaker for each sentence. Return JSON only.`;
       });
     }
 
+    const requestBody = {
+      model: this.options.model,
+      messages,
+      max_tokens: 4000,
+      temperature: 0.1,
+    };
+
+    // Save request log (first call only)
+    if (pass === 'pass1' && !this.pass1Logged) {
+      this.saveLog('pass1_request.json', requestBody);
+    } else if (pass === 'pass2' && !this.pass2Logged) {
+      this.saveLog('pass2_request.json', requestBody);
+    }
+
     const response = await fetch(`${this.options.apiUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.options.apiKey}`,
       },
-      body: JSON.stringify({
-        model: this.options.model,
-        messages,
-        max_tokens: 4000,
-        temperature: 0.1,
-      }),
+      body: JSON.stringify(requestBody),
       signal: this.abortController?.signal,
     });
 
@@ -314,6 +350,16 @@ Tag the speaker for each sentence. Return JSON only.`;
     }
 
     const data = await response.json();
+
+    // Save response log (first call only)
+    if (pass === 'pass1' && !this.pass1Logged) {
+      this.saveLog('pass1_response.json', data);
+      this.pass1Logged = true;
+    } else if (pass === 'pass2' && !this.pass2Logged) {
+      this.saveLog('pass2_response.json', data);
+      this.pass2Logged = true;
+    }
+
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {

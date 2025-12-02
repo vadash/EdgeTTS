@@ -114,6 +114,7 @@ export function useTTSConversion() {
         apiUrl: llmApiUrl.value,
         model: llmModel.value,
         narratorVoice: narratorVoice.value,
+        directoryHandle: savePathHandle.value,
       });
 
       const splitter = new TextBlockSplitter();
