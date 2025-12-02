@@ -151,6 +151,7 @@ export function useTTSConversion() {
       const assignments = await llmService.assignSpeakers(
         pass2Blocks,
         characterVoiceMap.value,
+        characters.map(c => c.canonicalName),
         (current, total) => {
           llmCurrentBlock.value = current;
           addStatusLine(`Pass 2: Block ${current}/${total}`);

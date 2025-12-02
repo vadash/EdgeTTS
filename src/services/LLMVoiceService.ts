@@ -100,6 +100,7 @@ export class LLMVoiceService {
   async assignSpeakers(
     blocks: TextBlock[],
     characterVoiceMap: Map<string, string>,
+    canonicalNames: string[],
     onProgress?: ProgressCallback
   ): Promise<SpeakerAssignment[]> {
     const MAX_CONCURRENT = 20;
@@ -117,7 +118,7 @@ export class LLMVoiceService {
 
       const batch = blocks.slice(i, i + MAX_CONCURRENT);
       const batchPromises = batch.map((block) =>
-        this.processPass2Block(block, characterVoiceMap)
+        this.processPass2Block(block, characterVoiceMap, canonicalNames)
       );
 
       const batchResults = await Promise.all(batchPromises);
@@ -139,18 +140,15 @@ export class LLMVoiceService {
    */
   private async processPass2Block(
     block: TextBlock,
-    characterVoiceMap: Map<string, string>
+    characterVoiceMap: Map<string, string>,
+    canonicalNames: string[]
   ): Promise<SpeakerAssignment[]> {
-    const characterList = Array.from(characterVoiceMap.keys()).filter(
-      (name) => name !== 'narrator'
-    );
-
     const numberedSentences = block.sentences
       .map((s, i) => `[${block.sentenceStartIndex + i}] ${s}`)
       .join('\n');
 
     const response = await this.callLLMWithRetry(
-      this.buildPass2Prompt(characterList, numberedSentences, block.sentenceStartIndex),
+      this.buildPass2Prompt(canonicalNames, numberedSentences, block.sentenceStartIndex),
       (result) => this.validatePass2Response(result, block, characterVoiceMap),
       [],
       'pass2'
@@ -184,12 +182,11 @@ Extract all speaking characters from the provided text block.
 <rules>
 1. Identify every character who speaks dialogue (text in quotes: "...", «...»)
 2. Group name variations together (e.g., "Lily", "Lil", "Miss Thompson" = same person)
-3. Detect gender from context: "male", "female", or "unknown"
-4. Ignore the narrator - only extract characters who speak dialogue
-5. Attribution phrases like "said John" or "he replied" indicate the speaker
-6. Inner thoughts without quotes are NOT dialogue - ignore them
-7. Dialogue often continues across sentences without re-attribution - detect conversational flow
-8. Inner monologue (character's unspoken thoughts) differs from spoken dialogue - note if detectable
+3. Include titles as variations: "Professor Smith", "Dr. Smith", "Mr. Smith" = same person as "Smith"
+4. Detect gender from context: "male", "female", or "unknown"
+5. Ignore the narrator - only extract characters who speak dialogue
+6. Attribution phrases like "said John" or "he replied" indicate the speaker
+7. Inner thoughts without quotes are NOT dialogue - ignore them
 </rules>
 
 <example>
@@ -244,14 +241,15 @@ For each numbered sentence, identify who is speaking.
 </task>
 
 <rules>
-1. "narrator" speaks: descriptions, actions, pure attribution tags (standalone "she said"), inner thoughts
-2. Character speaks: sentences containing their dialogue in quotation marks ("...", «...»)
-3. When a sentence has BOTH dialogue AND attribution ("Hello!" she said.), the CHARACTER speaks it
+1. "narrator" speaks: descriptions, actions, pure attribution without quotes (standalone "she said"), inner thoughts
+2. Character speaks: ANY sentence containing dialogue in quotation marks ("...", «...») - even partial quotes
+3. If a sentence contains ANY quoted dialogue, the CHARACTER speaks it (not narrator), regardless of other text
 4. Every sentence needs exactly one speaker
 5. When unsure, use "narrator"
 6. Dialogue continuation: if a character speaks and next sentence is also dialogue with no new attribution, same speaker continues
 7. Pronouns in attribution ("she said", "he replied") refer to the most recently named character of matching gender
-8. Exclamations/thoughts without quotes (e.g., "Shit!" or "Well, thank the Gods") = narrator unless clearly dialogue
+8. Split dialogue: when dialogue is broken across sentences (one ends mid-quote, next continues), both belong to same speaker
+9. Unquoted interjections in prose (thoughts like "Damn" without quotes) = narrator
 </rules>
 
 <characters>
