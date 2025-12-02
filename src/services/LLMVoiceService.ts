@@ -182,12 +182,24 @@ Extract all speaking characters from the provided text block.
 </task>
 
 <rules>
-1. Identify every character who speaks dialogue (quoted or indicated by speech marks)
+1. Identify every character who speaks dialogue (text in quotes: "...", «...»)
 2. Group name variations together (e.g., "Lily", "Lil", "Miss Thompson" = same person)
-3. Detect gender: "male", "female", or "unknown"
-4. Ignore the narrator - they are not a character
-5. Attribution phrases like "said John" indicate John is speaking the preceding dialogue
+3. Detect gender from context: "male", "female", or "unknown"
+4. Ignore the narrator - only extract characters who speak dialogue
+5. Attribution phrases like "said John" or "he replied" indicate the speaker
+6. Inner thoughts without quotes are NOT dialogue - ignore them
 </rules>
+
+<example>
+Input: «Привет!» — сказала Маша. Иван кивнул. «Как дела?» — спросил он.
+Output:
+{
+  "characters": [
+    {"canonicalName": "Маша", "variations": ["Маша"], "gender": "female"},
+    {"canonicalName": "Иван", "variations": ["Иван"], "gender": "male"}
+  ]
+}
+</example>
 
 <output_format>
 Respond with ONLY valid JSON, no markdown:
@@ -200,6 +212,7 @@ Respond with ONLY valid JSON, no markdown:
     }
   ]
 }
+If no speaking characters found, return: {"characters": []}
 </output_format>`;
 
     const user = `<text>
@@ -219,8 +232,9 @@ Extract all speaking characters from this text. Return JSON only.`;
     numberedSentences: string,
     startIndex: number
   ): { system: string; user: string } {
+    const chars = characterList.length > 0 ? characterList.join(', ') : '(no characters detected)';
     const system = `<role>
-You are a dialogue tagger for text-to-speech production.
+You are a dialogue tagger for text-to-speech audiobook production.
 </role>
 
 <task>
@@ -228,23 +242,41 @@ For each numbered sentence, identify who is speaking.
 </task>
 
 <rules>
-1. Use "narrator" for: descriptions, narrative prose, attribution tags ("she said", "he replied")
-2. Use the character's canonical name for: actual spoken dialogue only
-3. Every sentence must have exactly one speaker
-4. When in doubt, use "narrator"
+1. "narrator" speaks: descriptions, actions, pure attribution tags (standalone "she said"), inner thoughts
+2. Character speaks: sentences containing their dialogue in quotation marks ("...", «...»)
+3. When a sentence has BOTH dialogue AND attribution ("Hello!" she said.), the CHARACTER speaks it
+4. Every sentence needs exactly one speaker
+5. When unsure, use "narrator"
 </rules>
 
 <characters>
-${characterList.length > 0 ? characterList.join(', ') : '(no characters detected)'}
+${chars}
 </characters>
+
+<example>
+Input:
+[0] Мария вошла в комнату.
+[1] «Привет!» — сказала она.
+[2] Иван улыбнулся.
+[3] «Рад тебя видеть», — ответил он.
+
+Output:
+{
+  "sentences": [
+    {"index": 0, "speaker": "narrator"},
+    {"index": 1, "speaker": "Мария"},
+    {"index": 2, "speaker": "narrator"},
+    {"index": 3, "speaker": "Иван"}
+  ]
+}
+</example>
 
 <output_format>
 Respond with ONLY valid JSON, no markdown:
 {
   "sentences": [
     {"index": ${startIndex}, "speaker": "narrator"},
-    {"index": ${startIndex + 1}, "speaker": "CharacterName"},
-    ...
+    {"index": ${startIndex + 1}, "speaker": "CharacterName"}
   ]
 }
 </output_format>`;

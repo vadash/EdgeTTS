@@ -13,15 +13,10 @@ export class TextBlockSplitter {
 
   /**
    * Split text into sentences
-   * Handles multiple sentence-ending punctuation marks and preserves them
+   * Quote-aware splitting that keeps dialogue + attribution together
    */
   splitIntoSentences(text: string): string[] {
     const sentences: string[] = [];
-
-    // Regex to match sentence boundaries
-    // Matches: . ! ? followed by space/newline, or end of string
-    // Also handles Russian quotes and em-dashes
-    const sentenceRegex = /[^.!?…]*[.!?…]+(?:\s+|$)|[^.!?…]+$/g;
 
     // Split by paragraphs first to preserve structure
     const paragraphs = text.split(/\n\s*\n/);
@@ -36,24 +31,109 @@ export class TextBlockSplitter {
         const trimmedLine = line.trim();
         if (!trimmedLine) continue;
 
-        // Try to split by sentence boundaries
-        const matches = trimmedLine.match(sentenceRegex);
-
-        if (matches) {
-          for (const match of matches) {
-            const sentence = match.trim();
-            if (sentence && this.isPronounceable(sentence)) {
-              sentences.push(sentence);
-            }
+        // Quote-aware sentence splitting
+        const lineSentences = this.splitLineIntoSentences(trimmedLine);
+        for (const sentence of lineSentences) {
+          if (sentence && this.isPronounceable(sentence)) {
+            sentences.push(sentence);
           }
-        } else if (this.isPronounceable(trimmedLine)) {
-          // Fallback: entire line is one sentence
-          sentences.push(trimmedLine);
         }
       }
     }
 
     return sentences;
+  }
+
+  /**
+   * Split a single line into sentences, respecting quote boundaries
+   * Keeps "dialogue" attribution together as one sentence
+   */
+  private splitLineIntoSentences(line: string): string[] {
+    const sentences: string[] = [];
+    let current = '';
+    let inQuote = false;
+    let quoteChar = '';
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1] || '';
+
+      current += char;
+
+      // Track quote state - opening quote
+      if (this.isOpeningQuote(char) && !inQuote) {
+        inQuote = true;
+        quoteChar = char;
+      }
+      // Closing quote
+      else if (inQuote && this.isClosingQuote(char, quoteChar)) {
+        inQuote = false;
+        quoteChar = '';
+
+        // After closing quote, look for attribution: "..." she said.
+        // Include attribution in same sentence
+        const remaining = line.slice(i + 1);
+        const attrMatch = remaining.match(/^(\s*[—\-–,]?\s*[a-zа-яёA-ZА-ЯЁ][^.!?…]*[.!?…])/);
+        if (attrMatch) {
+          current += attrMatch[1];
+          i += attrMatch[1].length;
+
+          // End sentence after quote + attribution
+          if (current.trim()) {
+            sentences.push(current.trim());
+            current = '';
+          }
+          continue;
+        }
+
+        // No attribution - end sentence after closing quote if followed by space/end
+        if (/\s/.test(nextChar) || i === line.length - 1) {
+          if (current.trim()) {
+            sentences.push(current.trim());
+            current = '';
+          }
+        }
+      }
+      // Only split on sentence-ending punct when outside quotes
+      else if (!inQuote && /[.!?…]/.test(char)) {
+        // Check if followed by space or end (not mid-word like "Dr.")
+        if (/\s/.test(nextChar) || i === line.length - 1) {
+          if (current.trim()) {
+            sentences.push(current.trim());
+            current = '';
+          }
+        }
+      }
+    }
+
+    // Add remaining text
+    if (current.trim()) {
+      sentences.push(current.trim());
+    }
+
+    return sentences;
+  }
+
+  /**
+   * Check if character is an opening quote
+   */
+  private isOpeningQuote(char: string): boolean {
+    // " (straight), " (left curly), « (guillemet), ' (straight single), „ (low-9)
+    return ['"', '\u201C', '\u00AB', "'", '\u201E'].includes(char);
+  }
+
+  /**
+   * Check if character is a closing quote matching the opening
+   */
+  private isClosingQuote(char: string, openQuote: string): boolean {
+    const pairs: Record<string, string> = {
+      '"': '"',             // straight -> straight
+      '\u201C': '\u201D',   // " -> " (curly)
+      '\u00AB': '\u00BB',   // « -> »
+      "'": "'",             // straight single
+      '\u201E': '\u201D',   // „ -> " (German/Russian)
+    };
+    return char === pairs[openQuote] || (char === '"' && openQuote === '"');
   }
 
   /**
