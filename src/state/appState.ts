@@ -1,5 +1,25 @@
 import { signal, computed } from '@preact/signals';
 import type { ProcessedBook, TTSWorker, AppSettings } from './types';
+import { loadLLMSettings as loadLLMSettingsInternal } from './llmState';
+
+// Re-export LLM state
+export {
+  llmEnabled,
+  llmApiKey,
+  llmApiUrl,
+  llmModel,
+  llmProcessingStatus,
+  llmCurrentBlock,
+  llmTotalBlocks,
+  llmError,
+  detectedCharacters,
+  characterVoiceMap,
+  saveLLMSettings,
+  loadLLMSettings,
+  resetLLMState,
+  isLLMConfigured,
+} from './llmState';
+export type { LLMProcessingStatus } from './llmState';
 
 // Settings State
 export const voice = signal<string>('ru-RU, DmitryNeural');
@@ -91,6 +111,8 @@ export function loadSettings(): void {
   } catch (e) {
     console.error('Failed to load settings:', e);
   }
+  // Load LLM settings from separate storage
+  loadLLMSettingsInternal();
 }
 
 export function addStatusLine(message: string): void {

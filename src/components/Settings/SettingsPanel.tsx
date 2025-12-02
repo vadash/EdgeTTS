@@ -7,11 +7,15 @@ import {
 } from '../../state/appState';
 import { Slider } from './Slider';
 import { PointsSelector } from './PointsSelector';
+import { LLMSettingsPanel } from './LLMSettingsPanel';
 
 export function SettingsPanel() {
   return (
     <div class="settings-panel">
-      <PointsSelector />
+      <LLMSettingsPanel />
+
+      <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color, #444)' }}>
+        <PointsSelector />
 
       <Slider
         label={<Text id="settings.rate">Скорость</Text>}
@@ -79,6 +83,7 @@ export function SettingsPanel() {
       >
         💾 <Text id="settings.save">Сохранить настройки</Text>
       </button>
+      </div>
     </div>
   );
 }

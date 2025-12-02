@@ -16,6 +16,31 @@ export function buildVoicePool(locale?: string): VoicePool {
 }
 
 /**
+ * Builds a filtered voice pool for LLM voice assignment
+ * Includes only: ru-*, en-*, and voices with "Multilingual" in name
+ */
+export function buildFilteredPool(): VoicePool {
+  const filtered = voices.filter(v =>
+    v.locale.startsWith('ru') ||
+    v.locale.startsWith('en') ||
+    v.name.includes('Multilingual')
+  );
+
+  return {
+    male: filtered.filter(v => v.gender === 'male').map(v => v.fullValue),
+    female: filtered.filter(v => v.gender === 'female').map(v => v.fullValue),
+  };
+}
+
+/**
+ * Get all voices from the filtered pool (ru-*, en-*, multilingual)
+ */
+export function getFilteredVoices(): string[] {
+  const pool = buildFilteredPool();
+  return [...pool.male, ...pool.female];
+}
+
+/**
  * Get all male voices, optionally filtered by locale
  */
 export function getMaleVoices(locale?: string): string[] {

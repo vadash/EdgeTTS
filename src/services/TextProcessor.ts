@@ -2,10 +2,7 @@
 // Migrated from processing_file.js
 
 import { TEXT_PROCESSING } from '../utils/constants';
-import type { ProcessedBook, VoiceAnnotatedChunk, CharacterInfo, VoicePool } from '../state/types';
-import { DialogueParser } from './DialogueParser';
-import { VoiceAssigner } from './VoiceAssigner';
-import { buildVoicePool } from './VoicePoolBuilder';
+import type { ProcessedBook } from '../state/types';
 
 export interface TextProcessorOptions {
   fileName: string;
@@ -16,15 +13,6 @@ export interface TextProcessorOptions {
   pointsType: 'V1' | 'V2' | 'V3';
   firstStringsLength?: number;
   lastStringsLength?: number;
-  // Multi-voice options
-  narratorVoice?: string;
-  voicePoolLocale?: string;
-}
-
-export interface ProcessedBookWithVoices extends ProcessedBook {
-  chunks: VoiceAnnotatedChunk[];
-  characters: Map<string, CharacterInfo>;
-  voiceAssignments: Map<string, string>;
 }
 
 export class TextProcessor {
@@ -35,8 +23,6 @@ export class TextProcessor {
   private caseSensitive: boolean;
   private pointsSelect: string;
   private pointsType: 'V1' | 'V2' | 'V3';
-  private narratorVoice: string;
-  private voicePoolLocale: string;
 
   fullText: string;
   allSentences: string[];
@@ -49,8 +35,6 @@ export class TextProcessor {
     this.caseSensitive = options.caseSensitive;
     this.pointsSelect = options.pointsSelect;
     this.pointsType = options.pointsType;
-    this.narratorVoice = options.narratorVoice ?? 'ru-RU, DmitryNeural';
-    this.voicePoolLocale = options.voicePoolLocale ?? 'ru-RU';
     this.fullText = options.text;
 
     const preSentences = this.applyDictionary(this.fullText);
@@ -201,76 +185,6 @@ export class TextProcessor {
       fileNames: this.fileNames,
       allSentences: this.allSentences,
       fullText: this.fullText,
-    };
-  }
-
-  /**
-   * Process text with multi-voice support
-   * Parses dialogue, assigns voices to characters, returns voice-annotated chunks
-   */
-  processWithVoices(): ProcessedBookWithVoices {
-    // Parse dialogue from full text
-    const parser = new DialogueParser({ language: 'auto' });
-    const parsed = parser.parse(this.fullText);
-
-    // Create voice assigner
-    const voicePool = buildVoicePool(this.voicePoolLocale);
-    const assigner = new VoiceAssigner({
-      narratorVoice: this.narratorVoice,
-      locale: this.voicePoolLocale,
-      voicePool,
-    });
-
-    // Assign voices to all characters
-    assigner.assignVoicesFromCharacters(parsed.characters);
-
-    // Convert segments to voice-annotated chunks
-    // We need to respect the sentence chunking from allSentences but add voice info
-    const chunks: VoiceAnnotatedChunk[] = [];
-
-    // Simple approach: map each segment to a chunk with voice
-    // For more complex chunking, we'd need to merge small segments
-    let partIndex = 0;
-    for (const segment of parsed.segments) {
-      // Apply dictionary processing to segment text
-      const processedLines = this.applyDictionary(segment.text);
-      const processedText = processedLines.join('\n');
-
-      if (!this.containsPronounceableChars(processedText)) {
-        continue; // Skip non-pronounceable segments
-      }
-
-      // Split into chunks if text is too long
-      const segmentChunks = this.splitIntoSections(processedLines);
-
-      for (const chunkText of segmentChunks) {
-        if (!this.containsPronounceableChars(chunkText)) {
-          continue;
-        }
-
-        // Get voice for this segment
-        const voice = segment.speakerType === 'narrator'
-          ? this.narratorVoice
-          : assigner.getVoiceForCharacter(segment.speaker, segment.gender);
-
-        chunks.push({
-          text: chunkText,
-          voice,
-          partIndex,
-          speaker: segment.speaker,
-        });
-
-        partIndex++;
-      }
-    }
-
-    return {
-      fileNames: this.fileNames,
-      allSentences: chunks.map(c => c.text),
-      fullText: this.fullText,
-      chunks,
-      characters: parsed.characters,
-      voiceAssignments: assigner.getAllAssignments(),
     };
   }
 

@@ -107,3 +107,46 @@ export interface VoicePool {
   male: string[];
   female: string[];
 }
+
+// LLM Voice Assignment Types
+export interface LLMCharacter {
+  canonicalName: string;
+  variations: string[];
+  gender: 'male' | 'female' | 'unknown';
+  voiceId?: string;
+}
+
+export interface TextBlock {
+  blockIndex: number;
+  sentences: string[];
+  sentenceStartIndex: number;
+}
+
+export interface Pass1Response {
+  characters: LLMCharacter[];
+}
+
+export interface Pass2Response {
+  sentences: Array<{ index: number; speaker: string }>;
+}
+
+export interface SpeakerAssignment {
+  sentenceIndex: number;
+  text: string;
+  speaker: string;
+  voiceId: string;
+}
+
+export interface LLMValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+
+export interface ProcessedBookWithVoices {
+  chunks: VoiceAnnotatedChunk[];
+  characters: Map<string, CharacterInfo>;
+  voiceAssignments: Map<string, string>;
+  fileNames: Array<[string, number]>;
+  allSentences: string[];
+  fullText: string;
+}

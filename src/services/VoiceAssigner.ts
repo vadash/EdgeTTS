@@ -2,8 +2,8 @@
  * VoiceAssigner - Assigns unique voices to characters based on gender
  */
 
-import { buildVoicePool, getRandomVoice } from './VoicePoolBuilder';
-import type { VoicePool, CharacterInfo } from '../state/types';
+import { buildVoicePool, buildFilteredPool } from './VoicePoolBuilder';
+import type { VoicePool, CharacterInfo, LLMCharacter } from '../state/types';
 
 export interface VoiceAssignment {
   character: string;
@@ -95,6 +95,41 @@ export class VoiceAssigner {
     for (const [name, info] of sorted) {
       this.assignVoice(name, info.gender);
     }
+  }
+
+  /**
+   * Assign voices to characters from LLM extraction result
+   * Returns a map of canonical name -> voice ID
+   */
+  assignVoicesFromLLMCharacters(characters: LLMCharacter[]): Map<string, string> {
+    const result = new Map<string, string>();
+
+    // Sort by number of variations (more variations = more prominent character)
+    const sorted = [...characters].sort((a, b) => b.variations.length - a.variations.length);
+
+    for (const char of sorted) {
+      const voice = this.assignVoice(char.canonicalName, char.gender);
+      result.set(char.canonicalName, voice);
+
+      // Also map all variations to the same voice
+      for (const variation of char.variations) {
+        if (variation !== char.canonicalName) {
+          result.set(variation, voice);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Create a VoiceAssigner with filtered pool (ru-*, en-*, multilingual only)
+   */
+  static createWithFilteredPool(narratorVoice: string): VoiceAssigner {
+    return new VoiceAssigner({
+      narratorVoice,
+      voicePool: buildFilteredPool(),
+    });
   }
 
   /**
