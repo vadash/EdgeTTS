@@ -180,6 +180,20 @@ export class AudioMerger {
     files: MergedFile[],
     directoryHandle?: FileSystemDirectoryHandle | null
   ): Promise<void> {
+    // Verify directory handle permissions if available
+    if (directoryHandle) {
+      try {
+        const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
+        if (permission !== 'granted') {
+          console.warn('Directory permission denied, falling back to downloads');
+          directoryHandle = null;
+        }
+      } catch (err) {
+        console.warn('Directory permission check failed:', err);
+        directoryHandle = null;
+      }
+    }
+
     for (const file of files) {
       if (directoryHandle) {
         await this.saveToDirectory(file, directoryHandle);

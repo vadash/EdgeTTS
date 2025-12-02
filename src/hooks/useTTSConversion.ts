@@ -337,21 +337,37 @@ export function useTTSConversion() {
   };
 
   const selectDirectory = useCallback(async (): Promise<boolean> => {
+    // If already have a handle, verify it's still valid and reuse
+    if (savePathHandle.value) {
+      try {
+        const permission = await savePathHandle.value.requestPermission({ mode: 'readwrite' });
+        if (permission === 'granted') {
+          addStatusLine(`Saving to: ${savePathHandle.value.name}`);
+          return true;
+        }
+      } catch {
+        savePathHandle.value = null;
+      }
+    }
+
+    // Require directory picker - no fallback to downloads
     if (!window.showDirectoryPicker) {
-      addStatusLine('Directory picker not supported - will download files');
-      return true;
+      addStatusLine('❌ Directory picker not supported. Please use Chrome, Edge, or Opera.');
+      return false;
     }
 
     try {
-      const handle = await window.showDirectoryPicker();
+      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
       savePathHandle.value = handle;
       addStatusLine(`Saving to: ${handle.name}`);
       return true;
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        addStatusLine('Directory selection cancelled - will download files');
+      if ((err as Error).name === 'AbortError') {
+        addStatusLine('❌ Directory selection required. Please select a folder to save files.');
+      } else {
+        addStatusLine(`❌ Directory selection failed: ${(err as Error).message}`);
       }
-      return true;
+      return false;
     }
   }, []);
 
