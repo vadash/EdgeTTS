@@ -30,6 +30,7 @@ A Preact + TypeScript web app that converts text files to MP3 audio using Micros
 - **TextProcessor**: Applies .lexx dictionary rules (regex and word-based), handles punctuation replacement, splits text into chunks.
 - **FileConverter**: Converts FB2 (XML parser), EPUB (JSZip + NCX navigation), ZIP archives to plain text.
 - **AudioMerger**: Concatenates MP3 chunks based on merge count setting, respects file boundaries.
+- **SecureStorage**: Encrypts sensitive data (API keys) using Web Crypto API. Uses non-extractable AES-256 key stored in IndexedDB, making exported data useless on other machines/browsers.
 
 ### LLM Voice Assignment System
 

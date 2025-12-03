@@ -93,7 +93,7 @@ export function saveSettings(): void {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-export function loadSettings(): void {
+export async function loadSettings(): Promise<void> {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
     if (saved) {
@@ -115,8 +115,8 @@ export function loadSettings(): void {
   } catch (e) {
     console.error('Failed to load settings:', e);
   }
-  // Load LLM settings from separate storage
-  loadLLMSettingsInternal();
+  // Load LLM settings from separate storage (async for encrypted API key)
+  await loadLLMSettingsInternal();
 }
 
 function formatElapsedTime(startTime: number): string {

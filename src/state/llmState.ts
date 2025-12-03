@@ -1,5 +1,6 @@
 import { signal } from '@preact/signals';
 import type { LLMCharacter } from './types';
+import { encryptValue, decryptValue } from '@/services/SecureStorage';
 
 // LLM Settings (persisted to localStorage)
 export const llmEnabled = signal<boolean>(true);
@@ -23,28 +24,29 @@ const LLM_SETTINGS_KEY = 'edgetts_llm_settings';
 
 interface LLMSettings {
   enabled: boolean;
-  apiKey: string;
+  apiKey: string; // encrypted
   apiUrl: string;
   model: string;
 }
 
-export function saveLLMSettings(): void {
+export async function saveLLMSettings(): Promise<void> {
+  const encryptedKey = await encryptValue(llmApiKey.value);
   const settings: LLMSettings = {
     enabled: llmEnabled.value,
-    apiKey: llmApiKey.value,
+    apiKey: encryptedKey,
     apiUrl: llmApiUrl.value,
     model: llmModel.value,
   };
   localStorage.setItem(LLM_SETTINGS_KEY, JSON.stringify(settings));
 }
 
-export function loadLLMSettings(): void {
+export async function loadLLMSettings(): Promise<void> {
   try {
     const saved = localStorage.getItem(LLM_SETTINGS_KEY);
     if (saved) {
       const settings: LLMSettings = JSON.parse(saved);
       llmEnabled.value = settings.enabled ?? true;
-      llmApiKey.value = settings.apiKey ?? '';
+      llmApiKey.value = await decryptValue(settings.apiKey ?? '');
       llmApiUrl.value = settings.apiUrl ?? 'https://api.openai.com/v1';
       llmModel.value = settings.model ?? 'gpt-4o-mini';
     }

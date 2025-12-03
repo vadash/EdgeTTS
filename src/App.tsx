@@ -10,7 +10,7 @@ import { ConvertButton } from './components/ConvertButton';
 
 export function App() {
   useEffect(() => {
-    loadSettings();
+    void loadSettings();
   }, []);
 
   return (

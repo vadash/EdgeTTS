@@ -78,7 +78,7 @@ export function SettingsPanel() {
       )}
 
       <button
-        onClick={() => { saveSettings(); saveLLMSettings(); }}
+        onClick={() => { saveSettings(); void saveLLMSettings(); }}
         style={{ width: '100%', marginBottom: '1rem' }}
       >
         💾 <Text id="settings.save">Save Settings</Text>
