@@ -2,7 +2,8 @@
 // Replaces legacy polling approach with Promise-based queue
 
 import { EdgeTTSService, TTSWorkerOptions } from './EdgeTTSService';
-import type { TTSConfig, StatusUpdate } from '../state/types';
+import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
+import { defaultConfig, getTTSRetryDelay, getWorkerStartDelay, type TTSConfig } from '@/config';
 
 export interface PoolTask {
   partIndex: number;
@@ -14,7 +15,8 @@ export interface PoolTask {
 
 export interface WorkerPoolOptions {
   maxWorkers: number;
-  config: TTSConfig;
+  config: VoiceConfig;
+  ttsConfig?: TTSConfig; // Optional: override TTS timing config
   onStatusUpdate?: (update: StatusUpdate) => void;
   onTaskComplete?: (partIndex: number, audioData: Uint8Array) => void;
   onTaskError?: (partIndex: number, error: Error) => void;
@@ -25,22 +27,6 @@ interface ActiveWorker {
   service: EdgeTTSService;
   task: PoolTask;
   retryCount: number;
-}
-
-const INITIAL_DELAY = 10000; // 10 seconds
-const SECOND_DELAY = 30000; // 30 seconds
-const DELAY_MULTIPLIER = 3;
-const MAX_DELAY = 600000; // 10 minutes
-const THREADS_PER_MINUTE = 75; // X threads per second
-const START_DELAY = 60000 / THREADS_PER_MINUTE; // 1000ms
-const ERROR_COOLDOWN = 10000; // 10 seconds - no new threads after any error
-
-function getRetryDelay(retryCount: number): number {
-  if (retryCount === 0) return INITIAL_DELAY; // 10s
-  if (retryCount === 1) return SECOND_DELAY; // 30s
-  // For retry 2+: 30s * 3^(retryCount-1), capped at 10 min
-  const delay = SECOND_DELAY * Math.pow(DELAY_MULTIPLIER, retryCount - 1);
-  return Math.min(delay, MAX_DELAY);
 }
 
 export class TTSWorkerPool {
@@ -54,7 +40,8 @@ export class TTSWorkerPool {
   private lastErrorTime = 0;
 
   private maxWorkers: number;
-  private config: TTSConfig;
+  private voiceConfig: VoiceConfig;
+  private ttsConfig: TTSConfig;
   private onStatusUpdate?: (update: StatusUpdate) => void;
   private onTaskComplete?: (partIndex: number, audioData: Uint8Array) => void;
   private onTaskError?: (partIndex: number, error: Error) => void;
@@ -62,7 +49,8 @@ export class TTSWorkerPool {
 
   constructor(options: WorkerPoolOptions) {
     this.maxWorkers = options.maxWorkers;
-    this.config = options.config;
+    this.voiceConfig = options.config;
+    this.ttsConfig = options.ttsConfig ?? defaultConfig.tts;
     this.onStatusUpdate = options.onStatusUpdate;
     this.onTaskComplete = options.onTaskComplete;
     this.onTaskError = options.onTaskError;
@@ -88,11 +76,13 @@ export class TTSWorkerPool {
     if (this.isProcessingQueue) return;
     this.isProcessingQueue = true;
 
+    const startDelay = getWorkerStartDelay(this.ttsConfig);
+
     while (this.activeWorkers.size < this.maxWorkers && this.queue.length > 0) {
       // Check error cooldown - wait if we had a recent error
       const timeSinceError = Date.now() - this.lastErrorTime;
-      if (this.lastErrorTime > 0 && timeSinceError < ERROR_COOLDOWN) {
-        const waitTime = ERROR_COOLDOWN - timeSinceError;
+      if (this.lastErrorTime > 0 && timeSinceError < this.ttsConfig.errorCooldown) {
+        const waitTime = this.ttsConfig.errorCooldown - timeSinceError;
         await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
 
@@ -101,7 +91,7 @@ export class TTSWorkerPool {
 
       // Wait before starting next worker (if there are more to start)
       if (this.queue.length > 0 && this.activeWorkers.size < this.maxWorkers) {
-        await new Promise((resolve) => setTimeout(resolve, START_DELAY));
+        await new Promise((resolve) => setTimeout(resolve, startDelay));
       }
     }
 
@@ -110,9 +100,9 @@ export class TTSWorkerPool {
 
   private spawnWorker(task: PoolTask, retryCount: number): void {
     // Use task-specific voice if provided, otherwise use default config voice
-    const taskConfig: TTSConfig = task.voice
-      ? { ...this.config, voice: `Microsoft Server Speech Text to Speech Voice (${task.voice})` }
-      : this.config;
+    const taskConfig: VoiceConfig = task.voice
+      ? { ...this.voiceConfig, voice: `Microsoft Server Speech Text to Speech Voice (${task.voice})` }
+      : this.voiceConfig;
 
     const workerOptions: TTSWorkerOptions = {
       indexPart: task.partIndex,
@@ -152,8 +142,8 @@ export class TTSWorkerPool {
     this.activeWorkers.delete(partIndex);
 
     if (worker) {
-      // Infinite retry with exponential backoff (10s, 30s, x3 until 10min max)
-      const delay = getRetryDelay(retryCount);
+      // Infinite retry with exponential backoff using injected config
+      const delay = getTTSRetryDelay(retryCount, this.ttsConfig);
       const delaySec = Math.round(delay / 1000);
       this.onStatusUpdate?.({
         partIndex,

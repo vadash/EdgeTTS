@@ -333,10 +333,12 @@ export interface VoicePool {
  * Voice assigner for mapping characters to voices
  */
 export interface IVoiceAssigner {
-  /** Assign voices to detected characters */
-  assignVoices(characters: LLMCharacter[]): Map<string, string>;
-  /** Get available voice pool */
-  getVoicePool(): VoicePool;
+  /** Assign voices to detected characters from LLM extraction */
+  assignVoicesFromLLMCharacters(characters: LLMCharacter[]): Map<string, string>;
+  /** Get the narrator voice */
+  getNarratorVoice(): string;
+  /** Reset all assignments */
+  reset(): void;
 }
 
 // ============================================================================
@@ -359,4 +361,74 @@ export interface IFileConverter {
   convert(file: File): Promise<ConvertedFile[]>;
   /** Check if file type is supported */
   isSupported(file: File): boolean;
+}
+
+// ============================================================================
+// Text Block Splitter Interface
+// ============================================================================
+
+/**
+ * Text block splitter for LLM processing
+ * Splits text into blocks suitable for LLM token limits
+ */
+export interface ITextBlockSplitter {
+  /** Create blocks for Pass 1 (character extraction) */
+  createPass1Blocks(text: string): TextBlock[];
+  /** Create blocks for Pass 2 (speaker assignment) */
+  createPass2Blocks(text: string): TextBlock[];
+}
+
+// ============================================================================
+// Voice Pool Builder Interface
+// ============================================================================
+
+/**
+ * Voice pool builder for filtering voices by locale
+ */
+export interface IVoicePoolBuilder {
+  /** Build voice pool filtered by locale */
+  buildPool(locale: string): VoicePool;
+}
+
+// ============================================================================
+// Pipeline Interfaces (re-exported from pipeline module)
+// ============================================================================
+
+// Note: Full pipeline types are in @/services/pipeline/types.ts
+// These are simplified versions for DI registration
+
+/**
+ * LLM service factory options
+ * Used to create LLM service instances with specific configuration
+ */
+export interface LLMServiceFactoryOptions {
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  narratorVoice: string;
+  directoryHandle?: FileSystemDirectoryHandle | null;
+}
+
+/**
+ * Factory for creating LLM service instances
+ */
+export interface ILLMServiceFactory {
+  /** Create a new LLM service instance */
+  create(options: LLMServiceFactoryOptions): ILLMService;
+}
+
+/**
+ * Factory for creating worker pools
+ */
+export interface IWorkerPoolFactory {
+  /** Create a new worker pool */
+  create(options: WorkerPoolOptions): IWorkerPool;
+}
+
+/**
+ * Factory for creating audio mergers
+ */
+export interface IAudioMergerFactory {
+  /** Create a new audio merger */
+  create(config: MergerConfig): IAudioMerger;
 }

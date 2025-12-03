@@ -13,13 +13,29 @@ import { defaultConfig, type AppConfig } from '@/config';
 import { ffmpegService } from '@/services/FFmpegService';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
 import { LoggerService } from '@/services/LoggerService';
+import { TextBlockSplitter } from '@/services/TextBlockSplitter';
+import { VoicePoolBuilder } from '@/services/VoicePoolBuilder';
+import { LLMVoiceService } from '@/services/LLMVoiceService';
+import { TTSWorkerPool } from '@/services/TTSWorkerPool';
+import { AudioMerger } from '@/services/AudioMerger';
+import { VoiceAssigner } from '@/services/VoiceAssigner';
+import { PipelineRunner } from '@/services/pipeline/PipelineRunner';
 import type { LogStore } from '@/stores/LogStore';
 
 import type {
   ILogger,
   ISecureStorage,
   IFFmpegService,
+  ITextBlockSplitter,
+  IVoicePoolBuilder,
+  ILLMServiceFactory,
+  IWorkerPoolFactory,
+  IAudioMergerFactory,
+  LLMServiceFactoryOptions,
+  WorkerPoolOptions,
+  MergerConfig,
 } from '@/services/interfaces';
+import type { IPipelineRunner } from '@/services/pipeline/types';
 
 // ============================================================================
 // Context Definition
@@ -206,9 +222,45 @@ export function createProductionContainer(
   // Register FFmpeg service (singleton - wraps existing singleton)
   container.registerSingleton(ServiceTypes.FFmpegService, () => new FFmpegServiceAdapter());
 
-  // Note: TTSService, WorkerPool, AudioMerger, LLMService are created
-  // per-conversion with specific options, so they're not pre-registered.
-  // They will be created by the ConversionOrchestrator.
+  // Register TextBlockSplitter (singleton)
+  container.registerSingleton<ITextBlockSplitter>(
+    ServiceTypes.TextBlockSplitter,
+    () => new TextBlockSplitter()
+  );
+
+  // Register VoicePoolBuilder (singleton)
+  container.registerSingleton<IVoicePoolBuilder>(
+    ServiceTypes.VoicePoolBuilder,
+    () => new VoicePoolBuilder()
+  );
+
+  // Register PipelineRunner (transient - new instance per conversion)
+  container.registerTransient<IPipelineRunner>(
+    ServiceTypes.PipelineRunner,
+    () => new PipelineRunner(container.get<ILogger>(ServiceTypes.Logger))
+  );
+
+  // Register factories for per-conversion services
+  container.registerSingleton<ILLMServiceFactory>(
+    ServiceTypes.LLMServiceFactory,
+    () => ({
+      create: (options: LLMServiceFactoryOptions) => new LLMVoiceService(options),
+    })
+  );
+
+  container.registerSingleton<IWorkerPoolFactory>(
+    ServiceTypes.WorkerPoolFactory,
+    () => ({
+      create: (options: WorkerPoolOptions) => new TTSWorkerPool(options),
+    })
+  );
+
+  container.registerSingleton<IAudioMergerFactory>(
+    ServiceTypes.AudioMergerFactory,
+    () => ({
+      create: (cfg: MergerConfig) => new AudioMerger(cfg),
+    })
+  );
 
   return container;
 }

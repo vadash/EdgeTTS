@@ -1,6 +1,19 @@
 import { voices } from '../components/VoiceSelector/voices';
 import type { VoicePool } from '../state/types';
 import type { DetectedLanguage } from '../utils/languageDetection';
+import type { IVoicePoolBuilder } from './interfaces';
+
+/**
+ * VoicePoolBuilder class implementing IVoicePoolBuilder interface
+ */
+export class VoicePoolBuilder implements IVoicePoolBuilder {
+  /**
+   * Build voice pool filtered by locale
+   */
+  buildPool(locale: string): VoicePool {
+    return buildFilteredPool(locale as DetectedLanguage);
+  }
+}
 
 /**
  * Builds a voice pool filtered by locale and separated by gender

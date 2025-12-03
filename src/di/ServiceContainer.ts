@@ -17,6 +17,16 @@ export const ServiceTypes = {
   VoiceAssigner: Symbol.for('IVoiceAssigner'),
   FileConverter: Symbol.for('IFileConverter'),
 
+  // New services for pipeline
+  TextBlockSplitter: Symbol.for('ITextBlockSplitter'),
+  VoicePoolBuilder: Symbol.for('IVoicePoolBuilder'),
+  PipelineRunner: Symbol.for('IPipelineRunner'),
+
+  // Factories (for creating per-conversion instances)
+  LLMServiceFactory: Symbol.for('ILLMServiceFactory'),
+  WorkerPoolFactory: Symbol.for('IWorkerPoolFactory'),
+  AudioMergerFactory: Symbol.for('IAudioMergerFactory'),
+
   // Configuration
   Config: Symbol.for('AppConfig'),
 } as const;
