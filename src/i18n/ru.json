@@ -48,7 +48,7 @@
     "formats": "txt, fb2, epub, ini, zip"
   },
   "convert": {
-    "button": "Сохранить в MP3",
+    "button": "Начать конвертацию",
     "selectFolder": "Выберите папку для сохранения"
   },
   "status": {
