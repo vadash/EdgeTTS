@@ -65,6 +65,10 @@ export class ConversionOrchestrator {
     this.stores.logs.startTimer();
     this.stores.llm.resetProcessingState();
 
+    // Detect and log language
+    const detectedLang = this.stores.data.detectedLanguage.value;
+    this.logger.info(`Detected language: ${detectedLang.toUpperCase()}`);
+
     const fileNames = existingBook?.fileNames ?? [[this.extractFilename(text), 0]];
 
     try {
@@ -78,7 +82,8 @@ export class ConversionOrchestrator {
 
       // Assign voices
       const assigner = VoiceAssigner.createWithFilteredPool(
-        this.stores.settings.narratorVoice.value
+        this.stores.settings.narratorVoice.value,
+        this.stores.data.detectedLanguage.value
       );
       const voiceMap = assigner.assignVoicesFromLLMCharacters(characters);
       this.stores.llm.setVoiceMap(voiceMap);

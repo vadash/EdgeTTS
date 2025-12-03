@@ -3,6 +3,7 @@
 
 import { signal, computed } from '@preact/signals';
 import type { ProcessedBook, DictionaryRule, TTSWorker } from '@/state/types';
+import { detectLanguage, type DetectedLanguage } from '@/utils/languageDetection';
 
 /**
  * Data Store - manages application data
@@ -66,6 +67,16 @@ export class DataStore {
   readonly hasDirectoryHandle = computed(() =>
     this.directoryHandle.value !== null
   );
+
+  /**
+   * Detect language from text content
+   */
+  readonly detectedLanguage = computed<DetectedLanguage>(() => {
+    const text = this.textContent.value;
+    const bookText = this.book.value?.allSentences.join(' ') ?? '';
+    const contentToAnalyze = text || bookText;
+    return detectLanguage(contentToAnalyze);
+  });
 
   // ========== Text Content Actions ==========
 

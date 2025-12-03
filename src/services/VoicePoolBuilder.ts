@@ -1,5 +1,6 @@
 import { voices } from '../components/VoiceSelector/voices';
 import type { VoicePool } from '../state/types';
+import type { DetectedLanguage } from '../utils/languageDetection';
 
 /**
  * Builds a voice pool filtered by locale and separated by gender
@@ -17,11 +18,11 @@ export function buildVoicePool(locale?: string): VoicePool {
 
 /**
  * Builds a filtered voice pool for LLM voice assignment
- * Includes only: en-*, and voices with "Multilingual" in name
+ * Includes voices matching the detected language + multilingual voices
  */
-export function buildFilteredPool(): VoicePool {
+export function buildFilteredPool(language: DetectedLanguage = 'en'): VoicePool {
   const filtered = voices.filter(v =>
-    v.locale.startsWith('en') ||
+    v.locale.startsWith(language) ||
     v.name.includes('Multilingual')
   );
 
@@ -32,10 +33,10 @@ export function buildFilteredPool(): VoicePool {
 }
 
 /**
- * Get all voices from the filtered pool (en-*, multilingual)
+ * Get all voices from the filtered pool
  */
-export function getFilteredVoices(): string[] {
-  const pool = buildFilteredPool();
+export function getFilteredVoices(language: DetectedLanguage = 'en'): string[] {
+  const pool = buildFilteredPool(language);
   return [...pool.male, ...pool.female];
 }
 

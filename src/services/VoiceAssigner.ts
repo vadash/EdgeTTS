@@ -4,6 +4,7 @@
 
 import { buildVoicePool, buildFilteredPool } from './VoicePoolBuilder';
 import type { VoicePool, CharacterInfo, LLMCharacter } from '../state/types';
+import type { DetectedLanguage } from '../utils/languageDetection';
 
 export interface VoiceAssignment {
   character: string;
@@ -147,12 +148,12 @@ export class VoiceAssigner {
   }
 
   /**
-   * Create a VoiceAssigner with filtered pool (ru-*, en-*, multilingual only)
+   * Create a VoiceAssigner with filtered pool (detected language + multilingual)
    */
-  static createWithFilteredPool(narratorVoice: string): VoiceAssigner {
+  static createWithFilteredPool(narratorVoice: string, language: DetectedLanguage = 'en'): VoiceAssigner {
     return new VoiceAssigner({
       narratorVoice,
-      voicePool: buildFilteredPool(),
+      voicePool: buildFilteredPool(language),
     });
   }
 

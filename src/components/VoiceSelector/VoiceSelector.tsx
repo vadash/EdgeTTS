@@ -1,6 +1,6 @@
-import { signal } from '@preact/signals';
+import { signal, computed } from '@preact/signals';
 import { Text } from 'preact-i18n';
-import { useSettings } from '../../stores';
+import { useSettings, useData } from '../../stores';
 import { useLogger } from '../../di';
 import voices from './voices';
 import { EdgeTTSService } from '../../services/EdgeTTSService';
@@ -23,7 +23,16 @@ const isPlaying = signal<boolean>(false);
 
 export function VoiceSelector() {
   const settings = useSettings();
+  const data = useData();
   const logger = useLogger();
+
+  // Filter voices based on detected language
+  const filteredVoices = computed(() => {
+    const lang = data.detectedLanguage.value;
+    return voices.filter(v =>
+      v.locale.startsWith(lang) || v.name.includes('Multilingual')
+    );
+  });
 
   const playVoiceSample = async () => {
     if (isPlaying.value || !samplePhrase.value.trim()) return;
@@ -82,7 +91,7 @@ export function VoiceSelector() {
           onChange={(e) => settings.setNarratorVoice((e.target as HTMLSelectElement).value)}
           aria-labelledby="voice-label"
         >
-          {voices.map((v) => (
+          {filteredVoices.value.map((v) => (
             <option key={v.fullValue} value={v.fullValue}>
               {v.fullValue} ({v.gender})
             </option>
