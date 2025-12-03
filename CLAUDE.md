@@ -29,7 +29,8 @@ A Preact + TypeScript web app that converts text files to MP3 audio using Micros
 - **TTSWorkerPool**: Queue-based worker pool with retry logic (3 retries, exponential backoff). Manages concurrent TTS requests.
 - **TextProcessor**: Applies .lexx dictionary rules (regex and word-based), handles punctuation replacement, splits text into chunks.
 - **FileConverter**: Converts FB2 (XML parser), EPUB (JSZip + NCX navigation), ZIP archives to plain text.
-- **AudioMerger**: Concatenates MP3 chunks based on merge count setting, respects file boundaries.
+- **AudioMerger**: Merges audio by ~30min duration, supports Opus encoding via FFmpeg.
+- **FFmpegService**: Singleton for FFmpeg WASM loading from CDN (jsdelivr/unpkg/cdnjs fallback). Handles Opus encoding, silence removal, and normalization.
 - **SecureStorage**: Encrypts sensitive data (API keys) using Web Crypto API. Uses non-extractable AES-256 key stored in IndexedDB, making exported data useless on other machines/browsers.
 
 ### LLM Voice Assignment System
@@ -50,8 +51,9 @@ Optional feature for multi-voice audiobooks using LLM-based character detection:
 Uses Preact Signals for reactive state.
 
 **appState.ts**:
-- Settings: `voice`, `rate`, `pitch`, `maxThreads`, `mergeFiles`
+- Settings: `voice`, `rate`, `pitch`, `maxThreads`, `outputFormat`, `silenceRemovalEnabled`, `normalizationEnabled`
 - Processing: `isProcessing`, `processedCount`, `totalCount`, `statusLines`
+- FFmpeg: `ffmpegLoaded`, `ffmpegLoading`, `ffmpegError`
 - Data: `dictionary`, `textContent`, `book`
 
 **llmState.ts** (LLM voice assignment):
@@ -64,7 +66,7 @@ Settings persist to localStorage.
 ### Components Structure
 
 - `VoiceSelector`: 340+ voices across 80+ locales (hardcoded in `voices.ts`)
-- `SettingsPanel`: Rate/pitch/volume sliders, merge settings
+- `SettingsPanel`: Rate/pitch sliders, output format (MP3/Opus), silence/normalization toggles
 - `FileHandlers`: File upload and .lexx dictionary upload
 - `ConvertButton`: Triggers conversion via `useTTSConversion` hook
 
@@ -74,7 +76,15 @@ Main orchestration hook in `src/hooks/useTTSConversion.ts`:
 1. Creates `TextProcessor` with current settings
 2. Spawns `TTSWorkerPool` with callback handlers
 3. Queues all sentence tasks
-4. Merges audio on completion
+4. Loads FFmpeg WASM (if Opus selected), merges audio by duration (~30min)
+
+### Audio Processing (FFmpeg)
+
+- **Format**: Opus 96kbps or MP3 fallback
+- **Merge**: Duration-based (~30min ±10%), respects file boundaries
+- **Silence removal**: -40dB threshold, 0.5s start, 0.25s stop
+- **Normalization**: -18 LUFS, LRA 7, TP -1.5dB (optional)
+- **CDN loading**: jsdelivr → unpkg → cdnjs fallback chain
 
 ## Build Configuration
 

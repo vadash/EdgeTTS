@@ -71,6 +71,14 @@ module.exports = (env, argv) => {
 
     devtool: isProduction ? 'source-map' : 'eval-source-map',
 
+    // Suppress FFmpeg dynamic import warnings (expected behavior)
+    ignoreWarnings: [
+      {
+        module: /@ffmpeg[\\/]ffmpeg[\\/]dist[\\/]esm/,
+        message: /Critical dependency/,
+      },
+    ],
+
     optimization: {
       splitChunks: {
         chunks: 'all',
