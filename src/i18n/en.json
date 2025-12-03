@@ -59,7 +59,9 @@
     "filter": {
       "all": "All",
       "errors": "Errors",
-      "warnings": "Warnings"
+      "warnings": "Warnings",
+      "info": "Info",
+      "debug": "Debug"
     },
     "actions": {
       "clear": "Clear",

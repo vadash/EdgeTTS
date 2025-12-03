@@ -76,6 +76,13 @@ export class LogStore implements ILogger {
   );
 
   /**
+   * Get debug entries only
+   */
+  readonly debugs = computed(() =>
+    this.entries.value.filter(e => e.level === 'debug')
+  );
+
+  /**
    * Get entry count
    */
   readonly count = computed(() => this.entries.value.length);
@@ -89,6 +96,16 @@ export class LogStore implements ILogger {
    * Get warning count
    */
   readonly warningCount = computed(() => this.warnings.value.length);
+
+  /**
+   * Get info count
+   */
+  readonly infoCount = computed(() => this.infos.value.length);
+
+  /**
+   * Get debug count
+   */
+  readonly debugCount = computed(() => this.debugs.value.length);
 
   /**
    * Check if there are any entries

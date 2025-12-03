@@ -59,7 +59,9 @@
     "filter": {
       "all": "Все",
       "errors": "Ошибки",
-      "warnings": "Предупр."
+      "warnings": "Предупр.",
+      "info": "Инфо",
+      "debug": "Отладка"
     },
     "actions": {
       "clear": "Очистить",

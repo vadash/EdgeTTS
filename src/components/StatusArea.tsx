@@ -16,6 +16,8 @@ export function StatusArea() {
   const filter = logs.filterLevel.value;
   const errorCount = logs.errorCount.value;
   const warningCount = logs.warningCount.value;
+  const infoCount = logs.infoCount.value;
+  const debugCount = logs.debugCount.value;
 
   // Get filtered entries
   const entries = logs.filtered.value;
@@ -134,6 +136,20 @@ export function StatusArea() {
           >
             <Text id="status.filter.warnings">Warnings</Text>
             {warningCount > 0 && <span class="count">({warningCount})</span>}
+          </button>
+          <button
+            class={`status-filter-btn ${filter === 'info' ? 'active' : ''}`}
+            onClick={() => setFilter('info')}
+          >
+            <Text id="status.filter.info">Info</Text>
+            {infoCount > 0 && <span class="count">({infoCount})</span>}
+          </button>
+          <button
+            class={`status-filter-btn ${filter === 'debug' ? 'active' : ''}`}
+            onClick={() => setFilter('debug')}
+          >
+            <Text id="status.filter.debug">Debug</Text>
+            {debugCount > 0 && <span class="count">({debugCount})</span>}
           </button>
         </div>
         <div class="status-actions">
