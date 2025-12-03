@@ -209,27 +209,31 @@ You are a character extractor for audiobook production.
 </role>
 
 <task>
-Extract all speaking characters from the provided text block.
+Extract ALL speaking characters from the provided text block.
 </task>
 
 <rules>
-1. Identify every character who speaks dialogue (text in quotes: "...", «...»)
-2. Group name variations together (e.g., "Lily", "Lil", "Miss Thompson" = same person)
-3. Include titles as variations: "Professor Smith", "Dr. Smith", "Mr. Smith" = same person as "Smith"
-4. Detect gender from context: "male", "female", or "unknown"
-5. Ignore the narrator - only extract characters who speak dialogue
-6. Attribution phrases like "said John" or "he replied" indicate the speaker
-7. Inner thoughts without quotes are NOT dialogue - ignore them
-8. Exclude unnamed/anonymous speakers ("a voice said", "the girl replied") - they are handled separately
+1. Extract EVERY named character who speaks dialogue (text in quotes: "...", «...»)
+2. Include ALL speakers: main characters, minor characters, professors, teachers, judges, officials, etc.
+3. Group name variations together (e.g., "Lily", "Lil", "Miss Thompson" = same person)
+4. Include titles as variations: "Professor Viridian", "Viridian" = same person
+5. Catch spelling variations/typos: "Mirian", "Miran" = same person
+6. Detect gender from context clues (pronouns, titles, names): "male", "female", or "unknown"
+7. Ignore the narrator - only extract characters who speak dialogue
+8. Attribution phrases like "said John", "the professor said", "he replied" indicate the speaker
+9. Inner thoughts without quotes are NOT dialogue - ignore them
+10. Exclude ONLY truly unnamed speakers ("a voice said", "someone shouted") - they are handled separately
+11. If a title is used ("the professor said") but the name is known from context, extract with the name
 </rules>
 
 <example>
-Input: «Привет!» — сказала Маша. Иван кивнул. «Как дела?» — спросил он.
+Input: "Hello!" said Mary. Professor Johnson smiled. "How are you?" he asked. "Fine," replied the judge.
 Output:
 {
   "characters": [
-    {"canonicalName": "Маша", "variations": ["Маша"], "gender": "female"},
-    {"canonicalName": "Иван", "variations": ["Иван"], "gender": "male"}
+    {"canonicalName": "Mary", "variations": ["Mary"], "gender": "female"},
+    {"canonicalName": "Professor Johnson", "variations": ["Professor Johnson", "Johnson"], "gender": "male"},
+    {"canonicalName": "judge", "variations": ["judge", "the judge"], "gender": "unknown"}
   ]
 }
 </example>
@@ -279,13 +283,14 @@ For each sentence with dialogue, output its index and speaker code. Skip narrato
 </task>
 
 <rules>
-1. Narrator: descriptions, actions, thoughts without quotes - DO NOT OUTPUT these
-2. Character: ANY sentence with dialogue in quotes ("...", «...») - OUTPUT index:code
-3. Unnamed speaker ("the girl said", "a man shouted"): use gender codes (MALE_UNNAMED/FEMALE_UNNAMED/UNKNOWN_UNNAMED)
-4. Dialogue continuation: same speaker continues until new attribution
-5. Pronouns ("she said") refer to most recent character of matching gender
-6. Multi-line dialogue: if one speech spans multiple [index] lines, tag each line
-7. Reported speech inside narrative ("he ranted about X") = skip (narrator)
+1. ONLY tag sentences containing actual quoted dialogue ("...", «...»)
+2. DO NOT tag: narrative descriptions, actions, thoughts, or reported speech
+3. Reported/indirect speech = SKIP: "said her goodbyes", "thanked him", "mentioned that..."
+4. Unnamed speaker ("a man shouted"): use MALE_UNNAMED/FEMALE_UNNAMED/UNKNOWN_UNNAMED
+5. Dialogue continuation: same speaker continues until new attribution
+6. Pronoun resolution with multiple same-gender characters: use MOST RECENT named attribution
+7. Track conversation context: if Lily and Mirian are talking, "she said" refers to the one who just spoke or was just mentioned
+8. Multi-line dialogue: if one speech spans multiple [index] lines, tag each line
 </rules>
 
 <codes>
@@ -294,24 +299,26 @@ ${codesSection}
 
 <example>
 Input:
-[0] Мария вошла в комнату.
-[1] «Привет!» — сказала она.
-[2] Какой-то мужчина улыбнулся.
-[3] «Рад тебя видеть», — ответил он.
-[4] «Кто вы?» — спросила девушка у двери.
+[0] Mary entered the room.
+[1] "Hello!" she said.
+[2] "How are you?" asked Anna.
+[3] "Good," she replied.
+[4] Anna nodded and said goodbye to her.
 
-Codes: A=Мария, B=MALE_UNNAMED, C=FEMALE_UNNAMED, D=UNKNOWN_UNNAMED
+Codes: A=Mary, B=Anna, C=MALE_UNNAMED, D=FEMALE_UNNAMED, E=UNKNOWN_UNNAMED
 
 Output:
 1:A
-3:B
-4:C
+2:B
+3:A
+
+Note: [3] "she" refers to Mary (responding to Anna's question). [4] is NOT tagged - "said goodbye" is reported speech, not quoted dialogue.
 </example>
 
 <output_format>
 Output ONLY lines in format: index:code
 One line per speaking sentence. Empty output = all narrator.
-No JSON, no explanation.
+No JSON, no explanation, no notes.
 </output_format>`;
 
     const user = `<sentences>
