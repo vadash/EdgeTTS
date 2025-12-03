@@ -60,7 +60,7 @@ export function LLMSettingsPanel() {
             onInput={(e) => {
               llmApiKey.value = (e.target as HTMLInputElement).value;
             }}
-            placeholder="sk-..."
+            placeholder="Api key will be encrypted in browser local storage"
             style={{
               width: '100%',
               padding: '0.5rem',
@@ -83,7 +83,7 @@ export function LLMSettingsPanel() {
             onInput={(e) => {
               llmApiUrl.value = (e.target as HTMLInputElement).value;
             }}
-            placeholder="https://api.openai.com/v1"
+            placeholder="https://enter.api.url.here.open.ai.compatible/v1"
             style={{
               width: '100%',
               padding: '0.5rem',
@@ -106,7 +106,7 @@ export function LLMSettingsPanel() {
             onInput={(e) => {
               llmModel.value = (e.target as HTMLInputElement).value;
             }}
-            placeholder="gpt-4o-mini"
+            placeholder="your-model-name"
             style={{
               width: '100%',
               padding: '0.5rem',

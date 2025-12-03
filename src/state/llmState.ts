@@ -47,8 +47,8 @@ export async function loadLLMSettings(): Promise<void> {
       const settings: LLMSettings = JSON.parse(saved);
       llmEnabled.value = settings.enabled ?? true;
       llmApiKey.value = await decryptValue(settings.apiKey ?? '');
-      llmApiUrl.value = settings.apiUrl ?? 'https://api.openai.com/v1';
-      llmModel.value = settings.model ?? 'gpt-4o-mini';
+      llmApiUrl.value = settings.apiUrl ?? '';
+      llmModel.value = settings.model ?? '';
     }
   } catch (e) {
     console.error('Failed to load LLM settings:', e);

@@ -1,10 +1,8 @@
 import { useText } from 'preact-i18n';
-import { textContent, isLiteMode } from '../state/appState';
+import { textContent } from '../state/appState';
 
 export function TextInput() {
   const { placeholder } = useText({ placeholder: 'text.placeholder' });
-
-  if (isLiteMode.value) return null;
 
   return (
     <textarea
