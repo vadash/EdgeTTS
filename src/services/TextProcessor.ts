@@ -1,7 +1,7 @@
 // TextProcessor Service - Text chunking and dictionary processing
 // Migrated from processing_file.js
 
-import { TEXT_PROCESSING } from '../utils/constants';
+import { defaultConfig } from '@/config';
 import type { ProcessedBook } from '../state/types';
 
 export interface TextProcessorOptions {
@@ -29,8 +29,8 @@ export class TextProcessor {
 
   constructor(options: TextProcessorOptions) {
     this.fileNames = [[options.fileName, 0]];
-    this.firstStringsLength = options.firstStringsLength ?? TEXT_PROCESSING.FIRST_STRINGS_LENGTH;
-    this.lastStringsLength = options.lastStringsLength ?? TEXT_PROCESSING.LAST_STRINGS_LENGTH;
+    this.firstStringsLength = options.firstStringsLength ?? defaultConfig.textProcessing.firstStringsLength;
+    this.lastStringsLength = options.lastStringsLength ?? defaultConfig.textProcessing.lastStringsLength;
     this.dictionary = options.dictionary;
     this.caseSensitive = options.caseSensitive;
     this.pointsSelect = options.pointsSelect;

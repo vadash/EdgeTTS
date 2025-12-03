@@ -3,7 +3,7 @@
 
 import { sha256 } from '../utils/sha256';
 import { generateConnectionId } from '../utils/uuid';
-import { EDGE_TTS_API, WIN_EPOCH, S_TO_NS } from '../utils/constants';
+import { defaultConfig, WIN_EPOCH, S_TO_NS } from '@/config';
 import type { TTSConfig, StatusUpdate } from '../state/types';
 
 export interface TTSWorkerOptions {
@@ -58,7 +58,7 @@ export class EdgeTTSService {
     const secMsGec = this.generateSecMsGec();
     const connectionId = generateConnectionId();
 
-    const url = `${EDGE_TTS_API.BASE_URL}?TrustedClientToken=${EDGE_TTS_API.TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC=${secMsGec}&Sec-MS-GEC-Version=${EDGE_TTS_API.SEC_MS_GEC_VERSION}&ConnectionId=${connectionId}`;
+    const url = `${defaultConfig.edgeTtsApi.baseUrl}?TrustedClientToken=${defaultConfig.edgeTtsApi.trustedClientToken}&Sec-MS-GEC=${secMsGec}&Sec-MS-GEC-Version=${defaultConfig.edgeTtsApi.secMsGecVersion}&ConnectionId=${connectionId}`;
 
     this.socket = new WebSocket(url);
     this.socket.addEventListener('open', this.handleOpen.bind(this));
@@ -100,7 +100,7 @@ export class EdgeTTSService {
       `X-Timestamp:${timestamp}\r\n` +
       'Content-Type:application/json; charset=utf-8\r\n' +
       'Path:speech.config\r\n\r\n' +
-      `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":false,"wordBoundaryEnabled":true},"outputFormat":"${EDGE_TTS_API.AUDIO_FORMAT}"}}}}\r\n`
+      `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":false,"wordBoundaryEnabled":true},"outputFormat":"${defaultConfig.edgeTtsApi.audioFormat}"}}}}\r\n`
     );
 
     // Send SSML
@@ -198,7 +198,7 @@ export class EdgeTTSService {
     ticks -= ticks % 300;
     ticks *= S_TO_NS / 100;
 
-    const strToHash = Math.floor(ticks) + EDGE_TTS_API.TRUSTED_CLIENT_TOKEN;
+    const strToHash = Math.floor(ticks) + defaultConfig.edgeTtsApi.trustedClientToken;
     return sha256(strToHash).toUpperCase();
   }
 

@@ -3,7 +3,7 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
-import { FFMPEG_CONFIG, AUDIO_PROCESSING } from '@/utils/constants';
+import { defaultConfig } from '@/config';
 
 export interface AudioProcessingConfig {
   silenceRemoval: boolean;
@@ -16,23 +16,11 @@ interface CDNConfig {
   wasmJs: string;
 }
 
-const CDN_MIRRORS: CDNConfig[] = [
-  {
-    baseUrl: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd',
-    coreJs: 'ffmpeg-core.js',
-    wasmJs: 'ffmpeg-core.wasm',
-  },
-  {
-    baseUrl: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd',
-    coreJs: 'ffmpeg-core.js',
-    wasmJs: 'ffmpeg-core.wasm',
-  },
-  {
-    baseUrl: 'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd',
-    coreJs: 'ffmpeg-core.min.js',
-    wasmJs: 'ffmpeg-core.wasm',
-  },
-];
+const CDN_MIRRORS: CDNConfig[] = defaultConfig.ffmpeg.cdnMirrors.map((url, index) => ({
+  baseUrl: url,
+  coreJs: index === 2 ? 'ffmpeg-core.min.js' : 'ffmpeg-core.js',
+  wasmJs: 'ffmpeg-core.wasm',
+}));
 
 class FFmpegService {
   private static instance: FFmpegService | null = null;
@@ -153,9 +141,9 @@ class FFmpegService {
 
       args.push(
         '-c:a', 'libopus',
-        '-b:a', `${AUDIO_PROCESSING.OPUS_BITRATE}k`,
-        '-compression_level', String(AUDIO_PROCESSING.OPUS_COMPRESSION),
-        '-ar', String(AUDIO_PROCESSING.SAMPLE_RATE),
+        '-b:a', `${defaultConfig.audio.opusBitrate}k`,
+        '-compression_level', String(defaultConfig.audio.opusCompression),
+        '-ar', String(defaultConfig.audio.sampleRate),
         '-ac', '1',
         '-vbr', 'on',
         'output.opus'
@@ -182,26 +170,26 @@ class FFmpegService {
     const filters: string[] = [];
 
     if (config.silenceRemoval) {
-      const sr = AUDIO_PROCESSING;
+      const audio = defaultConfig.audio;
       filters.push(
         `silenceremove=` +
-        `start_periods=${sr.SILENCE_START_PERIODS}:` +
-        `start_silence=${sr.SILENCE_START_DURATION}:` +
-        `start_threshold=${sr.SILENCE_THRESHOLD}dB:` +
+        `start_periods=${audio.silenceStartPeriods}:` +
+        `start_silence=${audio.silenceStartDuration}:` +
+        `start_threshold=${audio.silenceThreshold}dB:` +
         `detection=peak:` +
-        `stop_periods=${sr.SILENCE_STOP_PERIODS}:` +
-        `stop_silence=${sr.SILENCE_STOP_DURATION}:` +
-        `stop_threshold=${sr.SILENCE_THRESHOLD}dB`
+        `stop_periods=${audio.silenceStopPeriods}:` +
+        `stop_silence=${audio.silenceStopDuration}:` +
+        `stop_threshold=${audio.silenceThreshold}dB`
       );
     }
 
     if (config.normalization) {
-      const ap = AUDIO_PROCESSING;
+      const audio = defaultConfig.audio;
       filters.push(
         `loudnorm=` +
-        `I=${ap.NORM_LUFS}:` +
-        `LRA=${ap.NORM_LRA}:` +
-        `TP=${ap.NORM_TP}`
+        `I=${audio.normLufs}:` +
+        `LRA=${audio.normLra}:` +
+        `TP=${audio.normTruePeak}`
       );
     }
 

@@ -1,6 +1,6 @@
 import { Text } from 'preact-i18n';
 import { useData, useConversion } from '../stores';
-import { useTTSConversion } from '../hooks/useTTSConversionNew';
+import { useTTSConversion } from '../hooks/useTTSConversion';
 
 export function ConvertButton() {
   const dataStore = useData();

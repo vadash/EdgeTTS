@@ -2,7 +2,7 @@
 // Supports Opus encoding with silence removal and normalization
 
 import { ffmpegService, type AudioProcessingConfig } from './FFmpegService';
-import { AUDIO_PROCESSING } from '@/utils/constants';
+import { defaultConfig } from '@/config';
 
 export interface MergedFile {
   filename: string;
@@ -34,9 +34,9 @@ export class AudioMerger {
   constructor(config: MergerConfig) {
     this.config = config;
 
-    // Duration settings from constants
-    const targetMinutes = AUDIO_PROCESSING.TARGET_DURATION_MINUTES;
-    const tolerancePercent = AUDIO_PROCESSING.TOLERANCE_PERCENT;
+    // Duration settings from config
+    const targetMinutes = defaultConfig.audio.targetDurationMinutes;
+    const tolerancePercent = defaultConfig.audio.tolerancePercent;
 
     this.targetDurationMs = targetMinutes * 60 * 1000;
     this.minDurationMs = this.targetDurationMs * (1 - tolerancePercent / 100);
@@ -47,7 +47,7 @@ export class AudioMerger {
    * Estimate duration from MP3 bytes (96kbps = 12 bytes/ms)
    */
   private estimateDurationMs(bytes: number): number {
-    return Math.round(bytes / AUDIO_PROCESSING.BYTES_PER_MS);
+    return Math.round(bytes / defaultConfig.audio.bytesPerMs);
   }
 
   /**
