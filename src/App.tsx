@@ -1,6 +1,7 @@
 import { TextInput } from './components/TextInput';
 import { VoiceSelector } from './components/VoiceSelector/VoiceSelector';
 import { SettingsPanel } from './components/Settings/SettingsPanel';
+import { LanguageSelector } from './components/Settings/LanguageSelector';
 import { FileUpload } from './components/FileHandlers/FileUpload';
 import { DictionaryUpload } from './components/FileHandlers/DictionaryUpload';
 import { StatusArea } from './components/StatusArea';
@@ -10,7 +11,10 @@ export function App() {
   return (
     <div class="app">
       <aside class="sidebar">
-        <VoiceSelector />
+        <div class="top-row">
+          <VoiceSelector />
+          <LanguageSelector />
+        </div>
 
         <SettingsPanel />
 

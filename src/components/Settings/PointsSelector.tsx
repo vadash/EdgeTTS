@@ -22,12 +22,11 @@ export function PointsSelector() {
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem', gap: '0.5rem' }}>
+    <div class="points-selector">
       <select
         class="pointsselect"
         value={settings.pointsSelect.value}
         onChange={(e) => settings.setPointsSelect((e.target as HTMLSelectElement).value)}
-        style={{ width: '80%', borderRadius: '10px' }}
       >
         {POINTS_OPTIONS.map((key) => (
           <option key={key} value={key}>{labels[key]}</option>
@@ -35,7 +34,7 @@ export function PointsSelector() {
       </select>
       <button
         onClick={cyclePointsType}
-        style={{ width: '16%', minWidth: '40px' }}
+        class="points-type-btn"
       >
         {settings.pointsType.value}
       </button>

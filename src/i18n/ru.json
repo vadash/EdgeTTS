@@ -12,6 +12,9 @@
     "threads": "Потоков",
     "merge": "Объединять",
     "mergeAll": "ВСЕ",
+    "outputFormat": "Формат вывода",
+    "silenceRemoval": "Удалить тишину",
+    "normalization": "Нормализация звука",
     "points": {
       "label": "Замена точек",
       "none": "Не заменять точки",
@@ -52,9 +55,26 @@
     "ready": "Готово",
     "processing": "Обработка...",
     "completed": "Завершено",
-    "error": "Ошибка"
+    "error": "Ошибка",
+    "filter": {
+      "all": "Все",
+      "errors": "Ошибки",
+      "warnings": "Предупр."
+    },
+    "actions": {
+      "clear": "Очистить",
+      "copy": "Копировать",
+      "export": "Экспорт"
+    },
+    "progress": {
+      "eta": "Осталось"
+    }
   },
   "text": {
     "placeholder": "Текст..."
+  },
+  "language": {
+    "en": "EN",
+    "ru": "RU"
   }
 }

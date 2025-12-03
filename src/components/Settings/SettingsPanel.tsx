@@ -18,7 +18,7 @@ export function SettingsPanel() {
     <div class="settings-panel">
       <LLMSettingsPanel />
 
-      <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color, #444)' }}>
+      <div class="settings-section">
         <PointsSelector />
 
       <Slider
@@ -33,9 +33,8 @@ export function SettingsPanel() {
       <div
         class="dop-settings-toggle"
         onClick={() => settings.toggleDopSettings()}
-        style={{ cursor: 'pointer', textAlign: 'center', marginBottom: '0.5rem' }}
       >
-        <label style={{ cursor: 'pointer' }}>
+        <label>
           {settings.showDopSettings.value ? '▲' : '▼'} <Text id="settings.additional">Additional</Text>
         </label>
       </div>
@@ -65,7 +64,6 @@ export function SettingsPanel() {
             <select
               value={settings.outputFormat.value}
               onChange={(e) => settings.setOutputFormat((e.target as HTMLSelectElement).value as 'mp3' | 'opus')}
-              style={{ marginLeft: 'auto', padding: '0.25rem' }}
             >
               <option value="opus">Opus</option>
               <option value="mp3">MP3</option>
@@ -95,7 +93,7 @@ export function SettingsPanel() {
               </label>
 
               {conversion.ffmpegError.value && (
-                <div style={{ color: 'var(--warning-color, #f90)', fontSize: '0.85rem', marginTop: '0.25rem' }}>
+                <div class="warning-message">
                   ⚠️ {conversion.ffmpegError.value}
                 </div>
               )}
@@ -116,7 +114,7 @@ export function SettingsPanel() {
 
       <button
         onClick={handleSave}
-        style={{ width: '100%', marginBottom: '1rem' }}
+        class="w-full mb-1"
       >
         💾 <Text id="settings.save">Save Settings</Text>
       </button>

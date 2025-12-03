@@ -37,8 +37,8 @@ export function FileUpload() {
   };
 
   return (
-    <label>
-      <span style={{ display: 'block', textAlign: 'center', paddingBottom: '0.25rem' }}>
+    <label class="file-handler-label" aria-label="Upload text file">
+      <span class="file-handler-title">
         <Text id="files.upload">File</Text>
       </span>
       <input
@@ -47,11 +47,12 @@ export function FileUpload() {
         accept=".txt,.fb2,.epub,.ini,.zip"
         multiple
         onChange={handleFileChange}
-        style={{ display: 'none' }}
+        aria-label="Select text file to upload"
       />
       <button
         onClick={() => inputRef.current?.click()}
-        style={{ width: '100%' }}
+        class="w-full"
+        aria-label="Open file picker"
       >
         📄
       </button>

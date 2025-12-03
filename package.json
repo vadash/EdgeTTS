@@ -6,7 +6,10 @@
     "dev": "webpack serve --mode development",
     "build": "webpack --mode production",
     "preview": "npx serve dist",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "preact": "^10.19.3",
@@ -28,6 +31,10 @@
     "style-loader": "^3.3.3",
     "copy-webpack-plugin": "^11.0.0",
     "clean-webpack-plugin": "^4.0.0",
-    "@types/node": "^20.10.5"
+    "@types/node": "^20.10.5",
+    "vitest": "^2.1.0",
+    "jsdom": "^25.0.0",
+    "@testing-library/preact": "^3.2.4",
+    "@vitest/coverage-v8": "^2.1.0"
   }
 }

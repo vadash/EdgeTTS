@@ -12,11 +12,7 @@ export function TextInput() {
       placeholder={placeholder}
       value={dataStore.textContent.value}
       onInput={(e) => dataStore.setTextContent((e.target as HTMLTextAreaElement).value)}
-      style={{
-        flex: 1,
-        width: '100%',
-        minHeight: '200px',
-      }}
+      aria-label="Text content for conversion"
     />
   );
 }

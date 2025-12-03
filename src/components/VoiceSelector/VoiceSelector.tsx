@@ -1,4 +1,5 @@
 import { signal } from '@preact/signals';
+import { Text } from 'preact-i18n';
 import { useSettings } from '../../stores';
 import voices from './voices';
 import { EdgeTTSService } from '../../services/EdgeTTSService';
@@ -69,12 +70,15 @@ export function VoiceSelector() {
 
   return (
     <div class="voice-selector">
-      <label class="voice-selector-label">Narrator Voice:</label>
+      <label class="voice-selector-label" id="voice-label">
+        <Text id="settings.voice">Voice</Text>:
+      </label>
       <div class="voice-selector-row">
         <select
           class="voice-select"
           value={settings.narratorVoice.value}
           onChange={(e) => settings.setNarratorVoice((e.target as HTMLSelectElement).value)}
+          aria-labelledby="voice-label"
         >
           {voices.map((v) => (
             <option key={v.fullValue} value={v.fullValue}>
@@ -86,7 +90,8 @@ export function VoiceSelector() {
           class="play-sample-btn"
           onClick={playVoiceSample}
           disabled={isPlaying.value}
-          title="Play sample"
+          aria-label="Play voice sample"
+          aria-busy={isPlaying.value}
         >
           {isPlaying.value ? '...' : '▶'}
         </button>
@@ -97,6 +102,7 @@ export function VoiceSelector() {
         value={samplePhrase.value}
         onInput={(e) => samplePhrase.value = (e.target as HTMLInputElement).value}
         placeholder="Sample phrase..."
+        aria-label="Sample phrase for voice preview"
       />
     </div>
   );

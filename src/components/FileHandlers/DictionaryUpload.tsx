@@ -24,12 +24,14 @@ export function DictionaryUpload() {
     input.value = '';
   };
 
+  const ruleCount = dataStore.dictionaryRaw.value.length;
+
   return (
-    <label>
-      <span style={{ display: 'block', textAlign: 'center', paddingBottom: '0.25rem' }}>
+    <label class="file-handler-label" aria-label="Upload dictionary file">
+      <span class="file-handler-title">
         <Text id="files.dictionary">Dictionary</Text>
-        {dataStore.dictionaryRaw.value.length > 0 && (
-          <span style={{ color: 'var(--accent)' }}> ({dataStore.dictionaryRaw.value.length})</span>
+        {ruleCount > 0 && (
+          <span class="file-handler-count"> ({ruleCount})</span>
         )}
       </span>
       <input
@@ -37,10 +39,12 @@ export function DictionaryUpload() {
         type="file"
         accept=".lexx,.txt"
         onChange={handleFileChange}
+        aria-label="Select dictionary file"
       />
       <button
         onClick={() => inputRef.current?.click()}
-        style={{ width: '100%' }}
+        class="w-full"
+        aria-label="Open dictionary picker"
       >
         📖
       </button>

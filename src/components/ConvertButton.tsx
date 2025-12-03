@@ -20,13 +20,17 @@ export function ConvertButton() {
     await startConversion(dataStore.textContent.value, dataStore.book.value);
   };
 
+  const isProcessing = conversionStore.isProcessing.value;
+
   return (
     <button
       class="convert-btn"
       onClick={handleClick}
-      disabled={conversionStore.isProcessing.value}
+      disabled={isProcessing}
+      aria-label={isProcessing ? 'Converting text to speech' : 'Start text to speech conversion'}
+      aria-busy={isProcessing}
     >
-      {conversionStore.isProcessing.value ? (
+      {isProcessing ? (
         <Text id="status.processing">Processing...</Text>
       ) : (
         <Text id="convert.button">Save to MP3</Text>

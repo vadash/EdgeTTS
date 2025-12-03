@@ -12,6 +12,9 @@
     "threads": "Threads",
     "merge": "Merge",
     "mergeAll": "ALL",
+    "outputFormat": "Output Format",
+    "silenceRemoval": "Remove Silence",
+    "normalization": "Normalize Audio",
     "points": {
       "label": "Point replacement",
       "none": "Don't replace periods",
@@ -52,9 +55,26 @@
     "ready": "Ready",
     "processing": "Processing...",
     "completed": "Completed",
-    "error": "Error"
+    "error": "Error",
+    "filter": {
+      "all": "All",
+      "errors": "Errors",
+      "warnings": "Warnings"
+    },
+    "actions": {
+      "clear": "Clear",
+      "copy": "Copy",
+      "export": "Export"
+    },
+    "progress": {
+      "eta": "ETA"
+    }
   },
   "text": {
     "placeholder": "Text..."
+  },
+  "language": {
+    "en": "EN",
+    "ru": "RU"
   }
 }
