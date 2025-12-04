@@ -1,6 +1,7 @@
 import { Text } from 'preact-i18n';
-import { useData, useConversion } from '../stores';
-import { useTTSConversion } from '../hooks/useTTSConversion';
+import { useData, useConversion } from '@/stores';
+import { useTTSConversion } from '@/hooks/useTTSConversion';
+import { Button } from '@/components/common';
 
 export function ConvertButton() {
   const dataStore = useData();
@@ -23,18 +24,25 @@ export function ConvertButton() {
   const isProcessing = conversionStore.isProcessing.value;
 
   return (
-    <button
-      class="convert-btn"
+    <Button
+      variant="primary"
       onClick={handleClick}
-      disabled={isProcessing}
+      disabled={isProcessing || !dataStore.textContent.value.trim()}
+      className="w-full py-3 text-base"
       aria-label={isProcessing ? 'Converting text to speech' : 'Start text to speech conversion'}
       aria-busy={isProcessing}
     >
       {isProcessing ? (
-        <Text id="status.processing">Processing...</Text>
+        <>
+          <span className="animate-spin">⏳</span>
+          <Text id="status.processing">Processing...</Text>
+        </>
       ) : (
-        <Text id="convert.button">Save to MP3</Text>
+        <>
+          <span>🎵</span>
+          <Text id="convert.button">Save to MP3</Text>
+        </>
       )}
-    </button>
+    </Button>
   );
 }

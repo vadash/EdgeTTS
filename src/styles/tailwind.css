@@ -1,0 +1,191 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-primary text-white antialiased;
+  }
+
+  body {
+    @apply m-0 p-0 min-h-screen font-sans;
+  }
+
+  * {
+    @apply box-border;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-primary-secondary rounded;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary-tertiary rounded hover:bg-border;
+  }
+}
+
+@layer components {
+  /* Buttons */
+  .btn {
+    @apply px-4 py-2.5 rounded-lg font-medium transition-all duration-200
+           border border-border bg-primary-secondary text-white
+           hover:border-accent hover:shadow-[0_0_0_2px_rgba(13,110,253,0.3)]
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+           flex items-center justify-center gap-2;
+  }
+
+  .btn-primary {
+    @apply bg-accent border-accent text-white
+           hover:bg-accent-hover hover:border-accent-hover;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  .btn-icon {
+    @apply p-2 aspect-square;
+  }
+
+  /* Inputs */
+  .input-field {
+    @apply w-full px-3 py-2.5 rounded-lg
+           bg-primary border border-border text-white
+           placeholder:text-gray-500
+           focus:outline-none focus:border-accent
+           focus:shadow-[0_0_0_2px_rgba(13,110,253,0.3)]
+           transition-all duration-200;
+  }
+
+  .input-label {
+    @apply block text-sm text-gray-400 mb-1.5;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-primary-secondary rounded-lg p-4 border border-border;
+  }
+
+  /* Toggle Switch */
+  .toggle {
+    @apply relative inline-flex h-6 w-11 items-center rounded-full
+           bg-primary-tertiary cursor-pointer transition-colors duration-200;
+  }
+
+  .toggle-checked {
+    @apply bg-accent;
+  }
+
+  .toggle-thumb {
+    @apply inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200;
+  }
+
+  .toggle-thumb-checked {
+    @apply translate-x-6;
+  }
+
+  .toggle-thumb-unchecked {
+    @apply translate-x-1;
+  }
+
+  /* Tabs */
+  .tabs-list {
+    @apply flex border-b border-border overflow-x-auto;
+  }
+
+  .tab-trigger {
+    @apply px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors
+           text-gray-400 hover:text-white border-b-2 border-transparent
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-accent;
+  }
+
+  .tab-trigger-active {
+    @apply text-accent border-accent;
+  }
+
+  .tab-content {
+    @apply flex-1 overflow-y-auto p-4;
+  }
+
+  /* Select */
+  .select-field {
+    @apply w-full px-3 py-2.5 rounded-lg appearance-none
+           bg-primary border border-border text-white
+           focus:outline-none focus:border-accent
+           focus:shadow-[0_0_0_2px_rgba(13,110,253,0.3)]
+           transition-all duration-200 cursor-pointer
+           bg-[url('data:image/svg+xml;charset=UTF-8,%3csvg%20xmlns%3d%22http%3a%2f%2fwww.w3.org%2f2000%2fsvg%22%20width%3d%2212%22%20height%3d%2212%22%20viewBox%3d%220%200%2012%2012%22%3e%3cpath%20fill%3d%22%23888%22%20d%3d%22M6%208L1%203h10z%22%2f%3e%3c%2fsvg%3e')]
+           bg-[length:12px] bg-[right_12px_center] bg-no-repeat pr-10;
+  }
+
+  /* Slider */
+  .slider {
+    @apply w-full h-2 rounded-full bg-primary-tertiary appearance-none cursor-pointer
+           [&::-webkit-slider-thumb]:appearance-none
+           [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+           [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent
+           [&::-webkit-slider-thumb]:cursor-pointer
+           [&::-webkit-slider-thumb]:transition-transform
+           [&::-webkit-slider-thumb]:hover:scale-110
+           [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
+           [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-accent
+           [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer;
+  }
+
+  /* Progress Bar */
+  .progress-bar {
+    @apply h-1 bg-primary-tertiary rounded-full overflow-hidden;
+  }
+
+  .progress-bar-fill {
+    @apply h-full bg-accent transition-all duration-300 ease-out;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  }
+
+  .badge-info {
+    @apply bg-blue-500/20 text-blue-400;
+  }
+
+  .badge-warn {
+    @apply bg-yellow-500/20 text-yellow-400;
+  }
+
+  .badge-error {
+    @apply bg-red-500/20 text-red-400;
+  }
+
+  .badge-success {
+    @apply bg-green-500/20 text-green-400;
+  }
+}
+
+@layer utilities {
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe area padding for mobile */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

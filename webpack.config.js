@@ -40,6 +40,7 @@ export default (env, argv) => {
           use: [
             isProduction ? MiniCssExtractPlugin.loader : 'style-loader',
             'css-loader',
+            'postcss-loader',
           ],
         },
         {

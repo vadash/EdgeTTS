@@ -59,7 +59,7 @@ Optional feature for multi-voice audiobooks using LLM-based character detection:
 
 ### State Management (`src/stores/`)
 
-Modern state management using Zustand with typed stores:
+Modern state management using Preact Signals with typed stores:
 
 - **SettingsStore**: Voice settings (voice, rate, pitch, maxThreads), output format (MP3/Opus), audio processing toggles (silence removal, normalization)
 - **ConversionStore**: Conversion progress (isProcessing, processedCount, totalCount), status lines, save path handle
@@ -68,14 +68,62 @@ Modern state management using Zustand with typed stores:
 - **LogStore**: Centralized logging service
 - **LanguageStore**: UI language preferences
 
-Settings persist to localStorage via Zustand persistence middleware.
+Settings persist to localStorage.
 
-### Components Structure
+### UI Architecture
 
-- `VoiceSelector`: many voices across locales (hardcoded in `voices.ts`)
-- `SettingsPanel`: Rate/pitch sliders, output format (MP3/Opus), silence/normalization toggles
-- `FileHandlers`: File upload and .lexx dictionary upload
-- `ConvertButton`: Triggers conversion via `useTTSConversion` hook
+**Styling**: Tailwind CSS v3 with custom dark theme colors defined in `tailwind.config.js`
+
+**Routing**: Hash-based routing (`#/`, `#/settings`, `#/logs`) for GitHub Pages compatibility
+- `src/router/` - Router component and useRoute hook
+
+**Layout**:
+- Desktop: Header navigation + side-by-side text editor/status panel
+- Mobile (<768px): Bottom tab navigation with separate logs view
+
+### Components Structure (`src/components/`)
+
+```
+components/
+├── common/           # Reusable UI primitives
+│   ├── Button.tsx    # Button with variants (primary, default) and sizes
+│   ├── Input.tsx     # Text input with label
+│   ├── Select.tsx    # Dropdown select
+│   ├── Toggle.tsx    # Switch toggle
+│   ├── Slider.tsx    # Range slider with label
+│   ├── Tabs.tsx      # Tab container and TabPanel
+│   └── Card.tsx      # Card container
+│
+├── layout/           # App shell components
+│   ├── AppShell.tsx  # Main layout wrapper
+│   ├── Header.tsx    # Top navigation (desktop)
+│   └── BottomNav.tsx # Bottom navigation (mobile)
+│
+├── convert/          # Convert view components
+│   ├── ConvertView.tsx     # Main convert page layout
+│   ├── FileDropZone.tsx    # Drag-and-drop file upload
+│   ├── TextEditor.tsx      # Main text textarea
+│   ├── QuickVoiceSelect.tsx # Voice selector with preview
+│   └── ConvertButton.tsx   # Conversion trigger button
+│
+├── settings/         # Settings view with tabbed interface
+│   ├── SettingsView.tsx    # Settings page with tabs
+│   └── tabs/
+│       ├── GeneralTab.tsx      # Language, speed, pitch, threads
+│       ├── VoicePoolTab.tsx    # Enable/disable voices
+│       ├── LLMTab.tsx          # LLM API configuration
+│       ├── AudioTab.tsx        # Output format, silence removal
+│       ├── DictionaryTab.tsx   # Dictionary upload and rules
+│       └── ExportImportTab.tsx # Settings backup/restore
+│
+├── status/           # Status/logs components
+│   ├── StatusPanel.tsx   # Log display with filters
+│   ├── StatusView.tsx    # Full-page logs (mobile)
+│   └── ProgressBar.tsx   # Progress indicator
+│
+└── VoiceSelector/    # Voice data
+    └── voices.ts     # Hardcoded Microsoft Edge voices list
+```
 
 ### useTTSConversion Hook
 
@@ -144,10 +192,11 @@ Comprehensive test environment with mocked browser APIs:
 - **Path Aliases**: `@/*` maps to `src/*`
 - **Output**: Declarations and source maps to `dist/`
 - **Module Resolution**: Node with ES2021 lib support
+- **Test Exclusions**: `*.test.ts`, `*.test.tsx`, `src/test/**/*` excluded from main build
 
 ## Build Configuration
 
-- Webpack with ts-loader
+- Webpack with ts-loader and postcss-loader (for Tailwind)
 - Production builds output to `/EdgeTTS/` path (for GitHub Pages)
 - Path alias: `@/` maps to `src/`
 - React/ReactDOM aliased to Preact
@@ -168,11 +217,22 @@ src/
 ├── di/              # Dependency injection system
 ├── services/        # Business logic and API clients
 │   └── pipeline/    # Pipeline runner and steps
-├── stores/          # Zustand state management
+├── stores/          # Preact Signals state management
 ├── hooks/           # React hooks
-├── components/      # Preact UI components
+├── components/      # Preact UI components (see Components Structure above)
+├── router/          # Hash-based routing
+├── styles/          # Tailwind CSS entry point
+├── i18n/            # Internationalization (en.json, ru.json)
 ├── state/types.ts   # Shared TypeScript types
 ├── utils/           # Utility functions
 ├── errors/          # Error handling
 └── test/            # Test utilities and factories
 ```
+
+## Styling
+
+Tailwind CSS v3 with custom configuration:
+- **Dark theme**: Custom colors (primary, accent, border)
+- **Component classes**: `.btn`, `.input-field`, `.select-field`, `.toggle`, `.card`, `.tabs-list`, `.tab-trigger`
+- **Config**: `tailwind.config.js` with extended theme
+- **PostCSS**: `postcss.config.js` with tailwindcss and autoprefixer

@@ -2,10 +2,15 @@
   "app": {
     "title": "Edge TTS"
   },
+  "nav": {
+    "convert": "Конвертация",
+    "settings": "Настройки",
+    "logs": "Логи"
+  },
   "settings": {
     "toggle": "Настройки",
     "additional": "Дополнительно",
-    "save": "Сохранить настройки",
+    "save": "Сохранить",
     "voice": "Голос",
     "rate": "Скорость",
     "pitch": "Высота",
@@ -15,14 +20,38 @@
     "outputFormat": "Формат вывода",
     "silenceRemoval": "Удалить тишину",
     "normalization": "Нормализация звука",
+    "language": "Язык",
+    "voicesEnabled": "голосов включено",
+    "enableAll": "Включить все",
+    "disableAll": "Выключить все",
+    "rules": "Правила",
+    "noRules": "Словарь не загружен",
+    "dictionaryHint": "Замены слов для произношения TTS",
+    "dictionaryFormatHelp": "Формат словаря",
+    "export": "Экспорт",
+    "exportHint": "Сохранить настройки в файл",
+    "exportButton": "Экспорт в JSON",
+    "exportWarning": "API ключи не экспортируются для безопасности",
+    "import": "Импорт",
+    "importHint": "Загрузить настройки из файла",
+    "importButton": "Импорт из JSON",
+    "reset": "Сброс настроек",
+    "resetHint": "Восстановить настройки по умолчанию",
+    "resetButton": "Сбросить",
+    "outputFormatHint": "Opus лучше качество при меньшем размере",
+    "silenceRemovalHint": "Удалить длинные паузы из аудио",
+    "normalizationHint": "Выровнять уровни звука",
     "dictionary": {
       "label": "Реестр словаря",
-      "caseSensitive": "Регистр словаря"
+      "caseSensitive": "Учитывать регистр",
+      "caseSensitiveHint": "Точное соответствие регистра"
     }
   },
   "llm": {
     "title": "LLM Голосовое назначение",
+    "description": "Использовать ИИ для определения персонажей",
     "apiKey": "API Ключ",
+    "apiKeyHint": "Ваш API ключ зашифрован и хранится локально",
     "apiUrl": "API URL",
     "model": "Модель",
     "testConnection": "Тест соединения",
@@ -33,10 +62,11 @@
   "files": {
     "dictionary": "Словарь",
     "upload": "Файл",
+    "dropzone": "Перетащите файлы или нажмите для загрузки",
     "formats": "txt, fb2, epub, ini, zip"
   },
   "convert": {
-    "button": "Начать конвертацию",
+    "button": "Сохранить в MP3",
     "selectFolder": "Выберите папку для сохранения"
   },
   "status": {

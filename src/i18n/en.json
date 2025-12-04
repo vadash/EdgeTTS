@@ -2,6 +2,11 @@
   "app": {
     "title": "Edge TTS"
   },
+  "nav": {
+    "convert": "Convert",
+    "settings": "Settings",
+    "logs": "Logs"
+  },
   "settings": {
     "toggle": "Settings",
     "additional": "Additional",
@@ -15,14 +20,38 @@
     "outputFormat": "Output Format",
     "silenceRemoval": "Remove Silence",
     "normalization": "Normalize Audio",
+    "language": "Language",
+    "voicesEnabled": "voices enabled",
+    "enableAll": "Enable All",
+    "disableAll": "Disable All",
+    "rules": "Rules",
+    "noRules": "No dictionary rules loaded",
+    "dictionaryHint": "Word replacements for TTS pronunciation",
+    "dictionaryFormatHelp": "Dictionary format help",
+    "export": "Export",
+    "exportHint": "Save your settings to a file for backup or sharing",
+    "exportButton": "Export to JSON",
+    "exportWarning": "API keys are not exported for security",
+    "import": "Import",
+    "importHint": "Load settings from a previously exported file",
+    "importButton": "Import from JSON",
+    "reset": "Reset Settings",
+    "resetHint": "Restore all settings to their default values",
+    "resetButton": "Reset to Defaults",
+    "outputFormatHint": "Opus offers better quality at smaller file sizes",
+    "silenceRemovalHint": "Remove long pauses from audio",
+    "normalizationHint": "Balance audio levels",
     "dictionary": {
       "label": "Dictionary register",
-      "caseSensitive": "Dictionary case"
+      "caseSensitive": "Case Sensitive",
+      "caseSensitiveHint": "Match exact letter case"
     }
   },
   "llm": {
     "title": "LLM Voice Assignment",
+    "description": "Use AI to detect characters and assign voices",
     "apiKey": "API Key",
+    "apiKeyHint": "Your API key is encrypted and stored locally",
     "apiUrl": "API URL",
     "model": "Model",
     "testConnection": "Test Connection",
@@ -33,10 +62,11 @@
   "files": {
     "dictionary": "Dictionary",
     "upload": "File",
+    "dropzone": "Drop files here or click to upload",
     "formats": "txt, fb2, epub, ini, zip"
   },
   "convert": {
-    "button": "Start conversion",
+    "button": "Save to MP3",
     "selectFolder": "Select folder to save"
   },
   "status": {

@@ -8,10 +8,7 @@ import type { SupportedLocale } from './stores/LanguageStore';
 import type { ILogger } from './services/interfaces';
 import en from './i18n/en.json';
 import ru from './i18n/ru.json';
-import './styles/global.css';
-import './styles/theme.css';
-import './styles/components.css';
-import './styles/responsive.css';
+import './styles/tailwind.css';
 
 // i18n definitions map
 const definitions: Record<SupportedLocale, Record<string, unknown>> = { en, ru };

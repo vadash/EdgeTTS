@@ -22,5 +22,5 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "legacy"]
+  "exclude": ["node_modules", "dist", "legacy", "**/*.test.ts", "**/*.test.tsx", "src/test/**/*"]
 }

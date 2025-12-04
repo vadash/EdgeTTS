@@ -1,0 +1,134 @@
+import { useState } from 'preact/hooks';
+import { Text } from 'preact-i18n';
+import { useLLM } from '@/stores';
+import { LLMVoiceService } from '@/services/LLMVoiceService';
+import { Button } from '@/components/common';
+
+export function LLMTab() {
+  const llm = useLLM();
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+
+  const handleTestConnection = async () => {
+    if (!llm.apiKey.value) {
+      setTestResult({ success: false, error: 'API key is required' });
+      return;
+    }
+
+    setTesting(true);
+    setTestResult(null);
+
+    const service = new LLMVoiceService({
+      apiKey: llm.apiKey.value,
+      apiUrl: llm.apiUrl.value,
+      model: llm.model.value,
+      narratorVoice: '',
+    });
+
+    const result = await service.testConnection();
+    setTestResult(result);
+    setTesting(false);
+  };
+
+  const handleSave = async () => {
+    await llm.saveSettings();
+    setTestResult({ success: true, error: undefined });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <span className="text-2xl">🤖</span>
+        <div>
+          <h3 className="font-semibold">
+            <Text id="llm.title">LLM Voice Assignment</Text>
+          </h3>
+          <p className="text-sm text-gray-400">
+            <Text id="llm.description">Use AI to detect characters and assign voices</Text>
+          </p>
+        </div>
+      </div>
+
+      {/* API Key */}
+      <div className="space-y-1">
+        <label className="input-label">
+          <Text id="llm.apiKey">API Key</Text>
+        </label>
+        <input
+          type="password"
+          className="input-field"
+          value={llm.apiKey.value}
+          onInput={(e) => llm.setApiKey((e.target as HTMLInputElement).value)}
+          placeholder="sk-... (encrypted in browser storage)"
+        />
+        <p className="text-xs text-gray-500">
+          <Text id="llm.apiKeyHint">Your API key is encrypted and stored locally</Text>
+        </p>
+      </div>
+
+      {/* API URL */}
+      <div className="space-y-1">
+        <label className="input-label">
+          <Text id="llm.apiUrl">API URL</Text>
+        </label>
+        <input
+          type="text"
+          className="input-field"
+          value={llm.apiUrl.value}
+          onInput={(e) => llm.setApiUrl((e.target as HTMLInputElement).value)}
+          placeholder="https://api.openai.com/v1"
+        />
+      </div>
+
+      {/* Model */}
+      <div className="space-y-1">
+        <label className="input-label">
+          <Text id="llm.model">Model</Text>
+        </label>
+        <input
+          type="text"
+          className="input-field"
+          value={llm.model.value}
+          onInput={(e) => llm.setModel((e.target as HTMLInputElement).value)}
+          placeholder="gpt-4o-mini"
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button
+          onClick={handleTestConnection}
+          disabled={testing || !llm.apiKey.value}
+          className="flex-1"
+        >
+          {testing ? (
+            <Text id="llm.testing">Testing...</Text>
+          ) : (
+            <>🔌 <Text id="llm.testConnection">Test Connection</Text></>
+          )}
+        </Button>
+        <Button variant="primary" onClick={handleSave} className="flex-1">
+          💾 <Text id="settings.save">Save</Text>
+        </Button>
+      </div>
+
+      {/* Result */}
+      {testResult && (
+        <div
+          className={`p-3 rounded-lg ${
+            testResult.success
+              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+              : 'bg-red-500/20 text-red-400 border border-red-500/30'
+          }`}
+        >
+          {testResult.success ? (
+            <>✅ <Text id="llm.connectionSuccess">Connection successful!</Text></>
+          ) : (
+            <>❌ {testResult.error}</>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

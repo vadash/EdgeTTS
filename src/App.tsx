@@ -1,36 +1,17 @@
-import { TextInput } from './components/TextInput';
-import { VoiceSelector } from './components/VoiceSelector/VoiceSelector';
-import { SettingsPanel } from './components/Settings/SettingsPanel';
-import { LanguageSelector } from './components/Settings/LanguageSelector';
-import { FileUpload } from './components/FileHandlers/FileUpload';
-import { DictionaryUpload } from './components/FileHandlers/DictionaryUpload';
-import { StatusArea } from './components/StatusArea';
-import { ConvertButton } from './components/ConvertButton';
+import { AppShell } from './components/layout';
+import { Router } from './router';
+import { ConvertView } from './components/convert';
+import { SettingsView } from './components/settings';
+import { StatusView } from './components/status';
 
 export function App() {
   return (
-    <div class="app">
-      <aside class="sidebar">
-        <div class="top-row">
-          <VoiceSelector />
-          <LanguageSelector />
-        </div>
-
-        <SettingsPanel />
-
-        <div class="file-handlers">
-          <DictionaryUpload />
-          <FileUpload />
-        </div>
-
-        <ConvertButton />
-      </aside>
-
-      <main class="main-content">
-        <TextInput />
-      </main>
-
-      <StatusArea />
-    </div>
+    <AppShell>
+      <Router
+        convertView={<ConvertView />}
+        settingsView={<SettingsView />}
+        logsView={<StatusView />}
+      />
+    </AppShell>
   );
 }
