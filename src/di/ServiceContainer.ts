@@ -13,6 +13,7 @@ export const ServiceTypes = {
   TextBlockSplitter: Symbol.for('ITextBlockSplitter'),
   VoicePoolBuilder: Symbol.for('IVoicePoolBuilder'),
   PipelineRunner: Symbol.for('IPipelineRunner'),
+  PipelineBuilder: Symbol.for('IPipelineBuilder'),
 
   // Factories (for creating per-conversion instances)
   LLMServiceFactory: Symbol.for('ILLMServiceFactory'),

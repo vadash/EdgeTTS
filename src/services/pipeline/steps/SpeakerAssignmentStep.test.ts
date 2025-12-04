@@ -113,7 +113,7 @@ describe('SpeakerAssignmentStep', () => {
       });
 
       await expect(step.execute(context, createNeverAbortSignal()))
-        .rejects.toThrow('requires characters and voiceMap');
+        .rejects.toThrow("requires 'characters'");
     });
 
     it('throws when voiceMap missing', async () => {
@@ -122,7 +122,7 @@ describe('SpeakerAssignmentStep', () => {
       });
 
       await expect(step.execute(context, createNeverAbortSignal()))
-        .rejects.toThrow('requires characters and voiceMap');
+        .rejects.toThrow("requires 'voiceMap'");
     });
   });
 

@@ -22,6 +22,7 @@ import { AudioMerger } from '@/services/AudioMerger';
 import { VoiceAssigner } from '@/services/VoiceAssigner';
 import { EdgeTTSService } from '@/services/EdgeTTSService';
 import { PipelineRunner } from '@/services/pipeline/PipelineRunner';
+import { PipelineBuilder, createDefaultStepRegistry } from '@/services/pipeline';
 import type { LogStore } from '@/stores/LogStore';
 
 import type {
@@ -42,6 +43,7 @@ import type {
   VoiceAssignerOptions,
 } from '@/services/interfaces';
 import type { IPipelineRunner } from '@/services/pipeline/types';
+import type { IPipelineBuilder } from '@/services/pipeline';
 
 // ============================================================================
 // Context Definition
@@ -215,6 +217,15 @@ export function createProductionContainer(
   container.registerTransient<IPipelineRunner>(
     ServiceTypes.PipelineRunner,
     () => new PipelineRunner(container.get<ILogger>(ServiceTypes.Logger))
+  );
+
+  // Register PipelineBuilder (singleton)
+  container.registerSingleton<IPipelineBuilder>(
+    ServiceTypes.PipelineBuilder,
+    () => {
+      const stepRegistry = createDefaultStepRegistry();
+      return new PipelineBuilder(container, stepRegistry);
+    }
   );
 
   // Register factories for per-conversion services

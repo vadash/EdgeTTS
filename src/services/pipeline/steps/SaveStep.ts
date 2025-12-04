@@ -16,6 +16,7 @@ export interface SaveStepOptions {
  */
 export class SaveStep extends BasePipelineStep {
   readonly name = 'save';
+  protected readonly requiredContextKeys: (keyof PipelineContext)[] = [];
 
   constructor(private options: SaveStepOptions) {
     super();

@@ -21,6 +21,7 @@ export interface AudioMergeStepOptions {
  */
 export class AudioMergeStep extends BasePipelineStep {
   readonly name = 'audio-merge';
+  protected readonly requiredContextKeys: (keyof PipelineContext)[] = [];
 
   constructor(private options: AudioMergeStepOptions) {
     super();

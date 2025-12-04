@@ -21,6 +21,7 @@ export interface VoiceAssignmentStepOptions {
  */
 export class VoiceAssignmentStep extends BasePipelineStep {
   readonly name = 'voice-assignment';
+  protected readonly requiredContextKeys: (keyof PipelineContext)[] = [];
 
   constructor(private options: VoiceAssignmentStepOptions) {
     super();

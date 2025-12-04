@@ -4,24 +4,11 @@
 import type { ServiceContainer } from '@/di/ServiceContainer';
 import { ServiceTypes } from '@/di/ServiceContainer';
 import type { Stores } from '@/stores';
-import type {
-  ILogger,
-  IFFmpegService,
-  ITextBlockSplitter,
-  ILLMServiceFactory,
-  IWorkerPoolFactory,
-  IAudioMergerFactory,
-  IVoiceAssignerFactory,
-} from '@/services/interfaces';
-import type { IPipelineRunner, PipelineContext, PipelineProgress } from '@/services/pipeline/types';
-import type { ProcessedBook, TTSConfig as VoiceConfig } from '@/state/types';
-import {
-  pipelineConfig,
-  buildPipelineFromConfig,
-  createDefaultStepRegistry,
-  StepNames,
-  type StepRegistry,
-} from './pipeline';
+import type { ILogger } from '@/services/interfaces';
+import type { IPipelineBuilder } from '@/services/pipeline';
+import type { PipelineContext, PipelineProgress } from '@/services/pipeline/types';
+import type { ProcessedBook } from '@/state/types';
+import { StepNames } from './pipeline';
 import { AppError, noContentError } from '@/errors';
 
 /**
@@ -30,26 +17,14 @@ import { AppError, noContentError } from '@/errors';
 export class ConversionOrchestrator {
   private abortController: AbortController | null = null;
   private logger: ILogger;
-  private ffmpegService: IFFmpegService;
-  private textBlockSplitter: ITextBlockSplitter;
-  private llmServiceFactory: ILLMServiceFactory;
-  private workerPoolFactory: IWorkerPoolFactory;
-  private audioMergerFactory: IAudioMergerFactory;
-  private voiceAssignerFactory: IVoiceAssignerFactory;
-  private stepRegistry: StepRegistry;
+  private pipelineBuilder: IPipelineBuilder;
 
   constructor(
     private container: ServiceContainer,
     private stores: Stores
   ) {
     this.logger = container.get<ILogger>(ServiceTypes.Logger);
-    this.ffmpegService = container.get<IFFmpegService>(ServiceTypes.FFmpegService);
-    this.textBlockSplitter = container.get<ITextBlockSplitter>(ServiceTypes.TextBlockSplitter);
-    this.llmServiceFactory = container.get<ILLMServiceFactory>(ServiceTypes.LLMServiceFactory);
-    this.workerPoolFactory = container.get<IWorkerPoolFactory>(ServiceTypes.WorkerPoolFactory);
-    this.audioMergerFactory = container.get<IAudioMergerFactory>(ServiceTypes.AudioMergerFactory);
-    this.voiceAssignerFactory = container.get<IVoiceAssignerFactory>(ServiceTypes.VoiceAssignerFactory);
-    this.stepRegistry = createDefaultStepRegistry();
+    this.pipelineBuilder = container.get<IPipelineBuilder>(ServiceTypes.PipelineBuilder);
   }
 
   /**
@@ -79,8 +54,29 @@ export class ConversionOrchestrator {
     const fileNames = existingBook?.fileNames ?? [[this.extractFilename(text), 0]] as Array<[string, number]>;
 
     try {
-      // Build the pipeline
-      const pipeline = this.buildPipeline();
+      // Build the pipeline using the builder
+      const pipeline = this.pipelineBuilder.build({
+        // Voice settings
+        narratorVoice: this.stores.settings.narratorVoice.value,
+        voice: this.stores.settings.voice.value,
+        pitch: this.stores.settings.pitch.value,
+        rate: this.stores.settings.rate.value,
+        maxThreads: this.stores.settings.maxThreads.value,
+        enabledVoices: this.stores.settings.enabledVoices.value,
+        lexxRegister: this.stores.settings.lexxRegister.value,
+        outputFormat: this.stores.settings.outputFormat.value,
+        silenceRemoval: this.stores.settings.silenceRemovalEnabled.value,
+        normalization: this.stores.settings.normalizationEnabled.value,
+
+        // LLM settings
+        apiKey: this.stores.llm.apiKey.value,
+        apiUrl: this.stores.llm.apiUrl.value,
+        model: this.stores.llm.model.value,
+
+        // Data
+        detectedLanguage: detectedLang,
+        directoryHandle: this.stores.data.directoryHandle.value,
+      });
 
       // Create initial context
       const context: PipelineContext = {
@@ -131,70 +127,6 @@ export class ConversionOrchestrator {
   }
 
   /**
-   * Build the conversion pipeline with all steps
-   */
-  private buildPipeline(): IPipelineRunner {
-    const pipeline = this.container.get<IPipelineRunner>(ServiceTypes.PipelineRunner);
-    const settings = this.stores.settings;
-    const llmSettings = this.stores.llm;
-    const detectedLang = this.stores.data.detectedLanguage.value;
-
-    // Build step options
-    const llmOptions = {
-      apiKey: llmSettings.apiKey.value,
-      apiUrl: llmSettings.apiUrl.value,
-      model: llmSettings.model.value,
-      narratorVoice: settings.narratorVoice.value,
-      directoryHandle: this.stores.data.directoryHandle.value,
-    };
-
-    // Build pipeline configuration declaratively
-    const config = pipelineConfig()
-      .addStep(StepNames.CHARACTER_EXTRACTION, {
-        llmOptions,
-        createLLMService: (options: typeof llmOptions) => this.llmServiceFactory.create(options),
-        textBlockSplitter: this.textBlockSplitter,
-      })
-      .addStep(StepNames.VOICE_ASSIGNMENT, {
-        narratorVoice: settings.narratorVoice.value,
-        detectedLanguage: detectedLang,
-        enabledVoices: settings.enabledVoices.value,
-        createVoiceAssigner: (narratorVoice: string, locale: string, enabledVoices?: string[]) =>
-          this.voiceAssignerFactory.createWithFilteredPool(narratorVoice, locale, enabledVoices),
-      })
-      .addStep(StepNames.SPEAKER_ASSIGNMENT, {
-        llmOptions,
-        createLLMService: (options: typeof llmOptions) => this.llmServiceFactory.create(options),
-        textBlockSplitter: this.textBlockSplitter,
-      })
-      .addStep(StepNames.TEXT_SANITIZATION, {})
-      .addStep(StepNames.DICTIONARY_PROCESSING, {
-        caseSensitive: settings.lexxRegister.value,
-      })
-      .addStep(StepNames.TTS_CONVERSION, {
-        maxWorkers: settings.maxThreads.value,
-        ttsConfig: this.buildTTSConfig(),
-        createWorkerPool: (options: Parameters<typeof this.workerPoolFactory.create>[0]) =>
-          this.workerPoolFactory.create(options),
-      })
-      .addStep(StepNames.AUDIO_MERGE, {
-        outputFormat: settings.outputFormat.value,
-        silenceRemoval: settings.silenceRemovalEnabled.value,
-        normalization: settings.normalizationEnabled.value,
-        ffmpegService: this.ffmpegService,
-        createAudioMerger: (config: Parameters<typeof this.audioMergerFactory.create>[0]) =>
-          this.audioMergerFactory.create(config),
-      })
-      .addStep(StepNames.SAVE, {
-        createAudioMerger: (config: Parameters<typeof this.audioMergerFactory.create>[0]) =>
-          this.audioMergerFactory.create(config),
-      })
-      .build();
-
-    return buildPipelineFromConfig(config, this.stepRegistry, pipeline);
-  }
-
-  /**
    * Handle progress updates from pipeline steps
    */
   private handleProgress(progress: PipelineProgress): void {
@@ -240,19 +172,6 @@ export class ConversionOrchestrator {
         // Covered by merging status
         break;
     }
-  }
-
-  /**
-   * Build TTS voice config from settings
-   */
-  private buildTTSConfig(): VoiceConfig {
-    const settings = this.stores.settings;
-    return {
-      voice: `Microsoft Server Speech Text to Speech Voice (${settings.voice.value})`,
-      pitch: settings.pitch.value >= 0 ? `+${settings.pitch.value}Hz` : `${settings.pitch.value}Hz`,
-      rate: settings.rate.value >= 0 ? `+${settings.rate.value}%` : `${settings.rate.value}%`,
-      volume: '+0%',
-    };
   }
 
   /**

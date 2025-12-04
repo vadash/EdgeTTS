@@ -19,6 +19,7 @@ export interface SpeakerAssignmentStepOptions {
  */
 export class SpeakerAssignmentStep extends BasePipelineStep {
   readonly name = 'speaker-assignment';
+  protected readonly requiredContextKeys: (keyof PipelineContext)[] = ['characters', 'voiceMap'];
 
   private llmService: ILLMService | null = null;
 
@@ -28,12 +29,11 @@ export class SpeakerAssignmentStep extends BasePipelineStep {
 
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
+    this.validateContext(context);
 
-    const { characters, voiceMap } = context;
-
-    if (!characters || !voiceMap) {
-      throw new Error('SpeakerAssignmentStep requires characters and voiceMap from previous steps');
-    }
+    // After validation, these are guaranteed to exist
+    const characters = context.characters!;
+    const voiceMap = context.voiceMap!;
 
     // Create LLM service for this step
     this.llmService = this.options.createLLMService(this.options.llmOptions);

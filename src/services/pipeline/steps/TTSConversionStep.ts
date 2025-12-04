@@ -20,6 +20,7 @@ export interface TTSConversionStepOptions {
  */
 export class TTSConversionStep extends BasePipelineStep {
   readonly name = 'tts-conversion';
+  protected readonly requiredContextKeys: (keyof PipelineContext)[] = ['assignments'];
 
   private workerPool: IWorkerPool | null = null;
 
@@ -29,12 +30,11 @@ export class TTSConversionStep extends BasePipelineStep {
 
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
+    this.validateContext(context);
 
-    const { assignments, fileNames } = context;
-
-    if (!assignments || assignments.length === 0) {
-      throw new Error('TTSConversionStep requires assignments from previous step');
-    }
+    // After validation, these are guaranteed to exist
+    const assignments = context.assignments!;
+    const fileNames = context.fileNames;
 
     // Filter out empty sentences
     const chunks = assignments

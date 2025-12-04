@@ -189,7 +189,7 @@ describe('DictionaryProcessingStep', () => {
       const context = createContextWithAssignments([]);
 
       await expect(step.execute(context, signal)).rejects.toThrow(
-        'DictionaryProcessingStep requires assignments from previous step'
+        "non-empty 'assignments'"
       );
     });
 
@@ -198,7 +198,7 @@ describe('DictionaryProcessingStep', () => {
       const context = { text: 'test', fileNames: [], dictionaryRules: [], detectedLanguage: 'en' as const };
 
       await expect(step.execute(context, signal)).rejects.toThrow(
-        'DictionaryProcessingStep requires assignments from previous step'
+        "requires 'assignments'"
       );
     });
   });

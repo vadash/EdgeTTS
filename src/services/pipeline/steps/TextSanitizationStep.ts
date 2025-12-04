@@ -9,15 +9,14 @@ import { BasePipelineStep, PipelineContext } from '../types';
  */
 export class TextSanitizationStep extends BasePipelineStep {
   readonly name = 'text-sanitization';
+  protected readonly requiredContextKeys: (keyof PipelineContext)[] = ['assignments'];
 
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
+    this.validateContext(context);
 
-    const { assignments } = context;
-
-    if (!assignments || assignments.length === 0) {
-      throw new Error('TextSanitizationStep requires assignments from previous step');
-    }
+    // After validation, assignments is guaranteed to exist
+    const assignments = context.assignments!;
 
     this.reportProgress(0, assignments.length, 'Sanitizing text...');
 

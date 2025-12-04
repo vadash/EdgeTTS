@@ -207,12 +207,30 @@ export interface IPipelineRunner {
  */
 export abstract class BasePipelineStep implements IPipelineStep {
   abstract readonly name: string;
+  protected abstract readonly requiredContextKeys: (keyof PipelineContext)[];
   protected progressCallback?: ProgressCallback;
 
   abstract execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext>;
 
   setProgressCallback(callback: ProgressCallback): void {
     this.progressCallback = callback;
+  }
+
+  /**
+   * Validate that required context keys are present
+   * @throws Error if any required key is missing or empty
+   */
+  protected validateContext(context: PipelineContext): void {
+    for (const key of this.requiredContextKeys) {
+      const value = context[key];
+      if (value === undefined || value === null) {
+        throw new Error(`${this.name} requires '${key}' from previous step`);
+      }
+      // For arrays, also check empty
+      if (Array.isArray(value) && value.length === 0) {
+        throw new Error(`${this.name} requires non-empty '${key}'`);
+      }
+    }
   }
 
   /**

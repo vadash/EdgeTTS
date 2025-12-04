@@ -18,6 +18,7 @@ export interface DictionaryProcessingStepOptions {
  */
 export class DictionaryProcessingStep extends BasePipelineStep {
   readonly name = 'dictionary-processing';
+  protected readonly requiredContextKeys: (keyof PipelineContext)[] = ['assignments'];
 
   constructor(private options: DictionaryProcessingStepOptions) {
     super();
@@ -25,12 +26,11 @@ export class DictionaryProcessingStep extends BasePipelineStep {
 
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
+    this.validateContext(context);
 
-    const { assignments, dictionaryRules } = context;
-
-    if (!assignments || assignments.length === 0) {
-      throw new Error('DictionaryProcessingStep requires assignments from previous step');
-    }
+    // After validation, assignments is guaranteed to exist
+    const assignments = context.assignments!;
+    const { dictionaryRules } = context;
 
     // If no rules, pass through unchanged
     if (!dictionaryRules || dictionaryRules.length === 0) {

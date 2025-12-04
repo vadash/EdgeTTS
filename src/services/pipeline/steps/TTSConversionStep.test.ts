@@ -163,14 +163,14 @@ describe('TTSConversionStep', () => {
       const context = createTestContext();
 
       await expect(step.execute(context, createNeverAbortSignal()))
-        .rejects.toThrow('requires assignments');
+        .rejects.toThrow("requires 'assignments'");
     });
 
     it('throws when assignments empty', async () => {
       const context = createContextWithAssignments([]);
 
       await expect(step.execute(context, createNeverAbortSignal()))
-        .rejects.toThrow('requires assignments');
+        .rejects.toThrow("non-empty 'assignments'");
     });
 
     it('throws when no pronounceable content', async () => {

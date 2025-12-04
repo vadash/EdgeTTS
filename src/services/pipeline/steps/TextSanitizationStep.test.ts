@@ -195,7 +195,7 @@ describe('TextSanitizationStep', () => {
       const context = createContextWithAssignments([]);
 
       await expect(step.execute(context, signal)).rejects.toThrow(
-        'TextSanitizationStep requires assignments from previous step'
+        "non-empty 'assignments'"
       );
     });
 
@@ -204,7 +204,7 @@ describe('TextSanitizationStep', () => {
       const context = { text: 'test', fileNames: [], dictionaryRules: [], detectedLanguage: 'en' as const };
 
       await expect(step.execute(context, signal)).rejects.toThrow(
-        'TextSanitizationStep requires assignments from previous step'
+        "requires 'assignments'"
       );
     });
   });

@@ -27,5 +27,8 @@ export {
 // Default registry with built-in steps
 export { createDefaultStepRegistry, StepNames, type StepName } from './DefaultStepRegistry';
 
+// Pipeline builder
+export { PipelineBuilder, createPipelineBuilder, type IPipelineBuilder, type PipelineBuilderOptions } from './PipelineBuilder';
+
 // Steps will be exported here as they are created
 export * from './steps';

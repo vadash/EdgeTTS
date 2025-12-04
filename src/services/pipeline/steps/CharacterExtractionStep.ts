@@ -19,6 +19,7 @@ export interface CharacterExtractionStepOptions {
  */
 export class CharacterExtractionStep extends BasePipelineStep {
   readonly name = 'character-extraction';
+  protected readonly requiredContextKeys: (keyof PipelineContext)[] = [];
 
   private llmService: ILLMService | null = null;
 
