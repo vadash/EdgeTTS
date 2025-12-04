@@ -3,6 +3,7 @@ import { Text } from 'preact-i18n';
 import { useLLM } from '@/stores';
 import { LLMVoiceService } from '@/services/LLMVoiceService';
 import { Button } from '@/components/common';
+import { LLMHelp } from './LLMHelp';
 
 export function LLMTab() {
   const llm = useLLM();
@@ -129,6 +130,9 @@ export function LLMTab() {
           )}
         </div>
       )}
+
+      {/* Help section */}
+      <LLMHelp />
     </div>
   );
 }

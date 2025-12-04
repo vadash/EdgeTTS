@@ -62,6 +62,7 @@ export default (env, argv) => {
       new CopyWebpackPlugin({
         patterns: [
           { from: 'public/RU.lexx', to: 'RU.lexx' },
+          { from: 'public/llm-help.md', to: 'llm-help.md' },
         ],
       }),
     ],
