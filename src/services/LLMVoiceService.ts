@@ -208,60 +208,23 @@ export class LLMVoiceService {
    * Build Pass 1 prompt (character extraction)
    */
   private buildPass1Prompt(textBlock: string): { system: string; user: string } {
-    const system = `<role>
-You are a character extractor for audiobook production.
-</role>
+    const system = `Extract speaking characters from text for audiobook production.
 
-<task>
-Extract ALL speaking characters from the provided text block.
-</task>
+RULES:
+1. Find characters who speak dialogue or have thoughts
+2. Dialogue markers: "text", «text», — text (em-dash)
+3. Keep original names (don't translate)
+4. Use proper names as canonicalName, put roles in variations:
+   - If "брат" speaks and later identified as "Женька" → canonicalName: "Женька", variations: ["Женька", "брат"]
+   - brother/sister/мать/отец → put in variations, not canonicalName
+5. Gender from: pronouns (she/он), verb endings (-ла=female, -л=male), titles (Mrs/мистер)
 
-<rules>
-1. Extract EVERY named character who speaks dialogue (text in quotes: "...", «...», or em-dash dialogue: — text —)
-2. PRESERVE ORIGINAL NAMES exactly as they appear in the text - do NOT translate names to English
-3. Include ALL speakers: main characters, minor characters, professors, teachers, judges, officials, etc.
-4. Group name variations together (e.g., "Lily", "Lil", "Miss Thompson" = same person)
-5. Include titles as variations: "Professor Viridian", "Viridian" = same person
-6. Catch spelling variations/typos: "Mirian", "Miran" = same person
-7. Detect gender from context clues (pronouns, titles, names): "male", "female", or "unknown"
-8. Ignore the narrator - only extract characters who speak dialogue
-9. Attribution phrases like "said John", "the professor said", "he replied" indicate the speaker
-10. Inner thoughts without quotes are NOT dialogue - ignore them
-11. Exclude ONLY truly unnamed speakers ("a voice said", "someone shouted") - they are handled separately
-12. If a title is used ("the professor said") but the name is known from context, extract with the name
-</rules>
+OUTPUT JSON only:
+{"characters": [{"canonicalName": "Name", "variations": ["Name", "Nick"], "gender": "male|female|unknown"}]}
 
-<example>
-Input: "Hello!" said Mary. Professor Johnson smiled. "How are you?" he asked. "Fine," replied the judge.
-Output:
-{
-  "characters": [
-    {"canonicalName": "Mary", "variations": ["Mary"], "gender": "female"},
-    {"canonicalName": "Professor Johnson", "variations": ["Professor Johnson", "Johnson"], "gender": "male"},
-    {"canonicalName": "judge", "variations": ["judge", "the judge"], "gender": "unknown"}
-  ]
-}
-</example>
+Empty if no speakers: {"characters": []}`;
 
-<output_format>
-Respond with ONLY valid JSON, no markdown:
-{
-  "characters": [
-    {
-      "canonicalName": "Lily",
-      "variations": ["Lily", "Lil", "Miss Thompson"],
-      "gender": "female"
-    }
-  ]
-}
-If no speaking characters found, return: {"characters": []}
-</output_format>`;
-
-    const user = `<text>
-${textBlock}
-</text>
-
-Extract all speaking characters from this text. Return JSON only.`;
+    const user = `Text:\n${textBlock}\n\nExtract speakers. JSON only.`;
 
     return { system, user };
   }
@@ -286,68 +249,25 @@ Extract all speaking characters from this text. Return JSON only.`;
       .map(([name, code]) => `${code}=${name}`)
       .join(', ');
 
-    const system = `<role>
-You are a dialogue tagger for audiobook production.
-</role>
+    const system = `Tag dialogue speakers for audiobook. Output index:code for dialogue sentences only.
 
-<task>
-For each sentence with dialogue, output its index and speaker code. Skip narrator sentences.
-</task>
+CODES: ${characterCodes}
+UNNAMED: ${unnamedCodes}
 
-<rules>
-1. ONLY tag sentences containing actual quoted dialogue ("...", «...») or em-dash dialogue (— text —)
-2. DO NOT tag: narrative descriptions, actions, thoughts, or reported speech
-3. Reported/indirect speech = SKIP: "said her goodbyes", "thanked him", "mentioned that..."
-4. ALWAYS prefer known characters over UNNAMED codes when speaker can be identified
-5. Use UNNAMED codes ONLY for truly anonymous speakers like "a voice said", "someone shouted"
-6. Attribution after dialogue identifies the speaker: "— Текст, — сказала Мария" = Maria speaking
-7. Attribution phrases: "said X", "X replied", "X asked", "произнесла X", "сказал X" etc.
-8. Dialogue continuation: same speaker continues until new attribution
-9. Pronoun resolution: use MOST RECENT named attribution for same-gender pronouns
-10. Track conversation context: alternating dialogue usually alternates speakers
-11. Multi-line dialogue: if one speech spans multiple [index] lines, tag each line
-12. Short exclamations with attribution ("— Довольно! — сказал X") = X is the speaker
-</rules>
+RULES:
+1. Tag sentences with dialogue: "text", «text», — text (em-dash)
+2. Skip pure narration (no quotes/em-dash)
+3. Attribution after dialogue identifies speaker:
+   - "Hello," she said → "she" is the speaker
+   - — Привет, — сказал Иван → Иван is the speaker
+4. Pronoun in attribution = speaker, not someone mentioned in dialogue
+5. Role terms (брат/brother/sister) refer to a character - use their code
+6. Continue same speaker until new attribution
 
-<character_codes>
-${characterCodes}
-</character_codes>
+OUTPUT: index:code (one per line, no explanation)
+Empty = all narrator`;
 
-<unnamed_codes>
-${unnamedCodes}
-</unnamed_codes>
-
-<example>
-Input:
-[0] Mary entered the room.
-[1] "Hello!" she said.
-[2] — How are you? — asked Anna.
-[3] "Good," she replied.
-[4] Anna nodded and said goodbye to her.
-[5] — Enough! — interrupted the man sternly.
-
-Codes: A=Mary, B=Anna, C=MALE_UNNAMED, D=FEMALE_UNNAMED, E=UNKNOWN_UNNAMED
-
-Output:
-1:A
-2:B
-3:A
-5:C
-
-Note: [3] "she" refers to Mary (responding to Anna). [4] is NOT tagged - reported speech. [5] uses C (MALE_UNNAMED) because "the man" is not a named character.
-</example>
-
-<output_format>
-Output ONLY lines in format: index:code
-One line per speaking sentence. Empty output = all narrator.
-No JSON, no explanation, no notes.
-</output_format>`;
-
-    const user = `<sentences>
-${numberedSentences}
-</sentences>
-
-Tag speakers. Output index:code for each dialogue sentence. Use character codes when attribution identifies a known character.`;
+    const user = `Sentences:\n${numberedSentences}\n\nTag speakers.`;
 
     return { system, user };
   }
