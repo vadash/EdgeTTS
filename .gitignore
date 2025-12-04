@@ -27,3 +27,4 @@ coverage/
 # User
 /.claude/
 test.config.local.ts
+/repomix-output.txt
