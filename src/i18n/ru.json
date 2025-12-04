@@ -24,6 +24,7 @@
     "voicesEnabled": "голосов включено",
     "enableAll": "Включить все",
     "disableAll": "Выключить все",
+    "sampleText": "Текст для теста",
     "rules": "Правила",
     "noRules": "Словарь не загружен",
     "dictionaryHint": "Замены слов для произношения TTS",

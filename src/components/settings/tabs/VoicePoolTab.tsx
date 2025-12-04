@@ -8,6 +8,7 @@ import { EdgeTTSService } from '@/services/EdgeTTSService';
 // Voice pool state - which voices are enabled
 const enabledVoices = signal<Set<string>>(new Set(voices.map(v => v.fullValue)));
 const isPlaying = signal<string | null>(null);
+const sampleText = signal<string>('Hello, this is a sample of my voice.');
 
 export function VoicePoolTab() {
   const [filter, setFilter] = useState('');
@@ -50,7 +51,7 @@ export function VoicePoolTab() {
   };
 
   const playVoice = async (voiceId: string) => {
-    if (isPlaying.value) return;
+    if (isPlaying.value || !sampleText.value.trim()) return;
     isPlaying.value = voiceId;
 
     try {
@@ -65,7 +66,7 @@ export function VoicePoolTab() {
             pitch: '+0Hz',
             volume: '+0%'
           },
-          text: 'Hello, this is a sample of my voice.',
+          text: sampleText.value,
           onComplete: resolve,
           onError: reject
         });
@@ -130,6 +131,20 @@ export function VoicePoolTab() {
           placeholder="Search voices..."
           value={filter}
           onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
+        />
+      </div>
+
+      {/* Sample Text */}
+      <div>
+        <label className="text-sm text-gray-400 mb-1 block">
+          <Text id="settings.sampleText">Sample text</Text>
+        </label>
+        <input
+          type="text"
+          className="input-field w-full"
+          placeholder="Enter text to test voices..."
+          value={sampleText.value}
+          onInput={(e) => sampleText.value = (e.target as HTMLInputElement).value}
         />
       </div>
 

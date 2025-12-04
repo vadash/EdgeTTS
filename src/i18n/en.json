@@ -24,6 +24,7 @@
     "voicesEnabled": "voices enabled",
     "enableAll": "Enable All",
     "disableAll": "Disable All",
+    "sampleText": "Sample text",
     "rules": "Rules",
     "noRules": "No dictionary rules loaded",
     "dictionaryHint": "Word replacements for TTS pronunciation",
