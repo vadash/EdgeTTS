@@ -53,7 +53,7 @@ export function DictionaryTab() {
         <span className="text-2xl">📖</span>
         <div>
           <h3 className="font-semibold">
-            <Text id="settings.dictionary">Dictionary</Text>
+            <Text id="settings.dictionary.title">Dictionary</Text>
           </h3>
           <p className="text-sm text-gray-400">
             <Text id="settings.dictionaryHint">Word replacements for TTS pronunciation</Text>

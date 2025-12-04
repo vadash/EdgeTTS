@@ -43,6 +43,7 @@
     "silenceRemovalHint": "Remove long pauses from audio",
     "normalizationHint": "Balance audio levels",
     "dictionary": {
+      "title": "Dictionary",
       "label": "Dictionary register",
       "caseSensitive": "Case Sensitive",
       "caseSensitiveHint": "Match exact letter case"

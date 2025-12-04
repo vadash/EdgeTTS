@@ -43,6 +43,7 @@
     "silenceRemovalHint": "Удалить длинные паузы из аудио",
     "normalizationHint": "Выровнять уровни звука",
     "dictionary": {
+      "title": "Словарь",
       "label": "Реестр словаря",
       "caseSensitive": "Учитывать регистр",
       "caseSensitiveHint": "Точное соответствие регистра"
