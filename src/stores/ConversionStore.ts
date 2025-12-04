@@ -1,7 +1,7 @@
 // Conversion Store
 // Manages conversion process state and progress
 
-import { signal, computed } from '@preact/signals';
+import { signal, computed, effect } from '@preact/signals';
 
 /**
  * Conversion status stages
@@ -39,6 +39,15 @@ export interface ConversionError {
 export class ConversionStore {
   // Status
   readonly status = signal<ConversionStatus>('idle');
+
+  // Beforeunload handler reference
+  private readonly beforeUnloadHandler = (e: BeforeUnloadEvent): string | void => {
+    if (this.isProcessing.value) {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
+  };
 
   // Progress tracking
   readonly progress = signal<Progress>({ current: 0, total: 0 });
@@ -97,6 +106,17 @@ export class ConversionStore {
 
     return this.formatDuration(remaining);
   });
+
+  constructor() {
+    // Set up beforeunload listener that activates during processing
+    effect(() => {
+      if (this.isProcessing.value) {
+        window.addEventListener('beforeunload', this.beforeUnloadHandler);
+      } else {
+        window.removeEventListener('beforeunload', this.beforeUnloadHandler);
+      }
+    });
+  }
 
   // ========== Actions ==========
 
