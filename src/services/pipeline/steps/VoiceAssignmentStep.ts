@@ -11,7 +11,8 @@ import type { LLMCharacter } from '@/state/types';
 export interface VoiceAssignmentStepOptions {
   narratorVoice: string;
   detectedLanguage: string;
-  createVoiceAssigner: (narratorVoice: string, locale: string) => IVoiceAssigner;
+  enabledVoices?: string[];
+  createVoiceAssigner: (narratorVoice: string, locale: string, enabledVoices?: string[]) => IVoiceAssigner;
 }
 
 /**
@@ -42,7 +43,8 @@ export class VoiceAssignmentStep extends BasePipelineStep {
     // Create voice assigner with filtered pool
     const assigner = this.options.createVoiceAssigner(
       this.options.narratorVoice,
-      context.detectedLanguage || this.options.detectedLanguage
+      context.detectedLanguage || this.options.detectedLanguage,
+      this.options.enabledVoices
     );
 
     // Assign voices

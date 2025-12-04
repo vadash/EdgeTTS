@@ -361,8 +361,8 @@ export interface ITextBlockSplitter {
  * Voice pool builder for filtering voices by locale
  */
 export interface IVoicePoolBuilder {
-  /** Build voice pool filtered by locale */
-  buildPool(locale: string): VoicePool;
+  /** Build voice pool filtered by locale and enabled voices */
+  buildPool(locale: string, enabledVoices?: string[]): VoicePool;
 }
 
 // ============================================================================
@@ -440,6 +440,6 @@ export interface VoiceAssignerOptions {
 export interface IVoiceAssignerFactory {
   /** Create a new VoiceAssigner instance */
   create(options: VoiceAssignerOptions): IVoiceAssigner;
-  /** Create with filtered pool (detected language + multilingual) */
-  createWithFilteredPool(narratorVoice: string, language: string): IVoiceAssigner;
+  /** Create with filtered pool (detected language + multilingual, filtered by enabled voices) */
+  createWithFilteredPool(narratorVoice: string, language: string, enabledVoices?: string[]): IVoiceAssigner;
 }

@@ -159,11 +159,12 @@ export class VoiceAssigner implements IVoiceAssigner {
   static createWithFilteredPool(
     voicePoolBuilder: IVoicePoolBuilder,
     narratorVoice: string,
-    language: string = 'en'
+    language: string = 'en',
+    enabledVoices?: string[]
   ): VoiceAssigner {
     return new VoiceAssigner(voicePoolBuilder, {
       narratorVoice,
-      voicePool: voicePoolBuilder.buildPool(language),
+      voicePool: voicePoolBuilder.buildPool(language, enabledVoices),
     });
   }
 

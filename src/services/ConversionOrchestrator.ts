@@ -158,8 +158,9 @@ export class ConversionOrchestrator {
       .addStep(StepNames.VOICE_ASSIGNMENT, {
         narratorVoice: settings.narratorVoice.value,
         detectedLanguage: detectedLang,
-        createVoiceAssigner: (narratorVoice: string, locale: string) =>
-          this.voiceAssignerFactory.createWithFilteredPool(narratorVoice, locale),
+        enabledVoices: settings.enabledVoices.value,
+        createVoiceAssigner: (narratorVoice: string, locale: string, enabledVoices?: string[]) =>
+          this.voiceAssignerFactory.createWithFilteredPool(narratorVoice, locale, enabledVoices),
       })
       .addStep(StepNames.SPEAKER_ASSIGNMENT, {
         llmOptions,

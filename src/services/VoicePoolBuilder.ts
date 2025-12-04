@@ -8,20 +8,26 @@ import type { IVoicePoolBuilder } from './interfaces';
  */
 export class VoicePoolBuilder implements IVoicePoolBuilder {
   /**
-   * Build voice pool filtered by locale
+   * Build voice pool filtered by locale and enabled voices
    */
-  buildPool(locale: string): VoicePool {
-    return buildFilteredPool(locale as DetectedLanguage);
+  buildPool(locale: string, enabledVoices?: string[]): VoicePool {
+    return buildFilteredPool(locale as DetectedLanguage, enabledVoices);
   }
 }
 
 /**
  * Builds a voice pool filtered by locale and separated by gender
  */
-export function buildVoicePool(locale?: string): VoicePool {
-  const filtered = locale
-    ? voices.filter(v => v.locale.startsWith(locale.split('-')[0]))
+export function buildVoicePool(locale?: string, enabledVoices?: string[]): VoicePool {
+  // Start with enabled voices or all voices
+  let baseVoices = enabledVoices && enabledVoices.length > 0
+    ? voices.filter(v => enabledVoices.includes(v.fullValue))
     : voices;
+
+  // Filter by locale if specified
+  const filtered = locale
+    ? baseVoices.filter(v => v.locale.startsWith(locale.split('-')[0]))
+    : baseVoices;
 
   return {
     male: filtered.filter(v => v.gender === 'male').map(v => v.fullValue),
@@ -32,9 +38,16 @@ export function buildVoicePool(locale?: string): VoicePool {
 /**
  * Builds a filtered voice pool for LLM voice assignment
  * Includes voices matching the detected language + multilingual voices
+ * Respects user's enabled voices selection
  */
-export function buildFilteredPool(language: DetectedLanguage = 'en'): VoicePool {
-  const filtered = voices.filter(v =>
+export function buildFilteredPool(language: DetectedLanguage = 'en', enabledVoices?: string[]): VoicePool {
+  // Start with enabled voices or all voices
+  const baseVoices = enabledVoices && enabledVoices.length > 0
+    ? voices.filter(v => enabledVoices.includes(v.fullValue))
+    : voices;
+
+  // Filter by language + multilingual
+  const filtered = baseVoices.filter(v =>
     v.locale.startsWith(language) ||
     v.name.includes('Multilingual')
   );

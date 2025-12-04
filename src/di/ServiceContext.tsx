@@ -262,8 +262,8 @@ export function createProductionContainer(
       const voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
       return {
         create: (options: VoiceAssignerOptions) => new VoiceAssigner(voicePoolBuilder, options),
-        createWithFilteredPool: (narratorVoice: string, language: string) =>
-          VoiceAssigner.createWithFilteredPool(voicePoolBuilder, narratorVoice, language),
+        createWithFilteredPool: (narratorVoice: string, language: string, enabledVoices?: string[]) =>
+          VoiceAssigner.createWithFilteredPool(voicePoolBuilder, narratorVoice, language, enabledVoices),
       };
     }
   );
@@ -355,8 +355,8 @@ export function createTestContainer(overrides: ServiceOverrides = {}): ServiceCo
         const voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
         return {
           create: (options: VoiceAssignerOptions) => new VoiceAssigner(voicePoolBuilder, options),
-          createWithFilteredPool: (narratorVoice: string, language: string) =>
-            VoiceAssigner.createWithFilteredPool(voicePoolBuilder, narratorVoice, language),
+          createWithFilteredPool: (narratorVoice: string, language: string, enabledVoices?: string[]) =>
+            VoiceAssigner.createWithFilteredPool(voicePoolBuilder, narratorVoice, language, enabledVoices),
         };
       }
     );

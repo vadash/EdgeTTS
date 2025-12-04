@@ -125,7 +125,7 @@ export function createTestContainer(options: TestContainerOptions = {}): {
           getNarratorVoice: () => opts.narratorVoice,
           reset: () => {},
         }),
-        createWithFilteredPool: (narratorVoice) => ({
+        createWithFilteredPool: (narratorVoice, _language?, _enabledVoices?) => ({
           assignVoicesFromLLMCharacters: () => new Map(),
           getNarratorVoice: () => narratorVoice,
           reset: () => {},
