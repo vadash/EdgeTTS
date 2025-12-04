@@ -66,6 +66,31 @@ describe('TextBlockSplitter', () => {
       expect(sentences[0]).toBe('„Привет" сказала она.');
     });
 
+    it('handles two dialogues on same line', () => {
+      const text = '"There\'s a hole," Mirian said. "It\'s leaking."';
+      const sentences = splitter.splitIntoSentences(text);
+
+      expect(sentences).toHaveLength(2);
+      expect(sentences[0]).toBe('"There\'s a hole," Mirian said.');
+      expect(sentences[1]).toBe('"It\'s leaking."');
+    });
+
+    it('handles ellipsis as three dots', () => {
+      const text = '— Это... это абсурд! — выдохнул он.';
+      const sentences = splitter.splitIntoSentences(text);
+
+      expect(sentences).toHaveLength(1);
+      expect(sentences[0]).toBe('— Это... это абсурд! — выдохнул он.');
+    });
+
+    it('handles em-dash dialogue with attribution', () => {
+      const text = '— Довольно! — резко перебил его доктор.';
+      const sentences = splitter.splitIntoSentences(text);
+
+      expect(sentences).toHaveLength(1);
+      expect(sentences[0]).toBe('— Довольно! — резко перебил его доктор.');
+    });
+
     it('filters non-pronounceable text', () => {
       const text = 'Valid sentence. --- ... !!!';
       const sentences = splitter.splitIntoSentences(text);

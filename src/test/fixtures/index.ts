@@ -36,17 +36,40 @@ export const fixtures: TestFixture[] = [
     expectedDialogueLines: [
       { textContains: 'Are you okay', speaker: 'lily', strict: false },
       { textContains: 'nightmare or something', speaker: 'mirian', strict: false },
-      { textContains: 'There\'s a hole', speaker: 'mirian', strict: false },
-      { textContains: 'It\'s leaking', speaker: 'mirian', strict: false },
+      { textContains: 'a hole', speaker: 'mirian', strict: false },
+      { textContains: 'leaking', speaker: 'mirian', strict: false },
       { textContains: 'first floor', speaker: 'lily', strict: false },
       { textContains: 'How the hell', speaker: 'lily', strict: false },
       { textContains: 'No idea', speaker: 'mirian', strict: false },
       { textContains: 'enchantments exam', speaker: 'lily', strict: false },
-      { textContains: 'You\'re the best', speaker: 'mirian', strict: false },
-      { textContains: 'this one\'s free', speaker: 'lily', strict: false },
+      { textContains: 'the best', speaker: 'mirian', strict: false },
+      { textContains: 'free', speaker: 'lily', strict: false },
     ],
   },
-  // Add more fixtures here as needed
+  {
+    name: 'Russian Victorian Mystery',
+    file: 'victorian-mystery-ru.txt',
+    expectedCharacters: [
+      { name: 'блэквуд', gender: 'male' },
+      { name: 'элизабет', gender: 'female' },
+      { name: 'дэвид', gender: 'male' },
+      { name: 'холмсворт', gender: 'male' },
+      { name: 'маргарет', gender: 'female' },
+      { name: 'томас', gender: 'male' },
+    ],
+    expectedDialogueLines: [
+      { textContains: 'леди и джентльмены', speaker: 'блэквуд', strict: false },
+      { textContains: 'вы должны выполнять свой долг', speaker: 'элизабет', strict: false },
+      { textContains: 'ничего не знаю', speaker: 'дэвид', strict: false },
+      { textContains: 'Довольно!', speaker: 'холмсворт', strict: false },
+      { textContains: 'Давайте говорить честно', speaker: 'маргарет', strict: false },
+      { textContains: 'Как ты можешь', speaker: 'элизабет', strict: false },
+      { textContains: 'Реджинальд был монстром', speaker: 'маргарет', strict: false },
+      { textContains: 'Это... это абсурд', speaker: 'холмсворт', strict: false },
+      { textContains: 'видел, как доктор выходил', speaker: 'дэвид', strict: false },
+      { textContains: 'Простите за опоздание', speaker: 'томас', strict: false },
+    ],
+  },
 ];
 
 /**

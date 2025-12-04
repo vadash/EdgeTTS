@@ -217,17 +217,18 @@ Extract ALL speaking characters from the provided text block.
 </task>
 
 <rules>
-1. Extract EVERY named character who speaks dialogue (text in quotes: "...", «...»)
-2. Include ALL speakers: main characters, minor characters, professors, teachers, judges, officials, etc.
-3. Group name variations together (e.g., "Lily", "Lil", "Miss Thompson" = same person)
-4. Include titles as variations: "Professor Viridian", "Viridian" = same person
-5. Catch spelling variations/typos: "Mirian", "Miran" = same person
-6. Detect gender from context clues (pronouns, titles, names): "male", "female", or "unknown"
-7. Ignore the narrator - only extract characters who speak dialogue
-8. Attribution phrases like "said John", "the professor said", "he replied" indicate the speaker
-9. Inner thoughts without quotes are NOT dialogue - ignore them
-10. Exclude ONLY truly unnamed speakers ("a voice said", "someone shouted") - they are handled separately
-11. If a title is used ("the professor said") but the name is known from context, extract with the name
+1. Extract EVERY named character who speaks dialogue (text in quotes: "...", «...», or em-dash dialogue: — text —)
+2. PRESERVE ORIGINAL NAMES exactly as they appear in the text - do NOT translate names to English
+3. Include ALL speakers: main characters, minor characters, professors, teachers, judges, officials, etc.
+4. Group name variations together (e.g., "Lily", "Lil", "Miss Thompson" = same person)
+5. Include titles as variations: "Professor Viridian", "Viridian" = same person
+6. Catch spelling variations/typos: "Mirian", "Miran" = same person
+7. Detect gender from context clues (pronouns, titles, names): "male", "female", or "unknown"
+8. Ignore the narrator - only extract characters who speak dialogue
+9. Attribution phrases like "said John", "the professor said", "he replied" indicate the speaker
+10. Inner thoughts without quotes are NOT dialogue - ignore them
+11. Exclude ONLY truly unnamed speakers ("a voice said", "someone shouted") - they are handled separately
+12. If a title is used ("the professor said") but the name is known from context, extract with the name
 </rules>
 
 <example>
@@ -273,8 +274,15 @@ Extract all speaking characters from this text. Return JSON only.`;
     numberedSentences: string,
     startIndex: number
   ): { system: string; user: string } {
-    // Build codes section
-    const codesSection = Array.from(nameToCode.entries())
+    // Build codes section - exclude unnamed placeholders from main list
+    const characterCodes = Array.from(nameToCode.entries())
+      .filter(([name]) => !name.includes('UNNAMED'))
+      .map(([name, code]) => `${code}=${name}`)
+      .join(', ');
+
+    // Get unnamed codes
+    const unnamedCodes = Array.from(nameToCode.entries())
+      .filter(([name]) => name.includes('UNNAMED'))
       .map(([name, code]) => `${code}=${name}`)
       .join(', ');
 
@@ -287,27 +295,36 @@ For each sentence with dialogue, output its index and speaker code. Skip narrato
 </task>
 
 <rules>
-1. ONLY tag sentences containing actual quoted dialogue ("...", «...»)
+1. ONLY tag sentences containing actual quoted dialogue ("...", «...») or em-dash dialogue (— text —)
 2. DO NOT tag: narrative descriptions, actions, thoughts, or reported speech
 3. Reported/indirect speech = SKIP: "said her goodbyes", "thanked him", "mentioned that..."
-4. Unnamed speaker ("a man shouted"): use MALE_UNNAMED/FEMALE_UNNAMED/UNKNOWN_UNNAMED
-5. Dialogue continuation: same speaker continues until new attribution
-6. Pronoun resolution with multiple same-gender characters: use MOST RECENT named attribution
-7. Track conversation context: if Lily and Mirian are talking, "she said" refers to the one who just spoke or was just mentioned
-8. Multi-line dialogue: if one speech spans multiple [index] lines, tag each line
+4. ALWAYS prefer known characters over UNNAMED codes when speaker can be identified
+5. Use UNNAMED codes ONLY for truly anonymous speakers like "a voice said", "someone shouted"
+6. Attribution after dialogue identifies the speaker: "— Текст, — сказала Мария" = Maria speaking
+7. Attribution phrases: "said X", "X replied", "X asked", "произнесла X", "сказал X" etc.
+8. Dialogue continuation: same speaker continues until new attribution
+9. Pronoun resolution: use MOST RECENT named attribution for same-gender pronouns
+10. Track conversation context: alternating dialogue usually alternates speakers
+11. Multi-line dialogue: if one speech spans multiple [index] lines, tag each line
+12. Short exclamations with attribution ("— Довольно! — сказал X") = X is the speaker
 </rules>
 
-<codes>
-${codesSection}
-</codes>
+<character_codes>
+${characterCodes}
+</character_codes>
+
+<unnamed_codes>
+${unnamedCodes}
+</unnamed_codes>
 
 <example>
 Input:
 [0] Mary entered the room.
 [1] "Hello!" she said.
-[2] "How are you?" asked Anna.
+[2] — How are you? — asked Anna.
 [3] "Good," she replied.
 [4] Anna nodded and said goodbye to her.
+[5] — Enough! — interrupted the man sternly.
 
 Codes: A=Mary, B=Anna, C=MALE_UNNAMED, D=FEMALE_UNNAMED, E=UNKNOWN_UNNAMED
 
@@ -315,8 +332,9 @@ Output:
 1:A
 2:B
 3:A
+5:C
 
-Note: [3] "she" refers to Mary (responding to Anna's question). [4] is NOT tagged - "said goodbye" is reported speech, not quoted dialogue.
+Note: [3] "she" refers to Mary (responding to Anna). [4] is NOT tagged - reported speech. [5] uses C (MALE_UNNAMED) because "the man" is not a named character.
 </example>
 
 <output_format>
@@ -329,7 +347,7 @@ No JSON, no explanation, no notes.
 ${numberedSentences}
 </sentences>
 
-Tag speakers. Output index:code for each dialogue sentence.`;
+Tag speakers. Output index:code for each dialogue sentence. Use character codes when attribution identifies a known character.`;
 
     return { system, user };
   }

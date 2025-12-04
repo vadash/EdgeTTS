@@ -45,7 +45,7 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Split a single line into sentences, respecting quote boundaries
+   * Split a single line into sentences, respecting quote boundaries and em-dash dialogue
    * Keeps "dialogue" attribution together as one sentence
    */
   private splitLineIntoSentences(line: string): string[] {
@@ -53,12 +53,45 @@ export class TextBlockSplitter {
     let current = '';
     let inQuote = false;
     let quoteChar = '';
+    let inEmDashDialogue = false;
 
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
       const nextChar = line[i + 1] || '';
+      const next2Char = line[i + 2] || '';
+
+      // Skip ellipsis: handle ... as single unit
+      if (char === '.' && nextChar === '.' && next2Char === '.') {
+        current += '...';
+        i += 2; // skip next two dots
+        continue;
+      }
 
       current += char;
+
+      // Track em-dash dialogue (Russian style: — dialogue — attribution)
+      if (char === '—' || char === '–') {
+        if (!inQuote && !inEmDashDialogue && /\s/.test(nextChar)) {
+          // Opening em-dash at start or after space
+          inEmDashDialogue = true;
+        } else if (inEmDashDialogue && /\s/.test(nextChar)) {
+          // Second em-dash - attribution follows
+          // Look for attribution end
+          const remaining = line.slice(i + 1);
+          const attrMatch = remaining.match(/^(\s*[a-zа-яёA-ZА-ЯЁ][^.!?…]*[.!?…])/);
+          if (attrMatch) {
+            current += attrMatch[1];
+            i += attrMatch[1].length;
+            inEmDashDialogue = false;
+
+            if (current.trim()) {
+              sentences.push(current.trim());
+              current = '';
+            }
+            continue;
+          }
+        }
+      }
 
       // Track quote state - opening quote
       if (this.isOpeningQuote(char) && !inQuote) {
@@ -94,8 +127,8 @@ export class TextBlockSplitter {
           }
         }
       }
-      // Only split on sentence-ending punct when outside quotes
-      else if (!inQuote && /[.!?…]/.test(char)) {
+      // Only split on sentence-ending punct when outside quotes and em-dash dialogue
+      else if (!inQuote && !inEmDashDialogue && /[.!?…]/.test(char)) {
         // Check if followed by space or end (not mid-word like "Dr.")
         if (/\s/.test(nextChar) || i === line.length - 1) {
           if (current.trim()) {
