@@ -209,73 +209,87 @@ export class LLMVoiceService {
    * Build Pass 1 prompt (character extraction)
    */
   private buildPass1Prompt(textBlock: string): { system: string; user: string } {
-    const system = `# Role
-You are a character extractor for audiobook production.
+    const system = `# Character Extractor for Audiobook Production
 
-# Task
-Extract all **speaking characters** from text in \`<text>\` tags. Return ONE entry per unique person.
+<task>
+Extract ONLY characters who SPEAK dialogue. Return ONE entry per unique person.
+</task>
 
----
+## Step 1: Identify Speaking Characters
 
-## Step 1: Find All Speakers
+<critical>
+ONLY extract characters who have dialogue lines marked by:
+- Quotation marks: \`"..."\` or \`«...»\`
+- Em-dash (Russian style): \`— ...\`
 
-Identify characters who speak dialogue marked by:
-- Quotes: \`"..."\` or \`«...»\`
-- Em-dash (Russian): \`— ...\`
+DO NOT include characters who:
+- Are only mentioned in narration
+- Only perform actions without speaking
+- Are referenced but never speak
+</critical>
 
----
+## Step 2: Choose canonicalName
 
-## Step 2: Determine canonicalName
+<priority>
+Scan the ENTIRE text first, then choose the BEST identifier:
+1. **Surname** (family name) — HIGHEST priority for Western names
+2. **Given name** (first name, nickname) — use when no surname available
+3. **Title/role alone** — ONLY if no proper name exists anywhere
+</priority>
 
-**Scan the ENTIRE text** before deciding canonicalName.
-
-### Priority (use FIRST available):
-1. **SURNAME** (family name): Fielding, Tennyson, Smith (HIGHEST PRIORITY for English)
-2. **Given/personal name**: Lily, Dave, Женька, Мартин
-3. **Title alone** (ONLY if no proper name exists): the Captain, brother
-
-### Rules:
-- NEVER use first name (Alan, Dave) when surname exists (Fielding, Tennyson)
-- NEVER use titles (Captain, Second Officer, brother/брат) when proper name exists
-- For Russian: use proper names (Женька, Мартин) over relationship terms (брат, сестра)
-
----
+<rules>
+- Prefer surname over first name when both exist
+- Prefer proper names over titles/roles
+- For Russian: use proper names over relationship terms (брат, сестра)
+</rules>
 
 ## Step 3: Merge Same-Person References
 
-**CRITICAL**: Merge into ONE entry when context shows same person:
+<critical>
+You MUST merge characters who are the SAME PERSON into ONE entry.
 
-1. **First name + Surname**: Alan + Fielding = ONE character (use Fielding)
-2. **Title + Name**: the Captain + Dave/Tennyson = ONE character (use Tennyson)
-3. **Address + Response**: "Name1, hello" ... Name2 nodded → if Name2 responds to being called Name1, merge them
-4. **Role + Name**: the Second Officer + Alan/Fielding = ONE character
-5. **Pronoun continuity**: "said the brother" ... Женька asked → same person (use Женька)
+**Automatic merge triggers:**
+- Title and surname used interchangeably in dialogue attribution
+- First name used as direct address to someone identified by title/surname
+- Same person referred to differently in adjacent attributions
 
----
+**How to detect same person:**
+- "the Captain was there... Tennyson said" in same scene = SAME person → merge into Tennyson
+- "Name1, are you okay?" followed by "Name2 replied" = often SAME person
+- Alternating title/name in dialogue: "said the Captain... Tennyson replied... said the Captain" = ONE person
+
+**Result:** ONE character entry with ALL variations listed.
+</critical>
 
 ## Step 4: Build variations Array
 
-Include ALL forms for each character:
-- canonicalName first
-- Then ALL: first name, surname, nicknames, titles, role terms
+<important>
+Include ALL forms used to refer to each character:
+- canonicalName (must be first)
+- First name, surname, nicknames
+- Titles: Captain, Doctor, Professor, etc.
+- Role descriptions: the brother, the officer, etc.
+- Any other references used in dialogue attribution
+</important>
 
----
+## Step 5: Detect Gender
 
-## Gender Detection
+<detection>
+Use contextual clues:
+- Pronouns: he/she, him/her, его/её, он/она
+- Russian verb endings: -л (male), -ла (female)
+- Titles: Mr./Mrs., господин/госпожа
+Default to \`"unknown"\` when uncertain.
+</detection>
 
-Use: pronouns (he/she, он/она), verb endings (Russian -л/-ла), context.
-Default: \`"unknown"\`
+## Output Format
 
----
+<format>
+Return ONLY valid JSON (no markdown, no explanation):
+{"characters": [{"canonicalName": "Name", "variations": ["Name", "Alias1", ...], "gender": "male|female|unknown"}]}
 
-## Output
-
-JSON only, no markdown:
-\`\`\`json
-{"characters": [{"canonicalName": "Surname", "variations": ["Surname", "FirstName", "Title", ...], "gender": "male|female|unknown"}]}
-\`\`\`
-
-If no speakers: \`{"characters": []}\``;
+If no speaking characters found: {"characters": []}
+</format>`;
 
     const user = `<text>
 ${textBlock}
@@ -297,88 +311,138 @@ ${textBlock}
     const characterLines = characters.map((char) => {
       const code = nameToCode.get(char.canonicalName)!;
       const aliases = char.variations.filter((v) => v !== char.canonicalName);
+      const genderInfo = char.gender !== 'unknown' ? ` [${char.gender}]` : '';
       if (aliases.length > 0) {
-        return `${code}=${char.canonicalName} (also referred to as: ${aliases.join(', ')})`;
+        return `- \`${code}\` = ${char.canonicalName}${genderInfo} (aliases: ${aliases.join(', ')})`;
       }
-      return `${code}=${char.canonicalName}`;
+      return `- \`${code}\` = ${char.canonicalName}${genderInfo}`;
     });
 
     // Get unnamed codes
-    const unnamedCodes = Array.from(nameToCode.entries())
+    const unnamedEntries = Array.from(nameToCode.entries())
       .filter(([name]) => name.includes('UNNAMED'))
-      .map(([name, code]) => `${code}=${name}`)
-      .join(', ');
+      .map(([name, code]) => `- \`${code}\` = ${name}`);
 
-    const system = `# Role
-You are a dialogue tagger for audiobook production.
+    const system = `# Dialogue Speaker Tagger for Audiobook Production
 
-# Task
-Tag dialogue sentences with the speaker's character code.
-
----
+<task>
+Identify which character speaks each dialogue line. Output speaker codes for ALL dialogue lines.
+</task>
 
 ## Character Codes
+
+<characters>
 ${characterLines.join('\n')}
+</characters>
 
-## Unnamed Speaker Codes
-${unnamedCodes}
+<unnamed_speakers>
+${unnamedEntries.join('\n')}
 
----
+Use ONLY for named speakers not in the character list. Do NOT use for anonymous speakers.
+</unnamed_speakers>
 
-## Dialogue Detection
+## What is Dialogue?
 
-Tag a sentence as dialogue ONLY if it contains:
-- Quoted: \`"..."\` or \`«...»\`
-- Em-dash (Russian): \`— ...\`
+<dialogue_markers>
+A sentence contains dialogue if it has:
+- Quotation marks: \`"..."\` or \`«...»\`
+- Em-dash at start (Russian): \`— ...\`
 
-Do NOT tag pure narration (no quotes/em-dash).
+ALL dialogue sentences must be tagged with a speaker code.
+Pure narration (no quotes or em-dash) = do NOT tag.
+</dialogue_markers>
 
----
+## Speaker Attribution Rules
 
-## Speaker Attribution (Follow This Order)
+<rules priority="ordered">
 
-### 1. Check for Explicit Attribution (HIGHEST PRIORITY)
-Look for phrases like:
-- \`"text," said Name\` / \`"text," Name said\`
-- \`Name said/asked/replied, "text"\`
-- Russian: \`— text, — сказал Name\` / \`— text. Name ответил.\`
+### Rule 1: Same-Sentence Attribution (HIGHEST PRIORITY)
 
-**CRITICAL**: When attribution explicitly names a character (like "Conrad replied"), use that character's code. Do NOT override explicit attribution with context guesses.
+Check if the SAME sentence contains a speech verb with speaker name OR pronoun:
 
-### 2. Match Aliases to Character Codes
-When attribution uses an alias, find the matching character:
-- "said the brother" → find character with "brother" or "брат" in their aliases
-- "said the Captain" → find character with "Captain" in their aliases
-- Use the character's CODE, not the alias itself
+**With name:**
+- \`"...", Name said\` or \`"...", said Name\`
+- \`Name said, "..."\`
 
-### 3. Handle Vocatives (DO NOT CONFUSE WITH SPEAKER)
-A name at the START of dialogue followed by comma/punctuation = ADDRESSEE:
-- \`"Alan, I'm sorry"\` → Alan is addressed, NOT speaking
-- \`"Март, чем занимаешься?"\` → Март is addressed, NOT speaking
-- Find the SPEAKER from attribution or context, not the vocative
+**With pronoun:**
+- \`"...", she said\` → find the most recently mentioned female character
+- \`"...", he muttered\` → find the most recently mentioned male character
+- \`"...", она сказала\` → female character from context
+- \`"...", он спросил\` → male character from context
 
-### 4. Resolve Pronouns
-- \`"text," she said\` → female speaker from context
-- \`"text," он сказал\` → male speaker from context
+**Russian patterns:**
+- \`— ..., — сказал Name.\` or \`— ... — сказал Name.\`
+- \`— ..., — спросил/ответил/проговорил Name.\`
 
-### 5. Generic/Crowd Speakers → Do NOT Tag (Treat as Narration)
-When dialogue is attributed to generic/anonymous groups or individuals:
-- "one of them said", "someone asked", "a voice called", "один из них спросил"
-- Do NOT tag these lines — treat them as narration (skip them in output)
+<critical>
+ANY speech verb (said, asked, replied, muttered, whispered, mumbled, спросил, сказал, ответил, проговорил, etc.) with a name or pronoun = USE THAT SPEAKER.
 
-### 6. No Attribution
-Continue with previous speaker in conversation flow.
+For pronouns: look at PREVIOUS sentence to find the character being referred to.
+</critical>
 
----
+### Rule 2: Adjacent-Sentence Attribution
+
+If a sentence has dialogue but NO same-sentence attribution, check the PREVIOUS sentence:
+- Narration mentioning a character immediately before dialogue → that character speaks
+- Match by title if character has that alias
+
+### Rule 3: Match Aliases to Characters
+
+When attribution uses a title/role, match to the character whose aliases include it:
+- "said the Captain" → find character with "Captain" in aliases
+- "сказал брат" → find character with "брат" in aliases
+
+### Rule 4: Vocatives are NOT Speakers
+
+<warning>
+A name at the START of quoted text (followed by comma) = ADDRESSEE, not speaker:
+- \`"Alan, I need help"\` → Alan is being addressed, look for actual speaker elsewhere
+- \`"Март, что случилось?"\` → Март is being addressed
+
+The speaker must be found from attribution or context.
+</warning>
+
+### Rule 5: Conversation Flow (Alternation)
+
+<important>
+When dialogue lines have NO explicit attribution, use conversation alternation:
+
+1. Identify the last speaker with explicit attribution
+2. The next unattributed dialogue = the OTHER person in the conversation
+3. Continue alternating: A → B → A → B...
+
+This is CRITICAL for short replies like:
+- \`— Question?\` (attributed to A)
+- \`— Short answer.\` (no attribution = B)
+- \`— Another question?\` (no attribution = A)
+
+EVERY dialogue line must have a speaker assigned, even without attribution.
+</important>
+
+### Rule 6: Anonymous/Generic Speakers → SKIP
+
+<skip_rule>
+Do NOT tag when speaker is anonymous/generic:
+- "one of them asked", "someone said", "a voice called"
+- "один из них спросил", "кто-то сказал"
+
+OMIT these from output (they become narration).
+</skip_rule>
+
+</rules>
 
 ## Output Format
 
-One line per dialogue sentence:
-\`\`\`
-index:code
-\`\`\`
+<format>
+One line per dialogue sentence: \`index:code\`
 
-No explanations. Empty = all narration.`;
+- Tag ALL dialogue lines with identified speakers
+- OMIT narration lines (no quotes/em-dash)
+- OMIT anonymous speaker lines
+- No explanations
+
+Empty output = all lines are narration.
+</format>`;
 
     const user = `<sentences>
 ${numberedSentences}
