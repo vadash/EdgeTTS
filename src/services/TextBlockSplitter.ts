@@ -35,6 +35,7 @@ export class TextBlockSplitter {
   /**
    * Split a paragraph into sentences
    * Handles: .!?… and preserves abbreviations
+   * Quote-aware: doesn't split inside quoted text
    */
   private splitParagraphIntoSentences(paragraph: string): string[] {
     const sentences: string[] = [];
@@ -42,10 +43,23 @@ export class TextBlockSplitter {
     const text = paragraph.replace(/\n/g, ' ').replace(/\s+/g, ' ');
 
     let current = '';
+    let inQuotes = false;
+
     for (let i = 0; i < text.length; i++) {
       const char = text[i];
       const next = text[i + 1] || '';
       const next2 = text[i + 2] || '';
+
+      // Track quote state (handle various quote characters)
+      if (char === '"' || char === '"' || char === '«') {
+        if (!inQuotes) {
+          inQuotes = true;
+        }
+      } else if (char === '"' || char === '"' || char === '»') {
+        if (inQuotes) {
+          inQuotes = false;
+        }
+      }
 
       // Handle ellipsis
       if (char === '.' && next === '.' && next2 === '.') {
@@ -56,8 +70,8 @@ export class TextBlockSplitter {
 
       current += char;
 
-      // Split on sentence-ending punctuation
-      if (/[.!?…]/.test(char)) {
+      // Split on sentence-ending punctuation ONLY if not inside quotes
+      if (/[.!?…]/.test(char) && !inQuotes) {
         const atEnd = i === text.length - 1;
         const beforeSpace = /\s/.test(next);
 
