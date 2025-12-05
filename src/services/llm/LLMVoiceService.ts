@@ -31,9 +31,11 @@ export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
   private apiClient: LLMApiClient;
   private abortController: AbortController | null = null;
+  private logger?: ILogger;
 
   constructor(options: LLMVoiceServiceOptions) {
     this.options = options;
+    this.logger = options.logger;
     this.apiClient = new LLMApiClient({
       apiKey: options.apiKey,
       apiUrl: options.apiUrl,
@@ -60,6 +62,7 @@ export class LLMVoiceService {
     blocks: TextBlock[],
     onProgress?: ProgressCallback
   ): Promise<LLMCharacter[]> {
+    this.logger?.info(`[Extract] Starting (${blocks.length} blocks)`);
     const allCharacters: LLMCharacter[] = [];
     this.abortController = new AbortController();
     this.apiClient.resetLogging();
@@ -106,6 +109,7 @@ export class LLMVoiceService {
     characters: LLMCharacter[],
     onProgress?: ProgressCallback
   ): Promise<SpeakerAssignment[]> {
+    this.logger?.info(`[Assign] Starting (${blocks.length} blocks)`);
     const MAX_CONCURRENT = 20;
     const results: SpeakerAssignment[] = [];
     let completed = 0;
@@ -184,6 +188,7 @@ export class LLMVoiceService {
    * LLM-based character merge to deduplicate characters with different canonical names
    */
   private async mergeCharactersWithLLM(characters: LLMCharacter[]): Promise<LLMCharacter[]> {
+    this.logger?.info(`[Merge] Starting character deduplication (${characters.length} characters)`);
     const response = await this.apiClient.callWithRetry(
       buildMergePrompt(characters),
       (result) => validateMergeResponse(result, characters),

@@ -31,6 +31,8 @@ export class SpeakerAssignmentStep extends BasePipelineStep {
     this.checkCancelled(signal);
     this.validateContext(context);
 
+    this.reportProgress(0, 0, '=== LLM Pass 2: Speaker Assignment ===');
+
     // After validation, these are guaranteed to exist
     const characters = context.characters!;
     const voiceMap = context.voiceMap!;

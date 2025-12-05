@@ -67,7 +67,7 @@ export class LLMApiClient {
         const delay = getRetryDelay(attempt);
         attempt++;
 
-        this.logger?.warn(`Validation failed, retrying in ${delay}ms`, { errors: validation.errors });
+        this.logger?.info(`[${pass}] Validation failed, retry ${attempt}, waiting ${delay / 1000}s...`, { errors: validation.errors });
         await this.sleep(delay);
       } catch (error) {
         if (signal?.aborted) {
@@ -76,7 +76,7 @@ export class LLMApiClient {
 
         const delay = getRetryDelay(attempt);
         attempt++;
-        this.logger?.error(`API error, retrying in ${delay}ms`, error instanceof Error ? error : undefined, { error: String(error) });
+        this.logger?.info(`[${pass}] API error, retry ${attempt}, waiting ${delay / 1000}s...`, { error: String(error) });
         await this.sleep(delay);
       }
     }

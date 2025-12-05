@@ -30,6 +30,8 @@ export class CharacterExtractionStep extends BasePipelineStep {
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
 
+    this.reportProgress(0, 0, '=== LLM Pass 1: Character Extraction ===');
+
     // Create LLM service for this step
     this.llmService = this.options.createLLMService(this.options.llmOptions);
 
