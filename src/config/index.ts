@@ -60,15 +60,20 @@ export interface LLMConfig {
   retryDelays: number[];
   /** Maximum tokens for API response */
   maxTokens: number;
-  /** Temperature for deterministic output */
-  temperature: number;
+}
+
+export interface FFmpegCDNMirror {
+  /** Base URL for FFmpeg files */
+  baseUrl: string;
+  /** Core JS filename */
+  coreJs: string;
+  /** WASM filename */
+  wasmJs: string;
 }
 
 export interface FFmpegConfig {
-  /** FFmpeg WASM version */
-  version: string;
-  /** CDN mirror URLs for loading FFmpeg */
-  cdnMirrors: string[];
+  /** CDN mirrors for loading FFmpeg */
+  cdnMirrors: FFmpegCDNMirror[];
 }
 
 export interface EdgeTTSApiConfig {
@@ -95,12 +100,12 @@ export interface AppConfig {
  */
 export const defaultConfig: AppConfig = {
   tts: {
-    maxWorkers: 30,
-    initialRetryDelay: 10000, // 10 seconds
-    secondRetryDelay: 30000, // 30 seconds
+    maxWorkers: 20,
+    initialRetryDelay: 5000, // 5 seconds
+    secondRetryDelay: 10000, // 10 seconds
     retryMultiplier: 3,
     maxRetryDelay: 600000, // 10 minutes
-    workersPerMinute: 75,
+    workersPerMinute: 70,
     errorCooldown: 10000, // 10 seconds
   },
 
@@ -108,7 +113,7 @@ export const defaultConfig: AppConfig = {
     targetDurationMinutes: 30,
     tolerancePercent: 10,
     bytesPerMs: 12, // 96kbps = 12 bytes/ms
-    opusBitrate: 48,
+    opusBitrate: 64,
     opusCompression: 10,
     sampleRate: 24000,
     normLufs: -18,
@@ -127,15 +132,25 @@ export const defaultConfig: AppConfig = {
     maxConcurrentRequests: 20,
     retryDelays: [5000, 10000, 20000, 60000, 180000, 600000, 1200000, 2400000, 4800000],
     maxTokens: 4000,
-    temperature: 0.1,
   },
 
   ffmpeg: {
-    version: '0.12.10',
     cdnMirrors: [
-      'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd',
-      'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd',
-      'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd',
+      {
+        baseUrl: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd',
+        coreJs: 'ffmpeg-core.js',
+        wasmJs: 'ffmpeg-core.wasm',
+      },
+      {
+        baseUrl: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd',
+        coreJs: 'ffmpeg-core.js',
+        wasmJs: 'ffmpeg-core.wasm',
+      },
+      {
+        baseUrl: 'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd',
+        coreJs: 'ffmpeg-core.min.js',
+        wasmJs: 'ffmpeg-core.wasm',
+      },
     ],
   },
 

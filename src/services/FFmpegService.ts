@@ -11,17 +11,7 @@ export interface AudioProcessingConfig {
   normalization: boolean;
 }
 
-interface CDNConfig {
-  baseUrl: string;
-  coreJs: string;
-  wasmJs: string;
-}
-
-const CDN_MIRRORS: CDNConfig[] = defaultConfig.ffmpeg.cdnMirrors.map((url, index) => ({
-  baseUrl: url,
-  coreJs: index === 2 ? 'ffmpeg-core.min.js' : 'ffmpeg-core.js',
-  wasmJs: 'ffmpeg-core.wasm',
-}));
+const CDN_MIRRORS = defaultConfig.ffmpeg.cdnMirrors;
 
 /**
  * FFmpegService - Implements IFFmpegService interface
