@@ -114,7 +114,7 @@ export const defaultConfig: AppConfig = {
     silenceThreshold: -50,
     silenceStartPeriods: 1,
     silenceStartDuration: 0.75,
-    silenceStopPeriods: 1,
+    silenceStopPeriods: -1, // Must be -1 (remove all trailing silence). Positive values truncate after N silence periods!
     silenceStopDuration: 0.25,
   },
 
