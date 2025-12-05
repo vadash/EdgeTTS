@@ -109,6 +109,7 @@ export class LLMApiClient {
       messages,
       max_tokens: 4000,
       temperature: 0.0,
+      top_p: 0.95,
     };
 
     // Save request log (first call only per pass type)
