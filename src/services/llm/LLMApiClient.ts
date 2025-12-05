@@ -108,7 +108,7 @@ export class LLMApiClient {
       model: this.options.model,
       messages,
       max_tokens: 4000,
-      temperature: 0.1,
+      temperature: 0.0,
     };
 
     // Save request log (first call only per pass type)
