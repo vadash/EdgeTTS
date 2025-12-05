@@ -91,7 +91,8 @@ export class LLMVoiceService {
     // LLM merge only if multiple blocks were processed and multiple characters exist
     if (blocks.length > 1 && merged.length > 1) {
       onProgress?.(blocks.length, blocks.length, `Merging ${merged.length} characters...`);
-      merged = await this.mergeCharactersWithLLM(merged);
+      merged = await this.mergeCharactersWithLLM(merged, onProgress);
+      onProgress?.(blocks.length, blocks.length, `Merged to ${merged.length} characters`);
     }
 
     return merged;
@@ -184,14 +185,20 @@ export class LLMVoiceService {
   /**
    * LLM-based character merge to deduplicate characters with different canonical names
    */
-  private async mergeCharactersWithLLM(characters: LLMCharacter[]): Promise<LLMCharacter[]> {
+  private async mergeCharactersWithLLM(
+    characters: LLMCharacter[],
+    onProgress?: ProgressCallback
+  ): Promise<LLMCharacter[]> {
     this.logger?.info(`[Merge] Starting character deduplication (${characters.length} characters)`);
     const response = await this.apiClient.callWithRetry(
       buildMergePrompt(characters),
       (result) => validateMergeResponse(result, characters),
       this.abortController?.signal,
       [],
-      'merge'
+      'merge',
+      (attempt, delay) => {
+        onProgress?.(0, 0, `Merge validation failed, retry ${attempt} in ${Math.round(delay / 1000)}s...`);
+      }
     );
 
     const parsed = JSON.parse(response) as MergeResponse;
