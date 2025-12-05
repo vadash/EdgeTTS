@@ -16,10 +16,13 @@ export function FileDropZone() {
     if (!files || files.length === 0) return;
 
     try {
+      const allConverted: Array<{ filename: string; content: string }> = [];
+
       for (const file of Array.from(files)) {
         const converted = await convertFileToTxt(file);
+        allConverted.push(...converted);
 
-        for (const { filename, content } of converted) {
+        for (const { content } of converted) {
           const currentText = dataStore.textContent.value;
           dataStore.setTextContent(currentText + (currentText ? '\n\n' : '') + content);
         }
@@ -30,7 +33,25 @@ export function FileDropZone() {
           logs.info(`Loaded: ${file.name} (${converted.length} files)`);
         }
       }
-      dataStore.bookLoaded.value = true;
+
+      // Build fileNames array with sentence boundaries
+      const fileNames: Array<[string, number]> = [];
+      let sentenceIndex = 0;
+      for (const { filename, content } of allConverted) {
+        fileNames.push([filename, sentenceIndex]);
+        // Estimate sentence count by splitting on sentence-ending punctuation
+        const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        sentenceIndex += sentences.length;
+      }
+
+      // Create a book with the original filenames
+      const fullText = dataStore.textContent.value;
+      const allSentences = fullText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      dataStore.setBook({
+        fileNames,
+        allSentences,
+        fullText,
+      });
     } catch (err) {
       logs.error(`Error loading file: ${(err as Error).message}`);
     }
@@ -72,17 +93,38 @@ export function FileDropZone() {
     if (!files || files.length === 0) return;
 
     try {
+      const allConverted: Array<{ filename: string; content: string }> = [];
+
       for (const file of Array.from(files)) {
         const converted = await convertFileToTxt(file);
+        allConverted.push(...converted);
 
-        for (const { filename, content } of converted) {
+        for (const { content } of converted) {
           const currentText = dataStore.textContent.value;
           dataStore.setTextContent(currentText + (currentText ? '\n\n' : '') + content);
         }
 
         logs.info(`Loaded: ${file.name}`);
       }
-      dataStore.bookLoaded.value = true;
+
+      // Build fileNames array with sentence boundaries
+      const fileNames: Array<[string, number]> = [];
+      let sentenceIndex = 0;
+      for (const { filename, content } of allConverted) {
+        fileNames.push([filename, sentenceIndex]);
+        // Estimate sentence count by splitting on sentence-ending punctuation
+        const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        sentenceIndex += sentences.length;
+      }
+
+      // Create a book with the original filenames
+      const fullText = dataStore.textContent.value;
+      const allSentences = fullText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      dataStore.setBook({
+        fileNames,
+        allSentences,
+        fullText,
+      });
     } catch (err) {
       logs.error(`Error loading file: ${(err as Error).message}`);
     }
