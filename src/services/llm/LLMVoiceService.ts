@@ -196,8 +196,9 @@ export class LLMVoiceService {
       this.abortController?.signal,
       [],
       'merge',
-      (attempt, delay) => {
-        onProgress?.(0, 0, `Merge validation failed, retry ${attempt} in ${Math.round(delay / 1000)}s...`);
+      (attempt, delay, errors) => {
+        const reason = errors?.length ? `: ${errors[0]}` : '';
+        onProgress?.(0, 0, `Merge validation failed${reason}, retry ${attempt} in ${Math.round(delay / 1000)}s...`);
       }
     );
 

@@ -50,7 +50,7 @@ export class LLMApiClient {
     signal?: AbortSignal,
     previousErrors: string[] = [],
     pass: PassType = 'extract',
-    onRetry?: (attempt: number, delay: number) => void
+    onRetry?: (attempt: number, delay: number, errors?: string[]) => void
   ): Promise<string> {
     let attempt = 0;
 
@@ -69,7 +69,7 @@ export class LLMApiClient {
         attempt++;
 
         this.logger?.info(`[${pass}] Validation failed, retry ${attempt}, waiting ${delay / 1000}s...`, { errors: validation.errors });
-        onRetry?.(attempt, delay);
+        onRetry?.(attempt, delay, validation.errors);
         await this.sleep(delay);
       } catch (error) {
         if (signal?.aborted) {
