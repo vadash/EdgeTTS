@@ -184,8 +184,8 @@ describe('TTSWorkerPool', () => {
       pool = createPool();
       pool.addTask(createTask(0));
 
-      // Run through retries
-      await vi.advanceTimersByTimeAsync(5000);
+      // Run through retries: 50ms (1st fail) + 5000ms (delay) + 50ms (2nd fail) + 10000ms (delay) + 50ms (success)
+      await vi.advanceTimersByTimeAsync(20000);
 
       expect(attemptCount).toBe(3);
       expect(pool.getCompletedAudio().size).toBe(1);

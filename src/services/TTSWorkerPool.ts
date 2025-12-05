@@ -2,7 +2,7 @@
 // Replaces legacy polling approach with Promise-based queue
 
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
-import { defaultConfig, getTTSRetryDelay, getWorkerStartDelay, type TTSConfig } from '@/config';
+import { defaultConfig, getRetryDelay, getWorkerStartDelay, type TTSConfig } from '@/config';
 import type { IEdgeTTSServiceFactory, ITTSService, IWorkerPool, TTSWorkerOptions } from './interfaces';
 
 export interface PoolTask {
@@ -148,8 +148,8 @@ export class TTSWorkerPool implements IWorkerPool {
     this.activeWorkers.delete(partIndex);
 
     if (worker) {
-      // Infinite retry with exponential backoff using injected config
-      const delay = getTTSRetryDelay(retryCount, this.ttsConfig);
+      // Infinite retry with exponential backoff using shared config
+      const delay = getRetryDelay(retryCount);
       const delaySec = Math.round(delay / 1000);
       this.onStatusUpdate?.({
         partIndex,

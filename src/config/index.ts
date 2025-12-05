@@ -4,14 +4,6 @@
 export interface TTSConfig {
   /** Maximum concurrent WebSocket workers */
   maxWorkers: number;
-  /** Initial retry delay in ms */
-  initialRetryDelay: number;
-  /** Second retry delay in ms */
-  secondRetryDelay: number;
-  /** Multiplier for exponential backoff after second retry */
-  retryMultiplier: number;
-  /** Maximum retry delay in ms */
-  maxRetryDelay: number;
   /** Rate limit: workers per minute */
   workersPerMinute: number;
   /** Cooldown after error before spawning new workers (ms) */
@@ -56,10 +48,13 @@ export interface LLMConfig {
   assignBlockTokens: number;
   /** Maximum concurrent API requests */
   maxConcurrentRequests: number;
-  /** Retry delays in ms (array for sequential delays) */
-  retryDelays: number[];
   /** Maximum tokens for API response */
   maxTokens: number;
+}
+
+export interface RetryConfig {
+  /** Retry delays in ms - after exhausted, stays on last value forever */
+  delays: number[];
 }
 
 export interface FFmpegCDNMirror {
@@ -91,6 +86,7 @@ export interface AppConfig {
   tts: TTSConfig;
   audio: AudioConfig;
   llm: LLMConfig;
+  retry: RetryConfig;
   ffmpeg: FFmpegConfig;
   edgeTtsApi: EdgeTTSApiConfig;
 }
@@ -101,10 +97,6 @@ export interface AppConfig {
 export const defaultConfig: AppConfig = {
   tts: {
     maxWorkers: 20,
-    initialRetryDelay: 5000, // 5 seconds
-    secondRetryDelay: 10000, // 10 seconds
-    retryMultiplier: 3,
-    maxRetryDelay: 600000, // 10 minutes
     workersPerMinute: 70,
     errorCooldown: 10000, // 10 seconds
   },
@@ -130,8 +122,12 @@ export const defaultConfig: AppConfig = {
     extractBlockTokens: 16000,
     assignBlockTokens: 8000,
     maxConcurrentRequests: 20,
-    retryDelays: [5000, 10000, 20000, 60000, 180000, 600000, 1200000, 2400000, 4800000],
     maxTokens: 4000,
+  },
+
+  retry: {
+    // Shared retry delays for TTS and LLM - stays on last value forever
+    delays: [5000, 10000, 30000, 100000, 300000, 600000],
   },
 
   ffmpeg: {
@@ -172,14 +168,12 @@ export function loadConfig(): AppConfig {
 }
 
 /**
- * Get retry delay based on attempt number for TTS
+ * Get retry delay based on attempt number (shared by TTS and LLM)
+ * After exhausting the delays array, stays on the last value forever
  */
-export function getTTSRetryDelay(retryCount: number, config: TTSConfig = defaultConfig.tts): number {
-  if (retryCount === 0) return config.initialRetryDelay;
-  if (retryCount === 1) return config.secondRetryDelay;
-  // For retry 2+: secondDelay * multiplier^(retryCount-1), capped at maxDelay
-  const delay = config.secondRetryDelay * Math.pow(config.retryMultiplier, retryCount - 1);
-  return Math.min(delay, config.maxRetryDelay);
+export function getRetryDelay(attempt: number, config: RetryConfig = defaultConfig.retry): number {
+  const index = Math.min(attempt, config.delays.length - 1);
+  return config.delays[index];
 }
 
 /**

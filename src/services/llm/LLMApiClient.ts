@@ -1,4 +1,5 @@
 import type { LLMValidationResult } from '@/state/types';
+import { getRetryDelay } from '@/config';
 import type { ILogger } from '../interfaces';
 
 export interface LLMApiClientOptions {
@@ -50,7 +51,6 @@ export class LLMApiClient {
     previousErrors: string[] = [],
     pass: PassType = 'extract'
   ): Promise<string> {
-    const delays = [1000, 3000, 5000, 10000, 30000, 60000, 120000, 300000, 600000];
     let attempt = 0;
 
     while (true) {
@@ -64,9 +64,9 @@ export class LLMApiClient {
 
         // Validation failed - retry with errors in prompt
         previousErrors = validation.errors;
+        const delay = getRetryDelay(attempt);
         attempt++;
 
-        const delay = delays[Math.min(attempt - 1, delays.length - 1)];
         this.logger?.warn(`Validation failed, retrying in ${delay}ms`, { errors: validation.errors });
         await this.sleep(delay);
       } catch (error) {
@@ -74,8 +74,8 @@ export class LLMApiClient {
           throw new Error('Operation cancelled');
         }
 
+        const delay = getRetryDelay(attempt);
         attempt++;
-        const delay = delays[Math.min(attempt - 1, delays.length - 1)];
         this.logger?.error(`API error, retrying in ${delay}ms`, error instanceof Error ? error : undefined, { error: String(error) });
         await this.sleep(delay);
       }
