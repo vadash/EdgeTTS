@@ -19,6 +19,7 @@
     "@ffmpeg/util": "^0.12.1",
     "@preact/signals": "^1.2.2",
     "jszip": "^3.10.1",
+    "openai": "^6.10.0",
     "preact": "^10.19.3",
     "preact-i18n": "^2.4.0-preactx"
   },

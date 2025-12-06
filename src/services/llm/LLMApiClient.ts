@@ -1,3 +1,4 @@
+import OpenAI from 'openai';
 import type { LLMValidationResult } from '@/state/types';
 import { getRetryDelay } from '@/config';
 import type { ILogger } from '../interfaces';
@@ -23,6 +24,7 @@ export interface LLMPrompt {
 export class LLMApiClient {
   private options: LLMApiClientOptions;
   private logger?: ILogger;
+  private client: OpenAI;
   private extractLogged = false;
   private mergeLogged = false;
   private assignLogged = false;
@@ -30,6 +32,11 @@ export class LLMApiClient {
   constructor(options: LLMApiClientOptions) {
     this.options = options;
     this.logger = options.logger;
+    this.client = new OpenAI({
+      apiKey: options.apiKey,
+      baseURL: options.apiUrl,
+      dangerouslyAllowBrowser: true,
+    });
   }
 
   /**
@@ -94,7 +101,7 @@ export class LLMApiClient {
     previousErrors: string[] = [],
     pass: PassType = 'extract'
   ): Promise<string> {
-    const messages: Array<{ role: string; content: string }> = [
+    const messages: Array<{ role: 'system' | 'user'; content: string }> = [
       { role: 'system', content: prompt.system },
       { role: 'user', content: prompt.user },
     ];
@@ -113,7 +120,7 @@ export class LLMApiClient {
       max_tokens: 4000,
       temperature: 0.0,
       top_p: 0.95,
-      stream: true,
+      stream: true as const,
     };
 
     // Save request log (first call only per pass type)
@@ -125,23 +132,13 @@ export class LLMApiClient {
       this.saveLog('assign_request.json', requestBody);
     }
 
-    const response = await fetch(`${this.options.apiUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.options.apiKey}`,
-      },
-      body: JSON.stringify(requestBody),
-      signal,
-    });
+    // Use OpenAI SDK for streaming
+    const stream = await this.client.chat.completions.create(requestBody, { signal });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API error ${response.status}: ${errorText}`);
+    let content = '';
+    for await (const chunk of stream) {
+      content += chunk.choices[0]?.delta?.content || '';
     }
-
-    // Parse SSE stream
-    const content = await this.parseSSEStream(response);
 
     // Build response object for logging
     const data = {
@@ -167,68 +164,6 @@ export class LLMApiClient {
 
     // Extract JSON from response (handle markdown code blocks)
     return this.extractJSON(content);
-  }
-
-  /**
-   * Parse SSE stream and concatenate content from all chunks
-   * Also handles non-streaming JSON responses for API compatibility
-   */
-  private async parseSSEStream(response: Response): Promise<string> {
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error('No response body');
-    }
-
-    const decoder = new TextDecoder();
-    let content = '';
-    let buffer = '';
-    let rawResponse = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      buffer += chunk;
-      rawResponse += chunk;
-
-      // Process complete SSE events from buffer
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-          if (!data) continue;
-
-          try {
-            const parsed = JSON.parse(data);
-            const delta = parsed.choices?.[0]?.delta?.content;
-            if (delta) {
-              content += delta;
-            }
-          } catch {
-            // Skip malformed JSON chunks
-          }
-        }
-      }
-    }
-
-    // If no SSE content found, try parsing as non-streaming JSON response
-    if (!content && rawResponse.trim()) {
-      try {
-        const parsed = JSON.parse(rawResponse);
-        const messageContent = parsed.choices?.[0]?.message?.content;
-        if (messageContent) {
-          return messageContent;
-        }
-      } catch {
-        // Not valid JSON, will be handled by extractJSON
-      }
-    }
-
-    return content;
   }
 
   /**
@@ -275,20 +210,11 @@ export class LLMApiClient {
    */
   async testConnection(): Promise<{ success: boolean; error?: string }> {
     try {
-      const response = await fetch(`${this.options.apiUrl}/models`, {
-        headers: {
-          Authorization: `Bearer ${this.options.apiKey}`,
-        },
-      });
-
-      if (response.ok) {
-        return { success: true };
-      }
-
-      const error = await response.text();
-      return { success: false, error: `API error ${response.status}: ${error}` };
+      await this.client.models.list();
+      return { success: true };
     } catch (e) {
-      return { success: false, error: (e as Error).message };
+      const error = e instanceof Error ? e.message : String(e);
+      return { success: false, error };
     }
   }
 
