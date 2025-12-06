@@ -32,7 +32,7 @@ export function buildMergePrompt(characters: LLMCharacter[]): LLMPrompt {
 export function buildAssignPrompt(
   characters: LLMCharacter[],
   nameToCode: Map<string, string>,
-  numberedSentences: string,
+  numberedParagraphs: string,
   _startIndex: number
 ): LLMPrompt {
   // Build character codes with aliases/variations
@@ -59,6 +59,6 @@ export function buildAssignPrompt(
 
   return {
     system,
-    user: LLM_PROMPTS.assign.userTemplate.replace('{{sentences}}', numberedSentences),
+    user: LLM_PROMPTS.assign.userTemplate.replace('{{paragraphs}}', numberedParagraphs),
   };
 }

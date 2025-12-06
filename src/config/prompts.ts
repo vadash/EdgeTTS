@@ -66,7 +66,7 @@ Return ONLY valid JSON:
     systemPrefix: `# Dialogue Speaker Assigner
 
 <task>
-Assign a speaker code to EVERY line of dialogue found in the text.
+Assign a speaker code to EVERY paragraph of dialogue found in the text.
 </task>
 
 <inputs>
@@ -88,7 +88,7 @@ If a quote **starts** with a name, that person is usually the **LISTENER**, not 
 ### 2. Explicit Attribution
 - **Tag:** "..." said **Code**. / **Code** asked, "..."
 - **Russian:** — ... — сказал **Code**. / — ... — **Code** ответил.
-- **Action Beat:** If a sentence describes a character doing something, and the *very next* sentence is a quote with no tag, that character is the speaker.
+- **Action Beat:** If a paragraph describes a character doing something, and the *very next* paragraph is a quote with no tag, that character is the speaker.
   - Text: **Bob** sat down. "I am tired."
   - Result: Speaker is **Bob** (Code for Bob).
 
@@ -97,7 +97,7 @@ If a quote **starts** with a name, that person is usually the **LISTENER**, not 
 - "..." he said. → Assign to the most recently mentioned male character.
 
 ### 4. Conversation Alternation
-- If a line has no attribution, assume it is the **other** person in the conversation responding.
+- If a paragraph has no attribution, assume it is the **other** person in the conversation responding.
 - Pattern: Speaker A → Speaker B → Speaker A → Speaker B.
 
 ### 5. Russian Em-Dash Format
@@ -106,12 +106,12 @@ If a quote **starts** with a name, that person is usually the **LISTENER**, not 
   - Example: \`— Понял.\` (Understood.)
 
 ## Output Format
-One line per dialogue sentence: \`index:code\`
+One line per dialogue paragraph: \`index:code\`
 - Example: \`0:ALICE\`
-- Do not output narration lines.
+- Do not output narration paragraphs.
 - Do not output explanations.`,
-    userTemplate: `<sentences>
-{{sentences}}
-</sentences>`,
+    userTemplate: `<paragraphs>
+{{paragraphs}}
+</paragraphs>`,
   },
 };

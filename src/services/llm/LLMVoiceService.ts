@@ -11,6 +11,18 @@ import { buildExtractPrompt, buildMergePrompt, buildAssignPrompt } from './Promp
 import { validateExtractResponse, validateMergeResponse, validateAssignResponse, parseAssignResponse } from './ResponseValidators';
 import { buildCodeMapping, mergeCharacters, applyMergeResponse } from './CharacterUtils';
 
+/**
+ * Regex matching speech/dialogue symbols:
+ * " - Double quote
+ * « » - Guillemets
+ * ‹ › - Single guillemets
+ * — - Em dash
+ * " " - Curly double quotes
+ * „ - Low double quote
+ * ' ' ' - Single quotes (straight and curly)
+ */
+export const SPEECH_SYMBOLS_REGEX = /["\u00AB\u00BB\u2014\u201C\u201D\u201E\u2039\u203A'\u2018\u2019]/;
+
 export interface LLMVoiceServiceOptions {
   apiKey: string;
   apiUrl: string;
@@ -152,32 +164,42 @@ export class LLMVoiceService {
     nameToCode: Map<string, string>,
     codeToName: Map<string, string>
   ): Promise<SpeakerAssignment[]> {
-    const numberedSentences = block.sentences
+    const hasSpeech = block.sentences.some(p => SPEECH_SYMBOLS_REGEX.test(p));
+
+    if (!hasSpeech) {
+      return block.sentences.map((text, i) => ({
+        sentenceIndex: block.sentenceStartIndex + i,
+        text,
+        speaker: 'narrator',
+        voiceId: this.options.narratorVoice,
+      }));
+    }
+
+    const numberedParagraphs = block.sentences
       .map((s, i) => `[${block.sentenceStartIndex + i}] ${s}`)
       .join('\n');
 
     const response = await this.apiClient.callWithRetry(
-      buildAssignPrompt(characters, nameToCode, numberedSentences, block.sentenceStartIndex),
+      buildAssignPrompt(characters, nameToCode, numberedParagraphs, block.sentenceStartIndex),
       (result) => validateAssignResponse(result, block, codeToName),
       this.abortController?.signal,
       [],
       'assign'
     );
 
-    // Parse sparse response and build speaker assignments
     const speakerMap = parseAssignResponse(response, codeToName);
 
     return block.sentences.map((text, i) => {
       const index = block.sentenceStartIndex + i;
-      const speaker = speakerMap.get(index) || 'narrator';
+      const hasSpeechSymbols = SPEECH_SYMBOLS_REGEX.test(text);
+      const speaker = hasSpeechSymbols ? (speakerMap.get(index) || 'narrator') : 'narrator';
       return {
         sentenceIndex: index,
         text,
         speaker,
-        voiceId:
-          speaker === 'narrator'
-            ? this.options.narratorVoice
-            : characterVoiceMap.get(speaker) ?? this.options.narratorVoice,
+        voiceId: speaker === 'narrator'
+          ? this.options.narratorVoice
+          : characterVoiceMap.get(speaker) ?? this.options.narratorVoice,
       };
     });
   }

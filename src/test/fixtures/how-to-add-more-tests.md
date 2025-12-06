@@ -1,6 +1,6 @@
   Files:
   - src/test/fixtures/index.ts - fixture definitions (add new tests here)
-  - src/test/fixtures/sample-story-en.txt - test text file
+  - src/test/fixtures/XXX.txt - test text file
   - src/test/llm-test-helpers.ts - reusable helpers
   - src/test/llm-real.test.ts - data-driven test runner
 

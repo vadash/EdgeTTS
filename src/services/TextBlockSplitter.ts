@@ -1,8 +1,8 @@
 import type { TextBlock } from '@/state/types';
 
 /**
- * TextBlockSplitter - Splits text into sentences and blocks for LLM processing
- * Simple approach: preserve paragraph boundaries, split on sentence endings
+ * TextBlockSplitter - Splits text into paragraphs and blocks for LLM processing
+ * Each line (\n) is a paragraph. Large paragraphs (>3000 chars) are split by sentence boundaries.
  */
 export class TextBlockSplitter {
   /**
@@ -13,27 +13,30 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Split text into sentences, preserving paragraph structure
-   * Returns flat array of sentences for backward compatibility
+   * Split text into paragraphs (one per line)
+   * Large paragraphs (>3000 chars) are split by sentence boundaries
    */
-  splitIntoSentences(text: string): string[] {
-    const sentences: string[] = [];
-    const paragraphs = text.split(/\n\s*\n/);
+  splitIntoParagraphs(text: string): string[] {
+    const paragraphs: string[] = [];
+    const lines = text.split('\n');
 
-    for (const para of paragraphs) {
-      const trimmed = para.trim();
+    for (const line of lines) {
+      const trimmed = line.trim();
       if (!trimmed) continue;
 
-      // Split paragraph into sentences
-      const paraSentences = this.splitParagraphIntoSentences(trimmed);
-      sentences.push(...paraSentences);
+      if (trimmed.length > 3000) {
+        const sentences = this.splitParagraphIntoSentences(trimmed);
+        paragraphs.push(...sentences);
+      } else {
+        paragraphs.push(trimmed);
+      }
     }
 
-    return sentences;
+    return paragraphs;
   }
 
   /**
-   * Split a paragraph into sentences
+   * Split a large paragraph into sentences (used for paragraphs >3000 chars)
    * Handles: .!?… and preserves abbreviations
    * Quote-aware: doesn't split inside quoted text
    */
@@ -207,16 +210,16 @@ export class TextBlockSplitter {
    * Create blocks for Extract (character extraction) - larger blocks
    */
   createExtractBlocks(text: string): TextBlock[] {
-    const sentences = this.splitIntoSentences(text);
-    return this.splitIntoBlocks(sentences, 16000);
+    const paragraphs = this.splitIntoParagraphs(text);
+    return this.splitIntoBlocks(paragraphs, 16000);
   }
 
   /**
    * Create blocks for Assign (speaker assignment) - smaller blocks
    */
   createAssignBlocks(text: string): TextBlock[] {
-    const sentences = this.splitIntoSentences(text);
-    return this.splitIntoBlocks(sentences, 8000);
+    const paragraphs = this.splitIntoParagraphs(text);
+    return this.splitIntoBlocks(paragraphs, 8000);
   }
 }
 
