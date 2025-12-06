@@ -30,7 +30,7 @@ export class LogStore implements ILogger {
   readonly entries = signal<LogEntry[]>([]);
 
   // Configuration
-  readonly maxEntries = signal<number>(500);
+  readonly maxEntries = signal<number>(50000);
 
   // Timer state
   readonly startTime = signal<number | null>(null);
