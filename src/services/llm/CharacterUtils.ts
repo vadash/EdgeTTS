@@ -1,4 +1,4 @@
-import type { LLMCharacter, MergeResponse } from '@/state/types';
+import type { LLMCharacter, MergeResponse, SpeakerAssignment } from '@/state/types';
 
 export interface CodeMapping {
   nameToCode: Map<string, string>;
@@ -96,4 +96,20 @@ export function applyMergeResponse(characters: LLMCharacter[], mergeResponse: Me
   }
 
   return result;
+}
+
+/**
+ * Count speaking frequency per character from speaker assignments
+ * Returns a map of speaker name → sentence count (excludes narrator)
+ */
+export function countSpeakingFrequency(
+  assignments: SpeakerAssignment[]
+): Map<string, number> {
+  const frequency = new Map<string, number>();
+  for (const a of assignments) {
+    if (a.speaker !== 'narrator') {
+      frequency.set(a.speaker, (frequency.get(a.speaker) ?? 0) + 1);
+    }
+  }
+  return frequency;
 }

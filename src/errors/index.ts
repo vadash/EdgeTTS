@@ -30,6 +30,7 @@ export type ErrorCode =
   | 'CONVERSION_CANCELLED'
   | 'CONVERSION_NO_CONTENT'
   | 'CONVERSION_FAILED'
+  | 'INSUFFICIENT_VOICES'
   // Generic errors
   | 'UNKNOWN_ERROR';
 
@@ -62,6 +63,7 @@ export const errorMessages: Record<ErrorCode, string> = {
   CONVERSION_CANCELLED: 'Conversion was cancelled',
   CONVERSION_NO_CONTENT: 'No content to convert',
   CONVERSION_FAILED: 'Conversion failed',
+  INSUFFICIENT_VOICES: 'Insufficient voices in pool',
   // Generic
   UNKNOWN_ERROR: 'An unknown error occurred',
 };
@@ -256,6 +258,16 @@ export function conversionCancelledError(): AppError {
  */
 export function noContentError(): AppError {
   return AppError.fromCode('CONVERSION_NO_CONTENT');
+}
+
+/**
+ * Create insufficient voices error
+ */
+export function insufficientVoicesError(maleCount: number, femaleCount: number): AppError {
+  return new AppError(
+    'INSUFFICIENT_VOICES',
+    `Need 5+ voices (2+ male, 2+ female). Got: ${maleCount} male, ${femaleCount} female`
+  );
 }
 
 // ============================================================================

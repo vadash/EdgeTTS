@@ -9,6 +9,8 @@ import {
   type VoiceAssignmentStepOptions,
   SpeakerAssignmentStep,
   type SpeakerAssignmentStepOptions,
+  VoiceRemappingStep,
+  type VoiceRemappingStepOptions,
   TextSanitizationStep,
   DictionaryProcessingStep,
   type DictionaryProcessingStepOptions,
@@ -27,6 +29,7 @@ export const StepNames = {
   CHARACTER_EXTRACTION: 'character-extraction',
   VOICE_ASSIGNMENT: 'voice-assignment',
   SPEAKER_ASSIGNMENT: 'speaker-assignment',
+  VOICE_REMAPPING: 'voice-remapping',
   TEXT_SANITIZATION: 'text-sanitization',
   DICTIONARY_PROCESSING: 'dictionary-processing',
   TTS_CONVERSION: 'tts-conversion',
@@ -58,6 +61,12 @@ export function createDefaultStepRegistry(): StepRegistry {
     StepNames.SPEAKER_ASSIGNMENT,
     (options) => new SpeakerAssignmentStep(options),
     'Assigns speakers to sentences using LLM (Assign)'
+  );
+
+  registry.register<VoiceRemappingStepOptions>(
+    StepNames.VOICE_REMAPPING,
+    (options) => new VoiceRemappingStep(options),
+    'Remaps voices based on speaking frequency'
   );
 
   registry.register<Record<string, never>>(

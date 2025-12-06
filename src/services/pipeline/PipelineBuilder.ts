@@ -17,6 +17,7 @@ import type {
   IWorkerPoolFactory,
   IAudioMergerFactory,
   IVoiceAssignerFactory,
+  IVoicePoolBuilder,
   LLMServiceFactoryOptions,
   WorkerPoolOptions,
   MergerConfig,
@@ -67,6 +68,7 @@ export class PipelineBuilder implements IPipelineBuilder {
   private workerPoolFactory: IWorkerPoolFactory;
   private audioMergerFactory: IAudioMergerFactory;
   private voiceAssignerFactory: IVoiceAssignerFactory;
+  private voicePoolBuilder: IVoicePoolBuilder;
   private ffmpegService: IFFmpegService;
 
   constructor(
@@ -78,6 +80,7 @@ export class PipelineBuilder implements IPipelineBuilder {
     this.workerPoolFactory = container.get<IWorkerPoolFactory>(ServiceTypes.WorkerPoolFactory);
     this.audioMergerFactory = container.get<IAudioMergerFactory>(ServiceTypes.AudioMergerFactory);
     this.voiceAssignerFactory = container.get<IVoiceAssignerFactory>(ServiceTypes.VoiceAssignerFactory);
+    this.voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
     this.ffmpegService = container.get<IFFmpegService>(ServiceTypes.FFmpegService);
   }
 
@@ -122,6 +125,10 @@ export class PipelineBuilder implements IPipelineBuilder {
         llmOptions,
         createLLMService: (opts: LLMServiceFactoryOptions) => this.llmServiceFactory.create(opts),
         textBlockSplitter: this.textBlockSplitter,
+      })
+      .addStep(StepNames.VOICE_REMAPPING, {
+        narratorVoice: options.narratorVoice,
+        pool: this.voicePoolBuilder.buildPool(options.detectedLanguage, options.enabledVoices),
       })
       .addStep(StepNames.TEXT_SANITIZATION, {})
       .addStep(StepNames.DICTIONARY_PROCESSING, {

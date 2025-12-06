@@ -4,12 +4,12 @@
 import type { ServiceContainer } from '@/di/ServiceContainer';
 import { ServiceTypes } from '@/di/ServiceContainer';
 import type { Stores } from '@/stores';
-import type { ILogger } from '@/services/interfaces';
+import type { ILogger, IVoicePoolBuilder } from '@/services/interfaces';
 import type { IPipelineBuilder } from '@/services/pipeline';
 import type { PipelineContext, PipelineProgress } from '@/services/pipeline/types';
 import type { ProcessedBook } from '@/state/types';
 import { StepNames } from './pipeline';
-import { AppError, noContentError } from '@/errors';
+import { AppError, noContentError, insufficientVoicesError } from '@/errors';
 
 /**
  * Orchestrates the full TTS conversion workflow using pipeline architecture
@@ -18,6 +18,7 @@ export class ConversionOrchestrator {
   private abortController: AbortController | null = null;
   private logger: ILogger;
   private pipelineBuilder: IPipelineBuilder;
+  private voicePoolBuilder: IVoicePoolBuilder;
 
   constructor(
     private container: ServiceContainer,
@@ -25,6 +26,7 @@ export class ConversionOrchestrator {
   ) {
     this.logger = container.get<ILogger>(ServiceTypes.Logger);
     this.pipelineBuilder = container.get<IPipelineBuilder>(ServiceTypes.PipelineBuilder);
+    this.voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
   }
 
   /**
@@ -41,14 +43,22 @@ export class ConversionOrchestrator {
       throw new AppError('LLM_NOT_CONFIGURED', 'LLM API key not configured');
     }
 
+    // Validate voice pool size (need 5+ total, 2+ male, 2+ female)
+    const detectedLang = this.stores.data.detectedLanguage.value;
+    const enabledVoices = this.stores.settings.enabledVoices.value;
+    const pool = this.voicePoolBuilder.buildPool(detectedLang, enabledVoices);
+    const totalVoices = pool.male.length + pool.female.length;
+    if (totalVoices < 5 || pool.male.length < 2 || pool.female.length < 2) {
+      throw insufficientVoicesError(pool.male.length, pool.female.length);
+    }
+
     // Initialize
     this.abortController = new AbortController();
     this.stores.conversion.startConversion();
     this.stores.logs.startTimer();
     this.stores.llm.resetProcessingState();
 
-    // Detect and log language
-    const detectedLang = this.stores.data.detectedLanguage.value;
+    // Log language
     this.logger.info(`Detected language: ${detectedLang.toUpperCase()}`);
 
     const fileNames = existingBook?.fileNames ?? [[this.extractFilename(text), 0]] as Array<[string, number]>;
@@ -149,6 +159,10 @@ export class ConversionOrchestrator {
         this.stores.conversion.setStatus('llm-assign');
         this.stores.llm.setProcessingStatus('assigning');
         this.stores.llm.setBlockProgress(progress.current, progress.total);
+        break;
+
+      case StepNames.VOICE_REMAPPING:
+        // Voice remapping logs its own table
         break;
 
       case StepNames.TEXT_SANITIZATION:

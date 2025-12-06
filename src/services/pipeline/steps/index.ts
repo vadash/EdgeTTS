@@ -20,6 +20,12 @@ export {
 } from './SpeakerAssignmentStep';
 
 export {
+  VoiceRemappingStep,
+  createVoiceRemappingStep,
+  type VoiceRemappingStepOptions,
+} from './VoiceRemappingStep';
+
+export {
   TextSanitizationStep,
   createTextSanitizationStep,
 } from './TextSanitizationStep';
