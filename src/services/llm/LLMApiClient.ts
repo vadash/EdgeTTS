@@ -171,6 +171,7 @@ export class LLMApiClient {
 
   /**
    * Parse SSE stream and concatenate content from all chunks
+   * Also handles non-streaming JSON responses for API compatibility
    */
   private async parseSSEStream(response: Response): Promise<string> {
     const reader = response.body?.getReader();
@@ -181,12 +182,15 @@ export class LLMApiClient {
     const decoder = new TextDecoder();
     let content = '';
     let buffer = '';
+    let rawResponse = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+      rawResponse += chunk;
 
       // Process complete SSE events from buffer
       const lines = buffer.split('\n');
@@ -208,6 +212,19 @@ export class LLMApiClient {
             // Skip malformed JSON chunks
           }
         }
+      }
+    }
+
+    // If no SSE content found, try parsing as non-streaming JSON response
+    if (!content && rawResponse.trim()) {
+      try {
+        const parsed = JSON.parse(rawResponse);
+        const messageContent = parsed.choices?.[0]?.message?.content;
+        if (messageContent) {
+          return messageContent;
+        }
+      } catch {
+        // Not valid JSON, will be handled by extractJSON
       }
     }
 
