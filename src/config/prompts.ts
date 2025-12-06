@@ -1,16 +1,18 @@
 // LLM Prompts Configuration
-// Externalized prompts for easy tuning and A/B testing
+// Optimized for Royal Road / LitRPG / Fantasy Web Fiction
 
 export const LLM_PROMPTS = {
   extract: {
-    system: `# Character Extractor for Audiobook Production: SPEAKERS ONLY
+    system: `# Character Extractor: Web Fiction & LitRPG Focus
 
 <TASK>
-Read the text and identify **ALL unique people** who have dialogue.
-Output the result as a single, valid JSON object containing an array named "characters".
+Analyze the text and extract **all unique speaking characters**, including non-human entities and system interfaces.
+Output a single valid JSON object.
 </TASK>
 
-# CHARACTER MERGING RULES (MANDATORY AND CRITICAL)
+# RULES
+
+## CHARACTER MERGING
 
 1.  **Merge Rule:** You MUST merge characters if they are the same person, even if referenced by different names, titles, or roles. Use contextual clues for merging.
     *   *Example 1 (Role + Name):* If "The Officer" speaks, and he is later referred to by name ("Smith") or nickname ("John"), these three identities (**Officer, Smith, John**) MUST be merged into **ONE** character entry.
@@ -18,77 +20,105 @@ Output the result as a single, valid JSON object containing an array named "char
 2.  **Canonical Name Selection:** Use the most specific proper name found (usually the last name or the fullest name, e.g., "Smith," not "The Officer").
 3.  **Variations List:** The \`variations\` array MUST list the canonical name plus all titles, roles, and aliases found in the text for that person (e.g., ["Smith", "Officer", "John"]).
 
-# SELECTION CRITERIA
+## GENRE-SPECIFIC
 
-*   **Dialogue Only:** Only include characters who have spoken dialogue (text in quotes or following em-dashes).
-*   **Gender:** Infer gender from pronouns (he/she, он/она) or context. If context is insufficient, use "unknown".
+1.  **The "System" / Game Interface:**
+    *   If you see text inside square brackets (e.g., \`[You have leveled up]\` or \`[Quest Accepted]\`), EXTRACT a character named "System" (or "Interface").
+    *   Gender: "female".
 
-# OUTPUT FORMAT (STRICT)
-Return ONLY valid JSON. DO NOT INCLUDE ANY MARKDOWN WRAPPING (e.g., \`\`\`json), EXPLANATIONS, OR PRE/POST-AMBLE TEXT.
+2.  **Telepathy & Magic Comms:**
+    *   Look for text in angle brackets \`< ... >\`, asterisks \`* ... *\`, or italics explicitly described as "thought-speak" or "party chat".
+    *   Treat these as spoken dialogue.
 
-{"characters": [{"canonicalName": "Name", "variations": ["Name", "Title"], "gender": "male|female|unknown"}]}
+3.  **The "I" Character (First-Person POV):**
+    *   If the narration uses "I" (e.g., "I drew my sword and shouted"), you MUST extract a character for this person.
+    *   **Naming:** Use their proper name if revealed (e.g., "John"). If unknown, use "Protagonist" or "Main Character".
+
+4.  **Non-Human Entities:**
+    *   Monsters, swords that talk, ghosts, and AIs count as characters.
+
+## EXTRACTION
+1.  **Must Have Dialogue:** Only include characters who "speak" (via quotes, brackets, or telepathy). Do NOT include mentioned-only people.
+2.  **Name Resolution:** Prefer Proper Names > Titles > Roles (e.g., "Azaroth" > "The Dark Lord" > "The Demon").
+3.  **Gender Inference:**
+    *   "System"/"Constructs" -> "female".
+    *   "Beasts" -> "male" (unless specified otherwise).
+    *   Use pronouns and titles.
+
+# OUTPUT FORMAT (JSON ONLY)
+{"characters": [{"canonicalName": "string", "variations": ["string", "string"], "gender": "male|female|unknown"}]}
 `,
-    userTemplate: `<text>{{text}}</text>`,
+    userTemplate: `<text>
+{{text}}
+</text>`,
   },
 
   merge: {
     system: `# Character Cleanup and Canonicalization
 
 <TASK>
-Review the provided character list. Merge entries that are clearly the same person based on name similarity, nicknames, or common aliases not caught in the initial extraction.
+Merge duplicate identities, specifically handling Fantasy/LitRPG aliases.
 </TASK>
 
-# CRITICAL CONSTRAINT
-The \`keep\` and \`absorb\` values MUST be EXACTLY one of the input \`canonicalName\` values from the numbered list. Do NOT use variation names - use only the exact canonicalName strings provided.
+# MERGE LOGIC
+1.  **Protagonist Linking:** If you have "Protagonist" AND a specific name (e.g., "Jason") and the context implies "I am Jason", merge them. Keep "Jason".
+2.  **System/Interface:** Merge "System", "Game Interface", "Blue Box", and "Notification" into a single "System" entry.
+3.  **Fantasy Titles:** Merge "The King" with his name "Ranvar" if they refer to the same entity.
 
-# MERGING CRITERIA
-
-1.  **Keep Name:** Choose ONE of the input canonicalName values (the most descriptive one).
-2.  **Absorb Names:** List other canonicalName values that refer to the same person.
-3.  **Variations:** Combine all variations from both the kept and absorbed entries into the final \`variations\` list.
-
-# OUTPUT FORMAT (STRICT JSON ONLY)
-Return ONLY valid JSON. DO NOT INCLUDE ANY MARKDOWN, EXPLANATIONS, OR WRAPPER TEXT.
-
+# STRICT JSON OUTPUT
 {
   "merges": [
     {
-      "keep": "BestCanonicalName",
-      "absorb": ["OtherName"],
-      "variations": ["All", "Variations", "Combined"],
-      "gender": "male|female"
+      "keep": "ExactInputName",
+      "absorb": ["ExactInputName"],
+      "variations": ["All", "Aliases", "Here"],
+      "gender": "male|female|unknown"
     }
   ],
-  "unchanged": ["Name1", "Name2"]
+  "unchanged": ["Name1"]
 }`,
-    userTemplate: `<characters>{{characters}}</characters>`,
+    userTemplate: `<characters>
+{{characters}}
+</characters>`,
   },
 
   assign: {
     systemPrefix: `# Dialogue Speaker Assigner
 
 <TASK>
-Assign the appropriate speaker code to EVERY dialogue paragraph provided in the input.
+Assign a speaker code to every dialogue paragraph.
 </TASK>
 
-# OUTPUT FORMAT (CRITICAL)
-Output ONLY a list of assignments, one per line, using the mandatory format: \`index:CODE\`.
+# GENRE-SPECIFIC MATCHING RULES (Order of Importance)
 
-*   Example: \`0:ALICE\`
-*   **You MUST output an assignment for EVERY dialogue index, starting from 0.**
-*   Do not include any headers, footers, explanations, or extraneous text.
+1.  **Formatting Clues (LitRPG/Magic):**
+    *   Text in \`[ ... ]\` -> Assign to **System** (or Interface).
+    *   Text in \`< ... >\` -> Assign to the character identified as using telepathy.
 
-# INPUT CODES
-These are the only valid codes you may use for assignment:
+2.  **Action Beats (The "Sigh" Rule):**
+    *   In web fiction, authors often skip "said" tags. Look for actions *immediately* before or after the dialogue.
+    *   *Example:* John rubbed his temples. "Why is this happening?" -> Speaker is **John**.
+    *   *Example:* "Die!" The goblin lunged. -> Speaker is **The Goblin**.
 
-Characters:
+3.  **The "Vocative" Trap (Anti-Pattern):**
+    *   If a name appears INSIDE the quotes addressing someone, that person is the LISTENER.
+    *   *Example:* "Heal me, **Cleric**!" -> Speaker is **NOT** Cleric.
+
+4.  **First-Person Narration:**
+    *   If a paragraph contains "I [verb]" (outside quotes) and then speech, the speaker is the **Protagonist**.
+    *   *Example:* I looked at the stats. "Not bad." -> Speaker is **Protagonist**.
+
+# AVAILABLE SPEAKERS
 {{characterLines}}
-
-Unnamed Speakers:
 {{unnamedEntries}}
+
+# OUTPUT FORMAT
+index:CODE
 `,
     systemSuffix: `
-# END OF ASSIGNMENT TASK`,
-    userTemplate: `<paragraphs>{{paragraphs}}</paragraphs>`,
+# START ASSIGNMENT`,
+    userTemplate: `<paragraphs>
+{{paragraphs}}
+</paragraphs>`,
   },
 };
