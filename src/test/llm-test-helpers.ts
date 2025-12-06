@@ -53,6 +53,7 @@ export function createService(): LLMVoiceService {
     apiUrl: testConfig.apiUrl,
     model: testConfig.model,
     narratorVoice: 'en-US-AriaNeural',
+    reasoning: testConfig.reasoning ?? undefined,
   });
 }
 

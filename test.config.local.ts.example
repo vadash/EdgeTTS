@@ -2,4 +2,5 @@ export const testConfig = {
   apiKey: '',      // Your API key here
   apiUrl: '',      // e.g., https://api.openai.com/v1
   model: '',       // e.g., gpt-4o-mini
+  reasoning: null as 'auto' | 'high' | 'medium' | 'low' | null, // null = off, or 'low'/'medium'/'high'/'auto'
 };
