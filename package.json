@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:real": "vitest run --config vitest.real.config.ts",
+    "test:llm": "vitest run --config vitest.llm.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },

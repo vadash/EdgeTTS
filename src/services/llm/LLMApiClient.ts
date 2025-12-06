@@ -113,6 +113,7 @@ export class LLMApiClient {
       max_tokens: 4000,
       temperature: 0.0,
       top_p: 0.95,
+      stream: true,
     };
 
     // Save request log (first call only per pass type)
@@ -139,7 +140,14 @@ export class LLMApiClient {
       throw new Error(`API error ${response.status}: ${errorText}`);
     }
 
-    const data = await response.json();
+    // Parse SSE stream
+    const content = await this.parseSSEStream(response);
+
+    // Build response object for logging
+    const data = {
+      choices: [{ message: { content } }],
+      model: this.options.model,
+    };
 
     // Save response log (first call only per pass type)
     if (pass === 'extract' && !this.extractLogged) {
@@ -153,14 +161,57 @@ export class LLMApiClient {
       this.assignLogged = true;
     }
 
-    const content = data.choices?.[0]?.message?.content;
-
     if (!content) {
       throw new Error('Empty response from API');
     }
 
     // Extract JSON from response (handle markdown code blocks)
     return this.extractJSON(content);
+  }
+
+  /**
+   * Parse SSE stream and concatenate content from all chunks
+   */
+  private async parseSSEStream(response: Response): Promise<string> {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    const decoder = new TextDecoder();
+    let content = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE events from buffer
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+          if (!data) continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              content += delta;
+            }
+          } catch {
+            // Skip malformed JSON chunks
+          }
+        }
+      }
+    }
+
+    return content;
   }
 
   /**
