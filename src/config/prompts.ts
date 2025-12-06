@@ -3,53 +3,56 @@
 
 export const LLM_PROMPTS = {
   extract: {
-    system: `# Character Extractor for Audiobook Production
+    system: `# Character Extractor for Audiobook Production: SPEAKERS ONLY
 
-<task>
-Read the text and identify **unique people** who speak.
-Output a JSON list of characters.
-</task>
+<TASK>
+Read the text and identify **ALL unique people** who have dialogue.
+Output the result as a single, valid JSON object containing an array named "characters".
+</TASK>
 
-# Rules
+# CHARACTER MERGING RULES (MANDATORY AND CRITICAL)
 
-<contextual_merging>
-You MUST merge characters if the text implies they are the same person.
-- If "The Wizard" is referred to as "Gandalf", create **ONE** entry.
-- If "The detective" is named "Holmes", create **ONE** entry.
-- **Canonical Name:** Use the specific proper name (e.g., "Gandalf", "Holmes").
-- **Variations:** List all titles, roles, and aliases (e.g., ["Gandalf", "The Wizard", "Mithrandir"]).
-</contextual_merging>
+1.  **Merge Rule:** You MUST merge characters if they are the same person, even if referenced by different names, titles, or roles. Use contextual clues for merging.
+    *   *Example 1 (Role + Name):* If "The Officer" speaks, and he is later referred to by name ("Smith") or nickname ("John"), these three identities (**Officer, Smith, John**) MUST be merged into **ONE** character entry.
+    *   *Example 2 (Alias):* Merge "The Sorcerer" and "Merlin."
+2.  **Canonical Name Selection:** Use the most specific proper name found (usually the last name or the fullest name, e.g., "Smith," not "The Officer").
+3.  **Variations List:** The \`variations\` array MUST list the canonical name plus all titles, roles, and aliases found in the text for that person (e.g., ["Smith", "Officer", "John"]).
 
-<speakers_only>
-Only include characters who have dialogue (text in quotes or following em-dashes).
-</speakers_only>
+# SELECTION CRITERIA
 
-<gender>
-Infer gender from pronouns (he/she, он/она) or grammatical endings. Default to "unknown".
-</gender>
+*   **Dialogue Only:** Only include characters who have spoken dialogue (text in quotes or following em-dashes).
+*   **Gender:** Infer gender from pronouns (he/she, он/она) or context. If context is insufficient, use "unknown".
 
-# Output Format
-Return ONLY valid JSON:
-{"characters": [{"canonicalName": "Name", "variations": ["Name", "Title"], "gender": "male|female|unknown"}]}`,
+# OUTPUT FORMAT (STRICT)
+Return ONLY valid JSON. DO NOT INCLUDE ANY MARKDOWN WRAPPING (e.g., \`\`\`json), EXPLANATIONS, OR PRE/POST-AMBLE TEXT.
+
+{"characters": [{"canonicalName": "Name", "variations": ["Name", "Title"], "gender": "male|female|unknown"}]}
+`,
     userTemplate: `<text>{{text}}</text>`,
   },
 
   merge: {
-    system: `# Character Cleanup
+    system: `# Character Cleanup and Canonicalization
 
-<task>
-Review the extracted character list. Merge entries that are obviously the same person based on name similarity.
-(Note: Contextual merging should have already happened. Focus here on typos or "First Name" vs "Full Name".)
-</task>
+<TASK>
+Review the provided character list. Merge entries that are clearly the same person based on name similarity, nicknames, or common aliases not caught in the initial extraction.
+</TASK>
 
-# Output Format
-Return ONLY valid JSON:
+# MERGING CRITERIA
+
+1.  **Keep Name:** Select the fullest or most descriptive proper name as the \`keep\` value.
+2.  **Absorb Names:** List all other canonical names that refer to the same person under \`absorb\`.
+3.  **Variations:** Combine all variations from both the kept and absorbed entries into the final \`variations\` list.
+
+# OUTPUT FORMAT (STRICT JSON ONLY)
+Return ONLY valid JSON. DO NOT INCLUDE ANY MARKDOWN, EXPLANATIONS, OR WRAPPER TEXT.
+
 {
   "merges": [
     {
       "keep": "BestCanonicalName",
       "absorb": ["OtherName"],
-      "variations": ["All", "Variations"],
+      "variations": ["All", "Variations", "Combined"],
       "gender": "male|female"
     }
   ],
@@ -61,24 +64,28 @@ Return ONLY valid JSON:
   assign: {
     systemPrefix: `# Dialogue Speaker Assigner
 
-<task>
-Assign a speaker code to EVERY paragraph of dialogue found in the text.
-</task>
+<TASK>
+Assign the appropriate speaker code to EVERY dialogue paragraph provided in the input.
+</TASK>
 
-<inputs>
+# OUTPUT FORMAT (CRITICAL)
+Output ONLY a list of assignments, one per line, using the mandatory format: \`index:CODE\`.
+
+*   Example: \`0:ALICE\`
+*   **You MUST output an assignment for EVERY dialogue index, starting from 0.**
+*   Do not include any headers, footers, explanations, or extraneous text.
+
+# INPUT CODES
+These are the only valid codes you may use for assignment:
+
 Characters:
 {{characterLines}}
 
 Unnamed Speakers:
 {{unnamedEntries}}
-</inputs>`,
+`,
     systemSuffix: `
-# Output Format
-One line per dialogue paragraph: \`index:code\`
-- Example: \`0:ALICE\`
-- **You MUST output an assignment for EVERY paragraph containing dialogue.**
-- Do not skip any dialogue. If unsure, make your best guess.
-- Do not output explanations.`,
+# END OF ASSIGNMENT TASK`,
     userTemplate: `<paragraphs>{{paragraphs}}</paragraphs>`,
   },
 };
