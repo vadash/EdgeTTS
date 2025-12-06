@@ -63,7 +63,17 @@
     "testConnection": "Тест соединения",
     "testing": "Проверка...",
     "connectionSuccess": "Соединение успешно!",
-    "connectionError": "Ошибка соединения"
+    "connectionError": "Ошибка соединения",
+    "advancedSettings": "Расширенные настройки",
+    "streaming": "Потоковая передача",
+    "streamingHint": "Потоковая передача ответов в реальном времени",
+    "reasoning": "Режим рассуждения",
+    "reasoningHint": "Включить расширенное рассуждение для сложных задач",
+    "temperature": "Температура",
+    "temperatureHint": "Контролирует случайность (0 = детерминированный)",
+    "topP": "Top-P",
+    "topPHint": "Порог выборки ядра",
+    "reasoningDisablesParams": "Температура и Top-P отключены при включенном режиме рассуждения"
   },
   "files": {
     "dictionary": "Словарь",

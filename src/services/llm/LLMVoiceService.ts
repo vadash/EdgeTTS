@@ -28,6 +28,10 @@ export interface LLMVoiceServiceOptions {
   apiUrl: string;
   model: string;
   narratorVoice: string;
+  streaming?: boolean;
+  reasoning?: 'auto' | 'high' | 'medium' | 'low';
+  temperature?: number;
+  topP?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger?: ILogger;
 }
@@ -48,6 +52,10 @@ export class LLMVoiceService {
       apiKey: options.apiKey,
       apiUrl: options.apiUrl,
       model: options.model,
+      streaming: options.streaming,
+      reasoning: options.reasoning,
+      temperature: options.temperature,
+      topP: options.topP,
       directoryHandle: options.directoryHandle,
       logger: options.logger,
     });

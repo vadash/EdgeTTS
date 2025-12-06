@@ -2,8 +2,17 @@ import { useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { useLLM } from '@/stores';
 import { LLMVoiceService } from '@/services/llm';
-import { Button } from '@/components/common';
+import { Button, Toggle, Select, Slider } from '@/components/common';
 import { LLMHelp } from './LLMHelp';
+import type { ReasoningLevel } from '@/stores/LLMStore';
+
+const reasoningOptions = [
+  { value: 'off', label: 'Off' },
+  { value: 'auto', label: 'Auto' },
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+];
 
 export function LLMTab() {
   const llm = useLLM();
@@ -35,6 +44,13 @@ export function LLMTab() {
     await llm.saveSettings();
     setTestResult({ success: true, error: undefined });
   };
+
+  const handleReasoningChange = (e: Event) => {
+    const value = (e.target as HTMLSelectElement).value;
+    llm.setReasoning(value === 'off' ? null : value as ReasoningLevel);
+  };
+
+  const isReasoningEnabled = !!llm.reasoning.value;
 
   return (
     <div className="space-y-6">
@@ -94,6 +110,59 @@ export function LLMTab() {
           onInput={(e) => llm.setModel((e.target as HTMLInputElement).value)}
           placeholder="gpt-4o-mini"
         />
+      </div>
+
+      {/* Advanced Settings */}
+      <div className="space-y-4 pt-2 border-t border-gray-700">
+        <h4 className="text-sm font-medium text-gray-300">
+          <Text id="llm.advancedSettings">Advanced Settings</Text>
+        </h4>
+
+        {/* Streaming Toggle */}
+        <Toggle
+          checked={llm.streaming.value}
+          onChange={(v) => llm.setStreaming(v)}
+          label="Streaming"
+        />
+
+        {/* Reasoning Mode */}
+        <Select
+          label="Reasoning Mode"
+          value={llm.reasoning.value || 'off'}
+          options={reasoningOptions}
+          onChange={handleReasoningChange}
+        />
+
+        {/* Temperature */}
+        <Slider
+          label="Temperature"
+          value={llm.temperature.value}
+          min={0}
+          max={1}
+          step={0.1}
+          onChange={(v) => llm.setTemperature(v)}
+          formatValue={(v) => v.toFixed(1)}
+          disabled={isReasoningEnabled}
+        />
+
+        {/* Top-P */}
+        <Slider
+          label="Top-P"
+          value={llm.topP.value}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v) => llm.setTopP(v)}
+          formatValue={(v) => v.toFixed(2)}
+          disabled={isReasoningEnabled}
+        />
+
+        {/* Hint about reasoning mode */}
+        {isReasoningEnabled && (
+          <p className="text-xs text-yellow-500">
+            <Text id="llm.reasoningDisablesParams">Temperature and Top-P are disabled when reasoning mode is enabled</Text>
+          </p>
+        )}
       </div>
 
       {/* Actions */}

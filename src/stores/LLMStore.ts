@@ -13,6 +13,11 @@ import { StorageKeys } from '@/config/storage';
 export type LLMProcessingStatus = 'idle' | 'extracting' | 'review' | 'assigning' | 'error';
 
 /**
+ * Reasoning effort level for reasoning models
+ */
+export type ReasoningLevel = 'auto' | 'high' | 'medium' | 'low';
+
+/**
  * LLM settings for persistence
  */
 interface LLMSettings {
@@ -20,6 +25,10 @@ interface LLMSettings {
   apiKey: string; // encrypted
   apiUrl: string;
   model: string;
+  streaming: boolean;
+  reasoning: ReasoningLevel | null;
+  temperature: number;
+  topP: number;
 }
 
 /**
@@ -30,6 +39,10 @@ const defaultLLMSettings = {
   apiKey: '',
   apiUrl: 'https://api.openai.com/v1',
   model: 'gpt-4o-mini',
+  streaming: true,
+  reasoning: null as ReasoningLevel | null,
+  temperature: 0.0,
+  topP: 0.95,
 };
 
 /**
@@ -43,6 +56,10 @@ export class LLMStore {
   readonly apiKey = signal<string>(defaultLLMSettings.apiKey);
   readonly apiUrl = signal<string>(defaultLLMSettings.apiUrl);
   readonly model = signal<string>(defaultLLMSettings.model);
+  readonly streaming = signal<boolean>(defaultLLMSettings.streaming);
+  readonly reasoning = signal<ReasoningLevel | null>(defaultLLMSettings.reasoning);
+  readonly temperature = signal<number>(defaultLLMSettings.temperature);
+  readonly topP = signal<number>(defaultLLMSettings.topP);
 
   // Processing state
   readonly processingStatus = signal<LLMProcessingStatus>('idle');
@@ -112,6 +129,26 @@ export class LLMStore {
 
   setModel(value: string): void {
     this.model.value = value;
+    this.saveSettings();
+  }
+
+  setStreaming(value: boolean): void {
+    this.streaming.value = value;
+    this.saveSettings();
+  }
+
+  setReasoning(value: ReasoningLevel | null): void {
+    this.reasoning.value = value;
+    this.saveSettings();
+  }
+
+  setTemperature(value: number): void {
+    this.temperature.value = value;
+    this.saveSettings();
+  }
+
+  setTopP(value: number): void {
+    this.topP.value = value;
     this.saveSettings();
   }
 
@@ -196,6 +233,10 @@ export class LLMStore {
     this.apiKey.value = defaultLLMSettings.apiKey;
     this.apiUrl.value = defaultLLMSettings.apiUrl;
     this.model.value = defaultLLMSettings.model;
+    this.streaming.value = defaultLLMSettings.streaming;
+    this.reasoning.value = defaultLLMSettings.reasoning;
+    this.temperature.value = defaultLLMSettings.temperature;
+    this.topP.value = defaultLLMSettings.topP;
   }
 
   // ========== Persistence ==========
@@ -211,6 +252,10 @@ export class LLMStore {
         apiKey: encryptedKey,
         apiUrl: this.apiUrl.value,
         model: this.model.value,
+        streaming: this.streaming.value,
+        reasoning: this.reasoning.value,
+        temperature: this.temperature.value,
+        topP: this.topP.value,
       };
       localStorage.setItem(StorageKeys.llmSettings, JSON.stringify(settings));
     } catch (e) {
@@ -234,6 +279,10 @@ export class LLMStore {
         this.apiKey.value = await decryptValue(settings.apiKey ?? '', this.logStore);
         this.apiUrl.value = settings.apiUrl ?? defaultLLMSettings.apiUrl;
         this.model.value = settings.model ?? defaultLLMSettings.model;
+        this.streaming.value = settings.streaming ?? defaultLLMSettings.streaming;
+        this.reasoning.value = settings.reasoning ?? defaultLLMSettings.reasoning;
+        this.temperature.value = settings.temperature ?? defaultLLMSettings.temperature;
+        this.topP.value = settings.topP ?? defaultLLMSettings.topP;
       }
     } catch (e) {
       this.logStore.error(

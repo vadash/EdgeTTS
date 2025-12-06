@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import type { ChatCompletionCreateParamsStreaming, ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
 import type { LLMValidationResult } from '@/state/types';
 import { getRetryDelay } from '@/config';
 import type { ILogger } from '../interfaces';
@@ -7,6 +8,10 @@ export interface LLMApiClientOptions {
   apiKey: string;
   apiUrl: string;
   model: string;
+  streaming?: boolean;
+  reasoning?: 'auto' | 'high' | 'medium' | 'low';
+  temperature?: number;
+  topP?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger?: ILogger;
 }
@@ -130,14 +135,27 @@ export class LLMApiClient {
       });
     }
 
-    const requestBody = {
+    // Build request body - use 'any' to allow dynamic parameters
+    // that the strict OpenAI SDK types might not fully support (like reasoning_effort)
+    const requestBody: any = {
       model: this.options.model,
       messages,
-      max_tokens: 4000,
-      temperature: 0.0,
-      top_p: 0.95,
-      stream: true as const,
+      stream: this.options.streaming !== false,
     };
+
+    // Handle Reasoning vs Standard models
+    if (this.options.reasoning) {
+      // REASONING MODE (e.g., o1, o3-mini)
+      // Map 'auto' to 'medium' for standard OpenAI, pass as-is for proxies that support it
+      requestBody.reasoning_effort = this.options.reasoning === 'auto' ? 'medium' : this.options.reasoning;
+      requestBody.max_completion_tokens = 4000;
+      // Reasoning models crash if you send temperature or top_p - don't add them
+    } else {
+      // STANDARD MODE (e.g., gpt-4o, claude-3.5)
+      requestBody.max_tokens = 4000;
+      requestBody.temperature = this.options.temperature ?? 0.0;
+      requestBody.top_p = this.options.topP ?? 0.95;
+    }
 
     // Save request log (first call only per pass type)
     if (pass === 'extract' && !this.extractLogged) {
@@ -148,12 +166,44 @@ export class LLMApiClient {
       this.saveLog('assign_request.json', requestBody);
     }
 
-    // Use OpenAI SDK for streaming
-    const stream = await this.client.chat.completions.create(requestBody, { signal });
-
+    // Make API call - handle both streaming and non-streaming modes
     let content = '';
-    for await (const chunk of stream) {
-      content += chunk.choices[0]?.delta?.content || '';
+    const isStreaming = this.options.streaming !== false;
+
+    if (isStreaming) {
+      // Streaming mode - use explicit type to help TypeScript
+      const streamParams: ChatCompletionCreateParamsStreaming = {
+        model: requestBody.model,
+        messages: requestBody.messages,
+        stream: true,
+      };
+      // Add optional parameters
+      if (requestBody.reasoning_effort) (streamParams as any).reasoning_effort = requestBody.reasoning_effort;
+      if (requestBody.max_completion_tokens) streamParams.max_completion_tokens = requestBody.max_completion_tokens;
+      if (requestBody.max_tokens) streamParams.max_tokens = requestBody.max_tokens;
+      if (requestBody.temperature !== undefined) streamParams.temperature = requestBody.temperature;
+      if (requestBody.top_p !== undefined) streamParams.top_p = requestBody.top_p;
+
+      const stream = await this.client.chat.completions.create(streamParams, { signal });
+      for await (const chunk of stream) {
+        content += chunk.choices[0]?.delta?.content || '';
+      }
+    } else {
+      // Non-streaming mode - use explicit type to help TypeScript
+      const nonStreamParams: ChatCompletionCreateParamsNonStreaming = {
+        model: requestBody.model,
+        messages: requestBody.messages,
+        stream: false,
+      };
+      // Add optional parameters
+      if (requestBody.reasoning_effort) (nonStreamParams as any).reasoning_effort = requestBody.reasoning_effort;
+      if (requestBody.max_completion_tokens) nonStreamParams.max_completion_tokens = requestBody.max_completion_tokens;
+      if (requestBody.max_tokens) nonStreamParams.max_tokens = requestBody.max_tokens;
+      if (requestBody.temperature !== undefined) nonStreamParams.temperature = requestBody.temperature;
+      if (requestBody.top_p !== undefined) nonStreamParams.top_p = requestBody.top_p;
+
+      const response = await this.client.chat.completions.create(nonStreamParams, { signal });
+      content = response.choices[0]?.message?.content || '';
     }
 
     // Build response object for logging

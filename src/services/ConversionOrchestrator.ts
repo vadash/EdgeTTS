@@ -83,6 +83,10 @@ export class ConversionOrchestrator {
         apiKey: this.stores.llm.apiKey.value,
         apiUrl: this.stores.llm.apiUrl.value,
         model: this.stores.llm.model.value,
+        streaming: this.stores.llm.streaming.value,
+        reasoning: this.stores.llm.reasoning.value ?? undefined,
+        temperature: this.stores.llm.temperature.value,
+        topP: this.stores.llm.topP.value,
 
         // Data
         detectedLanguage: detectedLang,

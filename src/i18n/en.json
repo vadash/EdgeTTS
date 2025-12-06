@@ -63,7 +63,17 @@
     "testConnection": "Test Connection",
     "testing": "Testing...",
     "connectionSuccess": "Connection successful!",
-    "connectionError": "Connection failed"
+    "connectionError": "Connection failed",
+    "advancedSettings": "Advanced Settings",
+    "streaming": "Streaming",
+    "streamingHint": "Stream responses in real-time",
+    "reasoning": "Reasoning Mode",
+    "reasoningHint": "Enable extended reasoning for complex tasks",
+    "temperature": "Temperature",
+    "temperatureHint": "Controls randomness (0 = deterministic)",
+    "topP": "Top-P",
+    "topPHint": "Nucleus sampling threshold",
+    "reasoningDisablesParams": "Temperature and Top-P are disabled when reasoning mode is enabled"
   },
   "files": {
     "dictionary": "Dictionary",

@@ -45,6 +45,10 @@ export interface PipelineBuilderOptions {
   apiKey: string;
   apiUrl: string;
   model: string;
+  streaming?: boolean;
+  reasoning?: 'auto' | 'high' | 'medium' | 'low';
+  temperature?: number;
+  topP?: number;
 
   // Data
   detectedLanguage: string;
@@ -96,6 +100,10 @@ export class PipelineBuilder implements IPipelineBuilder {
       apiUrl: options.apiUrl,
       model: options.model,
       narratorVoice: options.narratorVoice,
+      streaming: options.streaming,
+      reasoning: options.reasoning,
+      temperature: options.temperature,
+      topP: options.topP,
       directoryHandle: options.directoryHandle,
     };
 

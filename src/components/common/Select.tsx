@@ -3,9 +3,10 @@ import type { JSX } from 'preact';
 interface SelectProps extends Omit<JSX.HTMLAttributes<HTMLSelectElement>, 'label'> {
   label?: string;
   options: Array<{ value: string; label: string }>;
+  value?: string;
 }
 
-export function Select({ label, id, options, className = '', ...props }: SelectProps) {
+export function Select({ label, id, options, className = '', value, ...props }: SelectProps) {
   const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
 
   return (
@@ -18,6 +19,7 @@ export function Select({ label, id, options, className = '', ...props }: SelectP
       <select
         id={selectId}
         className={`select-field ${className}`.trim()}
+        value={value}
         {...props}
       >
         {options.map((option) => (

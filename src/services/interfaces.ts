@@ -386,6 +386,10 @@ export interface LLMServiceFactoryOptions {
   apiUrl: string;
   model: string;
   narratorVoice: string;
+  streaming?: boolean;
+  reasoning?: 'auto' | 'high' | 'medium' | 'low';
+  temperature?: number;
+  topP?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
 }
 
