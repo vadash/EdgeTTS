@@ -10,30 +10,28 @@ Read the text and identify **unique people** who speak.
 Output a JSON list of characters.
 </task>
 
-## Critical Rules for Identity Resolution
+# Rules
 
-<rule_1_contextual_merging>
+<contextual_merging>
 You MUST merge characters if the text implies they are the same person.
 - If "The Wizard" is referred to as "Gandalf", create **ONE** entry.
 - If "The detective" is named "Holmes", create **ONE** entry.
 - **Canonical Name:** Use the specific proper name (e.g., "Gandalf", "Holmes").
 - **Variations:** List all titles, roles, and aliases (e.g., ["Gandalf", "The Wizard", "Mithrandir"]).
-</rule_1_contextual_merging>
+</contextual_merging>
 
-<rule_2_speakers_only>
+<speakers_only>
 Only include characters who have dialogue (text in quotes or following em-dashes).
-</rule_2_speakers_only>
+</speakers_only>
 
-<rule_3_gender>
+<gender>
 Infer gender from pronouns (he/she, он/она) or grammatical endings. Default to "unknown".
-</rule_3_gender>
+</gender>
 
-## Output Format
+# Output Format
 Return ONLY valid JSON:
 {"characters": [{"canonicalName": "Name", "variations": ["Name", "Title"], "gender": "male|female|unknown"}]}`,
-    userTemplate: `<text>
-{{text}}
-</text>`,
+    userTemplate: `<text>{{text}}</text>`,
   },
 
   merge: {
@@ -44,7 +42,7 @@ Review the extracted character list. Merge entries that are obviously the same p
 (Note: Contextual merging should have already happened. Focus here on typos or "First Name" vs "Full Name".)
 </task>
 
-## Output Format
+# Output Format
 Return ONLY valid JSON:
 {
   "merges": [
@@ -57,9 +55,7 @@ Return ONLY valid JSON:
   ],
   "unchanged": ["Name1", "Name2"]
 }`,
-    userTemplate: `<characters>
-{{characters}}
-</characters>`,
+    userTemplate: `<characters>{{characters}}</characters>`,
   },
 
   assign: {
@@ -77,41 +73,10 @@ Unnamed Speakers:
 {{unnamedEntries}}
 </inputs>`,
     systemSuffix: `
-## CRITICAL RULES (Order of Precedence)
-
-### 1. The "Vocative Trap" (Addressee != Speaker)
-If a quote **starts** with a name, that person is usually the **LISTENER**, not the speaker.
-- Text: "Alice? Are you ready?" she asked.
-- Logic: The speaker is asking Alice.
-- **Result:** Speaker is **NOT** Alice. Look for the person described as "she" (e.g., Sarah).
-
-### 2. Explicit Attribution
-- **Tag:** "..." said **Code**. / **Code** asked, "..."
-- **Russian:** — ... — сказал **Code**. / — ... — **Code** ответил.
-- **Action Beat:** If a paragraph describes a character doing something, and the *very next* paragraph is a quote with no tag, that character is the speaker.
-  - Text: **Bob** sat down. "I am tired."
-  - Result: Speaker is **Bob** (Code for Bob).
-
-### 3. Pronoun Resolution
-- "..." she said. → Assign to the most recently mentioned female character.
-- "..." he said. → Assign to the most recently mentioned male character.
-
-### 4. Conversation Alternation
-- If a paragraph has no attribution, assume it is the **other** person in the conversation responding.
-- Pattern: Speaker A → Speaker B → Speaker A → Speaker B.
-
-### 5. Russian Em-Dash Format
-- Treat lines starting with \`—\` (em-dash) exactly like quoted text.
-- **MANDATORY:** You must output a speaker assignment for every dashed line, even short ones.
-  - Example: \`— Понял.\` (Understood.)
-
-## Output Format
+# Output Format
 One line per dialogue paragraph: \`index:code\`
 - Example: \`0:ALICE\`
-- Do not output narration paragraphs.
 - Do not output explanations.`,
-    userTemplate: `<paragraphs>
-{{paragraphs}}
-</paragraphs>`,
+    userTemplate: `<paragraphs>{{paragraphs}}</paragraphs>`,
   },
 };
