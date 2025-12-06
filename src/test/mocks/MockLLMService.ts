@@ -48,13 +48,13 @@ export class MockLLMService implements ILLMService {
     this.cancelled = true;
   });
 
-  testConnection = vi.fn(async (): Promise<{ success: boolean; error?: string }> => {
-    return { success: true };
+  testConnection = vi.fn(async (): Promise<{ success: boolean; error?: string; model?: string }> => {
+    return { success: true, model: 'mock-model' };
   });
 
   // Test helpers
-  setTestConnectionResult(success: boolean, error?: string): void {
-    this.testConnection.mockResolvedValue({ success, error });
+  setTestConnectionResult(success: boolean, error?: string, model?: string): void {
+    this.testConnection.mockResolvedValue({ success, error, model });
   }
 
   reset(): void {

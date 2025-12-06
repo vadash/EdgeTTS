@@ -272,14 +272,34 @@ export class LLMApiClient {
   }
 
   /**
-   * Test API connection
+   * Test API connection with a real completion request
    */
-  async testConnection(): Promise<{ success: boolean; error?: string }> {
+  async testConnection(): Promise<{ success: boolean; error?: string; model?: string }> {
     try {
-      await this.client.models.list();
-      return { success: true };
-    } catch (e) {
-      const error = e instanceof Error ? e.message : String(e);
+      const response = await this.client.chat.completions.create({
+        model: this.options.model,
+        messages: [{ role: 'user', content: 'Reply with: ok' }],
+        max_tokens: 10,
+        stream: false,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return { success: false, error: 'Empty response from model' };
+      }
+
+      return { success: true, model: response.model };
+    } catch (e: any) {
+      // Extract meaningful error message
+      let error = e instanceof Error ? e.message : String(e);
+
+      // Handle OpenAI SDK error structure
+      if (e?.error?.message) {
+        error = e.error.message;
+      } else if (e?.status && e?.statusText) {
+        error = `${e.status} ${e.statusText}`;
+      }
+
       return { success: false, error };
     }
   }

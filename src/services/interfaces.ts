@@ -201,7 +201,7 @@ export interface ILLMService {
   cancel(): void;
 
   /** Test API connection */
-  testConnection(): Promise<{ success: boolean; error?: string }>;
+  testConnection(): Promise<{ success: boolean; error?: string; model?: string }>;
 }
 
 // ============================================================================

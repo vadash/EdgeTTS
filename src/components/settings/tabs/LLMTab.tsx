@@ -17,7 +17,7 @@ const reasoningOptions = [
 export function LLMTab() {
   const llm = useLLM();
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ success: boolean; error?: string; model?: string } | null>(null);
 
   const handleTestConnection = async () => {
     if (!llm.apiKey.value) {
@@ -193,7 +193,7 @@ export function LLMTab() {
           }`}
         >
           {testResult.success ? (
-            <>✅ <Text id="llm.connectionSuccess">Connection successful!</Text></>
+            <>✅ <Text id="llm.connectionSuccess">Connection successful!</Text> {testResult.model && <span className="text-gray-400">({testResult.model})</span>}</>
           ) : (
             <>❌ {testResult.error}</>
           )}

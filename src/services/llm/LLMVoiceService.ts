@@ -241,7 +241,7 @@ export class LLMVoiceService {
   /**
    * Test API connection
    */
-  async testConnection(): Promise<{ success: boolean; error?: string }> {
+  async testConnection(): Promise<{ success: boolean; error?: string; model?: string }> {
     return this.apiClient.testConnection();
   }
 }
