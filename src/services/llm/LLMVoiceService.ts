@@ -9,7 +9,7 @@ import type { ILogger, ProgressCallback } from '../interfaces';
 import { LLMApiClient } from './LLMApiClient';
 import { buildExtractPrompt, buildMergePrompt, buildAssignPrompt } from './PromptBuilders';
 import { validateExtractResponse, validateMergeResponse, validateAssignResponse, parseAssignResponse } from './ResponseValidators';
-import { buildCodeMapping, mergeCharacters, applyMergeResponse } from './CharacterUtils';
+import { buildCodeMapping, mergeCharacters, applyMergeResponse, normalizeCanonicalNames } from './CharacterUtils';
 
 /**
  * Regex matching speech/dialogue symbols:
@@ -102,8 +102,10 @@ export class LLMVoiceService {
 
     // LLM merge only if multiple blocks were processed and multiple characters exist
     if (blocks.length > 1 && merged.length > 1) {
-      onProgress?.(blocks.length, blocks.length, `Merging ${merged.length} characters...`);
-      merged = await this.mergeCharactersWithLLM(merged, onProgress);
+      // Normalize canonicalNames to longest variation before merge (prevents LLM picking variation names)
+      const normalized = normalizeCanonicalNames(merged);
+      onProgress?.(blocks.length, blocks.length, `Merging ${normalized.length} characters...`);
+      merged = await this.mergeCharactersWithLLM(normalized, onProgress);
       onProgress?.(blocks.length, blocks.length, `Merged to ${merged.length} characters`);
     }
 

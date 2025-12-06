@@ -39,10 +39,26 @@ export function validateExtractResponse(response: string): LLMValidationResult {
 
 /**
  * Validate Merge response (character deduplication)
+ * Uses fuzzy matching: accepts variations as valid keep/absorb values
  */
 export function validateMergeResponse(response: string, characters: LLMCharacter[]): LLMValidationResult {
   const errors: string[] = [];
   const validNames = new Set(characters.map((c) => c.canonicalName));
+
+  // Build variation -> canonicalName map for fuzzy matching
+  const variationToCanonical = new Map<string, string>();
+  for (const c of characters) {
+    variationToCanonical.set(c.canonicalName.toLowerCase(), c.canonicalName);
+    for (const v of c.variations) {
+      variationToCanonical.set(v.toLowerCase(), c.canonicalName);
+    }
+  }
+
+  // Helper to resolve name (exact match or variation fallback)
+  const resolveName = (name: string): string | null => {
+    if (validNames.has(name)) return name;
+    return variationToCanonical.get(name.toLowerCase()) ?? null;
+  };
 
   try {
     const parsed = JSON.parse(response) as MergeResponse;
@@ -64,20 +80,24 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
 
       if (!merge.keep || typeof merge.keep !== 'string') {
         errors.push(`Merge ${i}: missing or invalid "keep"`);
-      } else if (!validNames.has(merge.keep)) {
-        errors.push(`Merge ${i}: "keep" name "${merge.keep}" not found in characters`);
       } else {
-        usedNames.add(merge.keep);
+        const resolved = resolveName(merge.keep);
+        if (!resolved) {
+          errors.push(`Merge ${i}: "keep" name "${merge.keep}" not found in characters or variations`);
+        } else {
+          usedNames.add(resolved);
+        }
       }
 
       if (!merge.absorb || !Array.isArray(merge.absorb)) {
         errors.push(`Merge ${i}: missing or invalid "absorb" array`);
       } else {
         for (const name of merge.absorb) {
-          if (!validNames.has(name)) {
-            errors.push(`Merge ${i}: absorbed name "${name}" not found in characters`);
+          const resolved = resolveName(name);
+          if (!resolved) {
+            errors.push(`Merge ${i}: absorbed name "${name}" not found in characters or variations`);
           } else {
-            usedNames.add(name);
+            usedNames.add(resolved);
           }
         }
       }
@@ -93,10 +113,11 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
 
     // Validate unchanged
     for (const name of parsed.unchanged) {
-      if (!validNames.has(name)) {
-        errors.push(`Unchanged name "${name}" not found in characters`);
+      const resolved = resolveName(name);
+      if (!resolved) {
+        errors.push(`Unchanged name "${name}" not found in characters or variations`);
       } else {
-        usedNames.add(name);
+        usedNames.add(resolved);
       }
     }
 

@@ -1,5 +1,19 @@
 import type { LLMCharacter, MergeResponse, SpeakerAssignment } from '@/state/types';
 
+/**
+ * Normalize canonicalNames to use the longest variation.
+ * This prevents merge validation failures when LLM picks a longer variation as "keep".
+ */
+export function normalizeCanonicalNames(characters: LLMCharacter[]): LLMCharacter[] {
+  return characters.map((c) => {
+    const longest = c.variations.reduce((a, b) => (a.length >= b.length ? a : b), c.canonicalName);
+    return {
+      ...c,
+      canonicalName: longest,
+    };
+  });
+}
+
 export interface CodeMapping {
   nameToCode: Map<string, string>;
   codeToName: Map<string, string>;
@@ -73,15 +87,33 @@ export function mergeCharacters(characters: LLMCharacter[]): LLMCharacter[] {
 
 /**
  * Apply merge response to create final character list
+ * Handles fuzzy matching: resolves variation names to canonicalNames
  */
 export function applyMergeResponse(characters: LLMCharacter[], mergeResponse: MergeResponse): LLMCharacter[] {
   const result: LLMCharacter[] = [];
   const characterMap = new Map(characters.map((c) => [c.canonicalName, c]));
 
+  // Build variation -> canonicalName map for fuzzy resolution
+  const variationToCanonical = new Map<string, string>();
+  for (const c of characters) {
+    variationToCanonical.set(c.canonicalName.toLowerCase(), c.canonicalName);
+    for (const v of c.variations) {
+      variationToCanonical.set(v.toLowerCase(), c.canonicalName);
+    }
+  }
+
+  // Helper to resolve name
+  const resolveName = (name: string): string | null => {
+    if (characterMap.has(name)) return name;
+    return variationToCanonical.get(name.toLowerCase()) ?? null;
+  };
+
   // Add merged characters
   for (const merge of mergeResponse.merges) {
+    // Use the resolved name (in case LLM used a variation)
+    const resolvedKeep = resolveName(merge.keep) ?? merge.keep;
     result.push({
-      canonicalName: merge.keep,
+      canonicalName: resolvedKeep,
       variations: merge.variations,
       gender: merge.gender,
     });
@@ -89,7 +121,8 @@ export function applyMergeResponse(characters: LLMCharacter[], mergeResponse: Me
 
   // Add unchanged characters
   for (const name of mergeResponse.unchanged) {
-    const char = characterMap.get(name);
+    const resolvedName = resolveName(name);
+    const char = resolvedName ? characterMap.get(resolvedName) : null;
     if (char) {
       result.push({ ...char });
     }

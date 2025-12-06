@@ -38,10 +38,13 @@ Return ONLY valid JSON. DO NOT INCLUDE ANY MARKDOWN WRAPPING (e.g., \`\`\`json),
 Review the provided character list. Merge entries that are clearly the same person based on name similarity, nicknames, or common aliases not caught in the initial extraction.
 </TASK>
 
+# CRITICAL CONSTRAINT
+The \`keep\` and \`absorb\` values MUST be EXACTLY one of the input \`canonicalName\` values from the numbered list. Do NOT use variation names - use only the exact canonicalName strings provided.
+
 # MERGING CRITERIA
 
-1.  **Keep Name:** Select the fullest or most descriptive proper name as the \`keep\` value.
-2.  **Absorb Names:** List all other canonical names that refer to the same person under \`absorb\`.
+1.  **Keep Name:** Choose ONE of the input canonicalName values (the most descriptive one).
+2.  **Absorb Names:** List other canonicalName values that refer to the same person.
 3.  **Variations:** Combine all variations from both the kept and absorbed entries into the final \`variations\` list.
 
 # OUTPUT FORMAT (STRICT JSON ONLY)
