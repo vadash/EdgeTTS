@@ -76,6 +76,8 @@ Unnamed Speakers:
 # Output Format
 One line per dialogue paragraph: \`index:code\`
 - Example: \`0:ALICE\`
+- **You MUST output an assignment for EVERY paragraph containing dialogue.**
+- Do not skip any dialogue. If unsure, make your best guess.
 - Do not output explanations.`,
     userTemplate: `<paragraphs>{{paragraphs}}</paragraphs>`,
   },

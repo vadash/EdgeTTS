@@ -1,4 +1,5 @@
 import type { LLMValidationResult, LLMCharacter, TextBlock, MergeResponse } from '@/state/types';
+import { SPEECH_SYMBOLS_REGEX } from './LLMVoiceService';
 
 /**
  * Validate Extract response (character extraction)
@@ -124,10 +125,23 @@ export function validateAssignResponse(
   const minIndex = block.sentenceStartIndex;
   const maxIndex = block.sentenceStartIndex + block.sentences.length - 1;
 
-  // Empty response is valid (all narrator)
+  // Find dialogue paragraph indices (those with speech symbols)
+  const dialogueIndices = new Set<number>();
+  block.sentences.forEach((text, i) => {
+    if (SPEECH_SYMBOLS_REGEX.test(text)) {
+      dialogueIndices.add(minIndex + i);
+    }
+  });
+
+  // Empty response is only valid if no dialogue paragraphs
   if (!response.trim()) {
-    return { valid: true, errors: [] };
+    if (dialogueIndices.size > 0) {
+      errors.push(`Missing assignments for dialogue paragraphs: ${Array.from(dialogueIndices).join(', ')}`);
+    }
+    return { valid: errors.length === 0, errors };
   }
+
+  const assignedIndices = new Set<number>();
 
   for (const line of response.trim().split('\n')) {
     const trimmed = line.trim();
@@ -144,11 +158,19 @@ export function validateAssignResponse(
 
     if (index < minIndex || index > maxIndex) {
       errors.push(`Index ${index} out of range [${minIndex}-${maxIndex}]`);
+    } else {
+      assignedIndices.add(index);
     }
 
     if (!codeToName.has(code)) {
       errors.push(`Unknown code "${code}". Valid: ${Array.from(codeToName.keys()).join(', ')}`);
     }
+  }
+
+  // Check for missing dialogue assignments
+  const missingDialogue = Array.from(dialogueIndices).filter(idx => !assignedIndices.has(idx));
+  if (missingDialogue.length > 0) {
+    errors.push(`Missing assignments for dialogue paragraphs: ${missingDialogue.join(', ')}`);
   }
 
   return { valid: errors.length === 0, errors };
