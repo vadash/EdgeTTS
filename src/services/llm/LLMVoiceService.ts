@@ -200,26 +200,29 @@ export class LLMVoiceService {
       }));
     }
 
+    // Use 0-based indexing for LLM (most models prefer this)
     const numberedParagraphs = block.sentences
-      .map((s, i) => `[${block.sentenceStartIndex + i}] ${s}`)
+      .map((s, i) => `[${i}] ${s}`)
       .join('\n');
 
     const response = await this.apiClient.callWithRetry(
-      buildAssignPrompt(characters, nameToCode, numberedParagraphs, block.sentenceStartIndex),
-      (result) => validateAssignResponse(result, block, codeToName),
+      buildAssignPrompt(characters, nameToCode, numberedParagraphs, 0),
+      (result) => validateAssignResponse(result, block.sentences.length, codeToName),
       this.abortController?.signal,
       [],
       'assign'
     );
 
-    const speakerMap = parseAssignResponse(response, codeToName);
+    // Parse response (0-based) and map back to absolute indices
+    const relativeMap = parseAssignResponse(response, codeToName);
 
     return block.sentences.map((text, i) => {
-      const index = block.sentenceStartIndex + i;
+      const absoluteIndex = block.sentenceStartIndex + i;
+      const relativeIndex = i; // 0-based
       const hasSpeechSymbols = SPEECH_SYMBOLS_REGEX.test(text);
-      const speaker = hasSpeechSymbols ? (speakerMap.get(index) || 'narrator') : 'narrator';
+      const speaker = hasSpeechSymbols ? (relativeMap.get(relativeIndex) || 'narrator') : 'narrator';
       return {
-        sentenceIndex: index,
+        sentenceIndex: absoluteIndex,
         text,
         speaker,
         voiceId: speaker === 'narrator'

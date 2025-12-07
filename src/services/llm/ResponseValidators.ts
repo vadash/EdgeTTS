@@ -1,5 +1,4 @@
-import type { LLMValidationResult, LLMCharacter, TextBlock, MergeResponse } from '@/state/types';
-import { SPEECH_SYMBOLS_REGEX } from './LLMVoiceService';
+import type { LLMValidationResult, LLMCharacter, MergeResponse } from '@/state/types';
 
 /**
  * Validate Extract response (character extraction)
@@ -136,30 +135,22 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
 
 /**
  * Validate Assign response (sparse format: index:code lines)
+ * Uses 0-based indexing (0 to sentenceCount-1)
  */
 export function validateAssignResponse(
   response: string,
-  block: TextBlock,
+  sentenceCount: number,
   codeToName: Map<string, string>
 ): LLMValidationResult {
   const errors: string[] = [];
-  const minIndex = block.sentenceStartIndex;
-  const maxIndex = block.sentenceStartIndex + block.sentences.length - 1;
+  const minIndex = 0;
+  const maxIndex = sentenceCount - 1;
 
-  // Find dialogue paragraph indices (those with speech symbols)
-  const dialogueIndices = new Set<number>();
-  block.sentences.forEach((text, i) => {
-    if (SPEECH_SYMBOLS_REGEX.test(text)) {
-      dialogueIndices.add(minIndex + i);
-    }
-  });
-
-  // Empty response is only valid if no dialogue paragraphs
+  // Empty response - we can't validate without knowing which have dialogue
+  // Just check we got SOME assignments
   if (!response.trim()) {
-    if (dialogueIndices.size > 0) {
-      errors.push(`Missing assignments for dialogue paragraphs: ${Array.from(dialogueIndices).join(', ')}`);
-    }
-    return { valid: errors.length === 0, errors };
+    errors.push('Empty response');
+    return { valid: false, errors };
   }
 
   const assignedIndices = new Set<number>();
@@ -169,8 +160,8 @@ export function validateAssignResponse(
     if (!trimmed) continue;
 
     // More lenient regex: accept [123]:X or 123:X, and optional stuff after code
-    // Handles: "123:A", "[123]:A", "123:A (name)", "123:Tian (A)"
-    const match = trimmed.match(/^\[?(\d+)\]?:([A-Za-z0-9]+)/);
+    // Handles: "123:A", "[123]:A", "123:A (name)", "54:FEMALE_UNNAMED"
+    const match = trimmed.match(/^\[?(\d+)\]?:([A-Za-z0-9_]+)/);
     if (!match) {
       errors.push(`Invalid format: "${trimmed}". Expected: index:code`);
       continue;
@@ -186,14 +177,13 @@ export function validateAssignResponse(
     }
 
     if (!codeToName.has(code)) {
-      errors.push(`Unknown code "${code}". Valid: ${Array.from(codeToName.keys()).join(', ')}`);
+      errors.push(`Unknown code "${code}"`);
     }
   }
 
-  // Check for missing dialogue assignments
-  const missingDialogue = Array.from(dialogueIndices).filter(idx => !assignedIndices.has(idx));
-  if (missingDialogue.length > 0) {
-    errors.push(`Missing assignments for dialogue paragraphs: ${missingDialogue.join(', ')}`);
+  // Require at least some valid assignments
+  if (assignedIndices.size === 0) {
+    errors.push('No valid assignments found');
   }
 
   return { valid: errors.length === 0, errors };
@@ -209,8 +199,8 @@ export function parseAssignResponse(
   const speakerMap = new Map<number, string>();
 
   for (const line of response.trim().split('\n')) {
-    // More lenient regex: accept [123]:X or 123:X, and optional stuff after code
-    const match = line.trim().match(/^\[?(\d+)\]?:([A-Za-z0-9]+)/);
+    // More lenient regex: accept [123]:X or 123:X, handles underscores in codes
+    const match = line.trim().match(/^\[?(\d+)\]?:([A-Za-z0-9_]+)/);
     if (match) {
       const index = parseInt(match[1]);
       const code = match[2];

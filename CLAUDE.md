@@ -55,7 +55,7 @@ Optional feature for multi-voice audiobooks using LLM-based character detection:
 - **LLMVoiceService** (`src/services/llm/`): Three-pass LLM system using OpenAI-compatible API:
   - **Extract** (Pass 1): Extracts characters from text blocks (sequential processing, detects gender/name variations)
   - **Merge**: Deduplicates characters across blocks using LLM (identifies same person with different names)
-  - **Assign** (Pass 2): Assigns speakers to paragraphs (parallel, up to 20 concurrent). Paragraphs without speech symbols are auto-assigned to narrator, skipping LLM call.
+  - **Assign** (Pass 2): Assigns speakers to paragraphs (parallel, up to 20 concurrent). Uses 0-based relative indexing per block (0, 1, 2...) instead of absolute indices to improve LLM accuracy. Paragraphs without speech symbols are auto-assigned to narrator, skipping LLM call.
   - Uses sparse output format with character codes (A-Z, 0-9, a-z) for token reduction
   - Infinite retry with exponential backoff
   - Logs requests/responses to: `logs/extract_*.json`, `logs/merge_*.json`, `logs/assign_*.json`
