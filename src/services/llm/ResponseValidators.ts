@@ -168,7 +168,9 @@ export function validateAssignResponse(
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    const match = trimmed.match(/^(\d+):([A-Za-z0-9]+)$/);
+    // More lenient regex: accept [123]:X or 123:X, and optional stuff after code
+    // Handles: "123:A", "[123]:A", "123:A (name)", "123:Tian (A)"
+    const match = trimmed.match(/^\[?(\d+)\]?:([A-Za-z0-9]+)/);
     if (!match) {
       errors.push(`Invalid format: "${trimmed}". Expected: index:code`);
       continue;
@@ -207,7 +209,8 @@ export function parseAssignResponse(
   const speakerMap = new Map<number, string>();
 
   for (const line of response.trim().split('\n')) {
-    const match = line.trim().match(/^(\d+):([A-Za-z0-9]+)$/);
+    // More lenient regex: accept [123]:X or 123:X, and optional stuff after code
+    const match = line.trim().match(/^\[?(\d+)\]?:([A-Za-z0-9]+)/);
     if (match) {
       const index = parseInt(match[1]);
       const code = match[2];
