@@ -3,6 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [master]
+  delete:
+    tags: ['v*']
 
 permissions:
   contents: read
@@ -11,7 +13,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
@@ -21,19 +23,59 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
+      # Restore cached version builds
+      - name: Restore cache
+        uses: actions/cache@v4
+        with:
+          path: deploy
+          key: pages-${{ hashFiles('.github/workflows/deploy.yml') }}
+          restore-keys: pages-
+
+      - run: mkdir -p deploy
+
+      # Build latest
       - run: npm ci
       - run: npm run build
+      - run: rm -rf deploy/latest && cp -r dist/latest deploy/
+
+      # If this commit has a v* tag, save as that version
+      - name: Save tagged version
+        run: |
+          TAG=$(git tag --points-at HEAD | grep '^v' | head -1)
+          if [ -n "$TAG" ]; then
+            echo "Saving build as $TAG"
+            rm -rf "deploy/$TAG"
+            cp -r dist/latest "deploy/$TAG"
+          fi
+
+      # Remove versions for deleted tags
+      - name: Clean deleted tags
+        run: |
+          cd deploy
+          for dir in v*/; do
+            [ -d "$dir" ] || continue
+            tag="${dir%/}"
+            if ! git tag -l "$tag" | grep -q .; then
+              echo "Removing $tag"
+              rm -rf "$tag"
+            fi
+          done
+
+      # Generate index
+      - run: node scripts/generate-index.js deploy
 
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: deploy
 
       - id: deployment
         uses: actions/deploy-pages@v4

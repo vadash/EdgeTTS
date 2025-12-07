@@ -14,9 +14,11 @@ export default (env, argv) => {
     entry: './src/index.tsx',
 
     output: {
-      path: path.resolve(__dirname, 'dist'),
+      path: isProduction
+        ? path.resolve(__dirname, 'dist', 'latest')
+        : path.resolve(__dirname, 'dist'),
       filename: isProduction ? '[name].[contenthash].js' : '[name].js',
-      publicPath: isProduction ? '/EdgeTTS/' : '/',
+      publicPath: isProduction ? './' : '/',
     },
 
     resolve: {
@@ -51,7 +53,10 @@ export default (env, argv) => {
     },
 
     plugins: [
-      new CleanWebpackPlugin(),
+      new CleanWebpackPlugin({
+        // Only clean the specific version subfolder, not entire dist
+        cleanOnceBeforeBuildPatterns: ['**/*'],
+      }),
       new HtmlWebpackPlugin({
         template: './public/index.html',
         favicon: './public/logo.png',

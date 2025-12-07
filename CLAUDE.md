@@ -241,6 +241,21 @@ Tailwind CSS v3 with custom configuration:
 - **Config**: `tailwind.config.js` with extended theme
 - **PostCSS**: `postcss.config.js` with tailwindcss and autoprefixer
 
+## Multiple builds
+
+New structure:
+dist/
+├── index.html      ← version picker
+├── latest/         ← current build
+└── v1/             ← stable v1
+
+Commands:
+npm run build              # builds to dist/latest/
+npm run build:version v1   # builds to dist/v1/
+npm run build:version v2   # builds to dist/v2/
+
+Each build:version automatically adds/updates the entry in dist/index.html.
+
 ## CRITICAL
 
 1. USE bash commands for Windows!
