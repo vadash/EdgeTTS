@@ -129,6 +129,7 @@ export class LLMVoiceService {
     characters: LLMCharacter[],
     onProgress?: ProgressCallback
   ): Promise<SpeakerAssignment[]> {
+    console.log(`[Assign] Starting (${blocks.length} blocks)`);
     this.logger?.info(`[Assign] Starting (${blocks.length} blocks)`);
     const MAX_CONCURRENT = 20;
     const results: SpeakerAssignment[] = [];
@@ -146,13 +147,20 @@ export class LLMVoiceService {
       }
 
       const batch = blocks.slice(i, i + MAX_CONCURRENT);
+      console.log(`[Assign] Processing batch of ${batch.length} blocks`);
       const batchPromises = batch.map((block, batchIndex) => {
         const blockNum = i + batchIndex + 1;
+        console.log(`[assign] Starting block ${blockNum}/${blocks.length}`);
         this.logger?.info(`[assign] Starting block ${blockNum}/${blocks.length}`);
         return this.processAssignBlock(block, characterVoiceMap, characters, nameToCode, codeToName)
           .then(result => {
+            console.log(`[assign] Completed block ${blockNum}/${blocks.length}`);
             this.logger?.info(`[assign] Completed block ${blockNum}/${blocks.length}`);
             return result;
+          })
+          .catch(err => {
+            console.error(`[assign] Error in block ${blockNum}:`, err);
+            throw err;
           });
       });
 
@@ -180,6 +188,7 @@ export class LLMVoiceService {
     nameToCode: Map<string, string>,
     codeToName: Map<string, string>
   ): Promise<SpeakerAssignment[]> {
+    console.log(`[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`);
     const hasSpeech = block.sentences.some(p => SPEECH_SYMBOLS_REGEX.test(p));
 
     if (!hasSpeech) {

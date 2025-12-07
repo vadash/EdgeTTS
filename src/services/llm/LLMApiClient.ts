@@ -98,6 +98,7 @@ export class LLMApiClient {
         attempt++;
 
         this.logger?.info(`[${pass}] Validation failed, retry ${attempt}, waiting ${delay / 1000}s...`, { errors: previousErrors });
+        console.warn(`[${pass}] Validation failed (attempt ${attempt})`, validation.errors, 'Response:', response.substring(0, 300));
         onRetry?.(attempt, delay, previousErrors);
         await this.sleep(delay);
       } catch (error) {
@@ -108,6 +109,7 @@ export class LLMApiClient {
         const delay = getRetryDelay(attempt);
         attempt++;
         this.logger?.info(`[${pass}] API error, retry ${attempt}, waiting ${delay / 1000}s...`, { error: String(error) });
+        console.error(`[${pass}] API error (attempt ${attempt}):`, error);
         onRetry?.(attempt, delay);
         await this.sleep(delay);
       }
@@ -169,6 +171,7 @@ export class LLMApiClient {
 
     // Make API call - handle both streaming and non-streaming modes
     let content = '';
+    console.log(`[${pass}] API call starting...`);
     this.logger?.info(`[${pass}] API call starting...`);
     const isStreaming = this.options.streaming !== false;
 
@@ -208,6 +211,7 @@ export class LLMApiClient {
       content = response.choices[0]?.message?.content || '';
     }
 
+    console.log(`[${pass}] API call completed (${content.length} chars)`);
     this.logger?.info(`[${pass}] API call completed (${content.length} chars)`);
 
     // Build response object for logging
