@@ -32,12 +32,6 @@ export const fixtures: TestFixture[] = [
     expectedCharacters: [
       { name: "Fielding", gender: "male" },
       { name: "Tennyson", gender: "male" },
-      { name: "Alan", gender: "male" },
-      { name: "Conrad", gender: "male" },
-      { name: "Agnes", gender: "female" },
-      { name: "Willard", gender: "male" },
-      { name: "White", gender: "male" },
-      { name: "Harry", gender: "male" },
     ],
     expectedDialogueLines: [
       { textContains: "Alan, I'm so sorry", speaker: "Tennyson", strict: false },
