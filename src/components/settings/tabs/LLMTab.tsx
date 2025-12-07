@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { useLLM } from '@/stores';
+import { useLogger } from '@/di/ServiceContext';
 import { LLMVoiceService } from '@/services/llm';
 import { Button, Toggle, Select, Slider } from '@/components/common';
 import { LLMHelp } from './LLMHelp';
@@ -16,6 +17,7 @@ const reasoningOptions = [
 
 export function LLMTab() {
   const llm = useLLM();
+  const logger = useLogger();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; error?: string; model?: string } | null>(null);
 
@@ -33,6 +35,7 @@ export function LLMTab() {
       apiUrl: llm.apiUrl.value,
       model: llm.model.value,
       narratorVoice: '',
+      logger,
     });
 
     const result = await service.testConnection();

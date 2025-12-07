@@ -33,7 +33,7 @@ export interface LLMVoiceServiceOptions {
   temperature?: number;
   topP?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
-  logger?: ILogger;
+  logger: ILogger; // Required - prevents silent failures
 }
 
 /**
@@ -43,9 +43,12 @@ export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
   private apiClient: LLMApiClient;
   private abortController: AbortController | null = null;
-  private logger?: ILogger;
+  private logger: ILogger;
 
   constructor(options: LLMVoiceServiceOptions) {
+    if (!options.logger) {
+      throw new Error('LLMVoiceService requires a logger');
+    }
     this.options = options;
     this.logger = options.logger;
     this.apiClient = new LLMApiClient({

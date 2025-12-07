@@ -391,6 +391,7 @@ export interface LLMServiceFactoryOptions {
   temperature?: number;
   topP?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
+  logger: ILogger; // Required - prevents silent failures
 }
 
 /**

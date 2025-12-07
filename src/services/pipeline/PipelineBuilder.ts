@@ -18,6 +18,7 @@ import type {
   IAudioMergerFactory,
   IVoiceAssignerFactory,
   IVoicePoolBuilder,
+  ILogger,
   LLMServiceFactoryOptions,
   WorkerPoolOptions,
   MergerConfig,
@@ -74,6 +75,7 @@ export class PipelineBuilder implements IPipelineBuilder {
   private voiceAssignerFactory: IVoiceAssignerFactory;
   private voicePoolBuilder: IVoicePoolBuilder;
   private ffmpegService: IFFmpegService;
+  private logger: ILogger;
 
   constructor(
     private container: ServiceContainer,
@@ -86,6 +88,7 @@ export class PipelineBuilder implements IPipelineBuilder {
     this.voiceAssignerFactory = container.get<IVoiceAssignerFactory>(ServiceTypes.VoiceAssignerFactory);
     this.voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
     this.ffmpegService = container.get<IFFmpegService>(ServiceTypes.FFmpegService);
+    this.logger = container.get<ILogger>(ServiceTypes.Logger);
   }
 
   /**
@@ -105,6 +108,7 @@ export class PipelineBuilder implements IPipelineBuilder {
       temperature: options.temperature,
       topP: options.topP,
       directoryHandle: options.directoryHandle,
+      logger: this.logger,
     };
 
     // Build TTS config

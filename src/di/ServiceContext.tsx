@@ -228,9 +228,12 @@ export function createProductionContainer(
   // Register factories for per-conversion services
   container.registerSingleton<ILLMServiceFactory>(
     ServiceTypes.LLMServiceFactory,
-    () => ({
-      create: (options: LLMServiceFactoryOptions) => new LLMVoiceService(options),
-    })
+    () => {
+      const logger = container.get<ILogger>(ServiceTypes.Logger);
+      return {
+        create: (options: LLMServiceFactoryOptions) => new LLMVoiceService({ ...options, logger }),
+      };
+    }
   );
 
   // Register worker pool factory
