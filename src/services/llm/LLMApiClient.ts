@@ -290,14 +290,45 @@ export class LLMApiClient {
 
       return { success: true, model: response.model };
     } catch (e: any) {
-      // Extract meaningful error message
-      let error = e instanceof Error ? e.message : String(e);
+      let error = 'Unknown error';
 
-      // Handle OpenAI SDK error structure
+      // OpenAI SDK error structure
       if (e?.error?.message) {
         error = e.error.message;
-      } else if (e?.status && e?.statusText) {
-        error = `${e.status} ${e.statusText}`;
+      }
+      // HTTP status errors
+      else if (e?.status) {
+        const statusMap: Record<number, string> = {
+          400: 'Bad Request - Check API URL format',
+          401: 'Unauthorized - Invalid API key',
+          403: 'Forbidden - API key lacks permissions',
+          404: 'Not Found - Model or endpoint not found',
+          429: 'Rate Limited - Too many requests',
+          500: 'Server Error - API provider issue',
+          502: 'Bad Gateway - API provider unreachable',
+          503: 'Service Unavailable - API provider down',
+        };
+        error = statusMap[e.status] || `HTTP ${e.status}: ${e.statusText || 'Error'}`;
+      }
+      // Network/fetch errors
+      else if (e?.cause?.code === 'ENOTFOUND' || e?.message?.includes('fetch')) {
+        error = 'Network Error - Check API URL and internet connection';
+      }
+      // Timeout
+      else if (e?.message?.includes('timeout') || e?.message?.includes('Timeout')) {
+        error = 'Request Timeout - Server took too long to respond';
+      }
+      // CORS
+      else if (e?.message?.includes('CORS') || e?.message?.includes('cors')) {
+        error = 'CORS Error - API does not allow browser requests';
+      }
+      // Generic Error object
+      else if (e instanceof Error) {
+        error = e.message;
+      }
+      // String error
+      else if (typeof e === 'string') {
+        error = e;
       }
 
       return { success: false, error };

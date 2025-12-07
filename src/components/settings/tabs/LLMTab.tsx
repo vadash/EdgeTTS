@@ -38,11 +38,15 @@ export function LLMTab() {
     const result = await service.testConnection();
     setTestResult(result);
     setTesting(false);
+
+    // Auto-save on success
+    if (result.success) {
+      await llm.saveSettings();
+    }
   };
 
   const handleSave = async () => {
     await llm.saveSettings();
-    setTestResult({ success: true, error: undefined });
   };
 
   const handleReasoningChange = (e: Event) => {
