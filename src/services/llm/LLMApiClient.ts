@@ -233,6 +233,11 @@ export class LLMApiClient {
       throw new Error('Empty response from API');
     }
 
+    // Assign pass uses line-based format (index:CODE), not JSON
+    if (pass === 'assign') {
+      return content.trim();
+    }
+
     // Extract JSON from response (handle markdown code blocks)
     return this.extractJSON(content);
   }
