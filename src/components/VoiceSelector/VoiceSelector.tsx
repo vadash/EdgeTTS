@@ -1,9 +1,9 @@
 import { signal, computed } from '@preact/signals';
 import { Text } from 'preact-i18n';
 import { useSettings, useData } from '../../stores';
-import { useLogger } from '../../di';
+import { useLogger, useService, ServiceTypes } from '../../di';
 import voices from './voices';
-import { EdgeTTSService } from '../../services/EdgeTTSService';
+import type { IReusableTTSService } from '../../services/interfaces';
 
 const SAMPLE_PHRASES = [
   "The quick brown fox jumps over the lazy dog",
@@ -25,6 +25,7 @@ export function VoiceSelector() {
   const settings = useSettings();
   const data = useData();
   const logger = useLogger();
+  const ttsService = useService<IReusableTTSService>(ServiceTypes.TTSPreviewService);
 
   // Filter voices based on detected language
   const filteredVoices = computed(() => {
@@ -40,22 +41,15 @@ export function VoiceSelector() {
     isPlaying.value = true;
 
     try {
-      const audioData = await new Promise<Uint8Array>((resolve, reject) => {
-        const tts = new EdgeTTSService({
-          indexPart: 0,
-          filename: 'sample',
-          filenum: '0',
-          config: {
-            voice: `Microsoft Server Speech Text to Speech Voice (${settings.narratorVoice.value})`,
-            rate: `${settings.rate.value >= 0 ? '+' : ''}${settings.rate.value}%`,
-            pitch: `${settings.pitch.value >= 0 ? '+' : ''}${settings.pitch.value}Hz`,
-            volume: '+0%'
-          },
-          text: samplePhrase.value,
-          onComplete: resolve,
-          onError: reject
-        });
-        tts.start();
+      // Use singleton TTS service to avoid rate limiting
+      const audioData = await ttsService.send({
+        text: samplePhrase.value,
+        config: {
+          voice: `Microsoft Server Speech Text to Speech Voice (${settings.narratorVoice.value})`,
+          rate: `${settings.rate.value >= 0 ? '+' : ''}${settings.rate.value}%`,
+          pitch: `${settings.pitch.value >= 0 ? '+' : ''}${settings.pitch.value}Hz`,
+          volume: '+0%'
+        }
       });
 
       const blob = new Blob([(audioData.buffer as ArrayBuffer).slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength)], { type: 'audio/mpeg' });

@@ -1,4 +1,5 @@
 import type { LLMValidationResult, LLMCharacter, MergeResponse } from '@/state/types';
+import { extractJSON } from '@/utils/llmUtils';
 
 /**
  * Validate Extract response (character extraction)
@@ -7,7 +8,9 @@ export function validateExtractResponse(response: string): LLMValidationResult {
   const errors: string[] = [];
 
   try {
-    const parsed = JSON.parse(response);
+    // Use extractJSON to handle thinking tags and markdown code blocks
+    const cleaned = extractJSON(response);
+    const parsed = JSON.parse(cleaned);
 
     if (!parsed.characters || !Array.isArray(parsed.characters)) {
       errors.push('Response must have a "characters" array');
@@ -64,7 +67,9 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
   };
 
   try {
-    const parsed = JSON.parse(response) as MergeResponse;
+    // Use extractJSON to handle thinking tags and markdown code blocks
+    const cleaned = extractJSON(response);
+    const parsed = JSON.parse(cleaned) as MergeResponse;
 
     if (!parsed.merges || !Array.isArray(parsed.merges)) {
       errors.push('Response must have a "merges" array');
@@ -152,7 +157,9 @@ export function validateMergeResponse(response: string, characters: LLMCharacter
  */
 export function fixMergeResponse(response: string, characters: LLMCharacter[]): string {
   try {
-    const parsed = JSON.parse(response) as MergeResponse;
+    // Use extractJSON to handle thinking tags and markdown code blocks
+    const cleaned = extractJSON(response);
+    const parsed = JSON.parse(cleaned) as MergeResponse;
     const validNames = new Set(characters.map((c) => c.canonicalName));
 
     // Build variation -> canonicalName map

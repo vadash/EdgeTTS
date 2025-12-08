@@ -22,6 +22,7 @@ import { AudioMerger } from '@/services/AudioMerger';
 import { VoiceAssigner } from '@/services/VoiceAssigner';
 import { PipelineRunner } from '@/services/pipeline/PipelineRunner';
 import { PipelineBuilder, createDefaultStepRegistry } from '@/services/pipeline';
+import { ReusableEdgeTTSService } from '@/services/ReusableEdgeTTSService';
 import type { LogStore } from '@/stores/LogStore';
 
 import type {
@@ -34,6 +35,7 @@ import type {
   IWorkerPoolFactory,
   IAudioMergerFactory,
   IVoiceAssignerFactory,
+  IReusableTTSService,
   LLMServiceFactoryOptions,
   MergerConfig,
   VoiceAssignerOptions,
@@ -208,6 +210,16 @@ export function createProductionContainer(
   container.registerSingleton<IVoicePoolBuilder>(
     ServiceTypes.VoicePoolBuilder,
     () => new VoicePoolBuilder()
+  );
+
+  // Register TTS Preview Service (singleton for UI voice samples)
+  // Uses ReusableEdgeTTSService to avoid rate limiting from repeated sample plays
+  container.registerSingleton<IReusableTTSService>(
+    ServiceTypes.TTSPreviewService,
+    () => {
+      const logger = container.get<ILogger>(ServiceTypes.Logger);
+      return new ReusableEdgeTTSService(logger);
+    }
   );
 
   // Register PipelineRunner (transient - new instance per conversion)

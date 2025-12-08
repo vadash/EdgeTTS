@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
-import { jsonrepair } from 'jsonrepair';
 import type { LLMValidationResult } from '@/state/types';
 import { getRetryDelay } from '@/config';
 import type { ILogger } from '../interfaces';
+import { stripThinkingTags, extractJSON } from '@/utils/llmUtils';
 
 export interface LLMApiClientOptions {
   apiKey: string;
@@ -207,47 +207,11 @@ export class LLMApiClient {
 
     // Assign pass uses line-based format (index:CODE), not JSON
     if (pass === 'assign') {
-      return this.stripThinkingTags(content).trim();
+      return stripThinkingTags(content).trim();
     }
 
     // Extract JSON from response (handle markdown code blocks)
-    return this.extractJSON(content);
-  }
-
-  /**
-   * Strip thinking tags from LLM response (used by DeepSeek, Qwen, etc.)
-   */
-  private stripThinkingTags(content: string): string {
-    return content
-      .replace(/<think>[\s\S]*?<\/think>/gi, '')
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
-  }
-
-  /**
-   * Extract JSON from response (handles markdown code blocks and thinking tags)
-   * Uses jsonrepair to fix common LLM JSON issues (trailing commas, missing quotes, etc.)
-   */
-  private extractJSON(content: string): string {
-    const cleaned = this.stripThinkingTags(content);
-
-    let jsonCandidate: string;
-
-    // Try to extract from markdown code block
-    const jsonMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      jsonCandidate = jsonMatch[1].trim();
-    } else {
-      // Try to find raw JSON object
-      const objectMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (objectMatch) {
-        jsonCandidate = objectMatch[0];
-      } else {
-        jsonCandidate = cleaned.trim();
-      }
-    }
-
-    // Repair common JSON issues (trailing commas, missing quotes, unclosed brackets)
-    return jsonrepair(jsonCandidate);
+    return extractJSON(content);
   }
 
   /**

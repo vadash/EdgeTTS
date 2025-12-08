@@ -14,6 +14,7 @@ export const ServiceTypes = {
   VoicePoolBuilder: Symbol.for('IVoicePoolBuilder'),
   PipelineRunner: Symbol.for('IPipelineRunner'),
   PipelineBuilder: Symbol.for('IPipelineBuilder'),
+  TTSPreviewService: Symbol.for('ITTSPreviewService'),
 
   // Factories (for creating per-conversion instances)
   LLMServiceFactory: Symbol.for('ILLMServiceFactory'),

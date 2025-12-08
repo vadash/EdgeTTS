@@ -3,14 +3,16 @@ import { signal, computed } from '@preact/signals';
 import { Text } from 'preact-i18n';
 import { Button, Toggle } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
-import { EdgeTTSService } from '@/services/EdgeTTSService';
 import { useSettings } from '@/stores';
+import { useService, ServiceTypes } from '@/di';
+import type { IReusableTTSService } from '@/services/interfaces';
 
 const isPlaying = signal<string | null>(null);
 const sampleText = signal<string>('Hello, this is a sample of my voice.');
 
 export function VoicePoolTab() {
   const settings = useSettings();
+  const ttsService = useService<IReusableTTSService>(ServiceTypes.TTSPreviewService);
   const [filter, setFilter] = useState('');
   const [localeFilter, setLocaleFilter] = useState('all');
 
@@ -71,22 +73,15 @@ export function VoicePoolTab() {
     isPlaying.value = voiceId;
 
     try {
-      const audioData = await new Promise<Uint8Array>((resolve, reject) => {
-        const tts = new EdgeTTSService({
-          indexPart: 0,
-          filename: 'sample',
-          filenum: '0',
-          config: {
-            voice: `Microsoft Server Speech Text to Speech Voice (${voiceId})`,
-            rate: '+0%',
-            pitch: '+0Hz',
-            volume: '+0%'
-          },
-          text: sampleText.value,
-          onComplete: resolve,
-          onError: reject
-        });
-        tts.start();
+      // Use singleton TTS service to avoid rate limiting
+      const audioData = await ttsService.send({
+        text: sampleText.value,
+        config: {
+          voice: `Microsoft Server Speech Text to Speech Voice (${voiceId})`,
+          rate: '+0%',
+          pitch: '+0Hz',
+          volume: '+0%'
+        }
       });
 
       const blob = new Blob([(audioData.buffer as ArrayBuffer).slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength)], { type: 'audio/mpeg' });
