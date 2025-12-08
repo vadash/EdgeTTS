@@ -187,10 +187,8 @@ export class LLMVoiceService {
 
     // LLM merge only if multiple blocks were processed and multiple characters exist
     if (blocks.length > 1 && merged.length > 1) {
-      // Normalize canonicalNames to longest variation before merge (prevents LLM picking variation names)
-      const normalized = normalizeCanonicalNames(merged);
-      onProgress?.(blocks.length, blocks.length, `Merging ${normalized.length} characters...`);
-      merged = await this.mergeCharactersWithLLM(normalized, onProgress);
+      onProgress?.(blocks.length, blocks.length, `Merging ${merged.length} characters...`);
+      merged = await this.mergeCharactersWithLLM(merged, onProgress);
       onProgress?.(blocks.length, blocks.length, `Merged to ${merged.length} characters`);
     }
 
