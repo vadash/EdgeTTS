@@ -13,16 +13,55 @@ import { validateExtractResponse, validateMergeResponse, validateAssignResponse,
 import { buildCodeMapping, mergeCharacters, applyMergeResponse, normalizeCanonicalNames } from './CharacterUtils';
 
 /**
- * Regex matching speech/dialogue symbols:
+ * Unambiguous speech/dialogue symbols (no contraction risk):
  * " - Double quote
- * « » - Guillemets
- * ‹ › - Single guillemets
- * — - Em dash
- * " " - Curly double quotes
- * „ - Low double quote
- * ' ' ' - Single quotes (straight and curly)
+ * « » - Guillemets (U+00AB, U+00BB)
+ * ‹ › - Single guillemets (U+2039, U+203A)
+ * — - Em dash (U+2014)
+ * " " - Curly double quotes (U+201C, U+201D)
+ * „ - Low double quote (U+201E)
+ * ' - Left single quote (U+2018) - opening quote, not used in contractions
  */
-export const SPEECH_SYMBOLS_REGEX = /["\u00AB\u00BB\u2014\u201C\u201D\u201E\u2039\u203A'\u2018\u2019]/;
+const UNAMBIGUOUS_SPEECH_REGEX = /["\u00AB\u00BB\u2014\u201C\u201D\u201E\u2039\u203A\u2018]/;
+
+/**
+ * Apostrophe-like characters that could be contractions:
+ * ' (U+0027) - straight apostrophe/quote
+ * ' (U+2019) - right single quote (smart quote, also used as apostrophe)
+ * ` (U+0060) - backtick/grave accent
+ * ʼ (U+02BC) - modifier letter apostrophe
+ * ′ (U+2032) - prime
+ * ＇ (U+FF07) - fullwidth apostrophe
+ */
+const APOSTROPHE_LIKE_REGEX = /['\u2019`\u02BC\u2032\uFF07]/g;
+
+/**
+ * Check if character at index is part of a contraction (letter on both sides)
+ */
+const isContraction = (text: string, index: number): boolean => {
+  const prev = text[index - 1] || '';
+  const next = text[index + 1] || '';
+  // Letter before AND after = contraction (e.g., don't, it's, won't)
+  return /[\p{L}]/u.test(prev) && /[\p{L}]/u.test(next);
+};
+
+/**
+ * Check if text contains speech/dialogue symbols.
+ * Handles apostrophe-like characters by excluding contractions.
+ */
+export const hasSpeechSymbols = (text: string): boolean => {
+  // Fast path: unambiguous speech markers
+  if (UNAMBIGUOUS_SPEECH_REGEX.test(text)) return true;
+
+  // Check apostrophe-like chars - only count if NOT a contraction
+  // Reset regex lastIndex for global regex
+  APOSTROPHE_LIKE_REGEX.lastIndex = 0;
+  let match;
+  while ((match = APOSTROPHE_LIKE_REGEX.exec(text)) !== null) {
+    if (!isContraction(text, match.index)) return true;
+  }
+  return false;
+};
 
 export interface LLMVoiceServiceOptions {
   apiKey: string;
@@ -200,7 +239,7 @@ export class LLMVoiceService {
     codeToName: Map<string, string>
   ): Promise<SpeakerAssignment[]> {
     this.logger?.debug(`[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`);
-    const hasSpeech = block.sentences.some(p => SPEECH_SYMBOLS_REGEX.test(p));
+    const hasSpeech = block.sentences.some(p => hasSpeechSymbols(p));
 
     if (!hasSpeech) {
       return block.sentences.map((text, i) => ({
@@ -230,8 +269,8 @@ export class LLMVoiceService {
     return block.sentences.map((text, i) => {
       const absoluteIndex = block.sentenceStartIndex + i;
       const relativeIndex = i; // 0-based
-      const hasSpeechSymbols = SPEECH_SYMBOLS_REGEX.test(text);
-      const speaker = hasSpeechSymbols ? (relativeMap.get(relativeIndex) || 'narrator') : 'narrator';
+      const hasSpeech = hasSpeechSymbols(text);
+      const speaker = hasSpeech ? (relativeMap.get(relativeIndex) || 'narrator') : 'narrator';
       return {
         sentenceIndex: absoluteIndex,
         text,
