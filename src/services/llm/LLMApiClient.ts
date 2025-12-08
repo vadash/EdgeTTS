@@ -169,14 +169,9 @@ export class LLMApiClient {
 
     // Handle Reasoning vs Standard models
     if (this.options.reasoning) {
-      // REASONING MODE (e.g., o1, o3-mini)
-      // Map 'auto' to 'medium' for standard OpenAI, pass as-is for proxies that support it
-      requestBody.reasoning_effort = this.options.reasoning === 'auto' ? 'medium' : this.options.reasoning;
-      requestBody.max_completion_tokens = 4000;
+      requestBody.reasoning_effort = this.options.reasoning;
       // Reasoning models crash if you send temperature or top_p - don't add them
     } else {
-      // STANDARD MODE (e.g., gpt-4o, claude-3.5)
-      requestBody.max_tokens = 4000;
       requestBody.temperature = this.options.temperature ?? 0.0;
       requestBody.top_p = this.options.topP ?? 0.95;
     }
