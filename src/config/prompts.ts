@@ -219,6 +219,23 @@ Select the BEST name using this priority order (1 = highest priority):
 EXCEPTION: Always use "System" for LitRPG game interfaces, regardless of other names like "Interface", "Blue Box", "Notification".
 </naming_hierarchy>
 
+<no_translation_rule>
+**CRITICAL: NEVER TRANSLATE NAMES!**
+
+Preserve character names EXACTLY as they appear in the source text:
+- Russian names stay Russian: "Иван", "Александр", "Мария" (NOT "Ivan", "Alexander", "Maria")
+- Chinese names stay Chinese: "李明", "王芳" (NOT "Li Ming", "Wang Fang")
+- Japanese names stay Japanese: "田中", "佐藤" (NOT "Tanaka", "Sato")
+- Any language stays in original script
+
+This applies to:
+- canonicalName field
+- All entries in variations array
+- Titles and descriptors in the original language
+
+The only exception is "System" which should always be in English for LitRPG interfaces.
+</no_translation_rule>
+
 ### STEP 5: DETERMINE GENDER
 
 <gender_determination>
@@ -531,7 +548,17 @@ I gripped my staff tighter. "How many?"
 Output:
 {"characters": [{"canonicalName": "Familiar", "variations": ["Familiar"], "gender": "unknown"}, {"canonicalName": "Protagonist", "variations": ["Protagonist"], "gender": "unknown"}]}
 
-**Example 4: Complex Scene with Merges**
+**Example 4: Non-English Names (Russian)**
+Input:
+Иван нахмурился. «Это плохие новости».
+«Согласна», — ответила Мария.
+
+Output:
+{"characters": [{"canonicalName": "Иван", "variations": ["Иван"], "gender": "male"}, {"canonicalName": "Мария", "variations": ["Мария"], "gender": "female"}]}
+
+Note: Names are preserved in their original Cyrillic script, NOT translated to "Ivan" and "Maria".
+
+**Example 5: Complex Scene with Merges**
 Input:
 The Dark Lord rose from his throne. "Who dares disturb me?"
 Commander Reynolds stepped forward. "Lord Azaroth, we bring news of the rebellion."
@@ -541,7 +568,7 @@ Azaroth's eyes narrowed. "Speak, Commander."
 Output:
 {"characters": [{"canonicalName": "Azaroth", "variations": ["Azaroth", "The Dark Lord", "Dark Lord", "Lord Azaroth"], "gender": "male"}, {"canonicalName": "Commander Reynolds", "variations": ["Commander Reynolds", "Reynolds", "Commander", "The Commander"], "gender": "unknown"}]}
 
-**Example 5: Vocative Case Trap (Correct Handling)**
+**Example 6: Vocative Case Trap (Correct Handling)**
 Input:
 Sarah rushed into the room. "John, wake up! We need to leave!"
 John groaned. "Five more minutes..."
@@ -881,6 +908,17 @@ When merging multiple entries, select the canonical name using this priority:
 - Always use "System" for game interfaces (never "Interface" or "Blue Box")
 - Prefer name over "Protagonist" when linking narrator
 </name_selection>
+
+<no_translation_rule>
+**CRITICAL: NEVER TRANSLATE NAMES!**
+
+When merging entries, preserve names in their ORIGINAL language/script:
+- "Иван" + "Ваня" → keep="Иван", variations=["Иван", "Ваня"] (NOT "Ivan")
+- "Александр" + "Саша" → keep="Александр", variations=["Александр", "Саша"] (NOT "Alexander")
+- Do NOT transliterate or romanize names from Cyrillic, Chinese, Japanese, etc.
+
+The only exception is "System" which should always be in English.
+</no_translation_rule>
 
 ### GENDER RESOLUTION
 
