@@ -97,7 +97,7 @@ export interface AppConfig {
 export const defaultConfig: AppConfig = {
   tts: {
     maxWorkers: 20,
-    workersPerMinute: 60,
+    workersPerMinute: 50,
     errorCooldown: 10000, // 10 seconds
   },
 
@@ -121,13 +121,13 @@ export const defaultConfig: AppConfig = {
   llm: {
     extractBlockTokens: 16000,
     assignBlockTokens: 8000,
-    maxConcurrentRequests: 2,
+    maxConcurrentRequests: 3,
     maxTokens: 4000,
   },
 
   retry: {
     // Shared retry delays for TTS and LLM - stays on last value forever
-    delays: [5000, 10000, 30000, 100000, 300000, 600000],
+    delays: [10000, 20000, 50000, 100000, 300000, 600000],
   },
 
   ffmpeg: {

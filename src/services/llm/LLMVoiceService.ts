@@ -69,6 +69,11 @@ export const hasSpeechSymbols = (text: string): boolean => {
 const VOTING_TEMPERATURES = [0.1, 0.4, 0.7] as const;
 
 /**
+ * Delay between LLM API calls (ms)
+ */
+const LLM_DELAY_MS = 1000;
+
+/**
  * Majority vote helper for 3-way voting.
  * Returns the code that appears at least 2 times, or first vote (temp 0.0) as tiebreaker.
  */
@@ -178,7 +183,7 @@ export class LLMVoiceService {
 
       // Small delay between requests to avoid overwhelming LLM server
       if (i < blocks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
       }
     }
 
@@ -205,7 +210,7 @@ export class LLMVoiceService {
     onProgress?: ProgressCallback
   ): Promise<SpeakerAssignment[]> {
     const maxConcurrent = defaultConfig.llm.maxConcurrentRequests;
-    this.logger?.info(`[Assign] Starting (${blocks.length} blocks, max ${maxConcurrent} concurrent)`);
+    this.logger?.info(`[Assign] Starting (${blocks.length} blocks, max ${maxConcurrent} concurrent${this.options.useVoting ? ', voting enabled' : ''})`);
     const results: SpeakerAssignment[] = [];
     let completed = 0;
 
@@ -246,7 +251,7 @@ export class LLMVoiceService {
 
       // Small delay between batches to avoid overwhelming LLM server
       if (i + maxConcurrent < blocks.length) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
       }
     }
 
@@ -288,17 +293,20 @@ export class LLMVoiceService {
     let relativeMap: Map<number, string>;
 
     if (this.options.useVoting) {
-      // 3-way voting with different temperatures
-      const votingClients = VOTING_TEMPERATURES.map(temp => new LLMApiClient({
-        ...this.options,
-        temperature: temp,
-      }));
-
-      const responses = await Promise.all(
-        votingClients.map(client =>
-          client.callWithRetry(prompt, validator, this.abortController?.signal, [], 'assign')
-        )
-      );
+      // 3-way voting with different temperatures (sequential with delays)
+      const responses: string[] = [];
+      for (let i = 0; i < VOTING_TEMPERATURES.length; i++) {
+        const client = new LLMApiClient({
+          ...this.options,
+          temperature: VOTING_TEMPERATURES[i],
+        });
+        responses.push(
+          await client.callWithRetry(prompt, validator, this.abortController?.signal, [], 'assign')
+        );
+        if (i < VOTING_TEMPERATURES.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
+        }
+      }
 
       // Parse all responses
       const parsedMaps = responses.map(r => parseAssignResponse(r, codeToName));
