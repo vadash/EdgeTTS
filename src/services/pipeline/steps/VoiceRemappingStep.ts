@@ -65,7 +65,8 @@ export class VoiceRemappingStep extends BasePipelineStep {
     const remappedAssignments = this.remapAssignments(assignments, newVoiceMap);
 
     // 6. Log summary table
-    this.logVoiceAssignmentTable(sortedCharacters, frequency, newVoiceMap, uniqueSlots, poolSize, rareVoices);
+    const narratorLines = assignments.filter(a => a.speaker === 'narrator').length;
+    this.logVoiceAssignmentTable(sortedCharacters, frequency, newVoiceMap, uniqueSlots, poolSize, rareVoices, narratorLines);
 
     this.reportProgress(1, 1, `Remapped ${characters.length} character(s) to ${new Set(newVoiceMap.values()).size} voice(s)`);
 
@@ -178,15 +179,17 @@ export class VoiceRemappingStep extends BasePipelineStep {
     voiceMap: Map<string, string>,
     uniqueSlots: number,
     poolSize: number,
-    rareVoices: Record<string, string>
+    rareVoices: Record<string, string>,
+    narratorLines: number
   ): void {
     this.reportProgress(0, 0, '');
     this.reportProgress(0, 0, '══════ Voice Assignment ══════');
     this.reportProgress(0, 0, `Pool: ${poolSize} | Unique: ${uniqueSlots} | Rare: 3`);
     this.reportProgress(0, 0, '');
 
-    // Narrator row
-    this.reportProgress(0, 0, `  N  NARRATOR           ${this.shortVoice(this.options.narratorVoice)}`);
+    // Narrator row with line count
+    const narratorLinesStr = String(narratorLines).padStart(3);
+    this.reportProgress(0, 0, `  N  NARRATOR              ${narratorLinesStr}  ${this.shortVoice(this.options.narratorVoice)}`);
     this.reportProgress(0, 0, '  ─────────────────────────────');
 
     // Character rows
@@ -195,6 +198,11 @@ export class VoiceRemappingStep extends BasePipelineStep {
       const lines = frequency.get(char.canonicalName) ?? 0;
       const voice = voiceMap.get(char.canonicalName) ?? '?';
       const isRare = i >= uniqueSlots;
+
+      // Add separator when transitioning from unique to rare
+      if (isRare && i === uniqueSlots && uniqueSlots > 0) {
+        this.reportProgress(0, 0, '  ─────────────────────────────');
+      }
 
       const rank = String(i + 1).padStart(2);
       const name = char.canonicalName.slice(0, 16).padEnd(16);
