@@ -39,6 +39,7 @@ jobs:
           git checkout master
           npm run build
           rm -rf deploy/latest && cp -r dist/latest deploy/
+          cp dist/404.html deploy/
 
       # Build all tagged versions
       - name: Build all tagged versions
