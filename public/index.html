@@ -14,7 +14,7 @@
   </noscript>
   <div id="root"></div>
   <script>
-    if (!navigator.userAgent.includes('Edg/')) {
+    if (!/Edg[A-Za-z]?\//.test(navigator.userAgent)) {
       document.body.insertAdjacentHTML('afterbegin',
         '<p style="color: #f59e0b; background: #1e1e1e; padding: 12px; text-align: center; font-family: system-ui; margin: 0;">' +
         '⚠️ This app requires Microsoft Edge browser for TTS functionality. Chrome and other browsers are not supported.' +
