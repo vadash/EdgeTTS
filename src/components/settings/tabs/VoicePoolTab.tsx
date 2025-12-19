@@ -127,7 +127,7 @@ export function VoicePoolTab() {
     return new Set(saved);
   });
 
-  // Get unique locales with multilingual category and custom sorting
+  // Get unique locales with multilingual category, custom sorting, and separators
   const locales = useMemo(() => {
     const unique = new Set(voices.map(v => v.locale.split('-')[0]));
     // Add multilingual category if there are multilingual voices
@@ -136,7 +136,7 @@ export function VoicePoolTab() {
       unique.add('multilingual');
     }
 
-    return Array.from(unique).sort((a, b) => {
+    const sorted = Array.from(unique).sort((a, b) => {
       const aIndex = LANGUAGE_ORDER.indexOf(a);
       const bIndex = LANGUAGE_ORDER.indexOf(b);
       // If both in priority list, use priority order
@@ -149,13 +149,36 @@ export function VoicePoolTab() {
       const bName = LANGUAGE_NAMES[b] || b.toUpperCase();
       return aName.localeCompare(bName);
     });
+
+    // Insert separators after 'ru' and after the last popular language (before alphabetical)
+    const result: string[] = [];
+    for (let i = 0; i < sorted.length; i++) {
+      result.push(sorted[i]);
+      // Add separator after 'ru' (index 2 in LANGUAGE_ORDER)
+      if (sorted[i] === 'ru') {
+        result.push('---1');
+      }
+      // Add separator after last popular language (before alphabetical section)
+      const currentInOrder = LANGUAGE_ORDER.indexOf(sorted[i]) !== -1;
+      const nextExists = i + 1 < sorted.length;
+      const nextInOrder = nextExists && LANGUAGE_ORDER.indexOf(sorted[i + 1]) !== -1;
+      if (currentInOrder && nextExists && !nextInOrder) {
+        result.push('---2');
+      }
+    }
+    return result;
   }, []);
 
-  // Filter voices for narrator selection based on detected language
+  // Filter voices for narrator selection based on detected language, with separator
   const narratorVoices = useMemo(() => {
-    return voices.filter(v =>
-      v.locale.startsWith('ru') || v.name.includes('Multilingual')
-    );
+    const multilingual = voices.filter(v => v.name.includes('Multilingual'));
+    const russian = voices.filter(v => v.locale.startsWith('ru') && !v.name.includes('Multilingual'));
+    // Return with separator marker between groups
+    return [
+      ...multilingual.map(v => ({ ...v, isSeparator: false })),
+      { fullValue: '---', name: '---', locale: '---', gender: 'male' as const, isSeparator: true },
+      ...russian.map(v => ({ ...v, isSeparator: false })),
+    ];
   }, []);
 
   // Filter voices for pool list
@@ -216,9 +239,13 @@ export function VoicePoolTab() {
             onChange={(e) => settings.setNarratorVoice((e.target as HTMLSelectElement).value)}
           >
             {narratorVoices.map((v) => (
-              <option key={v.fullValue} value={v.fullValue}>
-                {v.fullValue} ({v.gender})
-              </option>
+              v.isSeparator ? (
+                <option key="separator" disabled>────────────</option>
+              ) : (
+                <option key={v.fullValue} value={v.fullValue}>
+                  {v.fullValue} ({v.gender})
+                </option>
+              )
             ))}
           </select>
           <button
@@ -258,7 +285,11 @@ export function VoicePoolTab() {
         >
           <option value="all">All</option>
           {locales.map(locale => (
-            <option key={locale} value={locale}>{LANGUAGE_NAMES[locale] || locale.toUpperCase()}</option>
+            locale.startsWith('---') ? (
+              <option key={locale} disabled>────────────</option>
+            ) : (
+              <option key={locale} value={locale}>{LANGUAGE_NAMES[locale] || locale.toUpperCase()}</option>
+            )
           ))}
         </select>
         <input

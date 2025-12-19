@@ -19,12 +19,16 @@ export function QuickVoiceSelect() {
   const data = useData();
   const preview = useVoicePreview();
 
-  // Filter voices based on detected language
+  // Filter voices based on detected language, with separator between groups
   const filteredVoices = computed(() => {
     const lang = data.detectedLanguage.value;
-    return voices.filter(v =>
-      v.locale.startsWith(lang) || v.name.includes('Multilingual')
-    );
+    const multilingual = voices.filter(v => v.name.includes('Multilingual'));
+    const langVoices = voices.filter(v => v.locale.startsWith(lang) && !v.name.includes('Multilingual'));
+    return [
+      ...multilingual.map(v => ({ ...v, isSeparator: false })),
+      { fullValue: '---', name: '---', locale: '---', gender: 'male' as const, isSeparator: true },
+      ...langVoices.map(v => ({ ...v, isSeparator: false })),
+    ];
   });
 
   const playVoiceSample = () => {
@@ -47,9 +51,13 @@ export function QuickVoiceSelect() {
           onChange={(e) => settings.setNarratorVoice((e.target as HTMLSelectElement).value)}
         >
           {filteredVoices.value.map((v) => (
-            <option key={v.fullValue} value={v.fullValue}>
-              {v.fullValue} ({v.gender})
-            </option>
+            v.isSeparator ? (
+              <option key="separator" disabled>────────────</option>
+            ) : (
+              <option key={v.fullValue} value={v.fullValue}>
+                {v.fullValue} ({v.gender})
+              </option>
+            )
           ))}
         </select>
         <button
