@@ -4,8 +4,31 @@ import { useSettings, useLLM, useData, useLogs } from '@/stores';
 import { Button } from '@/components/common';
 
 import type { AppSettings } from '@/state/types';
+import type { LLMStage } from '@/stores/LLMStore';
+
+interface StageExportConfig {
+  apiUrl: string;
+  model: string;
+  streaming: boolean;
+  reasoning: string | null;
+  temperature: number;
+  topP: number;
+}
 
 interface ExportData {
+  version: number;
+  settings: AppSettings;
+  llm: {
+    extract: StageExportConfig;
+    merge: StageExportConfig;
+    assign: StageExportConfig;
+    useVoting: boolean;
+  };
+  dictionary: string[];
+}
+
+// Legacy format for backward compatibility
+interface LegacyExportData {
   version: number;
   settings: AppSettings;
   llm: {
@@ -23,13 +46,27 @@ export function ExportImportTab() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [lastAction, setLastAction] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  const exportStageConfig = (stage: LLMStage): StageExportConfig => {
+    const config = llm[stage].value;
+    return {
+      apiUrl: config.apiUrl,
+      model: config.model,
+      streaming: config.streaming,
+      reasoning: config.reasoning,
+      temperature: config.temperature,
+      topP: config.topP,
+    };
+  };
+
   const handleExport = () => {
     const exportData: ExportData = {
-      version: 1,
+      version: 2, // Bumped version for new format
       settings: settings.toObject(),
       llm: {
-        apiUrl: llm.apiUrl.value,
-        model: llm.model.value,
+        extract: exportStageConfig('extract'),
+        merge: exportStageConfig('merge'),
+        assign: exportStageConfig('assign'),
+        useVoting: llm.useVoting.value,
       },
       dictionary: data.dictionaryRaw.value,
     };
@@ -47,6 +84,16 @@ export function ExportImportTab() {
     logs.info('Settings exported');
   };
 
+  const importStageConfig = (stage: LLMStage, config: StageExportConfig | undefined) => {
+    if (!config) return;
+    if (config.apiUrl) llm.setStageField(stage, 'apiUrl', config.apiUrl);
+    if (config.model) llm.setStageField(stage, 'model', config.model);
+    if (config.streaming !== undefined) llm.setStageField(stage, 'streaming', config.streaming);
+    if (config.reasoning !== undefined) llm.setStageField(stage, 'reasoning', config.reasoning as any);
+    if (config.temperature !== undefined) llm.setStageField(stage, 'temperature', config.temperature);
+    if (config.topP !== undefined) llm.setStageField(stage, 'topP', config.topP);
+  };
+
   const handleImport = async (e: Event) => {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -54,7 +101,7 @@ export function ExportImportTab() {
 
     try {
       const text = await file.text();
-      const importData: ExportData = JSON.parse(text);
+      const importData = JSON.parse(text);
 
       if (!importData.version || !importData.settings) {
         throw new Error('Invalid settings file format');
@@ -75,8 +122,22 @@ export function ExportImportTab() {
 
       // Import LLM settings (excluding API key)
       if (importData.llm) {
-        if (importData.llm.apiUrl) llm.setApiUrl(importData.llm.apiUrl);
-        if (importData.llm.model) llm.setModel(importData.llm.model);
+        if (importData.version >= 2 && importData.llm.extract) {
+          // New format (version 2+) - per-stage configs
+          importStageConfig('extract', importData.llm.extract);
+          importStageConfig('merge', importData.llm.merge);
+          importStageConfig('assign', importData.llm.assign);
+          if (importData.llm.useVoting !== undefined) {
+            llm.setUseVoting(importData.llm.useVoting);
+          }
+        } else {
+          // Legacy format (version 1) - apply same config to all stages
+          const legacyLlm = importData.llm as LegacyExportData['llm'];
+          for (const stage of ['extract', 'merge', 'assign'] as const) {
+            if (legacyLlm.apiUrl) llm.setStageField(stage, 'apiUrl', legacyLlm.apiUrl);
+            if (legacyLlm.model) llm.setStageField(stage, 'model', legacyLlm.model);
+          }
+        }
       }
 
       // Import dictionary

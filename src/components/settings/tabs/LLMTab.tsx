@@ -3,44 +3,64 @@ import { Text } from 'preact-i18n';
 import { useLLM } from '@/stores';
 import { useLogger } from '@/di/ServiceContext';
 import { LLMVoiceService } from '@/services/llm';
-import { Button, Toggle, Select, Slider } from '@/components/common';
+import { Toggle, Tabs, TabPanel } from '@/components/common';
 import { LLMHelp } from './LLMHelp';
-import type { ReasoningLevel } from '@/stores/LLMStore';
+import { StageConfigForm, type TestResult } from './StageConfigForm';
+import type { LLMStage, StageConfig } from '@/stores/LLMStore';
 
-const reasoningOptions = [
-  { value: 'off', label: 'Off' },
-  { value: 'auto', label: 'Auto' },
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
+const stageTabs = [
+  { id: 'extract', label: 'Extract', icon: '1️⃣' },
+  { id: 'merge', label: 'Merge', icon: '2️⃣' },
+  { id: 'assign', label: 'Assign', icon: '3️⃣' },
 ];
+
+type TestState = Record<LLMStage, {
+  testing: boolean;
+  result: TestResult | null;
+}>;
+
+const initialTestState: TestState = {
+  extract: { testing: false, result: null },
+  merge: { testing: false, result: null },
+  assign: { testing: false, result: null },
+};
 
 export function LLMTab() {
   const llm = useLLM();
   const logger = useLogger();
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; error?: string; model?: string } | null>(null);
+  const [testState, setTestState] = useState<TestState>(initialTestState);
 
-  const handleTestConnection = async () => {
-    if (!llm.apiKey.value) {
-      setTestResult({ success: false, error: 'API key is required' });
+  const handleTestConnection = async (stage: LLMStage, useStreaming: boolean) => {
+    const config = llm[stage].value;
+    if (!config.apiKey) {
+      setTestState(prev => ({
+        ...prev,
+        [stage]: { ...prev[stage], result: { success: false, error: 'API key is required' } }
+      }));
       return;
     }
 
-    setTesting(true);
-    setTestResult(null);
+    setTestState(prev => ({
+      ...prev,
+      [stage]: { ...prev[stage], testing: true, result: null }
+    }));
 
     const service = new LLMVoiceService({
-      apiKey: llm.apiKey.value,
-      apiUrl: llm.apiUrl.value,
-      model: llm.model.value,
+      apiKey: config.apiKey,
+      apiUrl: config.apiUrl,
+      model: config.model,
       narratorVoice: '',
       logger,
     });
 
-    const result = await service.testConnection();
-    setTestResult(result);
-    setTesting(false);
+    const result = useStreaming
+      ? await service.testConnectionStreaming()
+      : await service.testConnection();
+
+    setTestState(prev => ({
+      ...prev,
+      [stage]: { ...prev[stage], testing: false, result }
+    }));
 
     // Auto-save on success
     if (result.success) {
@@ -48,173 +68,74 @@ export function LLMTab() {
     }
   };
 
-  const handleSave = async () => {
-    await llm.saveSettings();
+  const handleStageFieldChange = <K extends keyof StageConfig>(
+    stage: LLMStage,
+    field: K,
+    value: StageConfig[K]
+  ) => {
+    llm.setStageField(stage, field, value);
   };
 
-  const handleReasoningChange = (e: Event) => {
-    const value = (e.target as HTMLSelectElement).value;
-    llm.setReasoning(value === 'off' ? null : value as ReasoningLevel);
+  const renderStageForm = (stage: LLMStage) => {
+    const stageState = testState[stage];
+    return (
+      <StageConfigForm
+        config={llm[stage].value}
+        onChange={(field, value) => handleStageFieldChange(stage, field, value)}
+        showVoting={stage === 'assign'}
+        useVoting={stage === 'assign' ? llm.useVoting.value : undefined}
+        onVotingChange={stage === 'assign' ? (v) => llm.setUseVoting(v) : undefined}
+        onTestConnection={(useStreaming) => handleTestConnection(stage, useStreaming)}
+        testing={stageState.testing}
+        testResult={stageState.result}
+      />
+    );
   };
-
-  const isReasoningEnabled = !!llm.reasoning.value;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <span className="text-2xl">🤖</span>
-        <div>
-          <h3 className="font-semibold">
-            <Text id="llm.title">LLM Voice Assignment</Text>
-          </h3>
-          <p className="text-sm text-gray-400">
-            <Text id="llm.description">Use AI to detect characters and assign voices</Text>
-          </p>
+      {/* Header with Master Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">🤖</span>
+          <div>
+            <h3 className="font-semibold">
+              <Text id="llm.title">LLM Voice Assignment</Text>
+            </h3>
+            <p className="text-sm text-gray-400">
+              <Text id="llm.description">Use AI to detect characters and assign voices</Text>
+            </p>
+          </div>
         </div>
-      </div>
-
-      {/* API Key */}
-      <div className="space-y-1">
-        <label className="input-label">
-          <Text id="llm.apiKey">API Key</Text>
-        </label>
-        <input
-          type="password"
-          className="input-field"
-          value={llm.apiKey.value}
-          onInput={(e) => llm.setApiKey((e.target as HTMLInputElement).value)}
-          placeholder="sk-... (encrypted in browser storage)"
-        />
-        <p className="text-xs text-gray-500">
-          <Text id="llm.apiKeyHint">Your API key is encrypted and stored locally</Text>
-        </p>
-      </div>
-
-      {/* API URL */}
-      <div className="space-y-1">
-        <label className="input-label">
-          <Text id="llm.apiUrl">API URL</Text>
-        </label>
-        <input
-          type="text"
-          className="input-field"
-          value={llm.apiUrl.value}
-          onInput={(e) => llm.setApiUrl((e.target as HTMLInputElement).value)}
-          placeholder="https://api.openai.com/v1"
-        />
-      </div>
-
-      {/* Model */}
-      <div className="space-y-1">
-        <label className="input-label">
-          <Text id="llm.model">Model</Text>
-        </label>
-        <input
-          type="text"
-          className="input-field"
-          value={llm.model.value}
-          onInput={(e) => llm.setModel((e.target as HTMLInputElement).value)}
-          placeholder="gpt-4o-mini"
-        />
-      </div>
-
-      {/* Advanced Settings */}
-      <div className="space-y-4 pt-2 border-t border-gray-700">
-        <h4 className="text-sm font-medium text-gray-300">
-          <Text id="llm.advancedSettings">Advanced Settings</Text>
-        </h4>
-
-        {/* Streaming Toggle */}
         <Toggle
-          checked={llm.streaming.value}
-          onChange={(v) => llm.setStreaming(v)}
-          label="Streaming"
+          checked={llm.enabled.value}
+          onChange={(v) => llm.setEnabled(v)}
         />
+      </div>
 
-        {/* Reasoning Mode */}
-        <Select
-          label="Reasoning Mode"
-          value={llm.reasoning.value || 'off'}
-          options={reasoningOptions}
-          onChange={handleReasoningChange}
-        />
+      {/* Stage description */}
+      <div className="text-sm text-gray-400 space-y-1">
+        <p><strong>Extract:</strong> <Text id="llm.extractDesc">Detects characters from text</Text></p>
+        <p><strong>Merge:</strong> <Text id="llm.mergeDesc">Deduplicates detected characters</Text></p>
+        <p><strong>Assign:</strong> <Text id="llm.assignDesc">Assigns speakers to sentences</Text></p>
+      </div>
 
-        {/* Temperature */}
-        <Slider
-          label="Temperature"
-          value={llm.temperature.value}
-          min={0}
-          max={1}
-          step={0.1}
-          onChange={(v) => llm.setTemperature(v)}
-          formatValue={(v) => v.toFixed(1)}
-          disabled={isReasoningEnabled}
-        />
-
-        {/* Top-P */}
-        <Slider
-          label="Top-P"
-          value={llm.topP.value}
-          min={0}
-          max={1}
-          step={0.05}
-          onChange={(v) => llm.setTopP(v)}
-          formatValue={(v) => v.toFixed(2)}
-          disabled={isReasoningEnabled}
-        />
-
-        {/* Voting */}
-        <Toggle
-          checked={llm.useVoting.value}
-          onChange={(v) => llm.setUseVoting(v)}
-          label="3-Way Voting"
-          title="Calls LLM 3x with different temperatures and uses majority vote for speaker assignment"
-          disabled={isReasoningEnabled}
-        />
-
-        {/* Hint about reasoning mode */}
-        {isReasoningEnabled && (
-          <p className="text-xs text-yellow-500">
-            <Text id="llm.reasoningDisablesParams">Temperature and Top-P are disabled when reasoning mode is enabled</Text>
-          </p>
+      {/* Stage Tabs */}
+      <Tabs tabs={stageTabs} defaultTab="extract">
+        {(activeTab) => (
+          <>
+            <TabPanel id="extract" activeTab={activeTab}>
+              {renderStageForm('extract')}
+            </TabPanel>
+            <TabPanel id="merge" activeTab={activeTab}>
+              {renderStageForm('merge')}
+            </TabPanel>
+            <TabPanel id="assign" activeTab={activeTab}>
+              {renderStageForm('assign')}
+            </TabPanel>
+          </>
         )}
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-2">
-        <Button
-          onClick={handleTestConnection}
-          disabled={testing || !llm.apiKey.value}
-          className="flex-1"
-        >
-          {testing ? (
-            <Text id="llm.testing">Testing...</Text>
-          ) : (
-            <>🔌 <Text id="llm.testConnection">Test Connection</Text></>
-          )}
-        </Button>
-        <Button variant="primary" onClick={handleSave} className="flex-1">
-          💾 <Text id="settings.save">Save</Text>
-        </Button>
-      </div>
-
-      {/* Result */}
-      {testResult && (
-        <div
-          className={`p-3 rounded-lg ${
-            testResult.success
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'bg-red-500/20 text-red-400 border border-red-500/30'
-          }`}
-        >
-          {testResult.success ? (
-            <>✅ <Text id="llm.connectionSuccess">Connection successful!</Text> {testResult.model && <span className="text-gray-400">({testResult.model})</span>}</>
-          ) : (
-            <>❌ {testResult.error}</>
-          )}
-        </div>
-      )}
+      </Tabs>
 
       {/* Help section */}
       <LLMHelp />

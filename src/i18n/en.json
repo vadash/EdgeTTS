@@ -73,7 +73,10 @@
     "temperatureHint": "Controls randomness (0 = deterministic)",
     "topP": "Top-P",
     "topPHint": "Nucleus sampling threshold",
-    "reasoningDisablesParams": "Temperature and Top-P are disabled when reasoning mode is enabled"
+    "reasoningDisablesParams": "Temperature and Top-P are disabled when reasoning mode is enabled",
+    "extractDesc": "Detects characters from text",
+    "mergeDesc": "Deduplicates detected characters",
+    "assignDesc": "Assigns speakers to sentences"
   },
   "files": {
     "dictionary": "Dictionary",

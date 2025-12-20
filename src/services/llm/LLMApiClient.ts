@@ -310,7 +310,7 @@ export class LLMApiClient {
   }
 
   /**
-   * Test API connection with a real completion request
+   * Test API connection with a real completion request (non-streaming)
    */
   async testConnection(): Promise<{ success: boolean; error?: string; model?: string }> {
     try {
@@ -328,49 +328,83 @@ export class LLMApiClient {
 
       return { success: true, model: response.model };
     } catch (e: any) {
-      let error = 'Unknown error';
-
-      // OpenAI SDK error structure
-      if (e?.error?.message) {
-        error = e.error.message;
-      }
-      // HTTP status errors
-      else if (e?.status) {
-        const statusMap: Record<number, string> = {
-          400: 'Bad Request - Check API URL format',
-          401: 'Unauthorized - Invalid API key',
-          403: 'Forbidden - API key lacks permissions',
-          404: 'Not Found - Model or endpoint not found',
-          429: 'Rate Limited - Too many requests',
-          500: 'Server Error - API provider issue',
-          502: 'Bad Gateway - API provider unreachable',
-          503: 'Service Unavailable - API provider down',
-        };
-        error = statusMap[e.status] || `HTTP ${e.status}: ${e.statusText || 'Error'}`;
-      }
-      // Network/fetch errors
-      else if (e?.cause?.code === 'ENOTFOUND' || e?.message?.includes('fetch')) {
-        error = 'Network Error - Check API URL and internet connection';
-      }
-      // Timeout
-      else if (e?.message?.includes('timeout') || e?.message?.includes('Timeout')) {
-        error = 'Request Timeout - Server took too long to respond';
-      }
-      // CORS
-      else if (e?.message?.includes('CORS') || e?.message?.includes('cors')) {
-        error = 'CORS Error - API does not allow browser requests';
-      }
-      // Generic Error object
-      else if (e instanceof Error) {
-        error = e.message;
-      }
-      // String error
-      else if (typeof e === 'string') {
-        error = e;
-      }
-
-      return { success: false, error };
+      return { success: false, error: this.formatApiError(e) };
     }
+  }
+
+  /**
+   * Test API connection with streaming (SSE) endpoint
+   */
+  async testConnectionStreaming(): Promise<{ success: boolean; error?: string; model?: string }> {
+    try {
+      const stream = await this.client.chat.completions.create({
+        model: this.options.model,
+        messages: [{ role: 'user', content: 'Reply with: ok' }],
+        max_tokens: 10,
+        stream: true,
+      });
+
+      let content = '';
+      let model = '';
+
+      for await (const chunk of stream) {
+        model = chunk.model || model;
+        content += chunk.choices[0]?.delta?.content || '';
+      }
+
+      if (!content) {
+        return { success: false, error: 'Empty response from streaming endpoint' };
+      }
+
+      return { success: true, model };
+    } catch (e: any) {
+      return { success: false, error: this.formatApiError(e) };
+    }
+  }
+
+  /**
+   * Format API error for user display
+   */
+  private formatApiError(e: any): string {
+    // OpenAI SDK error structure
+    if (e?.error?.message) {
+      return e.error.message;
+    }
+    // HTTP status errors
+    if (e?.status) {
+      const statusMap: Record<number, string> = {
+        400: 'Bad Request - Check API URL format',
+        401: 'Unauthorized - Invalid API key',
+        403: 'Forbidden - API key lacks permissions',
+        404: 'Not Found - Model or endpoint not found',
+        429: 'Rate Limited - Too many requests',
+        500: 'Server Error - API provider issue',
+        502: 'Bad Gateway - API provider unreachable',
+        503: 'Service Unavailable - API provider down',
+      };
+      return statusMap[e.status] || `HTTP ${e.status}: ${e.statusText || 'Error'}`;
+    }
+    // Network/fetch errors
+    if (e?.cause?.code === 'ENOTFOUND' || e?.message?.includes('fetch')) {
+      return 'Network Error - Check API URL and internet connection';
+    }
+    // Timeout
+    if (e?.message?.includes('timeout') || e?.message?.includes('Timeout')) {
+      return 'Request Timeout - Server took too long to respond';
+    }
+    // CORS
+    if (e?.message?.includes('CORS') || e?.message?.includes('cors')) {
+      return 'CORS Error - API does not allow browser requests';
+    }
+    // Generic Error object
+    if (e instanceof Error) {
+      return e.message;
+    }
+    // String error
+    if (typeof e === 'string') {
+      return e;
+    }
+    return 'Unknown error';
   }
 
   /**

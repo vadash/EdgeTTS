@@ -26,6 +26,19 @@ import type {
 import type { TTSConfig } from '@/state/types';
 
 /**
+ * Per-stage LLM configuration
+ */
+export interface StageLLMConfig {
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  streaming?: boolean;
+  reasoning?: 'auto' | 'high' | 'medium' | 'low';
+  temperature?: number;
+  topP?: number;
+}
+
+/**
  * Options required for building a pipeline
  */
 export interface PipelineBuilderOptions {
@@ -42,14 +55,10 @@ export interface PipelineBuilderOptions {
   normalization: boolean;
   deEss: boolean;
 
-  // LLM settings
-  apiKey: string;
-  apiUrl: string;
-  model: string;
-  streaming?: boolean;
-  reasoning?: 'auto' | 'high' | 'medium' | 'low';
-  temperature?: number;
-  topP?: number;
+  // Per-stage LLM settings
+  extractConfig: StageLLMConfig;
+  mergeConfig: StageLLMConfig;
+  assignConfig: StageLLMConfig;
   useVoting?: boolean;
 
   // Data
@@ -98,16 +107,40 @@ export class PipelineBuilder implements IPipelineBuilder {
   build(options: PipelineBuilderOptions): IPipelineRunner {
     const pipeline = this.container.get<IPipelineRunner>(ServiceTypes.PipelineRunner);
 
-    // Build LLM options
-    const llmOptions: LLMServiceFactoryOptions = {
-      apiKey: options.apiKey,
-      apiUrl: options.apiUrl,
-      model: options.model,
+    // Build LLM options for extract stage (includes merge config)
+    const extractLLMOptions: LLMServiceFactoryOptions = {
+      apiKey: options.extractConfig.apiKey,
+      apiUrl: options.extractConfig.apiUrl,
+      model: options.extractConfig.model,
       narratorVoice: options.narratorVoice,
-      streaming: options.streaming,
-      reasoning: options.reasoning,
-      temperature: options.temperature,
-      topP: options.topP,
+      streaming: options.extractConfig.streaming,
+      reasoning: options.extractConfig.reasoning,
+      temperature: options.extractConfig.temperature,
+      topP: options.extractConfig.topP,
+      directoryHandle: options.directoryHandle,
+      logger: this.logger,
+      // Pass merge config for the merge phase
+      mergeConfig: {
+        apiKey: options.mergeConfig.apiKey,
+        apiUrl: options.mergeConfig.apiUrl,
+        model: options.mergeConfig.model,
+        streaming: options.mergeConfig.streaming,
+        reasoning: options.mergeConfig.reasoning,
+        temperature: options.mergeConfig.temperature,
+        topP: options.mergeConfig.topP,
+      },
+    };
+
+    // Build LLM options for assign stage
+    const assignLLMOptions: LLMServiceFactoryOptions = {
+      apiKey: options.assignConfig.apiKey,
+      apiUrl: options.assignConfig.apiUrl,
+      model: options.assignConfig.model,
+      narratorVoice: options.narratorVoice,
+      streaming: options.assignConfig.streaming,
+      reasoning: options.assignConfig.reasoning,
+      temperature: options.assignConfig.temperature,
+      topP: options.assignConfig.topP,
       useVoting: options.useVoting,
       directoryHandle: options.directoryHandle,
       logger: this.logger,
@@ -124,7 +157,7 @@ export class PipelineBuilder implements IPipelineBuilder {
     // Build pipeline configuration declaratively
     const config = pipelineConfig()
       .addStep(StepNames.CHARACTER_EXTRACTION, {
-        llmOptions,
+        llmOptions: extractLLMOptions,
         createLLMService: (opts: LLMServiceFactoryOptions) => this.llmServiceFactory.create(opts),
         textBlockSplitter: this.textBlockSplitter,
       })
@@ -136,7 +169,7 @@ export class PipelineBuilder implements IPipelineBuilder {
           this.voiceAssignerFactory.createWithFilteredPool(narratorVoice, locale, enabledVoices),
       })
       .addStep(StepNames.SPEAKER_ASSIGNMENT, {
-        llmOptions,
+        llmOptions: assignLLMOptions,
         createLLMService: (opts: LLMServiceFactoryOptions) => this.llmServiceFactory.create(opts),
         textBlockSplitter: this.textBlockSplitter,
       })

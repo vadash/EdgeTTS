@@ -400,6 +400,16 @@ export interface LLMServiceFactoryOptions {
   useVoting?: boolean;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
+  // Optional separate config for merge stage
+  mergeConfig?: {
+    apiKey: string;
+    apiUrl: string;
+    model: string;
+    streaming?: boolean;
+    reasoning?: 'auto' | 'high' | 'medium' | 'low';
+    temperature?: number;
+    topP?: number;
+  };
 }
 
 /**

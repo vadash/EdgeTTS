@@ -108,6 +108,16 @@ export interface LLMVoiceServiceOptions {
   useVoting?: boolean;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
+  // Optional separate config for merge stage
+  mergeConfig?: {
+    apiKey: string;
+    apiUrl: string;
+    model: string;
+    streaming?: boolean;
+    reasoning?: 'auto' | 'high' | 'medium' | 'low';
+    temperature?: number;
+    topP?: number;
+  };
 }
 
 /**
@@ -116,6 +126,7 @@ export interface LLMVoiceServiceOptions {
 export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
   private apiClient: LLMApiClient;
+  private mergeApiClient: LLMApiClient;
   private abortController: AbortController | null = null;
   private logger: ILogger;
 
@@ -136,6 +147,22 @@ export class LLMVoiceService {
       directoryHandle: options.directoryHandle,
       logger: options.logger,
     });
+
+    // Use separate merge config if provided, otherwise use main config
+    const mergeConfig = options.mergeConfig;
+    this.mergeApiClient = mergeConfig
+      ? new LLMApiClient({
+          apiKey: mergeConfig.apiKey,
+          apiUrl: mergeConfig.apiUrl,
+          model: mergeConfig.model,
+          streaming: mergeConfig.streaming ?? options.streaming,
+          reasoning: mergeConfig.reasoning ?? options.reasoning,
+          temperature: mergeConfig.temperature ?? options.temperature,
+          topP: mergeConfig.topP ?? options.topP,
+          directoryHandle: options.directoryHandle,
+          logger: options.logger,
+        })
+      : this.apiClient;
   }
 
   /**
@@ -465,7 +492,7 @@ export class LLMVoiceService {
     onProgress?: ProgressCallback
   ): Promise<LLMCharacter[]> {
     this.logger?.info(`[Merge] Single merge: ${characters.length} characters`);
-    const response = await this.apiClient.callWithRetry(
+    const response = await this.mergeApiClient.callWithRetry(
       buildMergePrompt(characters),
       (result) => validateMergeResponse(result, characters),
       this.abortController?.signal,
@@ -490,9 +517,16 @@ export class LLMVoiceService {
   }
 
   /**
-   * Test API connection
+   * Test API connection (non-streaming)
    */
   async testConnection(): Promise<{ success: boolean; error?: string; model?: string }> {
     return this.apiClient.testConnection();
+  }
+
+  /**
+   * Test API connection (streaming/SSE)
+   */
+  async testConnectionStreaming(): Promise<{ success: boolean; error?: string; model?: string }> {
+    return this.apiClient.testConnectionStreaming();
   }
 }

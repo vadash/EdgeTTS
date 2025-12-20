@@ -79,14 +79,34 @@ export class ConversionOrchestrator {
         normalization: this.stores.settings.normalizationEnabled.value,
         deEss: this.stores.settings.deEssEnabled.value,
 
-        // LLM settings
-        apiKey: this.stores.llm.apiKey.value,
-        apiUrl: this.stores.llm.apiUrl.value,
-        model: this.stores.llm.model.value,
-        streaming: this.stores.llm.streaming.value,
-        reasoning: this.stores.llm.reasoning.value ?? undefined,
-        temperature: this.stores.llm.temperature.value,
-        topP: this.stores.llm.topP.value,
+        // Per-stage LLM settings
+        extractConfig: {
+          apiKey: this.stores.llm.extract.value.apiKey,
+          apiUrl: this.stores.llm.extract.value.apiUrl,
+          model: this.stores.llm.extract.value.model,
+          streaming: this.stores.llm.extract.value.streaming,
+          reasoning: this.stores.llm.extract.value.reasoning ?? undefined,
+          temperature: this.stores.llm.extract.value.temperature,
+          topP: this.stores.llm.extract.value.topP,
+        },
+        mergeConfig: {
+          apiKey: this.stores.llm.merge.value.apiKey,
+          apiUrl: this.stores.llm.merge.value.apiUrl,
+          model: this.stores.llm.merge.value.model,
+          streaming: this.stores.llm.merge.value.streaming,
+          reasoning: this.stores.llm.merge.value.reasoning ?? undefined,
+          temperature: this.stores.llm.merge.value.temperature,
+          topP: this.stores.llm.merge.value.topP,
+        },
+        assignConfig: {
+          apiKey: this.stores.llm.assign.value.apiKey,
+          apiUrl: this.stores.llm.assign.value.apiUrl,
+          model: this.stores.llm.assign.value.model,
+          streaming: this.stores.llm.assign.value.streaming,
+          reasoning: this.stores.llm.assign.value.reasoning ?? undefined,
+          temperature: this.stores.llm.assign.value.temperature,
+          topP: this.stores.llm.assign.value.topP,
+        },
         useVoting: this.stores.llm.useVoting.value,
 
         // Data

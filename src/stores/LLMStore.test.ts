@@ -30,16 +30,22 @@ describe('LLMStore', () => {
       expect(store.enabled.value).toBe(true);
     });
 
-    it('starts with empty API key', () => {
-      expect(store.apiKey.value).toBe('');
+    it('starts with empty API keys for all stages', () => {
+      expect(store.extract.value.apiKey).toBe('');
+      expect(store.merge.value.apiKey).toBe('');
+      expect(store.assign.value.apiKey).toBe('');
     });
 
-    it('starts with default API URL', () => {
-      expect(store.apiUrl.value).toBe('https://api.openai.com/v1');
+    it('starts with default API URL for all stages', () => {
+      expect(store.extract.value.apiUrl).toBe('https://api.openai.com/v1');
+      expect(store.merge.value.apiUrl).toBe('https://api.openai.com/v1');
+      expect(store.assign.value.apiUrl).toBe('https://api.openai.com/v1');
     });
 
-    it('starts with default model', () => {
-      expect(store.model.value).toBe('gpt-4o-mini');
+    it('starts with default model for all stages', () => {
+      expect(store.extract.value.model).toBe('gpt-4o-mini');
+      expect(store.merge.value.model).toBe('gpt-4o-mini');
+      expect(store.assign.value.model).toBe('gpt-4o-mini');
     });
 
     it('starts with idle processing status', () => {
@@ -70,8 +76,18 @@ describe('LLMStore', () => {
         expect(store.isConfigured.value).toBe(false);
       });
 
-      it('returns true when API key is set', () => {
-        store.setApiKey('sk-test-key');
+      it('returns true when extract API key is set', () => {
+        store.setStageField('extract', 'apiKey', 'sk-test-key');
+        expect(store.isConfigured.value).toBe(true);
+      });
+
+      it('returns true when merge API key is set', () => {
+        store.setStageField('merge', 'apiKey', 'sk-test-key');
+        expect(store.isConfigured.value).toBe(true);
+      });
+
+      it('returns true when assign API key is set', () => {
+        store.setStageField('assign', 'apiKey', 'sk-test-key');
         expect(store.isConfigured.value).toBe(true);
       });
     });
@@ -139,19 +155,33 @@ describe('LLMStore', () => {
       expect(store.enabled.value).toBe(true);
     });
 
-    it('sets API key', async () => {
-      store.setApiKey('sk-new-key');
-      expect(store.apiKey.value).toBe('sk-new-key');
+    it('sets stage API key', async () => {
+      store.setStageField('extract', 'apiKey', 'sk-new-key');
+      expect(store.extract.value.apiKey).toBe('sk-new-key');
     });
 
-    it('sets API URL', async () => {
-      store.setApiUrl('https://custom.api.com');
-      expect(store.apiUrl.value).toBe('https://custom.api.com');
+    it('sets stage API URL', async () => {
+      store.setStageField('merge', 'apiUrl', 'https://custom.api.com');
+      expect(store.merge.value.apiUrl).toBe('https://custom.api.com');
     });
 
-    it('sets model', async () => {
-      store.setModel('gpt-4');
-      expect(store.model.value).toBe('gpt-4');
+    it('sets stage model', async () => {
+      store.setStageField('assign', 'model', 'gpt-4');
+      expect(store.assign.value.model).toBe('gpt-4');
+    });
+
+    it('sets entire stage config', async () => {
+      const config = {
+        apiKey: 'sk-test',
+        apiUrl: 'https://custom.api.com',
+        model: 'gpt-4',
+        streaming: false,
+        reasoning: null,
+        temperature: 0.5,
+        topP: 0.9,
+      };
+      store.setStageConfig('extract', config);
+      expect(store.extract.value).toEqual(config);
     });
   });
 
@@ -240,7 +270,7 @@ describe('LLMStore', () => {
 
   describe('state management', () => {
     it('resets processing state but keeps settings', () => {
-      store.setApiKey('sk-key');
+      store.setStageField('extract', 'apiKey', 'sk-key');
       store.setProcessingStatus('extracting');
       store.setBlockProgress(5, 10);
       store.setError('Error');
@@ -256,31 +286,31 @@ describe('LLMStore', () => {
       expect(store.detectedCharacters.value).toEqual([]);
       expect(store.characterVoiceMap.value.size).toBe(0);
       // Settings preserved
-      expect(store.apiKey.value).toBe('sk-key');
+      expect(store.extract.value.apiKey).toBe('sk-key');
     });
 
     it('full reset clears everything', () => {
-      store.setApiKey('sk-key');
-      store.setApiUrl('https://custom.api.com');
-      store.setModel('gpt-4');
+      store.setStageField('extract', 'apiKey', 'sk-key');
+      store.setStageField('extract', 'apiUrl', 'https://custom.api.com');
+      store.setStageField('extract', 'model', 'gpt-4');
       store.setEnabled(false);
       store.setProcessingStatus('extracting');
 
       store.reset();
 
       expect(store.enabled.value).toBe(true);
-      expect(store.apiKey.value).toBe('');
-      expect(store.apiUrl.value).toBe('https://api.openai.com/v1');
-      expect(store.model.value).toBe('gpt-4o-mini');
+      expect(store.extract.value.apiKey).toBe('');
+      expect(store.extract.value.apiUrl).toBe('https://api.openai.com/v1');
+      expect(store.extract.value.model).toBe('gpt-4o-mini');
       expect(store.processingStatus.value).toBe('idle');
     });
   });
 
   describe('persistence', () => {
     it('saves settings to localStorage', async () => {
-      store.setApiKey('sk-test');
-      store.setApiUrl('https://custom.api.com');
-      store.setModel('gpt-4');
+      store.setStageField('extract', 'apiKey', 'sk-test');
+      store.setStageField('extract', 'apiUrl', 'https://custom.api.com');
+      store.setStageField('extract', 'model', 'gpt-4');
       store.setEnabled(false);
 
       await store.saveSettings();
@@ -289,42 +319,97 @@ describe('LLMStore', () => {
       expect(saved).toBeTruthy();
       const parsed = JSON.parse(saved!);
       expect(parsed.enabled).toBe(false);
-      expect(parsed.apiKey).toBe('encrypted:sk-test');
-      expect(parsed.apiUrl).toBe('https://custom.api.com');
-      expect(parsed.model).toBe('gpt-4');
+      expect(parsed.extract.apiKey).toBe('encrypted:sk-test');
+      expect(parsed.extract.apiUrl).toBe('https://custom.api.com');
+      expect(parsed.extract.model).toBe('gpt-4');
     });
 
     it('loads settings from localStorage', async () => {
       localStorage.setItem(StorageKeys.llmSettings, JSON.stringify({
         enabled: false,
-        apiKey: 'encrypted:sk-loaded',
-        apiUrl: 'https://loaded.api.com',
-        model: 'gpt-3.5-turbo',
+        useVoting: false,
+        extract: {
+          apiKey: 'encrypted:sk-loaded',
+          apiUrl: 'https://loaded.api.com',
+          model: 'gpt-3.5-turbo',
+          streaming: true,
+          reasoning: null,
+          temperature: 0.0,
+          topP: 0.95,
+        },
+        merge: {
+          apiKey: '',
+          apiUrl: 'https://api.openai.com/v1',
+          model: 'gpt-4o-mini',
+          streaming: true,
+          reasoning: null,
+          temperature: 0.0,
+          topP: 0.95,
+        },
+        assign: {
+          apiKey: '',
+          apiUrl: 'https://api.openai.com/v1',
+          model: 'gpt-4o-mini',
+          streaming: true,
+          reasoning: null,
+          temperature: 0.0,
+          topP: 0.95,
+        },
       }));
 
       await store.loadSettings();
 
       expect(store.enabled.value).toBe(false);
-      expect(store.apiKey.value).toBe('sk-loaded');
-      expect(store.apiUrl.value).toBe('https://loaded.api.com');
-      expect(store.model.value).toBe('gpt-3.5-turbo');
+      expect(store.extract.value.apiKey).toBe('sk-loaded');
+      expect(store.extract.value.apiUrl).toBe('https://loaded.api.com');
+      expect(store.extract.value.model).toBe('gpt-3.5-turbo');
     });
 
     it('uses defaults for missing settings', async () => {
-      localStorage.setItem(StorageKeys.llmSettings, JSON.stringify({}));
+      localStorage.setItem(StorageKeys.llmSettings, JSON.stringify({
+        extract: {},
+        merge: {},
+        assign: {},
+      }));
 
       await store.loadSettings();
 
       expect(store.enabled.value).toBe(true);
-      expect(store.apiKey.value).toBe('');
-      expect(store.apiUrl.value).toBe('https://api.openai.com/v1');
-      expect(store.model.value).toBe('gpt-4o-mini');
+      expect(store.extract.value.apiKey).toBe('');
+      expect(store.extract.value.apiUrl).toBe('https://api.openai.com/v1');
+      expect(store.extract.value.model).toBe('gpt-4o-mini');
     });
 
     it('handles missing localStorage gracefully', async () => {
       await store.loadSettings();
       // Should not throw and keep defaults
       expect(store.enabled.value).toBe(true);
+    });
+
+    it('migrates from legacy flat format', async () => {
+      // Old format with flat apiKey, apiUrl, model at root level
+      localStorage.setItem(StorageKeys.llmSettings, JSON.stringify({
+        enabled: false,
+        apiKey: 'encrypted:sk-legacy',
+        apiUrl: 'https://legacy.api.com',
+        model: 'gpt-3.5-turbo',
+        streaming: false,
+        reasoning: 'high',
+        temperature: 0.7,
+        topP: 0.9,
+        useVoting: true,
+      }));
+
+      await store.loadSettings();
+
+      // Should migrate to all stages
+      expect(store.enabled.value).toBe(false);
+      expect(store.useVoting.value).toBe(true);
+      expect(store.extract.value.apiKey).toBe('sk-legacy');
+      expect(store.extract.value.apiUrl).toBe('https://legacy.api.com');
+      expect(store.extract.value.model).toBe('gpt-3.5-turbo');
+      expect(store.merge.value.apiKey).toBe('sk-legacy');
+      expect(store.assign.value.apiKey).toBe('sk-legacy');
     });
   });
 });
