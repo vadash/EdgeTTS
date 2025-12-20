@@ -230,7 +230,8 @@ describe('TTSWorkerPool', () => {
       pool.addTask(createTask(0));
 
       // Run through retries with exponential backoff
-      await vi.advanceTimersByTimeAsync(20000);
+      // Default retry delays are [10000, 20000, ...], so we need at least 30000ms for 3 attempts
+      await vi.advanceTimersByTimeAsync(35000);
 
       expect(attemptCount).toBe(3);
       expect(pool.getCompletedAudio().size).toBe(1);
