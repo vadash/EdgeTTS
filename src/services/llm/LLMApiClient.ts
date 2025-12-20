@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import type { LLMValidationResult } from '@/state/types';
-import { getRetryDelay } from '@/config';
+import { getRetryDelay, defaultConfig } from '@/config';
 import type { ILogger } from '../interfaces';
 import { stripThinkingTags, extractJSON } from '@/utils/llmUtils';
 
@@ -222,6 +222,7 @@ export class LLMApiClient {
       model: this.options.model,
       messages,
       stream: this.options.streaming !== false,
+      max_tokens: defaultConfig.llm.maxTokens,
     };
 
     // Handle Reasoning vs Standard models
