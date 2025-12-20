@@ -386,12 +386,85 @@ export class LLMVoiceService {
 
   /**
    * LLM-based character merge to deduplicate characters with different canonical names
+   * Uses hierarchical chunking for large character lists
    */
   private async mergeCharactersWithLLM(
     characters: LLMCharacter[],
+    onProgress?: ProgressCallback,
+    iteration: number = 0,
+    prevCount: number = Infinity
+  ): Promise<LLMCharacter[]> {
+    const { mergeChunkSize, mergeChunkThreshold, mergeMaxIterations, mergeMinReductionPercent } = defaultConfig.llm;
+
+    // Small enough for single merge
+    if (characters.length <= mergeChunkThreshold) {
+      return this.singleMerge(characters, onProgress);
+    }
+
+    // Check iteration limit
+    if (iteration >= mergeMaxIterations) {
+      this.logger?.warn(`[Merge] Max iterations (${mergeMaxIterations}) reached with ${characters.length} characters, doing final merge`);
+      return this.singleMerge(characters, onProgress);
+    }
+
+    // Check convergence - if not reducing meaningfully, stop
+    if (iteration > 0) {
+      const reduction = ((prevCount - characters.length) / prevCount) * 100;
+      if (reduction < mergeMinReductionPercent) {
+        this.logger?.warn(`[Merge] Convergence detected (${reduction.toFixed(1)}% reduction), doing final merge with ${characters.length} characters`);
+        return this.singleMerge(characters, onProgress);
+      }
+    }
+
+    // Phase 1: Sequential chunk merge
+    this.logger?.info(`[Merge] Iteration ${iteration + 1}: Chunking ${characters.length} characters into chunks of ${mergeChunkSize}`);
+    const chunks = this.splitIntoChunks(characters, mergeChunkSize);
+    const chunkResults: LLMCharacter[][] = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      if (this.abortController?.signal.aborted) {
+        throw new Error('Operation cancelled');
+      }
+
+      onProgress?.(i + 1, chunks.length + 1, `Merging chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
+      const merged = await this.singleMerge(chunks[i]);
+      chunkResults.push(merged);
+      this.logger?.info(`[Merge] Chunk ${i + 1}/${chunks.length}: ${chunks[i].length} → ${merged.length} characters`);
+
+      // Small delay between chunks to avoid rate limits
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
+      }
+    }
+
+    // Phase 2: Cross-chunk merge
+    const combined = chunkResults.flat();
+    this.logger?.info(`[Merge] Cross-chunk merge: ${combined.length} characters (was ${characters.length})`);
+    onProgress?.(chunks.length, chunks.length + 1, `Cross-chunk merge (${combined.length} chars)...`);
+
+    // Recursive with iteration tracking
+    return this.mergeCharactersWithLLM(combined, onProgress, iteration + 1, characters.length);
+  }
+
+  /**
+   * Split characters into chunks of specified size
+   */
+  private splitIntoChunks(characters: LLMCharacter[], size: number): LLMCharacter[][] {
+    const chunks: LLMCharacter[][] = [];
+    for (let i = 0; i < characters.length; i += size) {
+      chunks.push(characters.slice(i, i + size));
+    }
+    return chunks;
+  }
+
+  /**
+   * Single merge operation (original logic)
+   */
+  private async singleMerge(
+    characters: LLMCharacter[],
     onProgress?: ProgressCallback
   ): Promise<LLMCharacter[]> {
-    this.logger?.info(`[Merge] Starting character deduplication (${characters.length} characters)`);
+    this.logger?.info(`[Merge] Single merge: ${characters.length} characters`);
     const response = await this.apiClient.callWithRetry(
       buildMergePrompt(characters),
       (result) => validateMergeResponse(result, characters),
