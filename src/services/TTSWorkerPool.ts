@@ -1,6 +1,8 @@
-// TTSWorkerPool - Worker pool using reusable WebSocket connections
-// Uses fixed worker array with centralized retry logic
+// TTSWorkerPool - Worker pool using p-queue and generic-pool
+// Uses battle-tested libraries for task scheduling and connection management
 
+import PQueue from 'p-queue';
+import { createPool, Pool } from 'generic-pool';
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 import { withRetry } from '@/utils/asyncUtils';
@@ -17,29 +19,23 @@ export interface WorkerPoolOptions {
   logger?: ILogger;
 }
 
-interface WorkerSlot {
-  id: number;
-  service: ReusableEdgeTTSService;
-  isBusy: boolean;
-}
-
 const TEMP_DIR_NAME = '_temp_work';
 
 /**
- * TTSWorkerPool - Uses fixed worker array with reusable WebSocket connections
+ * TTSWorkerPool - Uses p-queue for task scheduling and generic-pool for connection management
  *
  * Features:
- * - Fixed number of workers (configurable threads)
- * - Centralized retry logic with exponential backoff
+ * - p-queue handles concurrency and task scheduling
+ * - generic-pool manages WebSocket connections with acquire/release semantics
+ * - Centralized retry logic with exponential backoff via p-retry
  * - Handles sleep mode recovery via reconnection
  * - Writes audio chunks to disk immediately to prevent OOM
  */
 export class TTSWorkerPool implements IWorkerPool {
-  private workers: WorkerSlot[] = [];
-  private taskQueue: PoolTask[] = [];
+  private queue: PQueue;
+  private connectionPool: Pool<ReusableEdgeTTSService>;
   private completedTasks = new Map<number, string>();
   private failedTasks = new Set<number>();
-  private isProcessing = false;
   private tempDirHandle: FileSystemDirectoryHandle | null = null;
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private initPromise: Promise<void> | null = null;
@@ -47,6 +43,7 @@ export class TTSWorkerPool implements IWorkerPool {
   // Statistics
   private totalTasks = 0;
   private processedCount = 0;
+  private maxWorkers: number;
 
   private voiceConfig: VoiceConfig;
   private onStatusUpdate?: (update: StatusUpdate) => void;
@@ -63,15 +60,42 @@ export class TTSWorkerPool implements IWorkerPool {
     this.onTaskError = options.onTaskError;
     this.onAllComplete = options.onAllComplete;
     this.logger = options.logger;
+    this.maxWorkers = options.maxWorkers;
 
-    // Initialize fixed number of workers (configurable threads)
-    for (let i = 0; i < options.maxWorkers; i++) {
-      this.workers.push({
-        id: i,
-        service: new ReusableEdgeTTSService(this.logger),
-        isBusy: false,
-      });
-    }
+    // Initialize p-queue with concurrency matching worker count
+    this.queue = new PQueue({ concurrency: options.maxWorkers });
+
+    // Listen for queue idle to trigger onAllComplete
+    this.queue.on('idle', () => {
+      if (this.totalTasks > 0 && this.processedCount === this.totalTasks) {
+        this.onAllComplete?.();
+      }
+    });
+
+    // Initialize generic-pool for WebSocket connections
+    const logger = this.logger;
+    this.connectionPool = createPool(
+      {
+        create: async (): Promise<ReusableEdgeTTSService> => {
+          const service = new ReusableEdgeTTSService(logger);
+          await service.connect();
+          return service;
+        },
+        destroy: async (service: ReusableEdgeTTSService): Promise<void> => {
+          service.disconnect();
+        },
+        validate: async (service: ReusableEdgeTTSService): Promise<boolean> => {
+          return service.isReady();
+        },
+      },
+      {
+        max: options.maxWorkers,
+        min: 0, // Create connections on demand
+        testOnBorrow: true, // Validate connection before use
+        idleTimeoutMillis: 30000, // Match keep-alive interval
+        evictionRunIntervalMillis: 15000, // Check for stale connections
+      }
+    );
 
     // Initialize temp directory asynchronously
     this.initPromise = this.initTempDirectory();
@@ -120,66 +144,53 @@ export class TTSWorkerPool implements IWorkerPool {
    * Pre-warm connections before adding tasks
    */
   async warmup(): Promise<void> {
-    const promises = this.workers.map(async (worker) => {
-      try {
-        await worker.service.connect();
-      } catch {
-        // Ignore warmup errors - will retry on actual task
-      }
-    });
+    const promises: Promise<void>[] = [];
+    for (let i = 0; i < this.maxWorkers; i++) {
+      promises.push(
+        (async () => {
+          try {
+            const conn = await this.connectionPool.acquire();
+            await this.connectionPool.release(conn);
+          } catch {
+            // Ignore warmup errors - will retry on actual task
+          }
+        })()
+      );
+    }
     await Promise.allSettled(promises);
-    this.logger?.debug(`Warmed up ${this.workers.length} workers`);
+    this.logger?.debug(`Warmed up ${this.maxWorkers} connections`);
   }
 
   addTask(task: PoolTask): void {
-    this.taskQueue.push(task);
     this.totalTasks++;
-    this.processQueue();
+    // Wait for init before processing
+    this.queue.add(() => this.executeTask(task));
   }
 
   addTasks(tasks: PoolTask[]): void {
-    this.taskQueue.push(...tasks);
     this.totalTasks += tasks.length;
-    this.processQueue();
+    for (const task of tasks) {
+      this.queue.add(() => this.executeTask(task));
+    }
   }
 
   /**
-   * Main loop: Finds idle workers and assigns tasks
+   * Executes a single task with retry logic
+   * Acquires connection from pool, executes, releases back
    */
-  private async processQueue(): Promise<void> {
-    if (this.isProcessing) return;
-    this.isProcessing = true;
-
+  private async executeTask(task: PoolTask): Promise<void> {
     // Wait for temp directory initialization
     if (this.initPromise) {
       await this.initPromise;
       this.initPromise = null;
     }
 
-    // While we have tasks and free workers
-    while (this.taskQueue.length > 0) {
-      const freeWorker = this.workers.find((w) => !w.isBusy);
-
-      if (!freeWorker) {
-        // No threads available. Stop loop.
-        // The loop will restart when a worker finishes and calls processQueue()
-        break;
-      }
-
-      const task = this.taskQueue.shift()!;
-      this.executeTask(freeWorker, task);
-    }
-
-    this.isProcessing = false;
-  }
-
-  /**
-   * Executes a single task on a specific worker with retry logic
-   */
-  private async executeTask(worker: WorkerSlot, task: PoolTask): Promise<void> {
-    worker.isBusy = true;
+    // Acquire connection from pool
+    let service: ReusableEdgeTTSService | null = null;
 
     try {
+      service = await this.connectionPool.acquire();
+
       this.onStatusUpdate?.({
         partIndex: task.partIndex,
         message: `Part ${String(task.partIndex + 1).padStart(4, '0')}: Processing...`,
@@ -193,16 +204,17 @@ export class TTSWorkerPool implements IWorkerPool {
 
       // === CENTRALIZED RETRY LOGIC ===
       // This handles: Sleep mode disconnects, Rate limits, Network drops
+      const currentService = service; // Capture for closure
       const audioData = await withRetry(
         async () => {
           // Ensure connected (Reusable service handles idempotency)
           // If PC slept, state is likely disconnected, this reconnects.
-          if (!worker.service.isReady()) {
-            await worker.service.connect();
+          if (!currentService.isReady()) {
+            await currentService.connect();
           }
 
           // Send request
-          return await worker.service.send({
+          return await currentService.send({
             text: task.text,
             config: taskConfig,
           });
@@ -213,7 +225,7 @@ export class TTSWorkerPool implements IWorkerPool {
           maxDelay: 30000,
           onRetry: (attempt, err, delay) => {
             this.logger?.warn(
-              `Worker ${worker.id} retrying task ${task.partIndex} (Attempt ${attempt}). Waiting ${Math.round(delay)}ms. Error: ${err}`
+              `Retrying task ${task.partIndex} (Attempt ${attempt}). Waiting ${Math.round(delay)}ms. Error: ${err}`
             );
 
             this.onStatusUpdate?.({
@@ -223,7 +235,7 @@ export class TTSWorkerPool implements IWorkerPool {
             });
 
             // Force disconnect on error to ensure clean state for next attempt
-            worker.service.disconnect();
+            currentService.disconnect();
           },
         }
       );
@@ -247,15 +259,13 @@ export class TTSWorkerPool implements IWorkerPool {
       this.onTaskError?.(task.partIndex, error instanceof Error ? error : new Error(String(error)));
       this.logger?.error(`Task ${task.partIndex} failed permanently`, error as Error);
     } finally {
-      // Free the worker
-      worker.isBusy = false;
-
-      // Check for all complete
-      if (this.taskQueue.length === 0 && this.workers.every((w) => !w.isBusy)) {
-        this.onAllComplete?.();
-      } else {
-        // Trigger next task
-        this.processQueue();
+      // Release connection back to pool
+      if (service) {
+        try {
+          await this.connectionPool.release(service);
+        } catch {
+          // Connection may have been destroyed during retry
+        }
       }
     }
   }
@@ -284,24 +294,31 @@ export class TTSWorkerPool implements IWorkerPool {
    * Get pool statistics
    */
   getPoolStats(): { total: number; ready: number; busy: number; disconnected: number } {
-    let ready = 0;
-    let busy = 0;
-    let disconnected = 0;
+    // generic-pool provides: size (total created), available (idle), borrowed (in use), pending (waiting)
+    const poolSize = this.connectionPool.size;
+    const available = this.connectionPool.available;
+    const borrowed = this.connectionPool.borrowed;
 
-    for (const worker of this.workers) {
-      const state = worker.service.getState();
-      if (state === 'READY' && !worker.isBusy) ready++;
-      else if (state === 'BUSY' || worker.isBusy) busy++;
-      else if (state === 'DISCONNECTED') disconnected++;
-    }
-
-    return { total: this.workers.length, ready, busy, disconnected };
+    return {
+      total: this.maxWorkers,
+      ready: available,
+      busy: borrowed,
+      disconnected: this.maxWorkers - poolSize,
+    };
   }
 
   /**
    * Cleanup temp directory and remove all temp files
    */
   async cleanup(): Promise<void> {
+    // Drain and clear the connection pool
+    try {
+      await this.connectionPool.drain();
+      await this.connectionPool.clear();
+    } catch (err) {
+      this.logger?.warn(`Failed to drain connection pool: ${(err as Error).message}`);
+    }
+
     if (this.directoryHandle && this.tempDirHandle) {
       try {
         await this.directoryHandle.removeEntry(TEMP_DIR_NAME, { recursive: true });
@@ -314,11 +331,12 @@ export class TTSWorkerPool implements IWorkerPool {
   }
 
   clear(): void {
-    this.taskQueue = [];
-    this.workers.forEach((w) => {
-      w.isBusy = false;
-      w.service.disconnect();
-    });
+    // Clear the p-queue
+    this.queue.clear();
+
+    // Drain connection pool (async, but we don't wait)
+    this.connectionPool.drain().then(() => this.connectionPool.clear()).catch(() => {});
+
     this.completedTasks.clear();
     this.failedTasks.clear();
     this.totalTasks = 0;

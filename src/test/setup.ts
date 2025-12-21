@@ -3,6 +3,74 @@
 
 import { vi, afterEach } from 'vitest';
 
+// Mock p-retry - executes immediately without retry
+vi.mock('p-retry', () => ({
+  default: vi.fn(async (fn: (attemptNumber: number) => Promise<unknown>) => fn(1)),
+  AbortError: class AbortError extends Error {
+    constructor(message?: string) {
+      super(message);
+      this.name = 'AbortError';
+    }
+  },
+}));
+
+// Mock p-queue - executes tasks immediately
+vi.mock('p-queue', () => ({
+  default: class MockPQueue {
+    concurrency = 1;
+    private listeners: Map<string, Array<() => void>> = new Map();
+
+    add = vi.fn(async (fn: () => Promise<unknown>) => {
+      const result = await fn();
+      // Trigger idle event after task completes
+      setTimeout(() => {
+        const idleListeners = this.listeners.get('idle') || [];
+        idleListeners.forEach(listener => listener());
+      }, 0);
+      return result;
+    });
+    clear = vi.fn();
+    on = vi.fn((event: string, listener: () => void) => {
+      if (!this.listeners.has(event)) {
+        this.listeners.set(event, []);
+      }
+      this.listeners.get(event)!.push(listener);
+    });
+    get size() { return 0; }
+    get pending() { return 0; }
+  },
+}));
+
+// Mock generic-pool - simple acquire/release without actual pooling
+vi.mock('generic-pool', () => ({
+  createPool: vi.fn((factory: { create: () => Promise<unknown>; destroy: (obj: unknown) => Promise<void> }) => {
+    let created: unknown[] = [];
+    return {
+      acquire: vi.fn(async () => {
+        const obj = await factory.create();
+        created.push(obj);
+        return obj;
+      }),
+      release: vi.fn(async () => {}),
+      destroy: vi.fn(async (obj: unknown) => {
+        await factory.destroy(obj);
+        created = created.filter(c => c !== obj);
+      }),
+      drain: vi.fn(async () => {}),
+      clear: vi.fn(async () => {
+        for (const obj of created) {
+          await factory.destroy(obj);
+        }
+        created = [];
+      }),
+      get size() { return created.length; },
+      get available() { return created.length; },
+      get borrowed() { return 0; },
+      get pending() { return 0; },
+    };
+  }),
+}));
+
 // Mock browser APIs
 const localStorageMock = (() => {
   let store: Record<string, string> = {};

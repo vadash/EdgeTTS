@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import pRetry, { AbortError } from 'p-retry';
 import type { LLMValidationResult } from '@/state/types';
 import { getRetryDelay, defaultConfig } from '@/config';
 import type { ILogger } from '../interfaces';
@@ -132,7 +133,7 @@ export class LLMApiClient {
   }
 
   /**
-   * Call LLM API with retry and exponential backoff
+   * Call LLM API with retry and exponential backoff using p-retry
    * @param maxRetries - Maximum retries before giving up. Undefined = infinite retries.
    * @returns Response string, or null if maxRetries exceeded
    */
@@ -140,58 +141,84 @@ export class LLMApiClient {
     prompt: LLMPrompt,
     validate: (response: string) => LLMValidationResult,
     signal?: AbortSignal,
-    previousErrors: string[] = [],
+    initialErrors: string[] = [],
     pass: PassType = 'extract',
     onRetry?: (attempt: number, delay: number, errors?: string[]) => void,
     maxRetries?: number
   ): Promise<string | null> {
-    let attempt = 0;
+    // Track errors across retries (outside p-retry to accumulate)
+    let previousErrors = [...initialErrors];
 
-    while (maxRetries === undefined || attempt <= maxRetries) {
-      try {
-        const response = await this.call(prompt, signal, previousErrors, pass);
-        const validation = validate(response);
+    // p-retry doesn't support Infinity, use MAX_SAFE_INTEGER instead
+    const retries = maxRetries === undefined ? Number.MAX_SAFE_INTEGER : maxRetries;
 
-        if (validation.valid) {
-          return response;
+    try {
+      return await pRetry(
+        async (attemptNumber) => {
+          // Check for cancellation
+          if (signal?.aborted) {
+            throw new AbortError('Operation cancelled');
+          }
+
+          const response = await this.call(prompt, signal, previousErrors, pass);
+          const validation = validate(response);
+
+          if (validation.valid) {
+            return response;
+          }
+
+          // Validation failed - accumulate errors so LLM doesn't repeat mistakes
+          const newErrors = validation.errors.filter(e => !previousErrors.includes(e));
+          previousErrors = [...previousErrors, ...newErrors];
+
+          // Throw to trigger retry
+          const error = new Error(`Validation failed: ${validation.errors.join(', ')}`);
+          (error as any).validationErrors = previousErrors;
+          (error as any).responsePreview = response.substring(0, 300);
+          throw error;
+        },
+        {
+          retries,
+          signal,
+          onFailedAttempt: (error) => {
+            const delay = getRetryDelay(error.attemptNumber - 1);
+
+            // Check if this was a validation error or API error
+            const isValidationError = 'validationErrors' in error;
+
+            if (isValidationError) {
+              this.logger?.warn(
+                `[${pass}] Validation failed, retry ${error.attemptNumber}, waiting ${delay / 1000}s...`,
+                { errors: (error as any).validationErrors, response: (error as any).responsePreview }
+              );
+            } else {
+              this.logger?.error(
+                `[${pass}] API error, retry ${error.attemptNumber}, waiting ${delay / 1000}s...`,
+                error instanceof Error ? error : new Error(String(error))
+              );
+            }
+
+            onRetry?.(error.attemptNumber, delay, previousErrors);
+          },
+          // Custom retry delay using existing getRetryDelay function
+          // p-retry passes attemptNumber (1-based), getRetryDelay expects 0-based index
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          minTimeout: defaultConfig.retry.delays[0],
+          maxTimeout: defaultConfig.retry.delays[defaultConfig.retry.delays.length - 1],
+          // Override factor to use our custom delays via minTimeout/maxTimeout bounds
+          factor: 1.5,
         }
-
-        // Validation failed - accumulate errors so LLM doesn't repeat mistakes
-        const newErrors = validation.errors.filter(e => !previousErrors.includes(e));
-        previousErrors = [...previousErrors, ...newErrors];
-
-        // Check if we've exceeded max retries
-        if (maxRetries !== undefined && attempt >= maxRetries) {
-          this.logger?.warn(`[${pass}] Max retries (${maxRetries}) exceeded, giving up`, { errors: previousErrors });
-          return null;
-        }
-
-        const delay = getRetryDelay(attempt);
-        attempt++;
-
-        this.logger?.warn(`[${pass}] Validation failed, retry ${attempt}, waiting ${delay / 1000}s...`, { errors: previousErrors, response: response.substring(0, 300) });
-        onRetry?.(attempt, delay, previousErrors);
-        await this.sleep(delay);
-      } catch (error) {
-        if (signal?.aborted) {
-          throw new Error('Operation cancelled');
-        }
-
-        // Check if we've exceeded max retries
-        if (maxRetries !== undefined && attempt >= maxRetries) {
-          this.logger?.error(`[${pass}] Max retries (${maxRetries}) exceeded after error`, error instanceof Error ? error : new Error(String(error)));
-          return null;
-        }
-
-        const delay = getRetryDelay(attempt);
-        attempt++;
-        this.logger?.error(`[${pass}] API error, retry ${attempt}, waiting ${delay / 1000}s...`, error instanceof Error ? error : new Error(String(error)));
-        onRetry?.(attempt, delay);
-        await this.sleep(delay);
+      );
+    } catch (error) {
+      // AbortError means cancelled - rethrow
+      if (error instanceof AbortError) {
+        throw new Error('Operation cancelled');
       }
-    }
 
-    return null;
+      // Max retries exceeded
+      this.logger?.warn(`[${pass}] Max retries exceeded, giving up`, { errors: previousErrors });
+      return null;
+    }
   }
 
   /**
@@ -405,12 +432,5 @@ export class LLMApiClient {
       return e;
     }
     return 'Unknown error';
-  }
-
-  /**
-   * Sleep helper
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

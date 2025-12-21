@@ -19,14 +19,18 @@
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
     "@preact/signals": "^1.2.2",
+    "generic-pool": "^3.9.0",
     "jsonrepair": "^3.13.1",
     "jszip": "^3.10.1",
     "openai": "^6.10.0",
+    "p-queue": "^9.0.1",
+    "p-retry": "^7.1.1",
     "preact": "^10.19.3",
     "preact-i18n": "^2.4.0-preactx"
   },
   "devDependencies": {
     "@testing-library/preact": "^3.2.4",
+    "@types/generic-pool": "^3.1.11",
     "@types/node": "^20.10.5",
     "@vitest/coverage-v8": "^2.1.0",
     "autoprefixer": "^10.4.22",
