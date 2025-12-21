@@ -550,13 +550,23 @@ export class LLMVoiceService {
       onProgress?.(i + 1, mergeVotingTemperatures.length, `Merge vote ${i + 1}/${mergeVotingTemperatures.length} (temp=${temp})...`);
 
       const result = await this.singleMerge(preprocessed, temp, onProgress);
-      results.push(result);
-      this.logger?.info(`[Merge] Vote ${i + 1}/${mergeVotingTemperatures.length} (temp=${temp}): ${result.length} characters`);
+      if (result !== null) {
+        results.push(result);
+        this.logger?.info(`[Merge] Vote ${i + 1}/${mergeVotingTemperatures.length} (temp=${temp}): ${result.length} characters`);
+      } else {
+        this.logger?.warn(`[Merge] Vote ${i + 1}/${mergeVotingTemperatures.length} (temp=${temp}) failed, skipping`);
+      }
 
       // Small delay between votes to avoid rate limits
       if (i < mergeVotingTemperatures.length - 1) {
         await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
       }
+    }
+
+    // Need at least 1 successful vote
+    if (results.length === 0) {
+      this.logger?.error(`[Merge] All ${mergeVotingTemperatures.length} votes failed, returning preprocessed characters`);
+      return preprocessed;
     }
 
     // Phase 3: Pick median result by character count
@@ -571,12 +581,13 @@ export class LLMVoiceService {
 
   /**
    * Single merge operation with specified temperature
+   * Returns null if max retries exceeded
    */
   private async singleMerge(
     characters: LLMCharacter[],
     temperature: number,
     onProgress?: ProgressCallback
-  ): Promise<LLMCharacter[]> {
+  ): Promise<LLMCharacter[] | null> {
     this.logger?.info(`[Merge] Single merge: ${characters.length} characters (temp=${temperature})`);
 
     // Build context for strategy
@@ -605,12 +616,14 @@ export class LLMVoiceService {
         const errorCount = errors?.length || 0;
         const reason = errorCount ? ` (${errorCount} errors): ${errors![errors!.length - 1]}` : '';
         onProgress?.(0, 0, `Merge validation failed${reason}, retry ${attempt} in ${Math.round(delay / 1000)}s...`);
-      }
+      },
+      defaultConfig.llm.maxMergeRetries
     );
 
-    // With infinite retries, this should never be null
+    // Return null if max retries exceeded
     if (response === null) {
-      throw new Error('Merge failed unexpectedly');
+      this.logger?.warn(`[Merge] Vote failed after ${defaultConfig.llm.maxMergeRetries} retries (temp=${temperature})`);
+      return null;
     }
 
     // Parse and apply response using strategy

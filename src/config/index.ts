@@ -52,6 +52,8 @@ export interface LLMConfig {
   maxTokens: number;
   /** Maximum retries for assign blocks before fallback to default voice */
   maxAssignRetries: number;
+  /** Maximum retries for each merge vote before skipping */
+  maxMergeRetries: number;
   /** Temperatures for 5-way voting merge */
   mergeVotingTemperatures: number[];
   /** Minimum occurrence percent to keep a character (below this → generic voice) */
@@ -130,6 +132,7 @@ export const defaultConfig: AppConfig = {
     maxConcurrentRequests: 3,
     maxTokens: 8000,
     maxAssignRetries: 3,
+    maxMergeRetries: 5,
     mergeVotingTemperatures: [0.1, 0.2, 0.3, 0.4, 0.5],
     mergeMinOccurrencePercent: 0.001, // 0.1%
   },
