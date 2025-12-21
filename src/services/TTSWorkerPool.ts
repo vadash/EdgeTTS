@@ -1,5 +1,5 @@
 // TTSWorkerPool - Worker pool using reusable WebSocket connections
-// Uses TTSConnectionPool internally for connection management
+// Uses TTSConnectionPool internally for connection management (including CircuitBreaker)
 // Writes audio chunks to disk immediately to prevent OOM
 
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
@@ -31,7 +31,7 @@ const TEMP_DIR_NAME = '_temp_work';
  * TTSWorkerPool - Uses reusable WebSocket connections
  *
  * Features:
- * - Uses TTSConnectionPool for connection management
+ * - Uses TTSConnectionPool for connection management (including CircuitBreaker)
  * - Reuses WebSocket connections across multiple requests
  * - Writes audio chunks to disk immediately to prevent OOM
  * - Reduces rate-limiting by avoiding frequent new connections
@@ -59,12 +59,6 @@ export class TTSWorkerPool implements IWorkerPool {
   private onTaskError?: (partIndex: number, error: Error) => void;
   private onAllComplete?: () => void;
   private logger?: ILogger;
-
-  // Global pause mechanism for rate limiting protection
-  private consecutiveFailures = 0;
-  private globalPauseUntil = 0;
-  private readonly PAUSE_THRESHOLD = 30;
-  private readonly PAUSE_DURATION = 300000; // 5 minutes
 
   constructor(options: WorkerPoolOptions) {
     this.maxWorkers = options.maxWorkers;
@@ -155,15 +149,16 @@ export class TTSWorkerPool implements IWorkerPool {
     }
 
     while (this.inFlightParts.size < this.maxWorkers && this.queue.length > 0) {
-      // Check global pause (rate limiting protection)
-      if (Date.now() < this.globalPauseUntil) {
-        const waitTime = this.globalPauseUntil - Date.now();
+      // Check circuit breaker status (handled by TTSConnectionPool)
+      const poolStats = this.connectionPool.getStats();
+      if (poolStats.circuitState === 'OPEN') {
+        const waitTime = Math.min(10000, 5000); // Wait up to 10s before checking again
         this.onStatusUpdate?.({
           partIndex: -1,
-          message: `Rate limited - pausing for ${Math.round(waitTime / 1000)}s...`,
+          message: `Rate limited (circuit breaker open) - waiting...`,
           isComplete: false,
         });
-        await new Promise((resolve) => setTimeout(resolve, Math.min(waitTime, 10000)));
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
         continue;
       }
 
@@ -218,7 +213,6 @@ export class TTSWorkerPool implements IWorkerPool {
     this.inFlightParts.delete(partIndex);
     this.completedAudio.set(partIndex, filename);
     this.completedCount++;
-    this.consecutiveFailures = 0; // Reset on success
 
     this.onStatusUpdate?.({
       partIndex,
@@ -233,13 +227,6 @@ export class TTSWorkerPool implements IWorkerPool {
 
   private handleTaskError(partIndex: number, error: Error, retryCount: number): void {
     this.lastErrorTime = Date.now();
-    this.consecutiveFailures++;
-
-    // Trigger global pause if too many consecutive failures
-    if (this.consecutiveFailures >= this.PAUSE_THRESHOLD && this.globalPauseUntil < Date.now()) {
-      this.globalPauseUntil = Date.now() + this.PAUSE_DURATION;
-      this.logger?.warn(`Global pause triggered: ${this.consecutiveFailures} consecutive failures, waiting 5 minutes`);
-    }
 
     const task = this.activeTasks.get(partIndex);
     this.activeTasks.delete(partIndex);

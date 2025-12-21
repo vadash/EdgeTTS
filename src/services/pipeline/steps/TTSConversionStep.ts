@@ -22,6 +22,7 @@ export interface TTSConversionStepOptions {
 export class TTSConversionStep extends BasePipelineStep {
   readonly name = 'tts-conversion';
   protected readonly requiredContextKeys: (keyof PipelineContext)[] = ['assignments', 'directoryHandle'];
+  readonly dropsContextKeys: (keyof PipelineContext)[] = ['text', 'dictionaryRules', 'assignments', 'characters'];
 
   private workerPool: IWorkerPool | null = null;
 
@@ -120,14 +121,7 @@ export class TTSConversionStep extends BasePipelineStep {
       }
 
       return {
-        // Only keep fields needed by downstream steps
-        // Drop: assignments, characters to free memory
-        text: '', // Clear - no longer needed
-        fileNames: context.fileNames,
-        dictionaryRules: [], // Clear - no longer needed
-        detectedLanguage: context.detectedLanguage,
-        directoryHandle: context.directoryHandle,
-        voiceMap: context.voiceMap,
+        ...context,
         audioMap,
         tempDirHandle,
         failedTasks,

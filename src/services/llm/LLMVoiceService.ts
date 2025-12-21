@@ -8,9 +8,15 @@ import type {
 import type { ILogger, ProgressCallback } from '../interfaces';
 import { defaultConfig } from '@/config';
 import { LLMApiClient } from './LLMApiClient';
-import { buildExtractPrompt, buildMergePrompt, buildAssignPrompt } from './PromptBuilders';
-import { validateExtractResponse, validateMergeResponse, validateAssignResponse, parseAssignResponse, fixMergeResponse } from './ResponseValidators';
-import { buildCodeMapping, mergeCharacters, applyMergeResponse, normalizeCanonicalNames } from './CharacterUtils';
+import { buildCodeMapping, mergeCharacters, applyMergeResponse } from './CharacterUtils';
+import {
+  type IPromptStrategy,
+  type ExtractContext,
+  type MergeContext,
+  type AssignContext,
+  type AssignResult,
+  createDefaultStrategies,
+} from './PromptStrategy';
 
 /**
  * Unambiguous speech/dialogue symbols (no contraction risk):
@@ -179,6 +185,12 @@ export interface LLMVoiceServiceOptions {
     temperature?: number;
     topP?: number;
   };
+  // Optional strategy overrides (for testing or custom implementations)
+  strategies?: {
+    extract?: IPromptStrategy<ExtractContext, ExtractResponse>;
+    merge?: IPromptStrategy<MergeContext, MergeResponse>;
+    assign?: IPromptStrategy<AssignContext, AssignResult>;
+  };
 }
 
 /**
@@ -190,6 +202,11 @@ export class LLMVoiceService {
   private mergeApiClient: LLMApiClient;
   private abortController: AbortController | null = null;
   private logger: ILogger;
+
+  // Prompt strategies
+  private extractStrategy: IPromptStrategy<ExtractContext, ExtractResponse>;
+  private mergeStrategy: IPromptStrategy<MergeContext, MergeResponse>;
+  private assignStrategy: IPromptStrategy<AssignContext, AssignResult>;
 
   constructor(options: LLMVoiceServiceOptions) {
     if (!options.logger) {
@@ -224,6 +241,12 @@ export class LLMVoiceService {
           logger: options.logger,
         })
       : this.apiClient;
+
+    // Initialize strategies (use provided or defaults)
+    const defaultStrategies = createDefaultStrategies();
+    this.extractStrategy = options.strategies?.extract ?? defaultStrategies.extract;
+    this.mergeStrategy = options.strategies?.merge ?? defaultStrategies.merge;
+    this.assignStrategy = options.strategies?.assign ?? defaultStrategies.assign;
   }
 
   /**
@@ -257,10 +280,11 @@ export class LLMVoiceService {
 
       const block = blocks[i];
       const blockText = block.sentences.join('\n');
+      const context: ExtractContext = { textBlock: blockText };
 
       const response = await this.apiClient.callWithRetry(
-        buildExtractPrompt(blockText),
-        validateExtractResponse,
+        this.extractStrategy.buildPrompt(context),
+        (res) => this.extractStrategy.validateResponse(res, context),
         this.abortController.signal,
         [],
         'extract'
@@ -271,7 +295,7 @@ export class LLMVoiceService {
         throw new Error('Extract failed unexpectedly');
       }
 
-      const parsed = JSON.parse(response) as ExtractResponse;
+      const parsed = this.extractStrategy.parseResponse(response, context);
       allCharacters.push(...parsed.characters);
 
       // Small delay between requests to avoid overwhelming LLM server
@@ -383,8 +407,17 @@ export class LLMVoiceService {
       .map((s, i) => `[${i}] ${s}`)
       .join('\n');
 
-    const prompt = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 0);
-    const validator = (result: string) => validateAssignResponse(result, block.sentences.length, codeToName);
+    // Build context for strategy
+    const context: AssignContext = {
+      characters,
+      nameToCode,
+      codeToName,
+      numberedParagraphs,
+      sentenceCount: block.sentences.length,
+    };
+
+    const prompt = this.assignStrategy.buildPrompt(context);
+    const validator = (result: string) => this.assignStrategy.validateResponse(result, context);
 
     let relativeMap: Map<number, string>;
 
@@ -423,8 +456,8 @@ export class LLMVoiceService {
         }));
       }
 
-      // Parse valid responses only
-      const parsedMaps = validResponses.map(r => parseAssignResponse(r, codeToName));
+      // Parse valid responses only using strategy
+      const parsedMaps = validResponses.map(r => this.assignStrategy.parseResponse(r, context).speakerMap);
 
       // Majority vote for each paragraph (use available responses)
       relativeMap = new Map();
@@ -456,7 +489,7 @@ export class LLMVoiceService {
         }));
       }
 
-      relativeMap = parseAssignResponse(response, codeToName);
+      relativeMap = this.assignStrategy.parseResponse(response, context).speakerMap;
     }
 
     return block.sentences.map((text, i) => {
@@ -546,6 +579,9 @@ export class LLMVoiceService {
   ): Promise<LLMCharacter[]> {
     this.logger?.info(`[Merge] Single merge: ${characters.length} characters (temp=${temperature})`);
 
+    // Build context for strategy
+    const context: MergeContext = { characters };
+
     // Create a client with the specified temperature
     const client = new LLMApiClient({
       apiKey: this.options.mergeConfig?.apiKey ?? this.options.apiKey,
@@ -560,8 +596,8 @@ export class LLMVoiceService {
     });
 
     const response = await client.callWithRetry(
-      buildMergePrompt(characters),
-      (result) => validateMergeResponse(result, characters),
+      this.mergeStrategy.buildPrompt(context),
+      (result) => this.mergeStrategy.validateResponse(result, context),
       this.abortController?.signal,
       [],
       'merge',
@@ -577,9 +613,8 @@ export class LLMVoiceService {
       throw new Error('Merge failed unexpectedly');
     }
 
-    // Fix response by auto-adding any missing characters to unchanged list
-    const fixedResponse = fixMergeResponse(response, characters);
-    const parsed = JSON.parse(fixedResponse) as MergeResponse;
+    // Parse and apply response using strategy
+    const parsed = this.mergeStrategy.parseResponse(response, context);
     return applyMergeResponse(characters, parsed);
   }
 

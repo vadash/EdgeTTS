@@ -31,6 +31,9 @@ export class DataStore {
   readonly numBook = signal<number>(0);
   readonly numText = signal<number>(0);
 
+  // Language detection (explicit signal, not computed)
+  readonly detectedLanguage = signal<DetectedLanguage>('en');
+
   // ========== Computed Properties ==========
 
   /**
@@ -68,15 +71,21 @@ export class DataStore {
     this.directoryHandle.value !== null
   );
 
+  // ========== Language Detection ==========
+
   /**
-   * Detect language from text content
+   * Explicitly detect language from current content
+   * Call this when content is loaded or before conversion
+   * @returns The detected language
    */
-  readonly detectedLanguage = computed<DetectedLanguage>(() => {
+  detectLanguageFromContent(): DetectedLanguage {
     const text = this.textContent.value;
     const bookText = this.book.value?.allSentences.join(' ') ?? '';
     const contentToAnalyze = text || bookText;
-    return detectLanguage(contentToAnalyze);
-  });
+    const detected = detectLanguage(contentToAnalyze);
+    this.detectedLanguage.value = detected;
+    return detected;
+  }
 
   // ========== Text Content Actions ==========
 

@@ -4,6 +4,7 @@
 
 import { defaultConfig } from '@/config';
 import { sanitizeFilename } from '@/utils/fileUtils';
+import { parseMP3Duration } from './MP3Parser';
 import type { IFFmpegService, IAudioMerger, MergeProgressCallback } from './interfaces';
 
 export interface MergedFile {
@@ -64,13 +65,34 @@ export class AudioMerger implements IAudioMerger {
    * - Audio with different sample rates
    * - Heavily compressed or expanded audio
    *
-   * The heuristic is acceptable here because:
-   * - Edge TTS consistently outputs 96kbps MP3
-   * - Merge boundaries don't need to be exact (±10% tolerance)
-   * - Actual duration is recalculated after FFmpeg processing if needed
+   * This is now used only as a fallback when MP3 header parsing fails.
    */
-  private estimateDurationMs(bytes: number): number {
+  private estimateDurationMsFallback(bytes: number): number {
     return Math.round(bytes / defaultConfig.audio.bytesPerMs);
+  }
+
+  /**
+   * Get duration from MP3 file, with fallback to byte heuristic
+   * Reads file from disk and parses MP3 headers for accurate duration
+   */
+  private async getDurationMs(
+    filename: string,
+    tempDirHandle: FileSystemDirectoryHandle
+  ): Promise<number> {
+    try {
+      const audio = await this.readChunkFromDisk(filename, tempDirHandle);
+      const parsedDuration = parseMP3Duration(audio);
+
+      if (parsedDuration !== null && parsedDuration > 0) {
+        return parsedDuration;
+      }
+
+      // Fallback to byte heuristic
+      return this.estimateDurationMsFallback(audio.length);
+    } catch {
+      // If we can't read the file, return 0
+      return 0;
+    }
   }
 
   /**
@@ -140,12 +162,11 @@ export class AudioMerger implements IAudioMerger {
       const isFileBoundary = currentFile !== lastFilename;
       const isLastItem = i === totalSentences - 1;
 
-      // Get file size from disk
+      // Get actual duration from MP3 headers (with fallback to byte heuristic)
       const chunkFilename = audioMap.get(i);
       let chunkDurationMs = 0;
       if (chunkFilename) {
-        const fileSize = await this.getFileSize(chunkFilename, tempDirHandle);
-        chunkDurationMs = this.estimateDurationMs(fileSize);
+        chunkDurationMs = await this.getDurationMs(chunkFilename, tempDirHandle);
       }
 
       // Check if adding this chunk would exceed max duration

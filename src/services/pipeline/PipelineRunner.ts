@@ -56,6 +56,16 @@ export class PipelineRunner implements IPipelineRunner {
       try {
         currentContext = await step.execute(currentContext, signal);
         this.logger.info(`Completed step: ${step.name}`);
+
+        // Auto-cleanup context keys that this step no longer needs
+        if (step.dropsContextKeys && step.dropsContextKeys.length > 0) {
+          for (const key of step.dropsContextKeys) {
+            if (key in currentContext) {
+              // Use delete operator instead of setting to undefined
+              delete (currentContext as unknown as Record<string, unknown>)[key];
+            }
+          }
+        }
       } catch (error) {
         // Re-throw cancellation errors as-is
         if (signal.aborted || (error as Error).message === 'Pipeline cancelled') {

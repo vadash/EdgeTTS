@@ -17,6 +17,7 @@ export interface SaveStepOptions {
 export class SaveStep extends BasePipelineStep {
   readonly name = 'save';
   protected readonly requiredContextKeys: (keyof PipelineContext)[] = [];
+  readonly dropsContextKeys: (keyof PipelineContext)[] = ['mergedFiles'];
 
   constructor(private options: SaveStepOptions) {
     super();

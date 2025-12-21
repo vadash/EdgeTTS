@@ -43,8 +43,10 @@ export class ConversionOrchestrator {
       throw new AppError('LLM_NOT_CONFIGURED', 'LLM API key not configured');
     }
 
+    // Detect language explicitly before conversion
+    const detectedLang = this.stores.data.detectLanguageFromContent();
+
     // Validate voice pool size (need 5+ total, 2+ male, 2+ female)
-    const detectedLang = this.stores.data.detectedLanguage.value;
     const enabledVoices = this.stores.settings.enabledVoices.value;
     const pool = this.voicePoolBuilder.buildPool(detectedLang, enabledVoices);
     const totalVoices = pool.male.length + pool.female.length;
@@ -57,6 +59,10 @@ export class ConversionOrchestrator {
     this.stores.conversion.startConversion();
     this.stores.logs.startTimer();
     this.stores.llm.resetProcessingState();
+
+    // Clear text content immediately after conversion starts
+    this.stores.data.setTextContent('');
+    this.stores.data.setBook(null);
 
     // Log language
     this.logger.info(`Detected language: ${detectedLang.toUpperCase()}`);
@@ -202,11 +208,6 @@ export class ConversionOrchestrator {
         this.stores.conversion.setStatus('converting');
         this.stores.llm.setProcessingStatus('idle');
         this.stores.conversion.updateProgress(progress.current, progress.total);
-        // Clear large data no longer needed to reduce memory
-        if (progress.current === 0) {
-          this.stores.data.setTextContent('');
-          this.stores.data.setBook(null);
-        }
         break;
 
       case StepNames.AUDIO_MERGE:

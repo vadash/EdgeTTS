@@ -255,19 +255,32 @@ describe('DataStore', () => {
     });
 
     describe('detectedLanguage', () => {
+      it('defaults to English', () => {
+        expect(store.detectedLanguage.value).toBe('en');
+      });
+
       it('detects English from text content', () => {
         store.setTextContent('This is English text with many words.');
+        store.detectLanguageFromContent();
         expect(store.detectedLanguage.value).toBe('en');
       });
 
       it('detects Russian from text content', () => {
         store.setTextContent('Это русский текст с множеством слов.');
+        store.detectLanguageFromContent();
         expect(store.detectedLanguage.value).toBe('ru');
       });
 
       it('detects from book when no text content', () => {
         store.setBook({ allSentences: ['Русский текст.'], fileNames: [] });
+        store.detectLanguageFromContent();
         expect(store.detectedLanguage.value).toBe('ru');
+      });
+
+      it('returns detected language from method', () => {
+        store.setTextContent('Это русский текст.');
+        const detected = store.detectLanguageFromContent();
+        expect(detected).toBe('ru');
       });
     });
   });

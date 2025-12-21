@@ -158,6 +158,9 @@ export interface IPipelineStep {
   /** Unique name for this step */
   readonly name: string;
 
+  /** Context keys that this step no longer needs after execution */
+  readonly dropsContextKeys?: (keyof PipelineContext)[];
+
   /**
    * Execute this pipeline step
    * @param context Current pipeline context
@@ -210,6 +213,7 @@ export interface IPipelineRunner {
 export abstract class BasePipelineStep implements IPipelineStep {
   abstract readonly name: string;
   protected abstract readonly requiredContextKeys: (keyof PipelineContext)[];
+  readonly dropsContextKeys?: (keyof PipelineContext)[];
   protected progressCallback?: ProgressCallback;
 
   abstract execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext>;
