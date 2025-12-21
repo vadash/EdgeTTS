@@ -136,7 +136,8 @@ export const defaultConfig: AppConfig = {
 
   retry: {
     // Shared retry delays for TTS and LLM - stays on last value forever
-    delays: [5000, 10000, 20000, 40000, 60000, 120000],
+    // Extended to 10 minutes max to handle rate limiting
+    delays: [5000, 10000, 30000, 60000, 120000, 300000, 600000],
   },
 
   ffmpeg: {

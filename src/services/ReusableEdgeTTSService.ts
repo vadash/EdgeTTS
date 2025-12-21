@@ -302,9 +302,9 @@ export class ReusableEdgeTTSService {
     this.stopKeepAlive();
     this.keepAliveTimer = setInterval(() => {
       if (this.state === 'READY' && this.socket?.readyState === WebSocket.OPEN) {
-        // Send a no-op ping to keep connection alive
-        // Edge TTS doesn't have a formal ping, but sending empty speech.config is harmless
-        this.logger?.debug('Sending keep-alive');
+        // Send speech.config as keep-alive (harmless re-send)
+        this.sendConfig();
+        this.logger?.debug('Sent keep-alive');
       }
     }, KEEP_ALIVE_INTERVAL);
   }

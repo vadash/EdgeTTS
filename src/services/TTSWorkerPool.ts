@@ -59,6 +59,12 @@ export class TTSWorkerPool implements IWorkerPool {
   private onAllComplete?: () => void;
   private logger?: ILogger;
 
+  // Global pause mechanism for rate limiting protection
+  private consecutiveFailures = 0;
+  private globalPauseUntil = 0;
+  private readonly PAUSE_THRESHOLD = 30;
+  private readonly PAUSE_DURATION = 300000; // 5 minutes
+
   constructor(options: WorkerPoolOptions) {
     this.maxWorkers = options.maxWorkers;
     this.voiceConfig = options.config;
@@ -148,6 +154,18 @@ export class TTSWorkerPool implements IWorkerPool {
     }
 
     while (this.activeTasks.size < this.maxWorkers && this.queue.length > 0) {
+      // Check global pause (rate limiting protection)
+      if (Date.now() < this.globalPauseUntil) {
+        const waitTime = this.globalPauseUntil - Date.now();
+        this.onStatusUpdate?.({
+          partIndex: -1,
+          message: `Rate limited - pausing for ${Math.round(waitTime / 1000)}s...`,
+          isComplete: false,
+        });
+        await new Promise((resolve) => setTimeout(resolve, Math.min(waitTime, 10000)));
+        continue;
+      }
+
       // Check error cooldown
       const timeSinceError = Date.now() - this.lastErrorTime;
       if (this.lastErrorTime > 0 && timeSinceError < this.ttsConfig.errorCooldown) {
@@ -195,6 +213,7 @@ export class TTSWorkerPool implements IWorkerPool {
     this.activeTasks.delete(partIndex);
     this.completedAudio.set(partIndex, filename);
     this.completedCount++;
+    this.consecutiveFailures = 0; // Reset on success
 
     this.onStatusUpdate?.({
       partIndex,
@@ -209,6 +228,14 @@ export class TTSWorkerPool implements IWorkerPool {
 
   private handleTaskError(partIndex: number, error: Error, retryCount: number): void {
     this.lastErrorTime = Date.now();
+    this.consecutiveFailures++;
+
+    // Trigger global pause if too many consecutive failures
+    if (this.consecutiveFailures >= this.PAUSE_THRESHOLD && this.globalPauseUntil < Date.now()) {
+      this.globalPauseUntil = Date.now() + this.PAUSE_DURATION;
+      this.logger?.warn(`Global pause triggered: ${this.consecutiveFailures} consecutive failures, waiting 5 minutes`);
+    }
+
     const task = this.activeTasks.get(partIndex);
     this.activeTasks.delete(partIndex);
 

@@ -12,6 +12,7 @@ export interface PooledConnection {
   inUse: boolean;
   lastUsed: number;
   errorCount: number;
+  createdAt: number;
 }
 
 export interface ConnectionPoolOptions {
@@ -39,6 +40,9 @@ export class TTSConnectionPool {
   private nextId = 0;
   private logger?: ILogger;
   private isShuttingDown = false;
+
+  // Refresh connections after 30 minutes to prevent staleness
+  private readonly MAX_CONNECTION_AGE = 30 * 60 * 1000;
 
   constructor(options: ConnectionPoolOptions) {
     this.maxConnections = options.maxConnections;
@@ -96,6 +100,16 @@ export class TTSConnectionPool {
     );
 
     if (available) {
+      // Check if connection is too old and needs refresh
+      if (Date.now() - available.createdAt > this.MAX_CONNECTION_AGE) {
+        this.logger?.debug(`Connection ${available.id} expired (age: ${Math.round((Date.now() - available.createdAt) / 60000)}min), reconnecting`);
+        available.service.disconnect();
+        available.inUse = true;
+        await available.service.connect();
+        available.createdAt = Date.now();
+        return available;
+      }
+
       available.inUse = true;
       this.logger?.debug(`Acquired existing connection ${available.id}`);
       return available;
@@ -108,6 +122,7 @@ export class TTSConnectionPool {
 
     if (disconnected) {
       disconnected.inUse = true;
+      disconnected.createdAt = Date.now(); // Reset age on reconnect
       this.logger?.debug(`Reconnecting connection ${disconnected.id}`);
       await disconnected.service.connect();
       return disconnected;
@@ -186,6 +201,7 @@ export class TTSConnectionPool {
       inUse: false,
       lastUsed: 0,
       errorCount: 0,
+      createdAt: Date.now(),
     };
 
     this.connections.push(connection);
