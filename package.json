@@ -12,7 +12,8 @@
     "test:real": "vitest run --config vitest.real.config.ts",
     "test:llm": "vitest run --config vitest.llm.config.ts",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "repomix": "repomix --include src/**/*.ts --compress"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.10",

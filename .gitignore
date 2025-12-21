@@ -24,7 +24,9 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 
+# Secrets
+test.config.local.ts
+
 # User
 /.claude/
-test.config.local.ts
-/repomix-output.txt
+/repomix-*
