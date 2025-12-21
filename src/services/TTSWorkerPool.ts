@@ -42,6 +42,7 @@ export class TTSWorkerPool implements IWorkerPool {
   private activeTasks: Map<number, QueuedTask> = new Map();
   private completedAudio: Map<number, string> = new Map();
   private failedTasks: Set<number> = new Set();
+  private inFlightParts: Set<number> = new Set();
   private totalTasks = 0;
   private completedCount = 0;
   private isProcessingQueue = false;
@@ -153,7 +154,7 @@ export class TTSWorkerPool implements IWorkerPool {
       this.initPromise = null;
     }
 
-    while (this.activeTasks.size < this.maxWorkers && this.queue.length > 0) {
+    while (this.inFlightParts.size < this.maxWorkers && this.queue.length > 0) {
       // Check global pause (rate limiting protection)
       if (Date.now() < this.globalPauseUntil) {
         const waitTime = this.globalPauseUntil - Date.now();
@@ -182,6 +183,9 @@ export class TTSWorkerPool implements IWorkerPool {
 
   private async processTask(task: QueuedTask): Promise<void> {
     this.activeTasks.set(task.partIndex, task);
+    if (task.retryCount === 0) {
+      this.inFlightParts.add(task.partIndex);
+    }
 
     this.onStatusUpdate?.({
       partIndex: task.partIndex,
@@ -211,6 +215,7 @@ export class TTSWorkerPool implements IWorkerPool {
 
   private handleTaskComplete(partIndex: number, filename: string): void {
     this.activeTasks.delete(partIndex);
+    this.inFlightParts.delete(partIndex);
     this.completedAudio.set(partIndex, filename);
     this.completedCount++;
     this.consecutiveFailures = 0; // Reset on success
@@ -334,6 +339,7 @@ export class TTSWorkerPool implements IWorkerPool {
     this.activeTasks.clear();
     this.completedAudio.clear();
     this.failedTasks.clear();
+    this.inFlightParts.clear();
     this.totalTasks = 0;
     this.completedCount = 0;
   }
