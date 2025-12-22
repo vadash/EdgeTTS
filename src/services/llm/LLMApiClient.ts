@@ -184,17 +184,19 @@ export class LLMApiClient {
             const delay = getRetryDelay(error.attemptNumber - 1);
 
             // Check if this was a validation error or API error
-            const isValidationError = 'validationErrors' in error;
+            // p-retry passes context object with {error, attemptNumber, ...}
+            const originalError = (error as any).error || error;
+            const isValidationError = 'validationErrors' in originalError;
 
             if (isValidationError) {
               this.logger?.warn(
                 `[${pass}] Validation failed, retry ${error.attemptNumber}, waiting ${delay / 1000}s...`,
-                { errors: (error as any).validationErrors, response: (error as any).responsePreview }
+                { errors: originalError.validationErrors, response: originalError.responsePreview }
               );
             } else {
               this.logger?.error(
                 `[${pass}] API error, retry ${error.attemptNumber}, waiting ${delay / 1000}s...`,
-                error instanceof Error ? error : new Error(String(error))
+                originalError instanceof Error ? originalError : new Error(String(originalError))
               );
             }
 
