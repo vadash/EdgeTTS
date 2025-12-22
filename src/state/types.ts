@@ -25,6 +25,7 @@ export interface AppSettings {
   silenceRemovalEnabled: boolean;
   normalizationEnabled: boolean;
   deEssEnabled: boolean;
+  silenceGapMs: number;
 }
 
 export interface ProcessedBook {

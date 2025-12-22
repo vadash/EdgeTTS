@@ -85,6 +85,7 @@ export class ConversionOrchestrator {
         silenceRemoval: this.stores.settings.silenceRemovalEnabled.value,
         normalization: this.stores.settings.normalizationEnabled.value,
         deEss: this.stores.settings.deEssEnabled.value,
+        silenceGapMs: this.stores.settings.silenceGapMs.value,
 
         // Per-stage LLM settings
         extractConfig: {

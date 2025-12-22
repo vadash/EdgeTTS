@@ -27,6 +27,7 @@ export interface MergerConfig {
   silenceRemoval: boolean;
   normalization: boolean;
   deEss: boolean;
+  silenceGapMs: number;
 }
 
 /**
@@ -284,6 +285,7 @@ export class AudioMerger implements IAudioMerger {
             silenceRemoval: this.config.silenceRemoval,
             normalization: this.config.normalization,
             deEss: this.config.deEss,
+            silenceGapMs: this.config.silenceGapMs,
           },
           onProgress
         );

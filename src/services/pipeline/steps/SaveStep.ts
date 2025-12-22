@@ -44,6 +44,7 @@ export class SaveStep extends BasePipelineStep {
       silenceRemoval: false,
       normalization: false,
       deEss: false,
+      silenceGapMs: 0,
     });
 
     await merger.saveMergedFiles(mergedFiles, directoryHandle);

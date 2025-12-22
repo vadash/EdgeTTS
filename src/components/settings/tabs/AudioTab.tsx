@@ -83,6 +83,30 @@ export function AudioTab() {
             />
           </div>
 
+          {/* Silence Gap */}
+          <div className="p-4 bg-primary rounded-lg border border-border">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <div className="font-medium">
+                  <Text id="settings.silenceGap">Gap Between Chunks</Text>
+                </div>
+                <div className="text-sm text-gray-400">
+                  <Text id="settings.silenceGapHint">Add silence between audio segments</Text>
+                </div>
+              </div>
+              <span className="text-sm font-mono">{settings.silenceGapMs.value}ms</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="500"
+              step="10"
+              value={settings.silenceGapMs.value}
+              onChange={(e) => settings.setSilenceGapMs(Number((e.target as HTMLInputElement).value))}
+              className="w-full"
+            />
+          </div>
+
           {/* FFmpeg Warning */}
           {conversion.ffmpegError.value && (
             <div className="p-3 rounded-lg bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">

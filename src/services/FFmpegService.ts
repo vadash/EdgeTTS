@@ -10,6 +10,7 @@ export interface AudioProcessingConfig {
   silenceRemoval: boolean;
   normalization: boolean;
   deEss: boolean;
+  silenceGapMs: number;
 }
 
 const CDN_MIRRORS = defaultConfig.ffmpeg.cdnMirrors;
@@ -116,8 +117,33 @@ export class FFmpegService implements IFFmpegService {
         inputFiles.push(filename);
       }
 
-      // Create concat file list
-      const concatList = inputFiles.map(f => `file '${f}'`).join('\n');
+      // Generate silence file if needed (for inter-chunk gaps)
+      const silenceGapMs = config.silenceGapMs ?? 0;
+      let hasSilenceFile = false;
+      if (silenceGapMs > 0 && inputFiles.length > 1) {
+        onProgress?.(`Generating ${silenceGapMs}ms silence gaps...`);
+        await ffmpeg.exec([
+          '-f', 'lavfi',
+          '-i', `anullsrc=r=${defaultConfig.audio.sampleRate}:cl=mono`,
+          '-t', String(silenceGapMs / 1000),
+          '-c:a', 'libmp3lame',
+          '-b:a', '96k',
+          'silence.mp3'
+        ]);
+        hasSilenceFile = true;
+      }
+
+      // Create concat file list (with silence interleaved if enabled)
+      let concatList: string;
+      if (hasSilenceFile) {
+        concatList = inputFiles
+          .map((f, i) => i < inputFiles.length - 1
+            ? `file '${f}'\nfile 'silence.mp3'`
+            : `file '${f}'`)
+          .join('\n');
+      } else {
+        concatList = inputFiles.map(f => `file '${f}'`).join('\n');
+      }
       await ffmpeg.writeFile('concat.txt', concatList);
 
       // Build filter chain
@@ -206,6 +232,12 @@ export class FFmpegService implements IFFmpegService {
       }
       await this.ffmpeg.deleteFile('concat.txt');
       await this.ffmpeg.deleteFile('output.opus');
+      // Try to delete silence file if it exists
+      try {
+        await this.ffmpeg.deleteFile('silence.mp3');
+      } catch {
+        // Ignore - file may not exist
+      }
     } catch {
       // Ignore cleanup errors
     }
@@ -216,7 +248,7 @@ export class FFmpegService implements IFFmpegService {
 
     try {
       // Try to clean common files
-      const filesToDelete = ['concat.txt', 'output.opus'];
+      const filesToDelete = ['concat.txt', 'output.opus', 'silence.mp3'];
       for (let i = 0; i < 10000; i++) {
         filesToDelete.push(`input_${i.toString().padStart(5, '0')}.mp3`);
       }

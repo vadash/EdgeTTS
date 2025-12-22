@@ -26,6 +26,7 @@ const defaultSettings: AppSettings = {
   silenceRemovalEnabled: true,
   normalizationEnabled: false,
   deEssEnabled: false,
+  silenceGapMs: 100,
 };
 
 /**
@@ -51,6 +52,7 @@ export class SettingsStore {
   readonly silenceRemovalEnabled = signal<boolean>(defaultSettings.silenceRemovalEnabled);
   readonly normalizationEnabled = signal<boolean>(defaultSettings.normalizationEnabled);
   readonly deEssEnabled = signal<boolean>(defaultSettings.deEssEnabled);
+  readonly silenceGapMs = signal<number>(defaultSettings.silenceGapMs);
 
   // Text processing settings
   readonly lexxRegister = signal<boolean>(defaultSettings.lexxRegister);
@@ -154,6 +156,11 @@ export class SettingsStore {
     this.save();
   }
 
+  setSilenceGapMs(value: number): void {
+    this.silenceGapMs.value = value;
+    this.save();
+  }
+
   // ========== Text Processing Setters ==========
 
   setLexxRegister(value: boolean): void {
@@ -211,6 +218,7 @@ export class SettingsStore {
       silenceRemovalEnabled: this.silenceRemovalEnabled.value,
       normalizationEnabled: this.normalizationEnabled.value,
       deEssEnabled: this.deEssEnabled.value,
+      silenceGapMs: this.silenceGapMs.value,
     };
     localStorage.setItem(StorageKeys.settings, JSON.stringify(settings));
   }
@@ -240,6 +248,7 @@ export class SettingsStore {
         this.silenceRemovalEnabled.value = settings.silenceRemovalEnabled ?? defaultSettings.silenceRemovalEnabled;
         this.normalizationEnabled.value = settings.normalizationEnabled ?? defaultSettings.normalizationEnabled;
         this.deEssEnabled.value = settings.deEssEnabled ?? defaultSettings.deEssEnabled;
+        this.silenceGapMs.value = settings.silenceGapMs ?? defaultSettings.silenceGapMs;
       }
     } catch (e) {
       this.logStore.error(
@@ -270,6 +279,7 @@ export class SettingsStore {
     this.silenceRemovalEnabled.value = defaultSettings.silenceRemovalEnabled;
     this.normalizationEnabled.value = defaultSettings.normalizationEnabled;
     this.deEssEnabled.value = defaultSettings.deEssEnabled;
+    this.silenceGapMs.value = defaultSettings.silenceGapMs;
     this.save();
   }
 
@@ -294,6 +304,7 @@ export class SettingsStore {
       silenceRemovalEnabled: this.silenceRemovalEnabled.value,
       normalizationEnabled: this.normalizationEnabled.value,
       deEssEnabled: this.deEssEnabled.value,
+      silenceGapMs: this.silenceGapMs.value,
     };
   }
 }

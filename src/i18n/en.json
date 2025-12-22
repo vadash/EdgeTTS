@@ -47,6 +47,8 @@
     "normalizationHint": "Balance audio levels",
     "deEss": "De-Ess",
     "deEssHint": "Reduce harsh sibilant sounds",
+    "silenceGap": "Gap Between Chunks",
+    "silenceGapHint": "Add silence between audio segments",
     "dictionary": {
       "title": "Dictionary",
       "label": "Dictionary register",

@@ -55,6 +55,7 @@ export interface PipelineBuilderOptions {
   silenceRemoval: boolean;
   normalization: boolean;
   deEss: boolean;
+  silenceGapMs: number;
 
   // Per-stage LLM settings
   extractConfig: StageLLMConfig;
@@ -194,6 +195,7 @@ export class PipelineBuilder implements IPipelineBuilder {
         silenceRemoval: options.silenceRemoval,
         normalization: options.normalization,
         deEss: options.deEss,
+        silenceGapMs: options.silenceGapMs,
         ffmpegService: this.ffmpegService,
         createAudioMerger: (cfg: MergerConfig) => this.audioMergerFactory.create(cfg),
       })

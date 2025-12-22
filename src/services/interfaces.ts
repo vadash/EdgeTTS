@@ -107,6 +107,7 @@ export interface MergerConfig {
   silenceRemoval: boolean;
   normalization: boolean;
   deEss: boolean;
+  silenceGapMs: number;
 }
 
 /**
@@ -222,6 +223,7 @@ export interface AudioProcessingOptions {
   silenceRemoval: boolean;
   normalization: boolean;
   deEss: boolean;
+  silenceGapMs: number;
 }
 
 /**
