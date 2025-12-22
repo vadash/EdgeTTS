@@ -10,7 +10,8 @@ import { jsonrepair } from 'jsonrepair';
 export function stripThinkingTags(content: string): string {
   return content
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .replace(/<scratchpad>[\s\S]*?<\/scratchpad>/gi, '');
 }
 
 /**

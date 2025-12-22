@@ -379,6 +379,54 @@ Example: "Protagonist"→"Jay"→"Jason Miller"
 
 ---
 
+## CHAIN OF THOUGHT (Required)
+
+<scratchpad_instructions>
+You MUST use <scratchpad> tags for step-by-step reasoning before outputting JSON.
+
+Inside <scratchpad>, work through these steps:
+1. **List candidates**: Identify potential duplicate pairs/groups
+2. **Apply merge rules**: Check Protagonist linking, System unification, name hierarchy
+3. **Apply anti-merge rules**: Verify no family members, no gender conflicts, no different roles
+4. **Determine keep vs absorb**: For each merge group, pick the most specific name to keep
+5. **Validate**: Confirm all indices are valid and no duplicates
+
+Example:
+<scratchpad>
+Characters to analyze:
+0. "Protagonist" (unknown)
+1. "Jason" (male)
+2. "System" (female)
+3. "Interface" (female)
+4. "The Dark Lord" (male)
+5. "Azaroth" (male)
+
+Step 1 - Potential duplicates:
+- "Protagonist" + "Jason" → both could be narrator?
+- "System" + "Interface" → LitRPG convention, same entity
+- "The Dark Lord" + "Azaroth" → title + name pattern
+
+Step 2 - Apply merge rules:
+- Protagonist (unknown) + Jason (male) → Jason is likely narrator → MERGE, keep Jason (1)
+- System + Interface → both game interface → MERGE, keep System (2)
+- The Dark Lord + Azaroth → title + proper name → MERGE, keep Azaroth (5)
+
+Step 3 - Anti-merge check:
+- No family relationships
+- No gender conflicts (Protagonist is unknown, resolves to male)
+- No different roles
+
+Step 4 - Final groups:
+- [1, 0] → Jason absorbs Protagonist
+- [2, 3] → System absorbs Interface
+- [5, 4] → Azaroth absorbs The Dark Lord
+</scratchpad>
+
+Then output your JSON result. The scratchpad will be automatically stripped.
+</scratchpad_instructions>
+
+---
+
 ## OUTPUT FORMAT
 
 <output_format>
@@ -507,15 +555,21 @@ Before outputting, verify:
 </character_list>
 
 <instruction>
-Review the character list above carefully. Identify and merge any duplicate entries that refer to the same person.
+Review the character list in <character_list> tags above. Identify and merge any duplicate entries that refer to the same person.
+
+First, use <scratchpad> tags to reason through:
+1. List potential duplicate candidates
+2. Apply merge rules (Protagonist linking, System unification, name hierarchy)
+3. Apply anti-merge rules (family, gender conflicts, different roles)
+4. Determine keep vs absorb for each group
+5. Validate all indices
+
+Then output valid JSON only (no markdown, no explanations).
 
 Remember:
 - Merge System/Interface variants into "System"
 - Link Protagonist to named character if appropriate
 - Keep the most specific proper name
 - Do NOT merge different people (family, different roles)
-- Account for ALL characters in output
-
-Output valid JSON only. No explanations.
 </instruction>`,
 };

@@ -380,6 +380,44 @@ If after trying ALL methods you STILL cannot determine the speaker:
 
 ---
 
+## CHAIN OF THOUGHT (Required)
+
+<scratchpad_instructions>
+You MUST use <scratchpad> tags for step-by-step reasoning before outputting assignments.
+
+Inside <scratchpad>, work through each paragraph using the decision flowchart:
+1. **Check LitRPG format**: Is it [bracketed]? → System
+2. **Check speech tags**: "said X", "X asked"? → Named character
+3. **Check action beats**: Character action near dialogue? → Acting character
+4. **Check first-person**: "I" as subject? → Protagonist
+5. **Use conversation flow**: Alternate speakers in dialogue
+
+Example:
+<scratchpad>
+Analyzing paragraphs with speakers A=John, B=Mary, C=System, D=Protagonist:
+
+0: John smiled. "Hello there!"
+   → Action beat "John smiled" before dialogue → Speaker = John → 0:A
+
+1: "Nice to meet you," Mary replied.
+   → Speech tag "Mary replied" → Speaker = Mary → 1:B
+
+2: [Quest Accepted: Find the Lost Sword]
+   → Square brackets = LitRPG system → Speaker = System → 2:C
+
+3: I nodded. "Let's do this."
+   → First-person "I nodded" → Speaker = Protagonist → 3:D
+
+4: "Be careful," the old man warned.
+   → Speech tag "the old man warned" → Need to match to code...
+   → Check speaker list... E=Old Man → 4:E
+</scratchpad>
+
+Then output ONLY the index:CODE pairs. The scratchpad will be automatically stripped.
+</scratchpad_instructions>
+
+---
+
 ## OUTPUT FORMAT
 
 <output_format>
@@ -485,23 +523,27 @@ For each paragraph, follow this decision tree:
 ## BEGIN ASSIGNMENT
 
 Analyze the paragraphs below. Apply the Attribution Methodology.
-Output ONLY the index:CODE pairs.
-No explanations. No reasoning. Just the assignments.
+First reason in <scratchpad> tags, then output the index:CODE pairs.
 One line per paragraph.`,
   userTemplate: `<dialogue_paragraphs>
 {{paragraphs}}
 </dialogue_paragraphs>
 
 <instruction>
-Assign a speaker code to each numbered paragraph above.
+Assign a speaker code to each numbered paragraph in <dialogue_paragraphs> tags above.
+Use the speaker codes from <speaker_list> in the system prompt.
+
+First, use <scratchpad> tags to analyze each paragraph:
+1. Check for [brackets] → System
+2. Check for speech tags → Named character
+3. Check for action beats → Acting character
+4. Check for first-person "I" → Protagonist
+5. Use conversation flow if needed
+
+Then output ONLY the index:CODE pairs (one per line, no other text).
 
 Remember:
 - [Bracketed text] = System
-- Look for speech tags and action beats
-- Avoid the vocative trap (names inside quotes are listeners)
-- First-person "I" = Protagonist/Narrator
-
-Output format: index:CODE
-One per line. No other text.
+- Avoid the vocative trap (names inside quotes are listeners, not speakers)
 </instruction>`,
 };

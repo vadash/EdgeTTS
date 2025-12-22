@@ -1,5 +1,5 @@
 import type { LLMValidationResult, LLMCharacter } from '@/state/types';
-import { extractJSON } from '@/utils/llmUtils';
+import { extractJSON, stripThinkingTags } from '@/utils/llmUtils';
 
 /**
  * Validate Extract response (character extraction)
@@ -118,16 +118,19 @@ export function validateAssignResponse(
   const minIndex = 0;
   const maxIndex = sentenceCount - 1;
 
+  // Strip thinking/scratchpad tags first
+  const cleaned = stripThinkingTags(response);
+
   // Empty response - we can't validate without knowing which have dialogue
   // Just check we got SOME assignments
-  if (!response.trim()) {
+  if (!cleaned.trim()) {
     errors.push('Empty response');
     return { valid: false, errors };
   }
 
   const assignedIndices = new Set<number>();
 
-  for (const line of response.trim().split('\n')) {
+  for (const line of cleaned.trim().split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
@@ -170,7 +173,10 @@ export function parseAssignResponse(
 ): Map<number, string> {
   const speakerMap = new Map<number, string>();
 
-  for (const line of response.trim().split('\n')) {
+  // Strip thinking/scratchpad tags first
+  const cleaned = stripThinkingTags(response);
+
+  for (const line of cleaned.trim().split('\n')) {
     // More lenient regex: accept [123]:X or 123:X, handles underscores in codes
     const match = line.trim().match(/^\[?(\d+)\]?:([A-Za-z0-9_]+)/);
     if (match) {

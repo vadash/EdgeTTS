@@ -487,6 +487,45 @@ Output: canonicalName="Protagonist", variations=["Protagonist"], gender="unknown
 
 ---
 
+## CHAIN OF THOUGHT (Required)
+
+<scratchpad_instructions>
+You MUST use <scratchpad> tags for step-by-step reasoning before outputting JSON.
+
+Inside <scratchpad>, work through these steps:
+1. **Scan**: List all dialogue markers found (quotes, [brackets], <telepathy>, etc.)
+2. **Attribute**: For each dialogue, identify the speaker using attribution methods
+3. **Merge Check**: Note any same-person references that need merging
+4. **Gender Check**: Verify gender evidence for each character
+5. **Validate**: Confirm no speaking characters are missed
+
+Example:
+<scratchpad>
+1. Found dialogue markers:
+   - Line 3: "Hello there!" (double quotes)
+   - Line 5: [Level Up!] (square brackets = System)
+   - Line 8: "I must leave," said John (speech tag)
+
+2. Speaker attribution:
+   - "Hello there!" → John (action beat before: "John smiled")
+   - [Level Up!] → System (LitRPG convention)
+   - "I must leave," said John → John (explicit tag)
+
+3. Same-person check:
+   - "John" and "The Guard" both appear - context shows John IS the guard → merge
+
+4. Gender evidence:
+   - John: "he" pronoun → male
+   - System: default → female
+
+5. Final character list: John (male), System (female)
+</scratchpad>
+
+Then output your JSON result. The scratchpad will be automatically stripped.
+</scratchpad_instructions>
+
+---
+
 ## OUTPUT FORMAT
 
 <output_format>
@@ -612,14 +651,21 @@ If you cannot determine who is speaking a piece of dialogue after trying all met
 </input_text>
 
 <instruction>
-Analyze the text above carefully. Extract ALL speaking characters following the system instructions.
+Analyze the text in <input_text> tags above. Extract ALL speaking characters following the system instructions.
+
+First, use <scratchpad> tags to reason through:
+1. Scan for all dialogue markers
+2. Attribute each dialogue to a speaker
+3. Check for same-person references to merge
+4. Verify gender evidence
+5. Validate completeness
+
+Then output valid JSON only (no markdown, no explanations).
 
 Remember:
 - Include System for [bracketed messages]
 - Include Protagonist for first-person "I" speech
 - Merge same-person references
 - Avoid the vocative trap
-
-Output valid JSON only. No explanations.
 </instruction>`,
 };
