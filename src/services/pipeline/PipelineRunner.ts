@@ -7,15 +7,17 @@ import type {
   IPipelineStep,
   PipelineContext,
   ProgressCallback,
+  PauseCallback,
 } from './types';
 
 /**
  * Pipeline runner that executes steps in sequence
- * Handles progress reporting and cancellation
+ * Handles progress reporting, cancellation, and pause callbacks
  */
 export class PipelineRunner implements IPipelineRunner {
   private steps: IPipelineStep[] = [];
   private progressCallback?: ProgressCallback;
+  private pauseCallbacks: Map<string, PauseCallback> = new Map();
 
   constructor(private logger: ILogger) {}
 
@@ -29,6 +31,11 @@ export class PipelineRunner implements IPipelineRunner {
     for (const step of this.steps) {
       step.setProgressCallback(callback);
     }
+  }
+
+  setPauseCallback(stepName: string, callback: PauseCallback): void {
+    console.log('[DEBUG] Setting pause callback for step:', stepName);
+    this.pauseCallbacks.set(stepName, callback);
   }
 
   getStepNames(): string[] {
@@ -64,6 +71,21 @@ export class PipelineRunner implements IPipelineRunner {
               // Use delete operator instead of setting to undefined
               delete (currentContext as unknown as Record<string, unknown>)[key];
             }
+          }
+        }
+
+        // Check for pause callback after this step
+        console.log('[DEBUG] Checking pause callback for step:', step.name, 'callbacks:', [...this.pauseCallbacks.keys()]);
+        const pauseCallback = this.pauseCallbacks.get(step.name);
+        if (pauseCallback) {
+          this.logger.info(`Pausing after step: ${step.name}`);
+          // Pause callback can modify context (e.g., update voiceMap)
+          currentContext = await pauseCallback(currentContext);
+          this.logger.info(`Resumed after step: ${step.name}`);
+
+          // Check for cancellation after pause (user might have cancelled during pause)
+          if (signal.aborted) {
+            throw new Error('Pipeline cancelled');
           }
         }
       } catch (error) {

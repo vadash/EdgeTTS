@@ -2,9 +2,13 @@ import { FileDropZone } from './FileDropZone';
 import { QuickVoiceSelect } from './QuickVoiceSelect';
 import { ConvertButton } from './ConvertButton';
 import { TextEditor } from './TextEditor';
+import { VoiceReviewModal } from './VoiceReviewModal';
 import { StatusPanel } from '@/components/status';
+import { useLLM } from '@/stores';
 
 export function ConvertView() {
+  const llm = useLLM();
+
   return (
     <div className="flex-1 flex flex-col md:flex-row gap-4 p-4 min-h-0">
       {/* Left Panel - Controls & Editor */}
@@ -33,6 +37,14 @@ export function ConvertView() {
       <div className="hidden md:flex w-80 lg:w-96 flex-shrink-0 min-h-0">
         <StatusPanel />
       </div>
+
+      {/* Voice Review Modal */}
+      {llm.pendingReview.value && (
+        <VoiceReviewModal
+          onConfirm={() => llm.confirmReview()}
+          onCancel={() => llm.cancelReview()}
+        />
+      )}
     </div>
   );
 }

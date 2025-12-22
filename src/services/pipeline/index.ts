@@ -5,6 +5,7 @@ export type {
   PipelineContext,
   PipelineProgress,
   ProgressCallback,
+  PauseCallback,
   IPipelineStep,
   IPipelineRunner,
 } from './types';

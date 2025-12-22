@@ -1,18 +1,20 @@
 // Save Step
-// Saves merged files to directory
+// Saves merged files and voice mapping to directory
 
 import { BasePipelineStep, PipelineContext } from '../types';
 import type { IAudioMerger, MergerConfig } from '@/services/interfaces';
+import { exportToJSON } from '@/services/VoiceMappingService';
 
 /**
  * Options for SaveStep
  */
 export interface SaveStepOptions {
   createAudioMerger: (config: MergerConfig) => IAudioMerger;
+  narratorVoice: string;
 }
 
 /**
- * Saves merged files to the selected directory
+ * Saves merged files and voice mapping to the selected directory
  */
 export class SaveStep extends BasePipelineStep {
   readonly name = 'save';
@@ -26,7 +28,7 @@ export class SaveStep extends BasePipelineStep {
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
 
-    const { mergedFiles, directoryHandle } = context;
+    const { mergedFiles, directoryHandle, characters, voiceMap, fileNames } = context;
 
     if (!mergedFiles || mergedFiles.length === 0) {
       this.reportProgress(1, 1, 'No files to save');
@@ -46,9 +48,41 @@ export class SaveStep extends BasePipelineStep {
 
     await merger.saveMergedFiles(mergedFiles, directoryHandle);
 
+    // Save voice mapping JSON if we have character data and a directory
+    if (directoryHandle && characters && voiceMap) {
+      try {
+        const bookName = this.extractBookName(fileNames);
+        const json = exportToJSON(characters, voiceMap, this.options.narratorVoice);
+        const fileName = `voices-${bookName}.json`;
+
+        const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(json);
+        await writable.close();
+
+        this.reportProgress(0, 0, `Saved voice mapping: ${fileName}`);
+      } catch {
+        // Non-fatal error - don't fail the whole save if voice mapping fails
+        this.reportProgress(0, 0, 'Warning: Could not save voice mapping');
+      }
+    }
+
     this.reportProgress(mergedFiles.length, mergedFiles.length, 'Save complete');
 
     return context;
+  }
+
+  /**
+   * Extract book name from fileNames for the JSON filename
+   */
+  private extractBookName(fileNames?: Array<[string, number]>): string {
+    if (!fileNames || fileNames.length === 0) {
+      return 'book';
+    }
+    // Get the first filename and clean it up
+    const [name] = fileNames[0];
+    // Remove extension and clean
+    return name.replace(/\.[^.]+$/, '').slice(0, 50) || 'book';
   }
 }
 

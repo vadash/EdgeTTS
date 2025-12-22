@@ -151,6 +151,13 @@ export interface PipelineProgress {
 export type ProgressCallback = (progress: PipelineProgress) => void;
 
 /**
+ * Callback for pausing after a step
+ * Called with the current context, returns a promise that resolves when ready to continue
+ * Can return a modified context to update values (e.g., voiceMap after user review)
+ */
+export type PauseCallback = (context: PipelineContext) => Promise<PipelineContext>;
+
+/**
  * Pipeline step interface
  * Each step transforms the context and passes it to the next step
  */
@@ -200,6 +207,14 @@ export interface IPipelineRunner {
    * @param callback Function to call with progress updates
    */
   setProgressCallback(callback: ProgressCallback): void;
+
+  /**
+   * Set a pause callback to be called after a specific step
+   * The pipeline will pause until the callback promise resolves
+   * @param stepName Name of the step to pause after
+   * @param callback Function that returns a promise (can modify context)
+   */
+  setPauseCallback(stepName: string, callback: PauseCallback): void;
 
   /**
    * Get list of step names

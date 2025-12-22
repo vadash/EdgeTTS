@@ -199,6 +199,7 @@ export class PipelineBuilder implements IPipelineBuilder {
       })
       .addStep(StepNames.SAVE, {
         createAudioMerger: (cfg: MergerConfig) => this.audioMergerFactory.create(cfg),
+        narratorVoice: options.narratorVoice,
       })
       .addStep(StepNames.CLEANUP, {
         logger: this.logger,

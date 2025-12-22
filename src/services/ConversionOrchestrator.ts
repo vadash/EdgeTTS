@@ -135,6 +135,30 @@ export class ConversionOrchestrator {
         this.handleProgress(progress);
       });
 
+      // Set up pause callback for voice review after voice-assignment step
+      pipeline.setPauseCallback(StepNames.VOICE_ASSIGNMENT, async (ctx: PipelineContext) => {
+        // Store characters and voice map for the review UI
+        if (ctx.characters) {
+          this.stores.llm.setCharacters(ctx.characters);
+        }
+        if (ctx.voiceMap) {
+          this.stores.llm.setVoiceMap(ctx.voiceMap);
+        }
+
+        // Trigger review UI and wait for user
+        this.stores.llm.setPendingReview(true);
+        await this.stores.llm.awaitReview();
+
+        // Get the (potentially modified) voice map from the store
+        const reviewedVoiceMap = this.stores.llm.characterVoiceMap.value;
+
+        // Return context with updated voice map
+        return {
+          ...ctx,
+          voiceMap: reviewedVoiceMap,
+        };
+      });
+
       // Run the pipeline
       await pipeline.run(context, this.abortController.signal);
 
@@ -149,6 +173,9 @@ export class ConversionOrchestrator {
       } else if ((error as Error).message === 'Pipeline cancelled') {
         this.stores.conversion.cancel();
         this.logger.info('Conversion cancelled');
+      } else if ((error as Error).message === 'Voice review cancelled') {
+        this.stores.conversion.cancel();
+        this.logger.info('Conversion cancelled by user during voice review');
       } else {
         const appError = AppError.fromUnknown(error);
         this.stores.conversion.setError(appError.message, appError.code);

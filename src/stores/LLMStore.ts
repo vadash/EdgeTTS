@@ -95,6 +95,11 @@ export class LLMStore {
   readonly detectedCharacters = signal<LLMCharacter[]>([]);
   readonly characterVoiceMap = signal<Map<string, string>>(new Map());
 
+  // Voice review state
+  readonly pendingReview = signal<boolean>(false);
+  private reviewResolver: (() => void) | null = null;
+  private reviewRejecter: ((reason: Error) => void) | null = null;
+
   constructor(logStore: LogStore) {
     this.logStore = logStore;
   }
@@ -236,6 +241,50 @@ export class LLMStore {
     this.characterVoiceMap.value = map;
   }
 
+  // ========== Voice Review Actions ==========
+
+  /**
+   * Set pending review state
+   */
+  setPendingReview(value: boolean): void {
+    this.pendingReview.value = value;
+    if (value) {
+      this.processingStatus.value = 'review';
+    }
+  }
+
+  /**
+   * Wait for user to complete voice review
+   * Returns a promise that resolves when user clicks Continue
+   * or rejects when user clicks Cancel
+   */
+  awaitReview(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.reviewResolver = resolve;
+      this.reviewRejecter = reject;
+    });
+  }
+
+  /**
+   * Called when user confirms voice review (Continue button)
+   */
+  confirmReview(): void {
+    this.pendingReview.value = false;
+    this.reviewResolver?.();
+    this.reviewResolver = null;
+    this.reviewRejecter = null;
+  }
+
+  /**
+   * Called when user cancels voice review (Cancel button)
+   */
+  cancelReview(): void {
+    this.pendingReview.value = false;
+    this.reviewRejecter?.(new Error('Voice review cancelled'));
+    this.reviewResolver = null;
+    this.reviewRejecter = null;
+  }
+
   // ========== State Management ==========
 
   /**
@@ -248,6 +297,9 @@ export class LLMStore {
     this.error.value = null;
     this.detectedCharacters.value = [];
     this.characterVoiceMap.value = new Map();
+    this.pendingReview.value = false;
+    this.reviewResolver = null;
+    this.reviewRejecter = null;
   }
 
   /**
