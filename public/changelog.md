@@ -1,22 +1,18 @@
 # Changelog
 
+## 22/12/25
+
+1) New feature: Voice Review & Export/Import
+
+2) One more rewrite for character merging
+
+3) Refactor to battle-tested libraries: p-retry, p-queue, generic-pool
+
 ## 20/12/25
 
 1) Add max retry limit with fallback for LLM assign step
 
-Previously, the assign step could get stuck in infinite retry loops when
-the LLM generated invalid character codes. Now it retries up to 3 times
-(~1.5 min total wait) before falling back to narrator voice for the
-failed block, allowing conversion to complete.
-
 2) Add hierarchical chunked merge for large character lists
-
-- Split large character lists (>150) into 100-char chunks
-- Process chunks sequentially to avoid rate limits
-- Cross-chunk merge catches duplicates across chunks
-- Convergence detection prevents infinite loops:
-  - Max 5 iterations before forcing final merge
-  - Stops if reduction <5% (plateau detection)
 
 ## 08/12/25
 
