@@ -255,6 +255,7 @@ export class AudioMerger implements IAudioMerger {
   /**
    * Merge audio data for a group with FFmpeg processing (async)
    * Reads chunks from disk one by one to minimize memory
+   * Missing chunks are replaced with silence placeholders
    */
   private async mergeAudioGroupAsync(
     audioMap: Map<number, string>,
@@ -263,18 +264,28 @@ export class AudioMerger implements IAudioMerger {
     tempDirHandle: FileSystemDirectoryHandle,
     onProgress?: (message: string) => void
   ): Promise<MergedFile | null> {
-    const chunks: Uint8Array[] = [];
+    const chunks: (Uint8Array | null)[] = [];
+    let missingCount = 0;
 
-    // Read chunks one by one from disk
+    // Read chunks one by one from disk, null for missing
     for (let i = group.fromIndex; i <= group.toIndex; i++) {
       const chunkFilename = audioMap.get(i);
       if (chunkFilename) {
         const audio = await this.readChunkFromDisk(chunkFilename, tempDirHandle);
         chunks.push(audio);
+      } else {
+        chunks.push(null); // Missing chunk - will be replaced with silence
+        missingCount++;
       }
     }
 
-    if (chunks.length === 0) return null;
+    // Warn about missing chunks
+    if (missingCount > 0) {
+      onProgress?.(`Warning: ${missingCount} missing chunk(s) replaced with silence`);
+    }
+
+    // Check if ALL chunks are missing
+    if (chunks.every(c => c === null)) return null;
 
     // Use FFmpeg for Opus encoding
     if (this.config.outputFormat === 'opus' && this.ffmpegService.isAvailable()) {

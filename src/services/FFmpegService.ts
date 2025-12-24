@@ -94,9 +94,10 @@ export class FFmpegService implements IFFmpegService {
 
   /**
    * Process audio chunks: concatenate, remove silence, normalize, encode to Opus
+   * Null entries in chunks array are replaced with silence placeholders
    */
   async processAudio(
-    chunks: Uint8Array[],
+    chunks: (Uint8Array | null)[],
     config: AudioProcessingConfig,
     onProgress?: (message: string) => void
   ): Promise<Uint8Array> {
@@ -107,21 +108,13 @@ export class FFmpegService implements IFFmpegService {
     const ffmpeg = this.ffmpeg;
 
     try {
-      // Write all input chunks to virtual filesystem
-      onProgress?.('Writing audio chunks to FFmpeg...');
-      const inputFiles: string[] = [];
+      // Generate silence file upfront (for gaps and missing chunk placeholders)
+      const silenceGapMs = config.silenceGapMs ?? 200; // Default 200ms for missing chunks
+      const hasMissingChunks = chunks.some(c => c === null);
+      const needsGaps = silenceGapMs > 0 && chunks.filter(c => c !== null).length > 1;
 
-      for (let i = 0; i < chunks.length; i++) {
-        const filename = `input_${i.toString().padStart(5, '0')}.mp3`;
-        await ffmpeg.writeFile(filename, chunks[i]);
-        inputFiles.push(filename);
-      }
-
-      // Generate silence file if needed (for inter-chunk gaps)
-      const silenceGapMs = config.silenceGapMs ?? 0;
-      let hasSilenceFile = false;
-      if (silenceGapMs > 0 && inputFiles.length > 1) {
-        onProgress?.(`Generating ${silenceGapMs}ms silence gaps...`);
+      if (hasMissingChunks || needsGaps) {
+        onProgress?.(`Generating ${silenceGapMs}ms silence...`);
         await ffmpeg.exec([
           '-f', 'lavfi',
           '-i', `anullsrc=r=${defaultConfig.audio.sampleRate}:cl=mono`,
@@ -130,21 +123,45 @@ export class FFmpegService implements IFFmpegService {
           '-b:a', '96k',
           'silence.mp3'
         ]);
-        hasSilenceFile = true;
       }
 
-      // Create concat file list (with silence interleaved if enabled)
-      let concatList: string;
-      if (hasSilenceFile) {
-        concatList = inputFiles
-          .map((f, i) => i < inputFiles.length - 1
-            ? `file '${f}'\nfile 'silence.mp3'`
-            : `file '${f}'`)
-          .join('\n');
-      } else {
-        concatList = inputFiles.map(f => `file '${f}'`).join('\n');
+      // Write all input chunks to virtual filesystem
+      onProgress?.('Writing audio chunks to FFmpeg...');
+      const inputFiles: (string | null)[] = [];
+      let actualFileIndex = 0;
+
+      for (let i = 0; i < chunks.length; i++) {
+        if (chunks[i] !== null) {
+          const filename = `input_${actualFileIndex.toString().padStart(5, '0')}.mp3`;
+          await ffmpeg.writeFile(filename, chunks[i]!);
+          inputFiles.push(filename);
+          actualFileIndex++;
+        } else {
+          // Mark position as missing - will use silence
+          inputFiles.push(null);
+        }
       }
-      await ffmpeg.writeFile('concat.txt', concatList);
+
+      // Create concat file list (with silence for gaps and missing chunks)
+      const concatLines: string[] = [];
+      const actualFiles = inputFiles.filter(f => f !== null);
+      let actualFileIdx = 0;
+
+      for (let i = 0; i < inputFiles.length; i++) {
+        if (inputFiles[i] !== null) {
+          concatLines.push(`file '${inputFiles[i]}'`);
+          // Add gap silence after chunk (except last)
+          if (needsGaps && actualFileIdx < actualFiles.length - 1) {
+            concatLines.push(`file 'silence.mp3'`);
+          }
+          actualFileIdx++;
+        } else {
+          // Missing chunk - insert silence placeholder
+          concatLines.push(`file 'silence.mp3'`);
+        }
+      }
+
+      await ffmpeg.writeFile('concat.txt', concatLines.join('\n'));
 
       // Build filter chain
       const filters = this.buildFilterChain(config);
@@ -176,8 +193,8 @@ export class FFmpegService implements IFFmpegService {
       // Read output
       const output = await ffmpeg.readFile('output.opus');
 
-      // Cleanup virtual filesystem
-      await this.cleanup(inputFiles);
+      // Cleanup virtual filesystem (only actual files, not null placeholders)
+      await this.cleanup(inputFiles.filter((f): f is string => f !== null));
 
       return output as Uint8Array;
     } catch (err) {

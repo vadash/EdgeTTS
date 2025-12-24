@@ -244,9 +244,9 @@ export interface IFFmpegService {
   /** Get load error if loading failed */
   getLoadError(): string | null;
 
-  /** Process audio chunks (concatenate, filter, encode) */
+  /** Process audio chunks (concatenate, filter, encode). Null entries = silence placeholders. */
   processAudio(
-    chunks: Uint8Array[],
+    chunks: (Uint8Array | null)[],
     config: AudioProcessingOptions,
     onProgress?: FFmpegProgressCallback
   ): Promise<Uint8Array>;
