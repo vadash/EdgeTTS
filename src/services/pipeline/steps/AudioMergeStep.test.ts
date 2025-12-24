@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AudioMergeStep, createAudioMergeStep } from './AudioMergeStep';
 import { createTestContext, createNeverAbortSignal, createTestAbortController, collectProgress, createContextWithAudio, createMockDirectoryHandle } from '@/test/pipeline/helpers';
 import { createMockFFmpegService } from '@/test/mocks/MockFFmpegService';
-import type { IAudioMerger, MergerConfig, MergedFile, IFFmpegService } from '@/services/interfaces';
+import type { IAudioMerger, MergerConfig, IFFmpegService } from '@/services/interfaces';
 
 describe('AudioMergeStep', () => {
   let step: AudioMergeStep;
@@ -17,14 +17,9 @@ describe('AudioMergeStep', () => {
     [2, 'chunk_000002.bin'],
   ]);
 
-  const testMergedFiles: MergedFile[] = [
-    { filename: 'output_001.mp3', blob: new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9])]), fromIndex: 0, toIndex: 2 },
-  ];
-
-  const createMockMerger = (files: MergedFile[]): IAudioMerger => ({
+  const createMockMerger = (savedCount: number): IAudioMerger => ({
     calculateMergeGroups: vi.fn(async () => [{ fromIndex: 0, toIndex: 2, filename: 'test', mergeNumber: 1, durationMs: 1000 }]),
-    merge: vi.fn(async () => files),
-    saveMergedFiles: vi.fn(async () => {}),
+    mergeAndSave: vi.fn(async () => savedCount),
   });
 
   beforeEach(() => {
@@ -32,13 +27,14 @@ describe('AudioMergeStep', () => {
     mockFFmpegService = createMockFFmpegService();
     mockFFmpegService.load.mockResolvedValue(true);
 
-    mockAudioMerger = createMockMerger(testMergedFiles);
+    mockAudioMerger = createMockMerger(1);
 
     step = createAudioMergeStep({
       outputFormat: 'mp3',
       silenceRemoval: false,
       normalization: false,
       deEss: false,
+      silenceGapMs: 0,
       ffmpegService: mockFFmpegService,
       createAudioMerger: (config) => {
         capturedConfig = config;
@@ -54,17 +50,20 @@ describe('AudioMergeStep', () => {
   });
 
   describe('execute', () => {
-    it('merges audio chunks', async () => {
-      const context = createContextWithAudio(testAudioMap);
+    it('merges audio chunks and saves to disk', async () => {
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       const result = await step.execute(context, createNeverAbortSignal());
 
-      expect(result.mergedFiles).toBeDefined();
-      expect(result.mergedFiles!.length).toBe(1);
+      expect(result.savedFileCount).toBe(1);
     });
 
     it('calls audio merger with correct parameters', async () => {
+      const directoryHandle = createMockDirectoryHandle();
       const context = createContextWithAudio(testAudioMap, {
         fileNames: [['chapter1', 0]],
+        directoryHandle,
         assignments: [
           { sentenceIndex: 0, text: 'A', speaker: 'N', voiceId: 'v1' },
           { sentenceIndex: 1, text: 'B', speaker: 'N', voiceId: 'v1' },
@@ -74,17 +73,19 @@ describe('AudioMergeStep', () => {
 
       await step.execute(context, createNeverAbortSignal());
 
-      expect(mockAudioMerger.merge).toHaveBeenCalled();
-      const [audioMap, totalChunks, fileNames, tempDirHandle] = (mockAudioMerger.merge as any).mock.calls[0];
+      expect(mockAudioMerger.mergeAndSave).toHaveBeenCalled();
+      const [audioMap, totalChunks, fileNames, tempDirHandle, saveDirHandle] = (mockAudioMerger.mergeAndSave as any).mock.calls[0];
       expect(audioMap.size).toBe(3);
       expect(totalChunks).toBe(3);
       expect(fileNames).toEqual([['chapter1', 0]]);
       expect(tempDirHandle).toBeDefined();
+      expect(saveDirHandle).toBe(directoryHandle);
     });
 
     it('preserves existing context properties', async () => {
       const context = createContextWithAudio(testAudioMap, {
         text: 'Original text.',
+        directoryHandle: createMockDirectoryHandle(),
         characters: [{ code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] }],
       });
 
@@ -94,11 +95,22 @@ describe('AudioMergeStep', () => {
       expect(result.characters).toHaveLength(1);
       expect(result.audioMap).toBe(testAudioMap);
     });
+
+    it('throws when directoryHandle is missing', async () => {
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: null,
+      });
+
+      await expect(step.execute(context, createNeverAbortSignal()))
+        .rejects.toThrow('Save directory handle required');
+    });
   });
 
   describe('output format', () => {
     it('uses MP3 format by default', async () => {
-      const context = createContextWithAudio(testAudioMap);
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       await step.execute(context, createNeverAbortSignal());
 
       expect(capturedConfig?.outputFormat).toBe('mp3');
@@ -110,6 +122,7 @@ describe('AudioMergeStep', () => {
         silenceRemoval: false,
         normalization: false,
         deEss: false,
+        silenceGapMs: 0,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -117,14 +130,16 @@ describe('AudioMergeStep', () => {
         },
       });
 
-      const context = createContextWithAudio(testAudioMap);
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       await step.execute(context, createNeverAbortSignal());
 
       expect(mockFFmpegService.load).toHaveBeenCalled();
       expect(capturedConfig?.outputFormat).toBe('opus');
     });
 
-    it('falls back to MP3 when FFmpeg fails to load', async () => {
+    it('throws when FFmpeg fails to load for Opus', async () => {
       mockFFmpegService.load.mockResolvedValue(false);
 
       step = createAudioMergeStep({
@@ -132,6 +147,7 @@ describe('AudioMergeStep', () => {
         silenceRemoval: false,
         normalization: false,
         deEss: false,
+        silenceGapMs: 0,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -139,14 +155,18 @@ describe('AudioMergeStep', () => {
         },
       });
 
-      const context = createContextWithAudio(testAudioMap);
-      await step.execute(context, createNeverAbortSignal());
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
 
-      expect(capturedConfig?.outputFormat).toBe('mp3');
+      await expect(step.execute(context, createNeverAbortSignal()))
+        .rejects.toThrow('FFmpeg failed to load');
     });
 
     it('does not load FFmpeg for MP3 format', async () => {
-      const context = createContextWithAudio(testAudioMap);
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       await step.execute(context, createNeverAbortSignal());
 
       expect(mockFFmpegService.load).not.toHaveBeenCalled();
@@ -160,6 +180,7 @@ describe('AudioMergeStep', () => {
         silenceRemoval: true,
         normalization: false,
         deEss: false,
+        silenceGapMs: 0,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -167,7 +188,9 @@ describe('AudioMergeStep', () => {
         },
       });
 
-      const context = createContextWithAudio(testAudioMap);
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       await step.execute(context, createNeverAbortSignal());
 
       expect(capturedConfig?.silenceRemoval).toBe(true);
@@ -179,6 +202,7 @@ describe('AudioMergeStep', () => {
         silenceRemoval: false,
         normalization: true,
         deEss: false,
+        silenceGapMs: 0,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -186,7 +210,9 @@ describe('AudioMergeStep', () => {
         },
       });
 
-      const context = createContextWithAudio(testAudioMap);
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       await step.execute(context, createNeverAbortSignal());
 
       expect(capturedConfig?.normalization).toBe(true);
@@ -194,24 +220,31 @@ describe('AudioMergeStep', () => {
   });
 
   describe('empty audio', () => {
-    it('returns empty merged files when no audio', async () => {
-      const context = createContextWithAudio(new Map());
+    it('returns zero savedFileCount when no audio', async () => {
+      const context = createContextWithAudio(new Map(), {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       const result = await step.execute(context, createNeverAbortSignal());
 
-      expect(result.mergedFiles).toEqual([]);
+      expect(result.savedFileCount).toBe(0);
     });
 
-    it('returns empty merged files when audioMap undefined', async () => {
-      const context = createTestContext();
+    it('returns zero savedFileCount when audioMap undefined', async () => {
+      const context = {
+        ...createTestContext(),
+        directoryHandle: createMockDirectoryHandle(),
+      };
       const result = await step.execute(context, createNeverAbortSignal());
 
-      expect(result.mergedFiles).toEqual([]);
+      expect(result.savedFileCount).toBe(0);
     });
   });
 
   describe('progress reporting', () => {
     it('reports progress during merge', async () => {
-      const context = createContextWithAudio(testAudioMap);
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       const { progress } = await collectProgress(step, context);
 
       expect(progress.length).toBeGreaterThan(0);
@@ -223,22 +256,28 @@ describe('AudioMergeStep', () => {
         silenceRemoval: false,
         normalization: false,
         deEss: false,
+        silenceGapMs: 0,
         ffmpegService: mockFFmpegService,
         createAudioMerger: () => mockAudioMerger,
       });
 
-      const context = createContextWithAudio(testAudioMap);
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       const { progress } = await collectProgress(step, context);
 
       expect(progress.some(p => p.message.toLowerCase().includes('ffmpeg'))).toBe(true);
     });
 
-    it('reports merged file count', async () => {
-      const context = createContextWithAudio(testAudioMap);
+    it('reports saved file count', async () => {
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       const { progress } = await collectProgress(step, context);
 
       const finalProgress = progress[progress.length - 1];
-      expect(finalProgress.message).toContain('1 merged');
+      expect(finalProgress.message).toContain('1');
+      expect(finalProgress.message.toLowerCase()).toContain('saved');
     });
   });
 
@@ -247,7 +286,9 @@ describe('AudioMergeStep', () => {
       const controller = createTestAbortController();
       controller.abort();
 
-      const context = createContextWithAudio(testAudioMap);
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       await expect(step.execute(context, controller.signal))
         .rejects.toThrow();
     });
@@ -265,11 +306,14 @@ describe('AudioMergeStep', () => {
         silenceRemoval: false,
         normalization: false,
         deEss: false,
+        silenceGapMs: 0,
         ffmpegService: mockFFmpegService,
         createAudioMerger: () => mockAudioMerger,
       });
 
-      const context = createContextWithAudio(testAudioMap);
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
       await expect(step.execute(context, controller.signal))
         .rejects.toThrow();
     });

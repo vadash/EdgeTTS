@@ -1,6 +1,6 @@
 // Audio Merge Step
-// Merges audio chunks into files
-// Reads chunks from disk to prevent OOM
+// Merges audio chunks and saves immediately to disk
+// Each file is saved as soon as it's merged to minimize RAM
 
 import { BasePipelineStep, PipelineContext } from '../types';
 import type { IAudioMerger, MergerConfig, IFFmpegService } from '@/services/interfaces';
@@ -19,13 +19,12 @@ export interface AudioMergeStepOptions {
 }
 
 /**
- * Merges audio chunks into files
+ * Merges audio chunks and saves each file immediately to disk
  * Handles FFmpeg loading for Opus encoding
- * Reads audio chunks from disk to minimize RAM usage
  */
 export class AudioMergeStep extends BasePipelineStep {
   readonly name = 'audio-merge';
-  protected readonly requiredContextKeys: (keyof PipelineContext)[] = ['audioMap', 'tempDirHandle'];
+  protected readonly requiredContextKeys: (keyof PipelineContext)[] = ['audioMap', 'tempDirHandle', 'directoryHandle'];
   readonly dropsContextKeys: (keyof PipelineContext)[] = ['audioMap'];
 
   constructor(private options: AudioMergeStepOptions) {
@@ -35,18 +34,22 @@ export class AudioMergeStep extends BasePipelineStep {
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
 
-    const { audioMap, tempDirHandle, assignments, fileNames } = context;
+    const { audioMap, tempDirHandle, directoryHandle, assignments, fileNames } = context;
 
     if (!audioMap || audioMap.size === 0) {
       this.reportProgress(1, 1, 'No audio to merge');
       return {
         ...context,
-        mergedFiles: [],
+        savedFileCount: 0,
       };
     }
 
     if (!tempDirHandle) {
       throw new Error('Temp directory handle required for disk-based audio merging');
+    }
+
+    if (!directoryHandle) {
+      throw new Error('Save directory handle required');
     }
 
     // Determine output format
@@ -61,8 +64,7 @@ export class AudioMergeStep extends BasePipelineStep {
       });
 
       if (!loaded) {
-        this.reportProgress(0, 1, 'FFmpeg not available, falling back to MP3');
-        useOpus = false;
+        throw new Error('FFmpeg failed to load. Cannot encode to Opus.');
       }
     }
 
@@ -82,22 +84,23 @@ export class AudioMergeStep extends BasePipelineStep {
 
     this.reportProgress(0, totalChunks, 'Merging audio...');
 
-    // Merge audio - reads from disk
-    const mergedFiles = await merger.merge(
+    // Merge and save immediately to disk
+    const savedCount = await merger.mergeAndSave(
       audioMap,
       totalChunks,
       fileNames,
       tempDirHandle,
+      directoryHandle,
       (current, total, message) => {
         this.reportProgress(current, total, message);
       }
     );
 
-    this.reportProgress(totalChunks, totalChunks, `Created ${mergedFiles.length} merged file(s)`);
+    this.reportProgress(totalChunks, totalChunks, `Saved ${savedCount} file(s)`);
 
     return {
       ...context,
-      mergedFiles,
+      savedFileCount: savedCount,
     };
   }
 }

@@ -1,25 +1,25 @@
 // Save Step
-// Saves merged files and voice mapping to directory
+// Saves voice mapping JSON to directory
+// Audio files are now saved progressively by AudioMergeStep
 
 import { BasePipelineStep, PipelineContext } from '../types';
-import type { IAudioMerger, MergerConfig } from '@/services/interfaces';
 import { exportToJSONSorted } from '@/services/VoiceMappingService';
 
 /**
  * Options for SaveStep
  */
 export interface SaveStepOptions {
-  createAudioMerger: (config: MergerConfig) => IAudioMerger;
   narratorVoice: string;
 }
 
 /**
- * Saves merged files and voice mapping to the selected directory
+ * Saves voice mapping JSON to the selected directory
+ * Audio files are already saved by AudioMergeStep
  */
 export class SaveStep extends BasePipelineStep {
   readonly name = 'save';
   protected readonly requiredContextKeys: (keyof PipelineContext)[] = [];
-  readonly dropsContextKeys: (keyof PipelineContext)[] = ['mergedFiles', 'assignments', 'characters'];
+  readonly dropsContextKeys: (keyof PipelineContext)[] = ['assignments', 'characters'];
 
   constructor(private options: SaveStepOptions) {
     super();
@@ -28,26 +28,10 @@ export class SaveStep extends BasePipelineStep {
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
 
-    const { mergedFiles, directoryHandle, characters, voiceMap, assignments, fileNames } = context;
+    const { savedFileCount, directoryHandle, characters, voiceMap, assignments, fileNames } = context;
 
-    if (!mergedFiles || mergedFiles.length === 0) {
-      this.reportProgress(1, 1, 'No files to save');
-      return context;
-    }
-
-    this.reportProgress(0, mergedFiles.length, `Saving ${mergedFiles.length} file(s)...`);
-
-    // Create merger to use its save functionality
-    // Note: The merger config doesn't matter for saving, we just need the save method
-    const merger = this.options.createAudioMerger({
-      outputFormat: 'mp3',
-      silenceRemoval: false,
-      normalization: false,
-      deEss: false,
-      silenceGapMs: 0,
-    });
-
-    await merger.saveMergedFiles(mergedFiles, directoryHandle);
+    // Audio files already saved by AudioMergeStep
+    this.reportProgress(1, 1, `${savedFileCount ?? 0} audio file(s) saved`);
 
     // Save voice mapping JSON if we have character data and a directory
     if (directoryHandle && characters && voiceMap && assignments) {
@@ -64,14 +48,14 @@ export class SaveStep extends BasePipelineStep {
         await writable.write(json);
         await writable.close();
 
-        this.reportProgress(0, 0, `Saved voice mapping: ${bookName}/${fileName}`);
+        this.reportProgress(1, 1, `Saved voice mapping: ${bookName}/${fileName}`);
       } catch {
         // Non-fatal error - don't fail the whole save if voice mapping fails
-        this.reportProgress(0, 0, 'Warning: Could not save voice mapping');
+        this.reportProgress(1, 1, 'Warning: Could not save voice mapping');
       }
     }
 
-    this.reportProgress(mergedFiles.length, mergedFiles.length, 'Save complete');
+    this.reportProgress(1, 1, 'Complete');
 
     return context;
   }

@@ -148,20 +148,15 @@ export interface IAudioMerger {
     tempDirHandle: FileSystemDirectoryHandle
   ): Promise<MergeGroup[]>;
 
-  /** Merge audio chunks according to groups */
-  merge(
+  /** Merge audio chunks and save each file immediately to disk */
+  mergeAndSave(
     audioMap: Map<number, string>,
     totalSentences: number,
     fileNames: Array<[string, number]>,
     tempDirHandle: FileSystemDirectoryHandle,
+    saveDirectoryHandle: FileSystemDirectoryHandle,
     onProgress?: MergeProgressCallback
-  ): Promise<MergedFile[]>;
-
-  /** Save merged files to a directory */
-  saveMergedFiles(
-    files: MergedFile[],
-    directoryHandle?: FileSystemDirectoryHandle | null
-  ): Promise<void>;
+  ): Promise<number>;
 }
 
 // ============================================================================

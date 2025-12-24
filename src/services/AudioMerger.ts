@@ -335,18 +335,33 @@ export class AudioMerger implements IAudioMerger {
   }
 
   /**
-   * Merge all completed audio (async with FFmpeg support)
-   * Reads audio chunks from disk to prevent OOM
+   * Merge and save all audio immediately to disk
+   * Each file is saved as soon as it's merged to minimize RAM usage
+   * Returns the number of files saved
    */
-  async merge(
+  async mergeAndSave(
     audioMap: Map<number, string>,
     totalSentences: number,
     fileNames: Array<[string, number]>,
     tempDirHandle: FileSystemDirectoryHandle,
+    saveDirectoryHandle: FileSystemDirectoryHandle,
     onProgress?: (current: number, total: number, message: string) => void
-  ): Promise<MergedFile[]> {
+  ): Promise<number> {
+    // Check permissions upfront
+    try {
+      const permission = await saveDirectoryHandle.requestPermission({ mode: 'readwrite' });
+      if (permission !== 'granted') {
+        throw new Error('Directory permission denied. Please grant access to save files.');
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('permission')) {
+        throw err;
+      }
+      throw new Error(`Directory permission check failed: ${(err as Error).message}`);
+    }
+
     const groups = await this.calculateMergeGroups(audioMap, totalSentences, fileNames, tempDirHandle);
-    const results: MergedFile[] = [];
+    let savedCount = 0;
 
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
@@ -362,39 +377,14 @@ export class AudioMerger implements IAudioMerger {
       );
 
       if (merged) {
-        results.push(merged);
+        // Save immediately
+        await this.saveToDirectory(merged, saveDirectoryHandle);
+        onProgress?.(i + 1, groups.length, `Saved ${merged.filename}`);
+        savedCount++;
       }
     }
 
-    return results;
-  }
-
-  /**
-   * Save merged files to directory
-   */
-  async saveMergedFiles(
-    files: MergedFile[],
-    directoryHandle?: FileSystemDirectoryHandle | null
-  ): Promise<void> {
-    if (!directoryHandle) {
-      throw new Error('Directory handle required. Please select a save folder.');
-    }
-
-    try {
-      const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
-      if (permission !== 'granted') {
-        throw new Error('Directory permission denied. Please grant access to save files.');
-      }
-    } catch (err) {
-      if (err instanceof Error && err.message.includes('permission')) {
-        throw err;
-      }
-      throw new Error(`Directory permission check failed: ${(err as Error).message}`);
-    }
-
-    for (const file of files) {
-      await this.saveToDirectory(file, directoryHandle);
-    }
+    return savedCount;
   }
 
   private async saveToDirectory(

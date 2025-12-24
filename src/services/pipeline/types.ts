@@ -2,7 +2,6 @@
 // Defines interfaces for the conversion pipeline architecture
 
 import type { LLMCharacter, SpeakerAssignment, TextBlock } from '@/state/types';
-import type { MergedFile } from '@/services/interfaces';
 
 // ============================================================================
 // Base Context Types
@@ -50,10 +49,10 @@ export interface ContextWithAudio extends ContextWithAssignments {
 }
 
 /**
- * Context with merged files (after AudioMergeStep)
+ * Context with saved files (after AudioMergeStep)
  */
-export interface ContextWithMergedFiles extends ContextWithAudio {
-  mergedFiles: MergedFile[];
+export interface ContextWithSavedFiles extends ContextWithAudio {
+  savedFileCount: number;
 }
 
 // ============================================================================
@@ -89,10 +88,10 @@ export function hasAudio(ctx: PipelineContext): ctx is PipelineContext & { audio
 }
 
 /**
- * Check if context has merged files
+ * Check if context has saved files
  */
-export function hasMergedFiles(ctx: PipelineContext): ctx is PipelineContext & { mergedFiles: MergedFile[] } {
-  return Array.isArray(ctx.mergedFiles);
+export function hasSavedFiles(ctx: PipelineContext): ctx is PipelineContext & { savedFileCount: number } {
+  return typeof ctx.savedFileCount === 'number';
 }
 
 // ============================================================================
@@ -124,8 +123,8 @@ export interface PipelineContext {
   tempDirHandle?: FileSystemDirectoryHandle;
   failedTasks?: Set<number>;
 
-  // Merge output
-  mergedFiles?: MergedFile[];
+  // Merge+Save output (count of saved files)
+  savedFileCount?: number;
 
   // Directory handle for saving
   directoryHandle?: FileSystemDirectoryHandle | null;
