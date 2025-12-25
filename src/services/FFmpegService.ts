@@ -106,6 +106,8 @@ export class FFmpegService implements IFFmpegService {
     }
 
     const ffmpeg = this.ffmpeg;
+    // Track files written to cleanup later
+    const inputFiles: (string | null)[] = [];
 
     try {
       // Generate silence file upfront (for gaps and missing chunk placeholders)
@@ -127,7 +129,6 @@ export class FFmpegService implements IFFmpegService {
 
       // Write all input chunks to virtual filesystem
       onProgress?.('Writing audio chunks to FFmpeg...');
-      const inputFiles: (string | null)[] = [];
       let actualFileIndex = 0;
 
       for (let i = 0; i < chunks.length; i++) {
@@ -198,8 +199,15 @@ export class FFmpegService implements IFFmpegService {
 
       return output as Uint8Array;
     } catch (err) {
-      // Cleanup on error
-      await this.cleanupAll();
+      // Cleanup on error - be aggressive
+      const writtenFiles = inputFiles.filter((f): f is string => f !== null);
+      await this.cleanup(writtenFiles);
+
+      // If we didn't track any files yet, or if something else is stuck, run full sweep
+      if (writtenFiles.length === 0) {
+        await this.cleanupAll();
+      }
+
       throw new Error(`FFmpeg processing failed: ${(err as Error).message}`);
     }
   }
@@ -240,45 +248,53 @@ export class FFmpegService implements IFFmpegService {
     return filters.join(',');
   }
 
+  /**
+   * Cleanup specific files robustly (ignores errors)
+   */
   private async cleanup(inputFiles: string[]): Promise<void> {
     if (!this.ffmpeg) return;
 
-    try {
-      for (const file of inputFiles) {
-        await this.ffmpeg.deleteFile(file);
-      }
-      await this.ffmpeg.deleteFile('concat.txt');
-      await this.ffmpeg.deleteFile('output.opus');
-      // Try to delete silence file if it exists
+    // 1. Delete input files
+    for (const file of inputFiles) {
       try {
-        await this.ffmpeg.deleteFile('silence.mp3');
+        await this.ffmpeg.deleteFile(file);
       } catch {
-        // Ignore - file may not exist
+        // Ignore delete errors, file might not exist
       }
-    } catch {
-      // Ignore cleanup errors
+    }
+
+    // 2. Delete common temp files
+    const tempFiles = ['concat.txt', 'output.opus', 'silence.mp3'];
+    for (const file of tempFiles) {
+      try {
+        await this.ffmpeg.deleteFile(file);
+      } catch {
+        // Ignore
+      }
     }
   }
 
+  /**
+   * Bruteforce cleanup when specific filenames are unknown
+   */
   private async cleanupAll(): Promise<void> {
     if (!this.ffmpeg) return;
 
-    try {
-      // Try to clean common files
-      const filesToDelete = ['concat.txt', 'output.opus', 'silence.mp3'];
-      for (let i = 0; i < 10000; i++) {
-        filesToDelete.push(`input_${i.toString().padStart(5, '0')}.mp3`);
-      }
+    // Common files
+    const filesToDelete = ['concat.txt', 'output.opus', 'silence.mp3'];
 
-      for (const file of filesToDelete) {
-        try {
-          await this.ffmpeg.deleteFile(file);
-        } catch {
-          break; // Stop when files don't exist
-        }
+    // Add potential input files (scan reasonable range)
+    for (let i = 0; i < 500; i++) {
+      filesToDelete.push(`input_${i.toString().padStart(5, '0')}.mp3`);
+    }
+
+    for (const file of filesToDelete) {
+      try {
+        await this.ffmpeg.deleteFile(file);
+      } catch {
+        // Ignore errors, DO NOT break the loop
+        // We want to try deleting everything
       }
-    } catch {
-      // Ignore cleanup errors
     }
   }
 
