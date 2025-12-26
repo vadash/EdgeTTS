@@ -54,7 +54,7 @@ export class ConversionStore {
 
   // Timing
   readonly startTime = signal<number | null>(null);
-  readonly mergeStartTime = signal<number | null>(null);
+  readonly phaseStartTime = signal<number | null>(null);
 
   // Error state
   readonly error = signal<ConversionError | null>(null);
@@ -99,38 +99,18 @@ export class ConversionStore {
     const { current, total } = this.progress.value;
     const status = this.status.value;
 
-    // 1. Merging Phase (uses separate timing to avoid skewed estimates)
-    if (status === 'merging') {
-      if (total === 0) return null;
-      const start = this.mergeStartTime.value;
-      if (!start) return null;
-
-      const remainingItems = total - current;
-      if (remainingItems <= 0) return '00:00:00';
-
-      // Heuristic: Default to 60s per block (approx 30min audio processing)
-      // If we have processed at least one item, calculate actual average
-      let timePerItem = 60000;
-
-      if (current > 0) {
-        const elapsed = Date.now() - start;
-        timePerItem = elapsed / current;
-      }
-
-      return this.formatDuration(remainingItems * timePerItem);
+    // Only calculate ETA for processing phases
+    if (status !== 'llm-extract' && status !== 'llm-assign' && status !== 'converting' && status !== 'merging') {
+      return null;
     }
 
-    // 2. Conversion/Extraction Phase (standard logic)
-    if (status === 'converting' || status === 'llm-extract' || status === 'llm-assign') {
-      const start = this.startTime.value;
-      if (!start || current === 0 || total === 0) return null;
-      const elapsed = Date.now() - start;
-      const rate = elapsed / current;
-      const remaining = (total - current) * rate;
-      return this.formatDuration(remaining);
-    }
+    const start = this.phaseStartTime.value;
+    if (!start || total === 0 || current === 0) return null;
 
-    return null;
+    const elapsed = Date.now() - start;
+    const rate = elapsed / current; // ms per item
+    const remainingItems = total - current;
+    return this.formatDuration(remainingItems * rate);
   });
 
   constructor() {
@@ -153,6 +133,7 @@ export class ConversionStore {
     this.status.value = 'idle';
     this.progress.value = { current: 0, total: 0 };
     this.startTime.value = Date.now();
+    this.phaseStartTime.value = null;
     this.error.value = null;
   }
 
@@ -161,8 +142,11 @@ export class ConversionStore {
    */
   setStatus(status: ConversionStatus): void {
     this.status.value = status;
-    if (status === 'merging') {
-      this.mergeStartTime.value = Date.now();
+    // Reset phase timer for all processing stages
+    if (status === 'llm-extract' || status === 'llm-assign' || status === 'converting' || status === 'merging') {
+      this.phaseStartTime.value = Date.now();
+      // Reset progress current to prevent rate calculation from using stale data
+      this.progress.value = { current: 0, total: this.progress.value.total };
     }
   }
 
@@ -221,7 +205,7 @@ export class ConversionStore {
     this.status.value = 'idle';
     this.progress.value = { current: 0, total: 0 };
     this.startTime.value = null;
-    this.mergeStartTime.value = null;
+    this.phaseStartTime.value = null;
     this.error.value = null;
   }
 

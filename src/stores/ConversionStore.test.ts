@@ -219,6 +219,7 @@ describe('ConversionStore', () => {
       expect(store.status.value).toBe('idle');
       expect(store.progress.value).toEqual({ current: 0, total: 0 });
       expect(store.startTime.value).toBeNull();
+      expect(store.phaseStartTime.value).toBeNull();
       expect(store.error.value).toBeNull();
     });
   });
@@ -287,7 +288,7 @@ describe('ConversionStore', () => {
       const startTime = 1000000;
       vi.spyOn(Date, 'now').mockReturnValue(startTime);
       store.startConversion();
-      store.setStatus('converting');
+      store.setStatus('converting'); // This sets phaseStartTime
       store.updateProgress(0, 100);
 
       // Advance time by 10 seconds, complete 10 items
@@ -301,26 +302,11 @@ describe('ConversionStore', () => {
       vi.restoreAllMocks();
     });
 
-    it('uses heuristic for merging phase with no progress', () => {
+    it('calculates ETA for merging phase using phaseStartTime', () => {
       const startTime = 1000000;
       vi.spyOn(Date, 'now').mockReturnValue(startTime);
       store.startConversion();
-      store.setStatus('merging'); // This sets mergeStartTime
-      store.updateProgress(0, 5);
-
-      // With 0 progress, uses 60s heuristic per item
-      // 5 items * 60s = 300s = 00:05:00
-      expect(store.estimatedTimeRemaining.value).toBe('00:05:00');
-
-      vi.restoreAllMocks();
-    });
-
-    it('calculates actual rate for merging phase with progress', () => {
-      const startTime = 1000000;
-      vi.spyOn(Date, 'now').mockReturnValue(startTime);
-      store.startConversion();
-      store.setStatus('merging'); // This sets mergeStartTime
-      store.updateProgress(0, 5);
+      store.setStatus('merging'); // This sets phaseStartTime
 
       // Advance time by 30 seconds, complete 1 item
       vi.spyOn(Date, 'now').mockReturnValue(startTime + 30000);
@@ -329,6 +315,34 @@ describe('ConversionStore', () => {
       // 1 item in 30 seconds = 30s/item
       // 4 items remaining * 30s = 120s = 00:02:00
       expect(store.estimatedTimeRemaining.value).toBe('00:02:00');
+
+      vi.restoreAllMocks();
+    });
+
+    it('resets phaseStartTime when transitioning between phases', () => {
+      const startTime = 1000000;
+      vi.spyOn(Date, 'now').mockReturnValue(startTime);
+      store.startConversion();
+      store.setStatus('llm-extract');
+      store.updateProgress(0, 50);
+
+      // Do some work in extract phase
+      vi.spyOn(Date, 'now').mockReturnValue(startTime + 60000); // 1 minute later
+      store.updateProgress(50, 50);
+
+      // Now transition to assign phase - phaseStartTime should reset
+      const assignStartTime = startTime + 60000;
+      vi.spyOn(Date, 'now').mockReturnValue(assignStartTime);
+      store.setStatus('llm-assign');
+      store.updateProgress(0, 100);
+
+      // Advance 10 seconds into assign phase, complete 10 items
+      vi.spyOn(Date, 'now').mockReturnValue(assignStartTime + 10000);
+      store.updateProgress(10, 100);
+
+      // ETA should be based on assign phase only (10s for 10 items = 1s/item)
+      // 90 remaining * 1s = 90s = 00:01:30
+      expect(store.estimatedTimeRemaining.value).toBe('00:01:30');
 
       vi.restoreAllMocks();
     });
