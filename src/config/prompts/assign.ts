@@ -340,20 +340,33 @@ Note: John's actions closest to dialogue in 0,1.
 
 Analyze the paragraphs below. Apply Attribution Methods in priority order.
 Output index:CODE pairs, one line per paragraph.`,
-  userTemplate: `<dialogue_paragraphs>
+  userTemplate: `<instruction_pre>
+Read the following numbered paragraphs TWICE.
+Pass 1: Understand the flow of conversation and who is present.
+Pass 2: Apply the attribution rules (Tags -> Actions -> Context) to assign the speaker.
+</instruction_pre>
+
+<context_pass_1>
 {{paragraphs}}
-</dialogue_paragraphs>
+</context_pass_1>
+
+<context_pass_2>
+{{paragraphs}}
+</context_pass_2>
 
 <instruction>
-Assign speaker code to each numbered paragraph.
-Use speaker codes from <speaker_list> in system prompt.
+Assign a speaker code to each numbered paragraph from <context_pass_2>.
+Use speaker codes from <speaker_list> in the system prompt.
 
-Apply in order:
+Apply Priority:
 1. [Brackets] → System
-2. Speech tags → Named character
-3. Action beats → Acting character
-4. First-person "I" → Protagonist
-5. Conversation flow if needed
+2. Speech tags ("said John") → Named character
+3. Action beats (John jumped.) → Acting character
+4. Conversation flow
+
+CRITICAL CHECKS:
+- "John, look out!" -> John is the LISTENER (Vocative). Do not assign to John.
+- Action proximity: If multiple characters act, the one CLOSEST to the quotes speaks.
 
 Output ONLY index:CODE pairs (one per line).
 

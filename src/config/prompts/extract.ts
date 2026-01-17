@@ -262,18 +262,28 @@ Note: Marcus is only mentioned, never speaks - NOT included.
 □ Valid JSON output only
 □ If <2 characters found, verify you didn't miss Narrator or System
 `,
-  userTemplate: `<input_text>
+  userTemplate: `<task_description>
+You must extract every character who speaks in the provided text.
+To ensure high precision and avoid hallucinations (characters mentioned but not speaking), read the text twice.
+</task_description>
+
+<analysis_pass_1>
 {{text}}
-</input_text>
+</analysis_pass_1>
+
+<analysis_pass_2>
+{{text}}
+</analysis_pass_2>
 
 <instruction>
-Extract ALL speaking characters from <input_text>.
+Extract ALL speaking characters found in the text above.
 
 Steps:
-1. Find all dialogue markers
-2. Attribute each to speaker
-3. Merge same-person references
-4. Check gender evidence
+1. Scan <analysis_pass_1> to build a mental list of potential speakers.
+2. Verify against <analysis_pass_2> to confirm they actually have dialogue markers (quotes, brackets, etc.).
+3. Attribute each to speaker.
+4. Merge same-person references.
+5. Check gender evidence.
 
 Output valid JSON only.
 

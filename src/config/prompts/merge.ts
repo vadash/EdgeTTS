@@ -376,6 +376,14 @@ Output:
 <instruction>
 Review characters in <character_list>. Merge duplicates.
 
+<scratchpad_requirement>
+You MUST perform a pairwise check for every name sharing a word.
+Example:
+- Check "John" vs "John Smith": [Match? Yes] -> Merge
+- Check "Guard" vs "The Guard": [Match? Yes] -> Merge
+- Check "Mary" vs "John": [Match? No] -> Skip
+</scratchpad_requirement>
+
 Use <scratchpad> to reason:
 1. Check variations overlap (PRIMARY signal)
 2. Apply merge rules
