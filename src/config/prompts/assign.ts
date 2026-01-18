@@ -159,6 +159,17 @@ Look OUTSIDE quotes for speech tags or action beats to find actual speaker.
 - Name after comma inside quotes: "text, John"
 - Name at start before comma: "John, text"
 - Name being called for attention
+
+<comma_rule>
+**THE "COMMA" RULE:**
+
+If a name appears inside quotes:
+- "Hello, John" → Comma BEFORE name = Vocative (John is Listener)
+- "John, look!" → Comma AFTER name = Vocative (John is Listener)
+- "John!" → Name alone with punctuation = Vocative (John is Listener)
+
+Speaker is the OTHER person in the scene.
+</comma_rule>
 </vocative_trap>
 
 ### MENTIONED ≠ SPEAKING
