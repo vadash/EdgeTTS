@@ -374,23 +374,38 @@ Output:
 </character_list>
 
 <instruction>
-Review characters in <character_list>. Merge duplicates.
+Analyze the list for duplicates.
 
-<scratchpad_requirement>
-You MUST perform a pairwise check for every name sharing a word.
-Example:
-- Check "John" vs "John Smith": [Match? Yes] -> Merge
-- Check "Guard" vs "The Guard": [Match? Yes] -> Merge
-- Check "Mary" vs "John": [Match? No] -> Skip
-</scratchpad_requirement>
+<scratchpad>
+STEP 1: IDENTIFY ANCHORS
+Anchors are unique, full names (e.g., "John Smith", "Elizabeth Queen").
+List all anchors:
+- Anchor 1: [name]
+- Anchor 2: [name]
+...
 
-Use <scratchpad> to reason:
-1. Check variations overlap (PRIMARY signal)
-2. Apply merge rules
-3. Apply anti-merge rules
-4. Determine keep vs absorb
+STEP 2: PAIRWISE CHECK
+For every other entry, check if it belongs to an Anchor:
+- Check: "John" → Matches Anchor "John Smith"? [Yes/No]
+- Check: "The Guard" → Matches Anchor "Guard Captain"? [Yes/No]
+- Check: "System" → Matches Anchor "Game Interface"? [Yes/No]
 
-Then output valid JSON only.
+STEP 3: LIST MERGE GROUPS
+Based on checks above, list groups:
+- Group 1: [keep_index, absorb_index1, absorb_index2, ...]
+...
+</scratchpad>
+
+<safety_rule>
+**WHEN IN DOUBT, SEPARATE.**
+
+If you are 90% sure they are the same → MERGE.
+If you are 50% sure → DO NOT MERGE.
+
+It is better to have two "Johns" than to accidentally merge "John Smith" and "John Doe".
+</safety_rule>
+
+Output valid JSON only.
 
 Remember:
 - Variations overlap = likely same person
