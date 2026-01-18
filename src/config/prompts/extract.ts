@@ -282,33 +282,37 @@ Note: Marcus is only mentioned, never speaks - NOT included.
 □ If <2 characters found, verify you didn't miss Narrator or System
 `,
   userTemplate: `<task_description>
-You must extract every character who speaks in the provided text.
-To ensure high precision and avoid hallucinations (characters mentioned but not speaking), read the text twice.
+Extract characters who speak in the provided text.
+To ensure accuracy, you MUST perform a "Candidate Prosecution" step before outputting JSON.
 </task_description>
 
-<analysis_pass_1>
+<text>
 {{text}}
-</analysis_pass_1>
-
-<analysis_pass_2>
-{{text}}
-</analysis_pass_2>
+</text>
 
 <instruction>
-Extract ALL speaking characters found in the text above.
+STEP 1: CANDIDATE PROSECUTION (Mental Scratchpad)
 
-Steps:
-1. Scan <analysis_pass_1> to build a mental list of potential speakers.
-2. Verify against <analysis_pass_2> to confirm they actually have dialogue markers (quotes, brackets, etc.).
-3. Attribute each to speaker.
-4. Merge same-person references.
-5. Check gender evidence.
+Scan the text. For EVERY potential name found, ask:
+
+1. Did they speak out loud or think?
+   - If NO → Ignore (mentioned only, not speaking)
+   - If YES → Continue to step 2
+
+2. Is the name ONLY inside quotes?
+   - "Hello, John" → John is inside quotes → Listener, ignore
+   - If YES → Ignore (vocative)
+   - If NO → Continue to step 3
+
+3. Is it a bracketed text?
+   - [Level Up] → System
+   - [Sigh] → Sound effect (Narrator, do not extract)
+   - <Telepathy> → Check context for speaker
+
+STEP 2: GENERATE JSON
+
+Extract ONLY those with "YES" in Step 1.
 
 Output valid JSON only.
-
-Remember:
-- [Bracketed] = System
-- Names inside quotes = vocative (listener, not speaker)
-- Include Protagonist for first-person "I" speech
 </instruction>`,
 };
