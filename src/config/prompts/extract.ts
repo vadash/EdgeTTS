@@ -280,6 +280,14 @@ Note: Marcus is only mentioned, never speaks - NOT included.
 □ No non-speaking characters included
 □ Valid JSON output only
 □ If <2 characters found, verify you didn't miss Narrator or System
+
+<remember>
+REMEMBER:
+- [Sigh] = Sound effect → DO NOT extract
+- [Level Up] = System → DO extract
+- "Hello, John" → John is listener, NOT speaker
+- Names inside quotes = vocative (listener)
+</remember>
 `,
   userTemplate: `<task_description>
 Extract characters who speak in the provided text.
