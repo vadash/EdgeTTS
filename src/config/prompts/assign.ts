@@ -83,6 +83,18 @@ But: "Sarah glared. John stepped back. 'Stay away!'"
 → Both are independent active actions
 → "stepped back" is CLOSEST to dialogue
 → Speaker = John
+
+<grammar_check>
+**GRAMMAR CHECK (Subject vs Object)**
+
+Look for the SUBJECT of the sentence closest to the quote:
+
+- "John looked at Mary. 'Hello.'" → Subject is John → Speaker is John
+- "Mary was hit by John. 'Ouch!'" → Subject is Mary (passive voice) → Speaker is Mary
+- "John hit Mary. 'Ouch!'" → Subject is John. But 'Ouch' is a reaction → Context implies Mary
+
+**Rule:** If unclear, prioritize the character performing the ACTIVE verb.
+</grammar_check>
 </action_beats>
 
 ### PRIORITY 4: FIRST-PERSON NARRATOR
