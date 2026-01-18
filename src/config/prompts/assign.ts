@@ -388,39 +388,36 @@ REMEMBER - CRITICAL:
 NO Markdown
 NO Explanations
 JSON ONLY (index:CODE format)`,
-  userTemplate: `<instruction_pre>
-Read the following numbered paragraphs TWICE.
-Pass 1: Understand the flow of conversation and who is present.
-Pass 2: Apply the attribution rules (Tags -> Actions -> Context) to assign the speaker.
-</instruction_pre>
+  userTemplate: `<task_primer>
+Assign speakers to the following paragraphs using the codes provided.
+</task_primer>
 
 <context_pass_1>
 {{paragraphs}}
 </context_pass_1>
 
+<analysis_instructions>
+Read the paragraphs again. Note who is present and who speaks when.
+</analysis_instructions>
+
 <context_pass_2>
 {{paragraphs}}
 </context_pass_2>
 
-<instruction>
-Assign a speaker code to each numbered paragraph from <context_pass_2>.
-Use speaker codes from <speaker_list> in the system prompt.
+<attribution_task_re_read>
+Task: Assign speakers to the paragraphs above using speaker codes.
+Read the task again: Assign speakers to the paragraphs above using speaker codes.
+</attribution_task_re_read>
 
-Apply Priority:
-1. [Brackets] → System
-2. Speech tags ("said John") → Named character
-3. Action beats (John jumped.) → Acting character
-4. Conversation flow
+<re_read_rules>
+**READ RULES AGAIN BEFORE OUTPUTTING:**
+1. [Brackets] = System
+2. "Name" inside quotes = Vocative (Listener, NOT Speaker) → Assign to the *other* person
+3. Closest action to dialogue = speaker
+4. Output format: index:CODE (No markdown, no extra text)
+</re_read_rules>
 
-CRITICAL CHECKS:
-- "John, look out!" -> John is the LISTENER (Vocative). Do not assign to John.
-- Action proximity: If multiple characters act, the one CLOSEST to the quotes speaks.
-
-Output ONLY index:CODE pairs (one per line).
-
-Remember:
-- [Bracketed] = System
-- Names inside quotes = vocative (listener, not speaker)
-- Closest action to dialogue = speaker
-</instruction>`,
+<output_trigger>
+Output the index:CODE list now:
+</output_trigger>`,
 };

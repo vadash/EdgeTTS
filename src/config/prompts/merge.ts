@@ -369,48 +369,49 @@ Output:
 □ Different people NOT merged
 □ Valid JSON only
 `,
-  userTemplate: `<character_list>
+  userTemplate: `<task_primer>
+Merge duplicate characters from the list below.
+</task_primer>
+
+<character_list_pass_1>
 {{characters}}
-</character_list>
+</character_list_pass_1>
 
-<instruction>
-Analyze the list for duplicates.
+<instruction_re_read>
+Read the list again to identify all potential duplicates.
+</instruction_re_read>
 
+<character_list_pass_2>
+{{characters}}
+</character_list_pass_2>
+
+<scratchpad_instructions>
 <scratchpad>
 STEP 1: IDENTIFY ANCHORS
 Anchors are unique, full names (e.g., "John Smith", "Elizabeth Queen").
-List all anchors:
-- Anchor 1: [name]
-- Anchor 2: [name]
-...
 
 STEP 2: PAIRWISE CHECK
-For every other entry, check if it belongs to an Anchor:
-- Check: "John" → Matches Anchor "John Smith"? [Yes/No]
-- Check: "The Guard" → Matches Anchor "Guard Captain"? [Yes/No]
-- Check: "System" → Matches Anchor "Game Interface"? [Yes/No]
+For every other entry, check if it belongs to an Anchor via variations overlap.
 
 STEP 3: LIST MERGE GROUPS
-Based on checks above, list groups:
-- Group 1: [keep_index, absorb_index1, absorb_index2, ...]
-...
+Based on checks above, list groups.
 </scratchpad>
+</scratchpad_instructions>
 
-<safety_rule>
-**WHEN IN DOUBT, SEPARATE.**
+<final_query>
+Task: Merge duplicates from the list above.
+Read the task again: Merge duplicates from the list above.
 
-If you are 90% sure they are the same → MERGE.
-If you are 50% sure → DO NOT MERGE.
+- If variations overlap → MERGE
+- If "Protagonist" matches a named character's context → MERGE
+- If System/Interface variants → MERGE into "System"
+- If unsure → DO NOT MERGE
 
-It is better to have two "Johns" than to accidentally merge "John Smith" and "John Doe".
-</safety_rule>
+**SAFETY RULE:**
+If 90% sure → MERGE.
+If 50% sure → DO NOT MERGE.
+Better to have two "Johns" than merge "John Smith" and "John Doe".
 
-Output valid JSON only.
-
-Remember:
-- Variations overlap = likely same person
-- Keep most specific proper name
-- System/Interface → merge into "System"
-- Different genders = different people (unless one unknown)
-</instruction>`,
+Output valid JSON only:
+</final_query>`,
 };

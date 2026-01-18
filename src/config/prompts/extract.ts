@@ -289,38 +289,37 @@ REMEMBER:
 - Names inside quotes = vocative (listener)
 </remember>
 `,
-  userTemplate: `<task_description>
-Extract characters who speak in the provided text.
-To ensure accuracy, you MUST perform a "Candidate Prosecution" step before outputting JSON.
-</task_description>
+  userTemplate: `<task_primer>
+Extract ALL speaking characters from the text below.
+</task_primer>
 
-<text>
+<text_input>
 {{text}}
-</text>
+</text_input>
 
-<instruction>
-STEP 1: CANDIDATE PROSECUTION (Mental Scratchpad)
+<instruction_re_read>
+Read the text above again to ensure no character is missed.
+</instruction_re_read>
 
-Scan the text. For EVERY potential name found, ask:
+<text_input_re_read>
+{{text}}
+</text_input_re_read>
 
-1. Did they speak out loud or think?
-   - If NO → Ignore (mentioned only, not speaking)
-   - If YES → Continue to step 2
+<final_instruction>
+Task: Extract EVERY unique entity that speaks.
+Read the task again: Extract EVERY unique entity that speaks.
 
-2. Is the name ONLY inside quotes?
-   - "Hello, John" → John is inside quotes → Listener, ignore
-   - If YES → Ignore (vocative)
-   - If NO → Continue to step 3
+CANDIDATE PROSECUTION - For EVERY potential name:
+1. Did they speak out loud or think? NO → Ignore
+2. Is the name ONLY inside quotes? ("Hello, John") YES → Vocative, Ignore
+3. Is it [bracketed]? [Level Up] → System. [Sigh] → Sound effect, Ignore.
 
-3. Is it a bracketed text?
-   - [Level Up] → System
-   - [Sigh] → Sound effect (Narrator, do not extract)
-   - <Telepathy> → Check context for speaker
-
-STEP 2: GENERATE JSON
-
-Extract ONLY those with "YES" in Step 1.
+CRITICAL REMINDERS:
+- [Sigh] = Sound effect → DO NOT extract
+- [Level Up] = System → DO extract
+- "Hello, John" → John is listener, NOT speaker
+- Names inside quotes = vocative (listener)
 
 Output valid JSON only.
-</instruction>`,
+</final_instruction>`,
 };
