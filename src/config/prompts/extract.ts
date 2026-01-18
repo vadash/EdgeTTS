@@ -69,6 +69,25 @@ Character actions IMMEDIATELY BEFORE or AFTER dialogue indicate speaker:
 | <Telepathic message> | Check context for telepath |
 | *Internal thought* | Narrator or specified character |
 
+<critical_rule>
+**CRITICAL: SYSTEM vs. SOUNDS**
+
+Square brackets can be System messages OR sound effects. Distinguish them:
+
+| Content | Speaker | Action |
+|---------|---------|--------|
+| [Level Up], [Quest], [Status], [Blue Box] | **System** | EXTRACT as "System" |
+| [Sigh], [Bang!], [Silence], [Phone rings] | **Narrator** | DO NOT create character |
+
+Sound effects describe ambient noise. System messages are game UI.
+
+Examples:
+- "[Level Up!]" → Extract "System"
+- "[Sigh]" → DO NOT extract (narrator sound effect)
+- "[Quest Complete: Kill 5 Goblins]" → Extract "System"
+- "[Thunder crashes]" → DO NOT extract (sound effect)
+</critical_rule>
+
 **METHOD 4: FIRST-PERSON NARRATOR**
 - **I** turned to face him. "What do you want?" → Speaker = Narrator/Protagonist
 - "Leave me alone!" **I** screamed. → Speaker = Narrator/Protagonist
