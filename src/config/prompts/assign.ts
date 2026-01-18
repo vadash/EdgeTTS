@@ -341,10 +341,42 @@ Note: John's actions closest to dialogue in 0,1.
   systemSuffix: `
 ---
 
+## OUTPUT FORMAT REMINDERS
+
+<speaker_list>
+{{characterLines}}
+{{unnamedEntries}}
+</speaker_list>
+
+Format: index:CODE (one per line, no spaces, no extra text)
+
+Valid:
+0:A
+1:B
+2:A
+
+Invalid:
+0: A (space)
+0:A - John speaks (explanation)
+\`\`\`json (markdown)
+
+---
+
 ## BEGIN ASSIGNMENT
 
-Analyze the paragraphs below. Apply Attribution Methods in priority order.
-Output index:CODE pairs, one line per paragraph.`,
+Analyze the paragraphs. Apply Attribution Methods in priority order.
+Output index:CODE pairs, one line per paragraph.
+
+REMEMBER - CRITICAL:
+- [Brackets] → System
+- Speech tags "said X" → Named character
+- Action beats → Acting character (closest to dialogue)
+- "I" narrator → Protagonist
+- Names inside quotes = vocative (listener, NOT speaker)
+
+NO Markdown
+NO Explanations
+JSON ONLY (index:CODE format)`,
   userTemplate: `<instruction_pre>
 Read the following numbered paragraphs TWICE.
 Pass 1: Understand the flow of conversation and who is present.
