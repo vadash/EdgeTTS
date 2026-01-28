@@ -386,4 +386,27 @@ describe('LLMStore', () => {
       expect(store.enabled.value).toBe(true);
     });
   });
+
+  describe('speakerAssignments', () => {
+    it('starts with empty assignments', () => {
+      expect(store.speakerAssignments.value).toEqual([]);
+    });
+
+    it('sets speaker assignments', () => {
+      const assignments = [
+        { sentenceIndex: 0, text: 'Hello', speaker: 'John', voiceId: 'voice-1' },
+        { sentenceIndex: 1, text: 'Hi', speaker: 'Mary', voiceId: 'voice-2' },
+      ];
+      store.setSpeakerAssignments(assignments);
+      expect(store.speakerAssignments.value).toEqual(assignments);
+    });
+
+    it('resets assignments on resetProcessingState', () => {
+      store.setSpeakerAssignments([
+        { sentenceIndex: 0, text: 'Hello', speaker: 'John', voiceId: 'voice-1' },
+      ]);
+      store.resetProcessingState();
+      expect(store.speakerAssignments.value).toEqual([]);
+    });
+  });
 });
