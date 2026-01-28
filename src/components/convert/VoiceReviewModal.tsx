@@ -32,11 +32,14 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
 
   const characters = llm.detectedCharacters.value;
   const voiceMap = llm.characterVoiceMap.value;
+  const lineCounts = llm.characterLineCounts.value;
 
-  // Sort characters by number of variations (more variations = more prominent)
-  const sortedCharacters = [...characters].sort(
-    (a, b) => b.variations.length - a.variations.length
-  );
+  // Sort characters by line count (more lines = more prominent)
+  const sortedCharacters = [...characters].sort((a, b) => {
+    const countA = lineCounts.get(a.canonicalName) ?? 0;
+    const countB = lineCounts.get(b.canonicalName) ?? 0;
+    return countB - countA;
+  });
 
   // Get enabled voices, grouped by gender
   const enabledVoices = settings.enabledVoices.value;
