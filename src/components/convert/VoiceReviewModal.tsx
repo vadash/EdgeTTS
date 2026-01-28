@@ -177,6 +177,9 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
                     <td className="py-2 pr-2">
                       <span className="font-medium">{char.canonicalName}</span>
                       <span className="ml-2 text-gray-500">{genderSymbol(char.gender)}</span>
+                      <span className="ml-2 text-xs text-gray-400 bg-surface-alt px-1.5 py-0.5 rounded">
+                        {lineCounts.get(char.canonicalName) ?? 0}
+                      </span>
                     </td>
                     <td className="py-2 pr-2">
                       <select
