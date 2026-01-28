@@ -139,6 +139,20 @@ export class LLMStore {
     this.detectedCharacters.value.map(c => c.canonicalName)
   );
 
+  /**
+   * Get line counts per character
+   */
+  readonly characterLineCounts = computed(() => {
+    const assignments = this.speakerAssignments.value;
+    const counts = new Map<string, number>();
+    for (const a of assignments) {
+      if (a.speaker !== 'narrator') {
+        counts.set(a.speaker, (counts.get(a.speaker) ?? 0) + 1);
+      }
+    }
+    return counts;
+  });
+
   // ========== Settings Actions ==========
 
   setEnabled(value: boolean): void {

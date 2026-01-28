@@ -408,5 +408,33 @@ describe('LLMStore', () => {
       store.resetProcessingState();
       expect(store.speakerAssignments.value).toEqual([]);
     });
+
+    describe('characterLineCounts', () => {
+      it('returns empty map when no assignments', () => {
+        expect(store.characterLineCounts.value.size).toBe(0);
+      });
+
+      it('counts lines per character', () => {
+        store.setSpeakerAssignments([
+          { sentenceIndex: 0, text: 'Hello', speaker: 'John', voiceId: 'v1' },
+          { sentenceIndex: 1, text: 'Hi', speaker: 'Mary', voiceId: 'v2' },
+          { sentenceIndex: 2, text: 'Hey', speaker: 'John', voiceId: 'v1' },
+          { sentenceIndex: 3, text: 'Yo', speaker: 'John', voiceId: 'v1' },
+        ]);
+        const counts = store.characterLineCounts.value;
+        expect(counts.get('John')).toBe(3);
+        expect(counts.get('Mary')).toBe(1);
+      });
+
+      it('excludes narrator from counts', () => {
+        store.setSpeakerAssignments([
+          { sentenceIndex: 0, text: 'Narration', speaker: 'narrator', voiceId: 'v0' },
+          { sentenceIndex: 1, text: 'Hello', speaker: 'John', voiceId: 'v1' },
+        ]);
+        const counts = store.characterLineCounts.value;
+        expect(counts.has('narrator')).toBe(false);
+        expect(counts.get('John')).toBe(1);
+      });
+    });
   });
 });
