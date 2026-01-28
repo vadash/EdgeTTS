@@ -136,14 +136,17 @@ export class ConversionOrchestrator {
         this.handleProgress(progress);
       });
 
-      // Set up pause callback for voice review after voice-assignment step
-      pipeline.setPauseCallback(StepNames.VOICE_ASSIGNMENT, async (ctx: PipelineContext) => {
+      // Set up pause callback for voice review after voice-remapping step
+      pipeline.setPauseCallback(StepNames.VOICE_REMAPPING, async (ctx: PipelineContext) => {
         // Store characters and voice map for the review UI
         if (ctx.characters) {
           this.stores.llm.setCharacters(ctx.characters);
         }
         if (ctx.voiceMap) {
           this.stores.llm.setVoiceMap(ctx.voiceMap);
+        }
+        if (ctx.assignments) {
+          this.stores.llm.setSpeakerAssignments(ctx.assignments);
         }
 
         // Trigger review UI and wait for user
@@ -153,10 +156,19 @@ export class ConversionOrchestrator {
         // Get the (potentially modified) voice map from the store
         const reviewedVoiceMap = this.stores.llm.characterVoiceMap.value;
 
-        // Return context with updated voice map
+        // Re-remap assignments with user's voice choices
+        const remappedAssignments = ctx.assignments?.map(a => ({
+          ...a,
+          voiceId: a.speaker === 'narrator'
+            ? this.stores.settings.narratorVoice.value
+            : reviewedVoiceMap.get(a.speaker) ?? this.stores.settings.narratorVoice.value,
+        }));
+
+        // Return context with updated voice map and re-mapped assignments
         return {
           ...ctx,
           voiceMap: reviewedVoiceMap,
+          assignments: remappedAssignments,
         };
       });
 
