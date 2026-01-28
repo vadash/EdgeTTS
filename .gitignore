@@ -30,3 +30,4 @@ test.config.local.ts
 # User
 /.claude/
 /repomix-*
+/tmp/
