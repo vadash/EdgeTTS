@@ -268,11 +268,14 @@ export function applyImportedMappings(
   for (const char of currentCharacters) {
     const match = findMatchingEntry(char, importedEntries);
     if (match && match.voice) {
+      console.debug(`[VoiceMapping] Matched "${char.canonicalName}" → "${match.name}" (voice: ${match.voice})`);
       newMap.set(char.canonicalName, match.voice);
       // Also update variations
       for (const variation of char.variations) {
         newMap.set(variation, match.voice);
       }
+    } else {
+      console.debug(`[VoiceMapping] No match for "${char.canonicalName}"`);
     }
   }
 
