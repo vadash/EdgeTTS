@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sortVoicesByPriority, randomizeBelowVoices, exportToJSON, exportToJSONSorted, normalizeForMatch, findMatchingEntry, type RandomizeBelowParams, type VoiceMappingEntry } from './VoiceMappingService';
+import { sortVoicesByPriority, randomizeBelowVoices, exportToJSON, exportToJSONSorted, normalizeForMatch, findMatchingEntry, applyImportedMappings, type RandomizeBelowParams, type VoiceMappingEntry } from './VoiceMappingService';
 import type { VoiceOption, LLMCharacter, SpeakerAssignment } from '@/state/types';
 
 describe('sortVoicesByPriority', () => {
@@ -150,6 +150,65 @@ describe('findMatchingEntry', () => {
     const match = findMatchingEntry(char, entries);
     // "Anna" is in "Joanna" but not at word boundary - should not match
     expect(match).toBeUndefined();
+  });
+});
+
+describe('applyImportedMappings with fuzzy matching', () => {
+  it('matches by alias overlap when canonical names differ', () => {
+    const importedEntries: VoiceMappingEntry[] = [
+      { name: 'The System', aliases: ['The System', 'System'], voice: 'en-US, MichelleNeural', gender: 'female' },
+    ];
+    const currentCharacters: LLMCharacter[] = [
+      { canonicalName: 'System', variations: ['System'], gender: 'female' },
+    ];
+    const currentVoiceMap = new Map<string, string>();
+
+    const result = applyImportedMappings(importedEntries, currentCharacters, currentVoiceMap);
+
+    expect(result.get('System')).toBe('en-US, MichelleNeural');
+  });
+
+  it('matches via normalized prefix stripping', () => {
+    const importedEntries: VoiceMappingEntry[] = [
+      { name: 'Professor Rinkle', aliases: ['Professor Rinkle'], voice: 'en-GB, LibbyNeural', gender: 'female' },
+    ];
+    const currentCharacters: LLMCharacter[] = [
+      { canonicalName: 'Rinkle', variations: ['Rinkle'], gender: 'female' },
+    ];
+    const currentVoiceMap = new Map<string, string>();
+
+    const result = applyImportedMappings(importedEntries, currentCharacters, currentVoiceMap);
+
+    expect(result.get('Rinkle')).toBe('en-GB, LibbyNeural');
+  });
+
+  it('sets voice for all variations of matched character', () => {
+    const importedEntries: VoiceMappingEntry[] = [
+      { name: 'Cale Cadwell Cobbs', aliases: ['Cale Cadwell Cobbs', 'Cale'], voice: 'en-IE, ConnorNeural', gender: 'male' },
+    ];
+    const currentCharacters: LLMCharacter[] = [
+      { canonicalName: 'Cale', variations: ['Cale', 'The Hero'], gender: 'male' },
+    ];
+    const currentVoiceMap = new Map<string, string>();
+
+    const result = applyImportedMappings(importedEntries, currentCharacters, currentVoiceMap);
+
+    expect(result.get('Cale')).toBe('en-IE, ConnorNeural');
+    expect(result.get('The Hero')).toBe('en-IE, ConnorNeural');
+  });
+
+  it('preserves existing mappings for unmatched characters', () => {
+    const importedEntries: VoiceMappingEntry[] = [
+      { name: 'The System', aliases: ['The System'], voice: 'en-US, MichelleNeural', gender: 'female' },
+    ];
+    const currentCharacters: LLMCharacter[] = [
+      { canonicalName: 'Unknown', variations: ['Unknown'], gender: 'male' },
+    ];
+    const currentVoiceMap = new Map([['Unknown', 'existing-voice']]);
+
+    const result = applyImportedMappings(importedEntries, currentCharacters, currentVoiceMap);
+
+    expect(result.get('Unknown')).toBe('existing-voice');
   });
 });
 

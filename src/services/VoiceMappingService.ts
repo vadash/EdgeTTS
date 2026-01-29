@@ -256,7 +256,7 @@ export function findMatchingEntry(
 
 /**
  * Apply imported entries to existing characters and voice map
- * Only updates characters that exist in both the import and current list
+ * Uses fuzzy matching cascade to find matches when canonical names differ.
  */
 export function applyImportedMappings(
   importedEntries: VoiceMappingEntry[],
@@ -264,15 +264,14 @@ export function applyImportedMappings(
   currentVoiceMap: Map<string, string>
 ): Map<string, string> {
   const newMap = new Map(currentVoiceMap);
-  const importMap = new Map(importedEntries.map(e => [e.name.toLowerCase(), e]));
 
   for (const char of currentCharacters) {
-    const imported = importMap.get(char.canonicalName.toLowerCase());
-    if (imported && imported.voice) {
-      newMap.set(char.canonicalName, imported.voice);
+    const match = findMatchingEntry(char, importedEntries);
+    if (match && match.voice) {
+      newMap.set(char.canonicalName, match.voice);
       // Also update variations
       for (const variation of char.variations) {
-        newMap.set(variation, imported.voice);
+        newMap.set(variation, match.voice);
       }
     }
   }
