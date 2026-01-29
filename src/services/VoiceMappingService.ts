@@ -27,6 +27,24 @@ export interface VoiceMappingFile {
 }
 
 /**
+ * Parameters for randomizeBelowVoices function
+ */
+export interface RandomizeBelowParams {
+  /** Characters sorted by line count (descending) */
+  sortedCharacters: LLMCharacter[];
+  /** Current voice assignments */
+  currentVoiceMap: Map<string, string>;
+  /** Index of row where button clicked (randomize BELOW this) */
+  clickedIndex: number;
+  /** All enabled voices */
+  enabledVoices: VoiceOption[];
+  /** Narrator voice to reserve */
+  narratorVoice: string;
+  /** Detected book language */
+  bookLanguage: DetectedLanguage;
+}
+
+/**
  * Export characters and voice mappings to JSON string
  */
 export function exportToJSON(
