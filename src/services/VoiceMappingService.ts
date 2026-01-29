@@ -15,6 +15,7 @@ export interface VoiceMappingEntry {
   name: string;
   voice: string;
   gender: 'male' | 'female' | 'unknown';
+  aliases?: string[];
 }
 
 /**
@@ -56,6 +57,7 @@ export function exportToJSON(
     name: char.canonicalName,
     voice: voiceMap.get(char.canonicalName) ?? '',
     gender: char.gender,
+    aliases: char.variations,
   }));
 
   const data: VoiceMappingFile = {

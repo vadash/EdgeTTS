@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sortVoicesByPriority, randomizeBelowVoices, type RandomizeBelowParams } from './VoiceMappingService';
+import { sortVoicesByPriority, randomizeBelowVoices, exportToJSON, type RandomizeBelowParams } from './VoiceMappingService';
 import type { VoiceOption, LLMCharacter } from '@/state/types';
 
 describe('sortVoicesByPriority', () => {
@@ -24,6 +24,20 @@ describe('sortVoicesByPriority', () => {
   it('excludes narrator voice from the list', () => {
     const sorted = sortVoicesByPriority(voices, 'en', 'en-US, GuyNeural');
     expect(sorted.find(v => v.fullValue === 'en-US, GuyNeural')).toBeUndefined();
+  });
+});
+
+describe('VoiceMappingEntry with aliases', () => {
+  it('exports aliases from character variations', () => {
+    const characters: LLMCharacter[] = [
+      { canonicalName: 'The System', variations: ['The System', 'System'], gender: 'female' },
+    ];
+    const voiceMap = new Map([['The System', 'en-US, MichelleNeural']]);
+
+    const json = exportToJSON(characters, voiceMap, 'en-US, GuyNeural');
+    const parsed = JSON.parse(json);
+
+    expect(parsed.voices[0].aliases).toEqual(['The System', 'System']);
   });
 });
 
