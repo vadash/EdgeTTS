@@ -102,4 +102,86 @@ describe('randomizeBelowVoices', () => {
     expect(result.get('Alice')).toBe('en-US, JennyNeural');
     expect(result.get('Bob')).toBe('en-US, DavisNeural');
   });
+
+  it('cycles through voices when more characters than voices', () => {
+    const limitedVoices: VoiceOption[] = [
+      { locale: 'en-US', name: 'GuyNeural', fullValue: 'en-US, GuyNeural', gender: 'male' },
+      { locale: 'en-US', name: 'DavisNeural', fullValue: 'en-US, DavisNeural', gender: 'male' },
+    ];
+
+    const manyMaleChars: LLMCharacter[] = [
+      { canonicalName: 'Alice', variations: [], gender: 'female' },
+      { canonicalName: 'Bob', variations: [], gender: 'male' },
+      { canonicalName: 'Charlie', variations: [], gender: 'male' },
+      { canonicalName: 'Dan', variations: [], gender: 'male' },
+      { canonicalName: 'Eve', variations: [], gender: 'male' },
+    ];
+
+    const currentMap = new Map([['Alice', 'en-US, JennyNeural']]);
+
+    const params: RandomizeBelowParams = {
+      sortedCharacters: manyMaleChars,
+      currentVoiceMap: currentMap,
+      clickedIndex: 0,
+      enabledVoices: limitedVoices,
+      narratorVoice: 'other-voice',
+      bookLanguage: 'en',
+    };
+
+    const result = randomizeBelowVoices(params);
+
+    // Should cycle: Davis, Guy, Davis, Guy (alphabetically sorted)
+    expect(result.get('Bob')).toBe('en-US, DavisNeural');
+    expect(result.get('Charlie')).toBe('en-US, GuyNeural');
+    expect(result.get('Dan')).toBe('en-US, DavisNeural');
+    expect(result.get('Eve')).toBe('en-US, GuyNeural');
+  });
+
+  it('falls back to other gender when pool is empty', () => {
+    const onlyMaleVoices: VoiceOption[] = [
+      { locale: 'en-US', name: 'GuyNeural', fullValue: 'en-US, GuyNeural', gender: 'male' },
+    ];
+
+    const femaleChar: LLMCharacter[] = [
+      { canonicalName: 'Narrator', variations: [], gender: 'male' },
+      { canonicalName: 'Alice', variations: [], gender: 'female' },
+    ];
+
+    const currentMap = new Map([['Narrator', 'other-voice']]);
+
+    const params: RandomizeBelowParams = {
+      sortedCharacters: femaleChar,
+      currentVoiceMap: currentMap,
+      clickedIndex: 0,
+      enabledVoices: onlyMaleVoices,
+      narratorVoice: 'other-voice',
+      bookLanguage: 'en',
+    };
+
+    const result = randomizeBelowVoices(params);
+
+    // Female Alice gets male voice since no female voices available
+    expect(result.get('Alice')).toBe('en-US, GuyNeural');
+  });
+
+  it('does nothing when clicked on last row', () => {
+    const currentMap = new Map([
+      ['Narrator', 'en-US, GuyNeural'],
+      ['Alice', 'en-US, JennyNeural'],
+    ]);
+
+    const params: RandomizeBelowParams = {
+      sortedCharacters: characters.slice(0, 2),
+      currentVoiceMap: currentMap,
+      clickedIndex: 1, // Last index
+      enabledVoices: allVoices,
+      narratorVoice: 'other-voice',
+      bookLanguage: 'en',
+    };
+
+    const result = randomizeBelowVoices(params);
+
+    expect(result.get('Narrator')).toBe('en-US, GuyNeural');
+    expect(result.get('Alice')).toBe('en-US, JennyNeural');
+  });
 });
