@@ -164,6 +164,97 @@ export function normalizeForMatch(name: string): string {
 }
 
 /**
+ * Check if normalized name A contains normalized name B at a word boundary.
+ * Requires B to be at least 4 chars to avoid false positives.
+ */
+function containsAtWordBoundary(haystack: string, needle: string): boolean {
+  if (needle.length < 4) return false;
+
+  const haystackWords = haystack.split(/\s+/);
+  const needleWords = needle.split(/\s+/);
+
+  // Check if all needle words appear in haystack words
+  return needleWords.every(nw =>
+    haystackWords.some(hw => hw === nw || hw.startsWith(nw) || nw.startsWith(hw))
+  );
+}
+
+/**
+ * Find matching imported entry for a character using cascade:
+ * 1. Exact canonical name match (case-insensitive)
+ * 2. Current canonical in imported aliases
+ * 3. Any current variation in imported aliases
+ * 4. Any imported alias in current variations
+ * 5. Normalized containment at word boundary
+ */
+export function findMatchingEntry(
+  char: LLMCharacter,
+  importedEntries: VoiceMappingEntry[]
+): VoiceMappingEntry | undefined {
+  const charCanonicalLower = char.canonicalName.toLowerCase();
+  const charVariationsLower = char.variations.map(v => v.toLowerCase());
+  const charNormalized = normalizeForMatch(char.canonicalName);
+  const charVariationsNormalized = char.variations.map(normalizeForMatch);
+
+  for (const entry of importedEntries) {
+    const entryNameLower = entry.name.toLowerCase();
+    const entryAliasesLower = (entry.aliases ?? [entry.name]).map(a => a.toLowerCase());
+    const entryNormalized = normalizeForMatch(entry.name);
+    const entryAliasesNormalized = (entry.aliases ?? [entry.name]).map(normalizeForMatch);
+
+    // 1. Exact canonical match
+    if (charCanonicalLower === entryNameLower) {
+      return entry;
+    }
+
+    // 2. Current canonical in imported aliases
+    if (entryAliasesLower.includes(charCanonicalLower)) {
+      return entry;
+    }
+
+    // 3. Any current variation in imported aliases
+    if (charVariationsLower.some(v => entryAliasesLower.includes(v))) {
+      return entry;
+    }
+
+    // 4. Any imported alias in current variations
+    if (entryAliasesLower.some(a => charVariationsLower.includes(a))) {
+      return entry;
+    }
+
+    // 5. Normalized containment (word boundary)
+    // Check if normalized char name/variations match entry name/aliases
+    if (charNormalized === entryNormalized) {
+      return entry;
+    }
+    if (charVariationsNormalized.some(v => v === entryNormalized)) {
+      return entry;
+    }
+    if (entryAliasesNormalized.some(a => a === charNormalized)) {
+      return entry;
+    }
+    if (entryAliasesNormalized.some(a => charVariationsNormalized.includes(a))) {
+      return entry;
+    }
+
+    // Word boundary containment
+    if (containsAtWordBoundary(entryNormalized, charNormalized) ||
+        containsAtWordBoundary(charNormalized, entryNormalized)) {
+      return entry;
+    }
+    for (const cv of charVariationsNormalized) {
+      for (const ea of entryAliasesNormalized) {
+        if (containsAtWordBoundary(ea, cv) || containsAtWordBoundary(cv, ea)) {
+          return entry;
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * Apply imported entries to existing characters and voice map
  * Only updates characters that exist in both the import and current list
  */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sortVoicesByPriority, randomizeBelowVoices, exportToJSON, exportToJSONSorted, normalizeForMatch, type RandomizeBelowParams } from './VoiceMappingService';
+import { sortVoicesByPriority, randomizeBelowVoices, exportToJSON, exportToJSONSorted, normalizeForMatch, findMatchingEntry, type RandomizeBelowParams, type VoiceMappingEntry } from './VoiceMappingService';
 import type { VoiceOption, LLMCharacter, SpeakerAssignment } from '@/state/types';
 
 describe('sortVoicesByPriority', () => {
@@ -93,6 +93,63 @@ describe('normalizeForMatch', () => {
 
   it('handles names without prefixes', () => {
     expect(normalizeForMatch('Damien')).toBe('damien');
+  });
+});
+
+describe('findMatchingEntry', () => {
+  const importedEntries: VoiceMappingEntry[] = [
+    { name: 'The System', aliases: ['The System', 'System'], voice: 'en-US, MichelleNeural', gender: 'female' },
+    { name: 'Cale Cadwell Cobbs', aliases: ['Cale Cadwell Cobbs', 'Cale'], voice: 'en-IE, ConnorNeural', gender: 'male' },
+    { name: 'Professor Rinkle', aliases: ['Professor Rinkle'], voice: 'en-GB, LibbyNeural', gender: 'female' },
+  ];
+
+  it('matches by exact canonical name (case-insensitive)', () => {
+    const char: LLMCharacter = { canonicalName: 'The System', variations: ['The System'], gender: 'female' };
+    const match = findMatchingEntry(char, importedEntries);
+    expect(match?.name).toBe('The System');
+  });
+
+  it('matches when current canonical is in imported aliases', () => {
+    const char: LLMCharacter = { canonicalName: 'System', variations: ['System'], gender: 'female' };
+    const match = findMatchingEntry(char, importedEntries);
+    expect(match?.name).toBe('The System');
+  });
+
+  it('matches when current variation is in imported aliases', () => {
+    const char: LLMCharacter = { canonicalName: 'The Protagonist', variations: ['The Protagonist', 'Cale'], gender: 'male' };
+    const match = findMatchingEntry(char, importedEntries);
+    expect(match?.name).toBe('Cale Cadwell Cobbs');
+  });
+
+  it('matches via normalized containment (word boundary)', () => {
+    const char: LLMCharacter = { canonicalName: 'Rinkle', variations: ['Rinkle'], gender: 'female' };
+    const match = findMatchingEntry(char, importedEntries);
+    expect(match?.name).toBe('Professor Rinkle');
+  });
+
+  it('returns undefined when no match found', () => {
+    const char: LLMCharacter = { canonicalName: 'Unknown Character', variations: ['Unknown Character'], gender: 'male' };
+    const match = findMatchingEntry(char, importedEntries);
+    expect(match).toBeUndefined();
+  });
+
+  it('handles entries without aliases (backward compat)', () => {
+    const oldEntries: VoiceMappingEntry[] = [
+      { name: 'The System', voice: 'en-US, MichelleNeural', gender: 'female' },
+    ];
+    const char: LLMCharacter = { canonicalName: 'The System', variations: ['The System'], gender: 'female' };
+    const match = findMatchingEntry(char, oldEntries);
+    expect(match?.name).toBe('The System');
+  });
+
+  it('does not match short substrings to avoid false positives', () => {
+    const entries: VoiceMappingEntry[] = [
+      { name: 'Joanna', aliases: ['Joanna'], voice: 'v1', gender: 'female' },
+    ];
+    const char: LLMCharacter = { canonicalName: 'Anna', variations: ['Anna'], gender: 'female' };
+    const match = findMatchingEntry(char, entries);
+    // "Anna" is in "Joanna" but not at word boundary - should not match
+    expect(match).toBeUndefined();
   });
 });
 
