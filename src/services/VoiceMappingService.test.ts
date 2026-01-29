@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { sortVoicesByPriority, randomizeBelowVoices, exportToJSON, type RandomizeBelowParams } from './VoiceMappingService';
-import type { VoiceOption, LLMCharacter } from '@/state/types';
+import { sortVoicesByPriority, randomizeBelowVoices, exportToJSON, exportToJSONSorted, type RandomizeBelowParams } from './VoiceMappingService';
+import type { VoiceOption, LLMCharacter, SpeakerAssignment } from '@/state/types';
 
 describe('sortVoicesByPriority', () => {
   const voices: VoiceOption[] = [
@@ -38,6 +38,21 @@ describe('VoiceMappingEntry with aliases', () => {
     const parsed = JSON.parse(json);
 
     expect(parsed.voices[0].aliases).toEqual(['The System', 'System']);
+  });
+
+  it('includes aliases in sorted export', () => {
+    const characters: LLMCharacter[] = [
+      { canonicalName: 'Cale', variations: ['Cale', 'Cale Cobbs'], gender: 'male' },
+    ];
+    const voiceMap = new Map([['Cale', 'en-IE, ConnorNeural']]);
+    const assignments: SpeakerAssignment[] = [
+      { sentenceIndex: 0, text: 'Hello', speaker: 'Cale', voiceId: 'en-IE, ConnorNeural' },
+    ];
+
+    const json = exportToJSONSorted(characters, voiceMap, assignments, 'en-US, GuyNeural');
+    const parsed = JSON.parse(json);
+
+    expect(parsed.voices[0].aliases).toEqual(['Cale', 'Cale Cobbs']);
   });
 });
 

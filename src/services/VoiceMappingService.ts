@@ -94,6 +94,7 @@ export function exportToJSONSorted(
     name: char.canonicalName,
     voice: voiceMap.get(char.canonicalName) ?? '',
     gender: char.gender,
+    aliases: char.variations,
   }));
 
   const data: VoiceMappingFile = {
