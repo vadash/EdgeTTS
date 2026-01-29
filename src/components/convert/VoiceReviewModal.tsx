@@ -5,7 +5,7 @@ import { useState, useRef } from 'preact/hooks';
 import { signal } from '@preact/signals';
 import { Text } from 'preact-i18n';
 import type { LLMCharacter } from '@/state/types';
-import { useSettings, useLLM, useLogs } from '@/stores';
+import { useSettings, useLLM, useLogs, useData } from '@/stores';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
 import { Button } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
@@ -13,6 +13,7 @@ import {
   importFromJSON,
   applyImportedMappings,
   readJSONFile,
+  randomizeBelowVoices,
 } from '@/services/VoiceMappingService';
 
 interface VoiceReviewModalProps {
@@ -26,6 +27,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
   const settings = useSettings();
   const llm = useLLM();
   const logs = useLogs();
+  const data = useData();
   const preview = useVoicePreview();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -79,6 +81,19 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
       rate: settings.rate.value,
       pitch: settings.pitch.value,
     });
+  };
+
+  const handleRandomizeBelow = (clickedIndex: number) => {
+    const enabledVoiceOptions = voices.filter(v => enabledVoices.includes(v.fullValue));
+    const newMap = randomizeBelowVoices({
+      sortedCharacters,
+      currentVoiceMap: voiceMap,
+      clickedIndex,
+      enabledVoices: enabledVoiceOptions,
+      narratorVoice: settings.voice.value,
+      bookLanguage: data.detectedLanguage.value,
+    });
+    llm.setVoiceMap(newMap);
   };
 
   const handleImportClick = () => {
@@ -170,7 +185,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
               </tr>
             </thead>
             <tbody>
-              {sortedCharacters.map((char) => {
+              {sortedCharacters.map((char, index) => {
                 const currentVoice = voiceMap.get(char.canonicalName) ?? '';
                 return (
                   <tr key={char.canonicalName} className="border-b border-border/50">
@@ -211,6 +226,15 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
                         aria-label={`Preview voice for ${char.canonicalName}`}
                       >
                         {preview.isPlaying && preview.currentVoiceId === currentVoice ? '...' : '▶'}
+                      </button>
+                    </td>
+                    <td className="py-2">
+                      <button
+                        className="btn btn-sm px-2"
+                        onClick={() => handleRandomizeBelow(index)}
+                        title="Randomize voices below"
+                      >
+                        🎲↓
                       </button>
                     </td>
                   </tr>
