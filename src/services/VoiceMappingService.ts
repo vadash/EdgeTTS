@@ -1,8 +1,9 @@
 // Voice Mapping Service
 // Handles export/import of character-to-voice mappings
 
-import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
+import type { LLMCharacter, SpeakerAssignment, VoiceOption } from '@/state/types';
 import { countSpeakingFrequency } from '@/services/llm/CharacterUtils';
+import type { DetectedLanguage } from '@/utils/languageDetection';
 
 /** Minimum speaking percentage to include a character in export (0.05%) */
 export const MIN_SPEAKING_PERCENTAGE = 0.0005;
@@ -152,4 +153,39 @@ export function downloadJSON(json: string, filename: string): void {
  */
 export async function readJSONFile(file: File): Promise<string> {
   return file.text();
+}
+
+/**
+ * Sorts voices by priority for randomization
+ * Priority: book language voices first, then rest alphabetically
+ * Excludes narrator voice from the result
+ */
+export function sortVoicesByPriority(
+  voices: VoiceOption[],
+  bookLanguage: DetectedLanguage,
+  narratorVoice: string
+): VoiceOption[] {
+  // Filter out narrator voice
+  const filtered = voices.filter(v => v.fullValue !== narratorVoice);
+
+  // Language prefix to match (e.g., 'en' matches 'en-US', 'en-GB')
+  const langPrefix = bookLanguage === 'ru' ? 'ru' : 'en';
+
+  // Separate into book language and other
+  const bookLangVoices: VoiceOption[] = [];
+  const otherVoices: VoiceOption[] = [];
+
+  for (const voice of filtered) {
+    if (voice.locale.startsWith(langPrefix)) {
+      bookLangVoices.push(voice);
+    } else {
+      otherVoices.push(voice);
+    }
+  }
+
+  // Sort each group alphabetically by fullValue
+  bookLangVoices.sort((a, b) => a.fullValue.localeCompare(b.fullValue));
+  otherVoices.sort((a, b) => a.fullValue.localeCompare(b.fullValue));
+
+  return [...bookLangVoices, ...otherVoices];
 }
