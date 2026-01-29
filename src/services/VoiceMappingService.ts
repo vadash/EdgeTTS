@@ -130,6 +130,39 @@ export function importFromJSON(json: string): {
   };
 }
 
+/** Prefixes to strip during normalization (order matters - check longer first) */
+const STRIP_PREFIXES = [
+  'the ', 'a ', 'an ',
+  'professor ', 'instructor ',
+  'lord ', 'lady ', 'king ', 'queen ', 'prince ', 'princess ',
+  'sir ', 'dame ', 'master ', 'mistress ',
+  'grand warden ', 'commander ', 'captain ',
+];
+
+/**
+ * Normalize a name for matching:
+ * 1. Trim whitespace
+ * 2. Lowercase
+ * 3. Strip common prefixes repeatedly until none match
+ */
+export function normalizeForMatch(name: string): string {
+  let normalized = name.trim().toLowerCase();
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const prefix of STRIP_PREFIXES) {
+      if (normalized.startsWith(prefix)) {
+        normalized = normalized.slice(prefix.length);
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return normalized.trim();
+}
+
 /**
  * Apply imported entries to existing characters and voice map
  * Only updates characters that exist in both the import and current list

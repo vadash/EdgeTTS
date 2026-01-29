@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sortVoicesByPriority, randomizeBelowVoices, exportToJSON, exportToJSONSorted, type RandomizeBelowParams } from './VoiceMappingService';
+import { sortVoicesByPriority, randomizeBelowVoices, exportToJSON, exportToJSONSorted, normalizeForMatch, type RandomizeBelowParams } from './VoiceMappingService';
 import type { VoiceOption, LLMCharacter, SpeakerAssignment } from '@/state/types';
 
 describe('sortVoicesByPriority', () => {
@@ -53,6 +53,46 @@ describe('VoiceMappingEntry with aliases', () => {
     const parsed = JSON.parse(json);
 
     expect(parsed.voices[0].aliases).toEqual(['Cale', 'Cale Cobbs']);
+  });
+});
+
+describe('normalizeForMatch', () => {
+  it('lowercases input', () => {
+    expect(normalizeForMatch('The System')).toBe('system');
+  });
+
+  it('strips "The " prefix', () => {
+    expect(normalizeForMatch('The Dark Lord')).toBe('dark lord');
+  });
+
+  it('strips "A " prefix', () => {
+    expect(normalizeForMatch('A Guard')).toBe('guard');
+  });
+
+  it('strips "An " prefix', () => {
+    expect(normalizeForMatch('An Elder')).toBe('elder');
+  });
+
+  it('strips title prefixes', () => {
+    expect(normalizeForMatch('Professor Rinkle')).toBe('rinkle');
+    expect(normalizeForMatch('Lord Azaroth')).toBe('azaroth');
+    expect(normalizeForMatch('Lady Morgana')).toBe('morgana');
+    expect(normalizeForMatch('King Harold')).toBe('harold');
+    expect(normalizeForMatch('Queen Elizabeth')).toBe('elizabeth');
+    expect(normalizeForMatch('Sir Lancelot')).toBe('lancelot');
+    expect(normalizeForMatch('Instructor Solsburn')).toBe('solsburn');
+  });
+
+  it('trims whitespace', () => {
+    expect(normalizeForMatch('  System  ')).toBe('system');
+  });
+
+  it('handles multiple prefixes', () => {
+    expect(normalizeForMatch('The Professor Smith')).toBe('smith');
+  });
+
+  it('handles names without prefixes', () => {
+    expect(normalizeForMatch('Damien')).toBe('damien');
   });
 });
 
