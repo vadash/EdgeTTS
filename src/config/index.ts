@@ -116,12 +116,12 @@ export const defaultConfig: AppConfig = {
     sampleRate: 24000,
     normLufs: -18,
     normLra: 6,
-    normTruePeak: -1.5,
-    silenceThreshold: -50,
+    normTruePeak: -1.0,
+    silenceThreshold: -55,
     silenceStartPeriods: 1,
     silenceStartDuration: 0.75,
     silenceStopPeriods: -1, // Must be -1 (remove all trailing silence). Positive values truncate after N silence periods!
-    silenceStopDuration: 0.25,
+    silenceStopDuration: 0.3,
   },
 
   llm: {
