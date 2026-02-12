@@ -24,9 +24,14 @@ const defaultSettings: AppSettings = {
   statusAreaWidth: 450,
   outputFormat: 'opus',
   silenceRemovalEnabled: true,
-  normalizationEnabled: false,
-  deEssEnabled: false,
+  normalizationEnabled: true,   // was false
+  deEssEnabled: true,           // was false
   silenceGapMs: 100,
+  // Broadcast voice audio enhancement
+  eqEnabled: true,
+  compressorEnabled: true,
+  fadeInEnabled: true,
+  stereoWidthEnabled: true,
 };
 
 /**
@@ -53,6 +58,10 @@ export class SettingsStore {
   readonly normalizationEnabled = signal<boolean>(defaultSettings.normalizationEnabled);
   readonly deEssEnabled = signal<boolean>(defaultSettings.deEssEnabled);
   readonly silenceGapMs = signal<number>(defaultSettings.silenceGapMs);
+  readonly eqEnabled = signal<boolean>(defaultSettings.eqEnabled);
+  readonly compressorEnabled = signal<boolean>(defaultSettings.compressorEnabled);
+  readonly fadeInEnabled = signal<boolean>(defaultSettings.fadeInEnabled);
+  readonly stereoWidthEnabled = signal<boolean>(defaultSettings.stereoWidthEnabled);
 
   // Text processing settings
   readonly lexxRegister = signal<boolean>(defaultSettings.lexxRegister);
@@ -161,6 +170,46 @@ export class SettingsStore {
     this.save();
   }
 
+  toggleEq(): void {
+    this.eqEnabled.value = !this.eqEnabled.value;
+    this.save();
+  }
+
+  setEqEnabled(value: boolean): void {
+    this.eqEnabled.value = value;
+    this.save();
+  }
+
+  toggleCompressor(): void {
+    this.compressorEnabled.value = !this.compressorEnabled.value;
+    this.save();
+  }
+
+  setCompressorEnabled(value: boolean): void {
+    this.compressorEnabled.value = value;
+    this.save();
+  }
+
+  toggleFadeIn(): void {
+    this.fadeInEnabled.value = !this.fadeInEnabled.value;
+    this.save();
+  }
+
+  setFadeInEnabled(value: boolean): void {
+    this.fadeInEnabled.value = value;
+    this.save();
+  }
+
+  toggleStereoWidth(): void {
+    this.stereoWidthEnabled.value = !this.stereoWidthEnabled.value;
+    this.save();
+  }
+
+  setStereoWidthEnabled(value: boolean): void {
+    this.stereoWidthEnabled.value = value;
+    this.save();
+  }
+
   // ========== Text Processing Setters ==========
 
   setLexxRegister(value: boolean): void {
@@ -219,6 +268,10 @@ export class SettingsStore {
       normalizationEnabled: this.normalizationEnabled.value,
       deEssEnabled: this.deEssEnabled.value,
       silenceGapMs: this.silenceGapMs.value,
+      eqEnabled: this.eqEnabled.value,
+      compressorEnabled: this.compressorEnabled.value,
+      fadeInEnabled: this.fadeInEnabled.value,
+      stereoWidthEnabled: this.stereoWidthEnabled.value,
     };
     localStorage.setItem(StorageKeys.settings, JSON.stringify(settings));
   }
@@ -249,6 +302,10 @@ export class SettingsStore {
         this.normalizationEnabled.value = settings.normalizationEnabled ?? defaultSettings.normalizationEnabled;
         this.deEssEnabled.value = settings.deEssEnabled ?? defaultSettings.deEssEnabled;
         this.silenceGapMs.value = settings.silenceGapMs ?? defaultSettings.silenceGapMs;
+        this.eqEnabled.value = settings.eqEnabled ?? defaultSettings.eqEnabled;
+        this.compressorEnabled.value = settings.compressorEnabled ?? defaultSettings.compressorEnabled;
+        this.fadeInEnabled.value = settings.fadeInEnabled ?? defaultSettings.fadeInEnabled;
+        this.stereoWidthEnabled.value = settings.stereoWidthEnabled ?? defaultSettings.stereoWidthEnabled;
       }
     } catch (e) {
       this.logStore.error(
@@ -280,6 +337,10 @@ export class SettingsStore {
     this.normalizationEnabled.value = defaultSettings.normalizationEnabled;
     this.deEssEnabled.value = defaultSettings.deEssEnabled;
     this.silenceGapMs.value = defaultSettings.silenceGapMs;
+    this.eqEnabled.value = defaultSettings.eqEnabled;
+    this.compressorEnabled.value = defaultSettings.compressorEnabled;
+    this.fadeInEnabled.value = defaultSettings.fadeInEnabled;
+    this.stereoWidthEnabled.value = defaultSettings.stereoWidthEnabled;
     this.save();
   }
 
@@ -305,6 +366,10 @@ export class SettingsStore {
       normalizationEnabled: this.normalizationEnabled.value,
       deEssEnabled: this.deEssEnabled.value,
       silenceGapMs: this.silenceGapMs.value,
+      eqEnabled: this.eqEnabled.value,
+      compressorEnabled: this.compressorEnabled.value,
+      fadeInEnabled: this.fadeInEnabled.value,
+      stereoWidthEnabled: this.stereoWidthEnabled.value,
     };
   }
 }

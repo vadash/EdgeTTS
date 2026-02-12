@@ -24,7 +24,15 @@ describe('SettingsStore', () => {
       expect(store.llmThreads.value).toBe(2);
       expect(store.outputFormat.value).toBe('opus');
       expect(store.silenceRemovalEnabled.value).toBe(true);
-      expect(store.normalizationEnabled.value).toBe(false);
+      expect(store.normalizationEnabled.value).toBe(true);  // changed from false to true
+      expect(store.deEssEnabled.value).toBe(true);            // changed from false to true
+    });
+
+    it('should have broadcast voice defaults', () => {
+      expect(store.eqEnabled.value).toBe(true);
+      expect(store.compressorEnabled.value).toBe(true);
+      expect(store.fadeInEnabled.value).toBe(true);
+      expect(store.stereoWidthEnabled.value).toBe(true);
     });
   });
 

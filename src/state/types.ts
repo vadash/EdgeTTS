@@ -26,6 +26,11 @@ export interface AppSettings {
   normalizationEnabled: boolean;
   deEssEnabled: boolean;
   silenceGapMs: number;
+  // Broadcast voice audio enhancement
+  eqEnabled: boolean;
+  compressorEnabled: boolean;
+  fadeInEnabled: boolean;
+  stereoWidthEnabled: boolean;
 }
 
 export interface ProcessedBook {
