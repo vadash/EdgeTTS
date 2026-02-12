@@ -35,6 +35,10 @@ describe('AudioMergeStep', () => {
       normalization: false,
       deEss: false,
       silenceGapMs: 0,
+      eq: false,
+      compressor: false,
+      fadeIn: false,
+      stereoWidth: false,
       ffmpegService: mockFFmpegService,
       createAudioMerger: (config) => {
         capturedConfig = config;
@@ -123,6 +127,10 @@ describe('AudioMergeStep', () => {
         normalization: false,
         deEss: false,
         silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -148,6 +156,10 @@ describe('AudioMergeStep', () => {
         normalization: false,
         deEss: false,
         silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -181,6 +193,10 @@ describe('AudioMergeStep', () => {
         normalization: false,
         deEss: false,
         silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -203,6 +219,10 @@ describe('AudioMergeStep', () => {
         normalization: true,
         deEss: false,
         silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: (config) => {
           capturedConfig = config;
@@ -216,6 +236,110 @@ describe('AudioMergeStep', () => {
       await step.execute(context, createNeverAbortSignal());
 
       expect(capturedConfig?.normalization).toBe(true);
+    });
+
+    it('passes eq option', async () => {
+      step = createAudioMergeStep({
+        outputFormat: 'mp3',
+        silenceRemoval: false,
+        normalization: false,
+        deEss: false,
+        silenceGapMs: 0,
+        eq: true,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: false,
+        ffmpegService: mockFFmpegService,
+        createAudioMerger: (config) => {
+          capturedConfig = config;
+          return mockAudioMerger;
+        },
+      });
+
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
+      await step.execute(context, createNeverAbortSignal());
+
+      expect(capturedConfig?.eq).toBe(true);
+    });
+
+    it('passes compressor option', async () => {
+      step = createAudioMergeStep({
+        outputFormat: 'mp3',
+        silenceRemoval: false,
+        normalization: false,
+        deEss: false,
+        silenceGapMs: 0,
+        eq: false,
+        compressor: true,
+        fadeIn: false,
+        stereoWidth: false,
+        ffmpegService: mockFFmpegService,
+        createAudioMerger: (config) => {
+          capturedConfig = config;
+          return mockAudioMerger;
+        },
+      });
+
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
+      await step.execute(context, createNeverAbortSignal());
+
+      expect(capturedConfig?.compressor).toBe(true);
+    });
+
+    it('passes fadeIn option', async () => {
+      step = createAudioMergeStep({
+        outputFormat: 'mp3',
+        silenceRemoval: false,
+        normalization: false,
+        deEss: false,
+        silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: true,
+        stereoWidth: false,
+        ffmpegService: mockFFmpegService,
+        createAudioMerger: (config) => {
+          capturedConfig = config;
+          return mockAudioMerger;
+        },
+      });
+
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
+      await step.execute(context, createNeverAbortSignal());
+
+      expect(capturedConfig?.fadeIn).toBe(true);
+    });
+
+    it('passes stereoWidth option', async () => {
+      step = createAudioMergeStep({
+        outputFormat: 'mp3',
+        silenceRemoval: false,
+        normalization: false,
+        deEss: false,
+        silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: true,
+        ffmpegService: mockFFmpegService,
+        createAudioMerger: (config) => {
+          capturedConfig = config;
+          return mockAudioMerger;
+        },
+      });
+
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: createMockDirectoryHandle(),
+      });
+      await step.execute(context, createNeverAbortSignal());
+
+      expect(capturedConfig?.stereoWidth).toBe(true);
     });
   });
 
@@ -257,6 +381,10 @@ describe('AudioMergeStep', () => {
         normalization: false,
         deEss: false,
         silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: () => mockAudioMerger,
       });
@@ -307,6 +435,10 @@ describe('AudioMergeStep', () => {
         normalization: false,
         deEss: false,
         silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: false,
         ffmpegService: mockFFmpegService,
         createAudioMerger: () => mockAudioMerger,
       });

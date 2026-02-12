@@ -14,6 +14,10 @@ export interface AudioMergeStepOptions {
   normalization: boolean;
   deEss: boolean;
   silenceGapMs: number;
+  eq: boolean;
+  compressor: boolean;
+  fadeIn: boolean;
+  stereoWidth: boolean;
   ffmpegService: IFFmpegService;
   createAudioMerger: (config: MergerConfig) => IAudioMerger;
 }
@@ -77,6 +81,10 @@ export class AudioMergeStep extends BasePipelineStep {
       normalization: this.options.normalization,
       deEss: this.options.deEss,
       silenceGapMs: this.options.silenceGapMs,
+      eq: this.options.eq,
+      compressor: this.options.compressor,
+      fadeIn: this.options.fadeIn,
+      stereoWidth: this.options.stereoWidth,
     });
 
     // Calculate total chunks for progress

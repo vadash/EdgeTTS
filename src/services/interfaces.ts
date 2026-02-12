@@ -108,6 +108,10 @@ export interface MergerConfig {
   normalization: boolean;
   deEss: boolean;
   silenceGapMs: number;
+  eq: boolean;
+  compressor: boolean;
+  fadeIn: boolean;
+  stereoWidth: boolean;
 }
 
 /**
@@ -219,6 +223,10 @@ export interface AudioProcessingOptions {
   normalization: boolean;
   deEss: boolean;
   silenceGapMs: number;
+  eq: boolean;
+  compressor: boolean;
+  fadeIn: boolean;
+  stereoWidth: boolean;
 }
 
 /**

@@ -11,6 +11,10 @@ export interface AudioProcessingConfig {
   normalization: boolean;
   deEss: boolean;
   silenceGapMs: number;
+  eq: boolean;
+  compressor: boolean;
+  fadeIn: boolean;
+  stereoWidth: boolean;
 }
 
 const CDN_MIRRORS = defaultConfig.ffmpeg.cdnMirrors;

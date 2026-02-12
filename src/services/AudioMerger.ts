@@ -28,6 +28,10 @@ export interface MergerConfig {
   normalization: boolean;
   deEss: boolean;
   silenceGapMs: number;
+  eq: boolean;
+  compressor: boolean;
+  fadeIn: boolean;
+  stereoWidth: boolean;
 }
 
 /**
@@ -297,6 +301,10 @@ export class AudioMerger implements IAudioMerger {
             normalization: this.config.normalization,
             deEss: this.config.deEss,
             silenceGapMs: this.config.silenceGapMs,
+            eq: this.config.eq,
+            compressor: this.config.compressor,
+            fadeIn: this.config.fadeIn,
+            stereoWidth: this.config.stereoWidth,
           },
           onProgress
         );
