@@ -86,6 +86,10 @@ export class ConversionOrchestrator {
         normalization: this.stores.settings.normalizationEnabled.value,
         deEss: this.stores.settings.deEssEnabled.value,
         silenceGapMs: this.stores.settings.silenceGapMs.value,
+        eq: this.stores.settings.eqEnabled.value,
+        compressor: this.stores.settings.compressorEnabled.value,
+        fadeIn: this.stores.settings.fadeInEnabled.value,
+        stereoWidth: this.stores.settings.stereoWidthEnabled.value,
 
         // Per-stage LLM settings
         extractConfig: {

@@ -56,6 +56,10 @@ export interface PipelineBuilderOptions {
   normalization: boolean;
   deEss: boolean;
   silenceGapMs: number;
+  eq: boolean;
+  compressor: boolean;
+  fadeIn: boolean;
+  stereoWidth: boolean;
 
   // Per-stage LLM settings
   extractConfig: StageLLMConfig;
@@ -196,6 +200,10 @@ export class PipelineBuilder implements IPipelineBuilder {
         normalization: options.normalization,
         deEss: options.deEss,
         silenceGapMs: options.silenceGapMs,
+        eq: options.eq,
+        compressor: options.compressor,
+        fadeIn: options.fadeIn,
+        stereoWidth: options.stereoWidth,
         ffmpegService: this.ffmpegService,
         createAudioMerger: (cfg: MergerConfig) => this.audioMergerFactory.create(cfg),
       })
