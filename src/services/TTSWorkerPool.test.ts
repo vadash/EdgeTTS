@@ -396,12 +396,12 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('warmup', () => {
-    it('warms up all workers by connecting them', async () => {
+    it('warms up ladder workers (2), not maxWorkers', async () => {
       pool = createPool({ maxWorkers: 5 });
       await pool.warmup();
 
-      // Each worker should have attempted to connect
-      expect(mockConnect).toHaveBeenCalledTimes(5);
+      // Ladder starts at 2 workers, not maxWorkers
+      expect(mockConnect).toHaveBeenCalledTimes(2);
     });
 
     it('ignores connection errors during warmup', async () => {
@@ -415,9 +415,9 @@ describe('TTSWorkerPool', () => {
         getState: vi.fn().mockReturnValue('DISCONNECTED'),
       }));
 
-      pool = createPool({ maxWorkers: 3 });
+      pool = createPool({ maxWorkers: 10 });
 
-      // Should not throw
+      // Should not throw (still warms 2 connections via ladder)
       await expect(pool.warmup()).resolves.toBeUndefined();
     });
   });

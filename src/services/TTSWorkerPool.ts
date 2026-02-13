@@ -5,6 +5,7 @@ import PQueue from 'p-queue';
 import { createPool, Pool } from 'generic-pool';
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
+import { LadderController } from './LadderController';
 import { withRetry, AbortError } from '@/utils/asyncUtils';
 import { isAppError } from '@/errors';
 import type { IWorkerPool, PoolTask, WorkerPoolProgress, ILogger } from './interfaces';
@@ -35,6 +36,7 @@ const TEMP_DIR_NAME = '_temp_work';
 export class TTSWorkerPool implements IWorkerPool {
   private queue: PQueue;
   private connectionPool: Pool<ReusableEdgeTTSService>;
+  private ladder: LadderController;
   private completedTasks = new Map<number, string>();
   private failedTasks = new Set<number>();
   private tempDirHandle: FileSystemDirectoryHandle | null = null;
@@ -62,6 +64,18 @@ export class TTSWorkerPool implements IWorkerPool {
     this.onAllComplete = options.onAllComplete;
     this.logger = options.logger;
     this.maxWorkers = options.maxWorkers;
+
+    // Initialize ladder controller for adaptive scaling
+    this.ladder = new LadderController(
+      {
+        sampleSize: 20,
+        successThreshold: 0.9,
+        scaleUpIncrement: 1,
+        scaleDownFactor: 0.5,
+      },
+      this.maxWorkers,
+      this.logger
+    );
 
     // Initialize p-queue with concurrency matching worker count
     this.queue = new PQueue({ concurrency: options.maxWorkers });
@@ -146,7 +160,9 @@ export class TTSWorkerPool implements IWorkerPool {
    */
   async warmup(): Promise<void> {
     const promises: Promise<void>[] = [];
-    for (let i = 0; i < this.maxWorkers; i++) {
+    const workersToWarmup = this.ladder.getCurrentWorkers();
+
+    for (let i = 0; i < workersToWarmup; i++) {
       promises.push(
         (async () => {
           try {
@@ -159,7 +175,7 @@ export class TTSWorkerPool implements IWorkerPool {
       );
     }
     await Promise.allSettled(promises);
-    this.logger?.debug(`Warmed up ${this.maxWorkers} connections`);
+    this.logger?.debug(`Warmed up ${workersToWarmup} connections (ladder-controlled)`);
   }
 
   addTask(task: PoolTask): void {
@@ -170,8 +186,23 @@ export class TTSWorkerPool implements IWorkerPool {
 
   addTasks(tasks: PoolTask[]): void {
     this.totalTasks += tasks.length;
-    for (const task of tasks) {
-      this.queue.add(() => this.executeTask(task));
+
+    // Add tasks gradually based on current ladder setting
+    const currentWorkers = this.ladder.getCurrentWorkers();
+    const batchSize = currentWorkers;
+
+    for (let i = 0; i < tasks.length; i += batchSize) {
+      const batch = tasks.slice(i, i + batchSize);
+      for (const task of batch) {
+        this.queue.add(() => this.executeTask(task));
+      }
+
+      // After each batch, pause briefly before next batch
+      if (i + batchSize < tasks.length) {
+        setTimeout(() => {
+          // Next batch will be processed after this delay
+        }, 100);
+      }
     }
   }
 
@@ -250,6 +281,10 @@ export class TTSWorkerPool implements IWorkerPool {
       // Save to disk
       const filename = await this.writeChunkToDisk(task.partIndex, audioData);
 
+      // Record success for ladder
+      this.ladder.recordTask(true, 0);
+      this.ladder.evaluate();
+
       this.completedTasks.set(task.partIndex, filename);
       this.processedCount++;
 
@@ -261,6 +296,10 @@ export class TTSWorkerPool implements IWorkerPool {
 
       this.onTaskComplete?.(task.partIndex, filename);
     } catch (error) {
+      // Record failure for ladder
+      this.ladder.recordTask(false, 11); // Max retries attempted
+      this.ladder.evaluate();
+
       this.failedTasks.add(task.partIndex);
       this.processedCount++;
       this.onTaskError?.(task.partIndex, error instanceof Error ? error : new Error(String(error)));
