@@ -12,7 +12,9 @@
     "test:real": "vitest run --config vitest.real.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "repomix": "npx repomix --include \"**/*.ts,*.md,*.js,package.json\" --style markdown --output repomix-output.md"
+    "repomix": "npm run repomix:source && npm run repomix:tests",
+    "repomix:source": "npx repomix --include \"**/*.ts,*.md,*.js,package.json\" --ignore \"**/*.test.ts,**/*.spec.ts,**/test/**,**/tests/**,**/vitest*.ts\" --style markdown --output repomix-source.md",
+    "repomix:tests": "npx repomix --include \"**/*.test.ts,**/*.spec.ts,**/vitest*.ts,**/*.test.tsx,**/*.spec.tsx\" --style markdown --output repomix-tests.md"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.10",
