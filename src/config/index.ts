@@ -4,8 +4,6 @@
 export interface TTSConfig {
   /** Maximum concurrent WebSocket workers */
   maxWorkers: number;
-  /** Rate limit: workers per minute */
-  workersPerMinute: number;
   /** Cooldown after error before spawning new workers (ms) */
   errorCooldown: number;
 }
@@ -103,7 +101,6 @@ export interface AppConfig {
 export const defaultConfig: AppConfig = {
   tts: {
     maxWorkers: 15,
-    workersPerMinute: 50,
     errorCooldown: 10000, // 10 seconds
   },
 
@@ -186,9 +183,3 @@ export function getRetryDelay(attempt: number, config: RetryConfig = defaultConf
   return config.delays[index];
 }
 
-/**
- * Get start delay between worker spawns
- */
-export function getWorkerStartDelay(config: TTSConfig = defaultConfig.tts): number {
-  return 60000 / config.workersPerMinute;
-}
