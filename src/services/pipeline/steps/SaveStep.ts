@@ -19,7 +19,7 @@ export interface SaveStepOptions {
 export class SaveStep extends BasePipelineStep {
   readonly name = 'save';
   protected readonly requiredContextKeys: (keyof PipelineContext)[] = [];
-  readonly dropsContextKeys: (keyof PipelineContext)[] = ['assignments', 'characters'];
+  readonly dropsContextKeys: (keyof PipelineContext)[] = ['assignments', 'characters', 'voiceMap', 'directoryHandle'];
 
   constructor(private options: SaveStepOptions) {
     super();

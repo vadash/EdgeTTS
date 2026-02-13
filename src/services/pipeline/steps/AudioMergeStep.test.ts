@@ -450,4 +450,12 @@ describe('AudioMergeStep', () => {
         .rejects.toThrow();
     });
   });
+
+  describe('dropsContextKeys', () => {
+    it('declares audioMap, tempDirHandle, and failedTasks as droppable', () => {
+      expect(step.dropsContextKeys).toContain('audioMap');
+      expect(step.dropsContextKeys).toContain('tempDirHandle');
+      expect(step.dropsContextKeys).toContain('failedTasks');
+    });
+  });
 });
