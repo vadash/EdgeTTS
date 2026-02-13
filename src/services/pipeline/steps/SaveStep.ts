@@ -4,6 +4,7 @@
 
 import { BasePipelineStep, PipelineContext } from '../types';
 import { exportToJSONSorted } from '@/services/VoiceMappingService';
+import { withPermissionRetry } from '@/services/FileSystemRetry';
 
 /**
  * Options for SaveStep
@@ -37,17 +38,16 @@ export class SaveStep extends BasePipelineStep {
     if (directoryHandle && characters && voiceMap && assignments) {
       try {
         const bookName = this.extractBookName(fileNames);
-        // Create/get book subfolder
-        const bookFolder = await directoryHandle.getDirectoryHandle(bookName, { create: true });
-        // Export with sorted and filtered voices
-        const json = exportToJSONSorted(characters, voiceMap, assignments, this.options.narratorVoice);
         const fileName = `${bookName}.json`;
+        await withPermissionRetry(directoryHandle, async () => {
+          const bookFolder = await directoryHandle.getDirectoryHandle(bookName, { create: true });
+          const json = exportToJSONSorted(characters, voiceMap, assignments, this.options.narratorVoice);
 
-        const fileHandle = await bookFolder.getFileHandle(fileName, { create: true });
-        const writable = await fileHandle.createWritable();
-        await writable.write(json);
-        await writable.close();
-
+          const fileHandle = await bookFolder.getFileHandle(fileName, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(json);
+          await writable.close();
+        });
         this.reportProgress(1, 1, `Saved voice mapping: ${bookName}/${fileName}`);
       } catch {
         // Non-fatal error - don't fail the whole save if voice mapping fails

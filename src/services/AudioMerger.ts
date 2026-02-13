@@ -5,6 +5,7 @@
 import { defaultConfig } from '@/config';
 import { sanitizeFilename } from '@/utils/fileUtils';
 import { findSyncWord, parseMP3Duration, skipID3v2Tag } from './MP3Parser';
+import { withPermissionRetry } from './FileSystemRetry';
 import type { IFFmpegService, IAudioMerger, MergeProgressCallback } from './interfaces';
 
 export interface MergedFile {
@@ -413,17 +414,19 @@ export class AudioMerger implements IAudioMerger {
     file: MergedFile,
     directoryHandle: FileSystemDirectoryHandle
   ): Promise<void> {
-    // Extract folder name from filename (remove extension and part number)
-    const folderName = sanitizeFilename(
-      file.filename
-        .replace(/\s+\d{4}\.(mp3|opus)$/, '')
-        .replace(/\.(mp3|opus)$/, '')
-    );
+    await withPermissionRetry(directoryHandle, async () => {
+      // Extract folder name from filename (remove extension and part number)
+      const folderName = sanitizeFilename(
+        file.filename
+          .replace(/\s+\d{4}\.(mp3|opus)$/, '')
+          .replace(/\.(mp3|opus)$/, '')
+      );
 
-    const folderHandle = await directoryHandle.getDirectoryHandle(folderName, { create: true });
-    const fileHandle = await folderHandle.getFileHandle(file.filename, { create: true });
-    const writableStream = await fileHandle.createWritable();
-    await writableStream.write(file.blob);
-    await writableStream.close();
+      const folderHandle = await directoryHandle.getDirectoryHandle(folderName, { create: true });
+      const fileHandle = await folderHandle.getFileHandle(file.filename, { create: true });
+      const writableStream = await fileHandle.createWritable();
+      await writableStream.write(file.blob);
+      await writableStream.close();
+    });
   }
 }
