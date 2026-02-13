@@ -105,7 +105,7 @@ export const defaultConfig: AppConfig = {
   },
 
   audio: {
-    targetDurationMinutes: 30,
+    targetDurationMinutes: 15,
     tolerancePercent: 10,
     bytesPerMs: 12, // 96kbps = 12 bytes/ms
     opusBitrate: 64,

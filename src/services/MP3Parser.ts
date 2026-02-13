@@ -78,6 +78,7 @@ interface FrameHeader {
   bitrate: number;
   sampleRate: number;
   padding: boolean;
+  channelMode: 'stereo' | 'joint-stereo' | 'dual-channel' | 'mono';
   frameSize: number;
   samplesPerFrame: number;
   frameDurationMs: number;
@@ -109,6 +110,7 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
   const byte1 = buffer[offset];
   const byte2 = buffer[offset + 1];
   const byte3 = buffer[offset + 2];
+  const byte4 = buffer[offset + 3];
 
   // Validate sync word
   if (byte1 !== 0xff || (byte2 & 0xe0) !== 0xe0) {
@@ -121,6 +123,7 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
   const bitrateBits = (byte3 >> 4) & 0x0f;
   const sampleRateBits = (byte3 >> 2) & 0x03;
   const paddingBit = (byte3 >> 1) & 0x01;
+  const channelModeBits = (byte4 >> 6) & 0x03;
 
   // Look up values
   const mpegVersion = MPEG_VERSIONS[versionBits as keyof typeof MPEG_VERSIONS];
@@ -158,14 +161,37 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
     return null;
   }
 
+  // Determine channel mode
+  // 00: Stereo, 01: Joint Stereo, 10: Dual channel, 11: Mono
+  let channelMode: 'stereo' | 'joint-stereo' | 'dual-channel' | 'mono';
+  switch (channelModeBits) {
+    case 0b00:
+      channelMode = 'stereo';
+      break;
+    case 0b01:
+      channelMode = 'joint-stereo';
+      break;
+    case 0b10:
+      channelMode = 'dual-channel';
+      break;
+    case 0b11:
+      channelMode = 'mono';
+      break;
+    default:
+      return null;
+  }
+
   // Calculate frame size
   // Layer I: frame_size = (12 * bitrate / sample_rate + padding) * 4
-  // Layer II/III: frame_size = 144 * bitrate / sample_rate + padding
+  // Layer II/III stereo: frame_size = 144 * bitrate / sample_rate + padding
+  // Layer II/III mono: frame_size = 72 * bitrate / sample_rate + padding
   let frameSize: number;
   if (layer === 1) {
     frameSize = Math.floor((12 * bitrate * 1000) / sampleRate + (paddingBit ? 1 : 0)) * 4;
   } else {
-    frameSize = Math.floor((144 * bitrate * 1000) / sampleRate) + (paddingBit ? 1 : 0);
+    // For mono, use 72; for stereo/joint/dual, use 144
+    const channelCoefficient = channelMode === 'mono' ? 72 : 144;
+    frameSize = Math.floor((channelCoefficient * bitrate * 1000) / sampleRate) + (paddingBit ? 1 : 0);
   }
 
   // Calculate frame duration in milliseconds
@@ -177,6 +203,7 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
     bitrate,
     sampleRate,
     padding: paddingBit === 1,
+    channelMode,
     frameSize,
     samplesPerFrame,
     frameDurationMs,
