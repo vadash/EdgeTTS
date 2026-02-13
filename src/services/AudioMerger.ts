@@ -4,7 +4,7 @@
 
 import { defaultConfig } from '@/config';
 import { sanitizeFilename } from '@/utils/fileUtils';
-import { parseMP3Duration } from './MP3Parser';
+import { findSyncWord, parseMP3Duration, skipID3v2Tag } from './MP3Parser';
 import type { IFFmpegService, IAudioMerger, MergeProgressCallback } from './interfaces';
 
 export interface MergedFile {
@@ -223,27 +223,40 @@ export class AudioMerger implements IAudioMerger {
     totalGroups: number,
     tempDirHandle: FileSystemDirectoryHandle
   ): Promise<MergedFile | null> {
-    let totalSize = 0;
-    const chunks: Uint8Array[] = [];
+    // Pass 1: Read chunks, calculate stripped sizes
+    interface ChunkInfo {
+      data: Uint8Array;
+      audioOffset: number;
+    }
 
-    // Read chunks one by one from disk
+    const chunkInfos: ChunkInfo[] = [];
+    let totalStrippedSize = 0;
+
     for (let i = group.fromIndex; i <= group.toIndex; i++) {
       const chunkFilename = audioMap.get(i);
-      if (chunkFilename) {
-        const audio = await this.readChunkFromDisk(chunkFilename, tempDirHandle);
-        totalSize += audio.length;
-        chunks.push(audio);
+      if (!chunkFilename) continue;
+
+      const data = await this.readChunkFromDisk(chunkFilename, tempDirHandle);
+      const id3Offset = skipID3v2Tag(data);
+      const syncOffset = findSyncWord(data, id3Offset);
+      const audioOffset = syncOffset >= 0 ? syncOffset : id3Offset;
+
+      const strippedLength = data.length - audioOffset;
+      if (strippedLength > 0) {
+        chunkInfos.push({ data, audioOffset });
+        totalStrippedSize += strippedLength;
       }
     }
 
-    if (totalSize === 0) return null;
+    if (totalStrippedSize === 0) return null;
 
-    // Combine into single Uint8Array
-    const combined = new Uint8Array(totalSize);
+    // Pass 2: Allocate exact buffer and copy stripped data
+    const combined = new Uint8Array(totalStrippedSize);
     let offset = 0;
-    for (const chunk of chunks) {
-      combined.set(chunk, offset);
-      offset += chunk.length;
+    for (const { data, audioOffset } of chunkInfos) {
+      const length = data.length - audioOffset;
+      combined.set(data.subarray(audioOffset), offset);
+      offset += length;
     }
 
     const filename = this.generateFilename(group, totalGroups, 'mp3');
