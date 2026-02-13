@@ -89,11 +89,15 @@ export class KeepAwake implements IKeepAwake {
   private async startScreenWakeLock(): Promise<void> {
     if (!('wakeLock' in navigator)) return;
 
+    // Register visibility listener regardless — it will acquire lock
+    // when tab becomes visible
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+
+    // Only request if currently visible; browser rejects when hidden
+    if (document.visibilityState !== 'visible') return;
+
     try {
       this.wakeLock = await navigator.wakeLock.request('screen');
-
-      // Re-acquire wake lock if visibility changes (tab becomes visible again)
-      document.addEventListener('visibilitychange', this.handleVisibilityChange);
     } catch {
       // Wake lock not supported or permission denied
     }
