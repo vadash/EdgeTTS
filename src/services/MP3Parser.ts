@@ -88,7 +88,7 @@ interface FrameHeader {
  * Find the sync word (0xFFE0 to 0xFFFF with appropriate bits)
  * Returns the offset of the frame header start, or -1 if not found
  */
-function findSyncWord(buffer: Uint8Array, startOffset: number): number {
+export function findSyncWord(buffer: Uint8Array, startOffset: number): number {
   for (let i = startOffset; i < buffer.length - 1; i++) {
     // Frame sync is 11 set bits (0xFF and first 3 bits of next byte)
     if (buffer[i] === 0xff && (buffer[i + 1] & 0xe0) === 0xe0) {
@@ -214,7 +214,7 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
  * Skip ID3v2 tag if present
  * Returns the offset after the ID3v2 tag, or 0 if no tag
  */
-function skipID3v2Tag(buffer: Uint8Array): number {
+export function skipID3v2Tag(buffer: Uint8Array): number {
   // ID3v2 tag starts with "ID3"
   if (buffer.length < 10) {
     return 0;
