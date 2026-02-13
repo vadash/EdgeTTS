@@ -178,4 +178,19 @@ this.queue = new PQueue({
 - [ ] Remove/disable `workersPerMinute` config (or repurpose)
 - [ ] Add unit tests for LadderController
 - [ ] Update integration tests
-- [ ] Update design doc with implementation notes
+- [x] Update design doc with implementation notes
+
+---
+
+## Implementation Notes (2025-02-13)
+
+### Dynamic Concurrency Solution
+PQueue doesn't support dynamic concurrency. Implemented task batching instead:
+- `addTasks()` batches tasks based on current ladder worker count
+- Each batch added to queue with 100ms delay between batches
+- Ladder re-evaluates after each task completion
+
+### Deviations from Design
+- Originally planned to modify PQueue concurrency directly; switched to batching
+- `scaleDown()` triggered on ANY failure, not just error spikes (safer)
+- Removed `workersPerMinute` config entirely (was unused)
