@@ -63,7 +63,7 @@ describe('LadderController', () => {
     it('reduces by 50% on immediate error call', () => {
       const ladder = new LadderController({ sampleSize: 20, successThreshold: 0.9, scaleUpIncrement: 1, scaleDownFactor: 0.5 }, 15);
       // Manually scale to 8
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 120; i++) {  // Fixed: 60 -> 120 (2 + 120/20 = 8)
         ladder.recordTask(true, 0);
         ladder.evaluate();
       }
@@ -91,7 +91,7 @@ describe('LadderController', () => {
         ladder.recordTask(true, 0);
       }
       ladder.evaluate();
-      // Should not scale up since only 5 in history and all success = 100% > 90%
+      // Should scale up: 5 in history, 100% success > 90%, 2 -> 3
       expect(ladder.getCurrentWorkers()).toBe(3);
     });
   });
