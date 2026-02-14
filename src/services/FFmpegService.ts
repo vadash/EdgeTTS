@@ -36,6 +36,10 @@ export class FFmpegService implements IFFmpegService {
   private operationCount = 0;
   private readonly MAX_OPERATIONS_BEFORE_REFRESH = 10;
 
+  // Cache blob URLs to avoid re-fetching from CDN on proactive refresh
+  private cachedCoreURL: string | null = null;
+  private cachedWasmURL: string | null = null;
+
   constructor(logger?: ILogger) {
     this.logger = logger;
   }
@@ -63,6 +67,26 @@ export class FFmpegService implements IFFmpegService {
       this.logger?.debug(`[FFmpeg] ${message}`);
     });
 
+    // Reuse cached blob URLs if available (avoids CDN fetch on proactive refresh)
+    if (this.cachedCoreURL && this.cachedWasmURL) {
+      try {
+        onProgress?.('Reloading FFmpeg from cache...');
+        await ffmpeg.load({ coreURL: this.cachedCoreURL, wasmURL: this.cachedWasmURL });
+        this.ffmpeg = ffmpeg;
+        this.loaded = true;
+        this.loadError = null;
+        onProgress?.('FFmpeg reloaded from cache');
+        return true;
+      } catch (err) {
+        this.logger?.warn('FFmpeg reload from cached blob URLs failed, fetching from CDN', {
+          error: err instanceof Error ? err.message : String(err)
+        });
+        // Invalidate cache and fall through to CDN fetch
+        this.cachedCoreURL = null;
+        this.cachedWasmURL = null;
+      }
+    }
+
     for (let i = 0; i < CDN_MIRRORS.length; i++) {
       const cdn = CDN_MIRRORS[i];
       onProgress?.(`Loading FFmpeg from CDN ${i + 1}/${CDN_MIRRORS.length}...`);
@@ -81,6 +105,9 @@ export class FFmpegService implements IFFmpegService {
         this.ffmpeg = ffmpeg;
         this.loaded = true;
         this.loadError = null;
+        // Cache blob URLs for future proactive refreshes
+        this.cachedCoreURL = coreURL;
+        this.cachedWasmURL = wasmURL;
         onProgress?.('FFmpeg loaded successfully');
         return true;
       } catch (err) {
