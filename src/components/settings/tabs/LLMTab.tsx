@@ -3,7 +3,7 @@ import { Text } from 'preact-i18n';
 import { useLLM } from '@/stores';
 import { useLogger } from '@/di/ServiceContext';
 import { LLMVoiceService } from '@/services/llm';
-import { Toggle, Tabs, TabPanel } from '@/components/common';
+import { Toggle, Tabs, TabPanel, Button } from '@/components/common';
 import { LLMHelp } from './LLMHelp';
 import { StageConfigForm, type TestResult } from './StageConfigForm';
 import type { LLMStage, StageConfig } from '@/stores/LLMStore';
@@ -150,6 +150,11 @@ export function LLMTab() {
           </>
         )}
       </Tabs>
+
+      {/* Save Button */}
+      <Button variant="primary" onClick={() => llm.saveSettings()} className="w-full">
+        💾 <Text id="settings.save">Save Settings</Text>
+      </Button>
 
       {/* Help section */}
       <LLMHelp />
