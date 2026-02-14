@@ -201,13 +201,19 @@ export class FFmpegService implements IFFmpegService {
         args.push('-af', filters);
       }
 
+      // Determine Opus encoding settings
+      const minBitrate = config.opusMinBitrate ?? defaultConfig.audio.opusBitrate;
+      const maxBitrate = config.opusMaxBitrate ?? minBitrate;
+      const compression = config.opusCompressionLevel ?? defaultConfig.audio.opusCompression;
+
       args.push(
         '-c:a', 'libopus',
-        '-b:a', `${defaultConfig.audio.opusBitrate}k`,
-        '-compression_level', String(defaultConfig.audio.opusCompression),
+        '-b:a', `${minBitrate}k`,
+        '-compression_level', String(compression),
+        '-vbr', 'on',
+        ...(maxBitrate > minBitrate ? ['-maxrate', `${maxBitrate}k`] : []),
         '-ar', String(defaultConfig.audio.sampleRate),
         '-ac', config.stereoWidth ? '2' : '1',
-        '-vbr', 'on',
         'output.opus'
       );
 
