@@ -34,6 +34,13 @@ describe('SettingsStore', () => {
       expect(store.fadeInEnabled.value).toBe(true);
       expect(store.stereoWidthEnabled.value).toBe(true);
     });
+
+    it('should have Opus encoding defaults', () => {
+      expect(store.opusPreset.value).toBe('balanced');
+      expect(store.opusMinBitrate.value).toBe(64);
+      expect(store.opusMaxBitrate.value).toBe(96);
+      expect(store.opusCompressionLevel.value).toBe(10);
+    });
   });
 
   describe('setters', () => {

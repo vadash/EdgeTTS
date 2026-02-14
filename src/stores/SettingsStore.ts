@@ -3,6 +3,7 @@
 
 import { signal, computed } from '@preact/signals';
 import type { AppSettings } from '@/state/types';
+import { AudioPreset, AUDIO_PRESETS } from '@/state/types';
 import type { LogStore } from './LogStore';
 import { StorageKeys } from '@/config/storage';
 
@@ -32,6 +33,11 @@ const defaultSettings: AppSettings = {
   compressorEnabled: true,
   fadeInEnabled: true,
   stereoWidthEnabled: true,
+  // Opus encoding settings
+  opusPreset: AudioPreset.BALANCED,
+  opusMinBitrate: 64,
+  opusMaxBitrate: 96,
+  opusCompressionLevel: 10,
 };
 
 /**
@@ -62,6 +68,12 @@ export class SettingsStore {
   readonly compressorEnabled = signal<boolean>(defaultSettings.compressorEnabled);
   readonly fadeInEnabled = signal<boolean>(defaultSettings.fadeInEnabled);
   readonly stereoWidthEnabled = signal<boolean>(defaultSettings.stereoWidthEnabled);
+
+  // Opus encoding settings
+  readonly opusPreset = signal<AudioPreset>(defaultSettings.opusPreset);
+  readonly opusMinBitrate = signal<number>(defaultSettings.opusMinBitrate);
+  readonly opusMaxBitrate = signal<number>(defaultSettings.opusMaxBitrate);
+  readonly opusCompressionLevel = signal<number>(defaultSettings.opusCompressionLevel);
 
   // Text processing settings
   readonly lexxRegister = signal<boolean>(defaultSettings.lexxRegister);
