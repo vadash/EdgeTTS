@@ -315,6 +315,10 @@ export class SettingsStore {
       compressorEnabled: this.compressorEnabled.value,
       fadeInEnabled: this.fadeInEnabled.value,
       stereoWidthEnabled: this.stereoWidthEnabled.value,
+      opusPreset: this.opusPreset.value,
+      opusMinBitrate: this.opusMinBitrate.value,
+      opusMaxBitrate: this.opusMaxBitrate.value,
+      opusCompressionLevel: this.opusCompressionLevel.value,
     };
     localStorage.setItem(StorageKeys.settings, JSON.stringify(settings));
   }
@@ -349,6 +353,10 @@ export class SettingsStore {
         this.compressorEnabled.value = settings.compressorEnabled ?? defaultSettings.compressorEnabled;
         this.fadeInEnabled.value = settings.fadeInEnabled ?? defaultSettings.fadeInEnabled;
         this.stereoWidthEnabled.value = settings.stereoWidthEnabled ?? defaultSettings.stereoWidthEnabled;
+        this.opusPreset.value = settings.opusPreset ?? defaultSettings.opusPreset;
+        this.opusMinBitrate.value = settings.opusMinBitrate ?? defaultSettings.opusMinBitrate;
+        this.opusMaxBitrate.value = settings.opusMaxBitrate ?? defaultSettings.opusMaxBitrate;
+        this.opusCompressionLevel.value = settings.opusCompressionLevel ?? defaultSettings.opusCompressionLevel;
       }
     } catch (e) {
       this.logStore.error(
@@ -384,6 +392,10 @@ export class SettingsStore {
     this.compressorEnabled.value = defaultSettings.compressorEnabled;
     this.fadeInEnabled.value = defaultSettings.fadeInEnabled;
     this.stereoWidthEnabled.value = defaultSettings.stereoWidthEnabled;
+    this.opusPreset.value = defaultSettings.opusPreset;
+    this.opusMinBitrate.value = defaultSettings.opusMinBitrate;
+    this.opusMaxBitrate.value = defaultSettings.opusMaxBitrate;
+    this.opusCompressionLevel.value = defaultSettings.opusCompressionLevel;
     this.save();
   }
 
@@ -413,6 +425,10 @@ export class SettingsStore {
       compressorEnabled: this.compressorEnabled.value,
       fadeInEnabled: this.fadeInEnabled.value,
       stereoWidthEnabled: this.stereoWidthEnabled.value,
+      opusPreset: this.opusPreset.value,
+      opusMinBitrate: this.opusMinBitrate.value,
+      opusMaxBitrate: this.opusMaxBitrate.value,
+      opusCompressionLevel: this.opusCompressionLevel.value,
     };
   }
 }

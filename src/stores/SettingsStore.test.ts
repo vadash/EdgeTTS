@@ -212,5 +212,61 @@ describe('SettingsStore', () => {
       expect(store.ttsThreads.value).toBe(15);
       expect(store.llmThreads.value).toBe(2);
     });
+
+    it('save should include Opus settings', () => {
+      store.setOpusPreset('fast' as any);
+      store.setOpusMinBitrate(56);
+      store.save();
+
+      // Check the LAST save call (explicit save at end)
+      const calls = (localStorage.setItem as any).mock.calls;
+      const savedData = JSON.parse(calls[calls.length - 1][1]);
+      expect(savedData.opusPreset).toBe('custom');
+      expect(savedData.opusMinBitrate).toBe(56);
+    });
+
+    it('load should restore Opus settings from localStorage', () => {
+      const savedState = {
+        opusPreset: 'mobile',
+        opusMinBitrate: 40,
+        opusMaxBitrate: 56,
+        opusCompressionLevel: 5,
+      };
+      localStorage.getItem = vi.fn(() => JSON.stringify(savedState));
+
+      store.load();
+
+      expect(store.opusPreset.value).toBe('mobile');
+      expect(store.opusMinBitrate.value).toBe(40);
+      expect(store.opusMaxBitrate.value).toBe(56);
+      expect(store.opusCompressionLevel.value).toBe(5);
+    });
+
+    it('load should use defaults when Opus settings missing', () => {
+      localStorage.getItem = vi.fn(() => JSON.stringify({ rate: 50 }));
+      store.load();
+
+      expect(store.opusPreset.value).toBe('balanced');
+      expect(store.opusMinBitrate.value).toBe(64);
+      expect(store.opusMaxBitrate.value).toBe(96);
+      expect(store.opusCompressionLevel.value).toBe(10);
+    });
+
+    it('reset should restore Opus defaults', () => {
+      store.setOpusPreset('custom' as any);
+      store.setOpusMinBitrate(100);
+      store.reset();
+
+      expect(store.opusPreset.value).toBe('balanced');
+      expect(store.opusMinBitrate.value).toBe(64);
+    });
+
+    it('toObject should include Opus settings', () => {
+      store.setOpusPreset('max_quality' as any);
+      const obj = store.toObject();
+
+      expect(obj.opusPreset).toBe('max_quality');
+      expect(obj.opusMinBitrate).toBe(128);
+    });
   });
 });
