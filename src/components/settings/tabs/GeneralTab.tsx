@@ -54,7 +54,7 @@ export function GeneralTab() {
         label="settings.ttsThreads"
         value={settings.ttsThreads.value}
         min={1}
-        max={30}
+        max={20}
         onChange={(v) => settings.setTtsThreads(v)}
       />
 
