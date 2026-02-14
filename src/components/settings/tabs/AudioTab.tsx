@@ -60,6 +60,60 @@ export function AudioTab() {
                 </button>
               ))}
             </div>
+
+            {/* Min Bitrate Slider */}
+            <div>
+              <div className="flex justify-between text-sm">
+                <Text id="settings.minBitrate">Min Bitrate</Text>
+                <span className="font-mono">{settings.opusMinBitrate.value} <Text id="settings.kbps">kbps</Text></span>
+              </div>
+              <input
+                type="range"
+                min="6"
+                max="256"
+                step="2"
+                value={settings.opusMinBitrate.value}
+                onChange={(e) => settings.setOpusMinBitrate(Number((e.target as HTMLInputElement).value))}
+                className="w-full"
+              />
+            </div>
+
+            {/* Max Bitrate Slider */}
+            <div>
+              <div className="flex justify-between text-sm">
+                <Text id="settings.maxBitrate">Max Bitrate</Text>
+                <span className="font-mono">{settings.opusMaxBitrate.value} <Text id="settings.kbps">kbps</Text></span>
+              </div>
+              <input
+                type="range"
+                min="6"
+                max="256"
+                step="2"
+                value={settings.opusMaxBitrate.value}
+                onChange={(e) => settings.setOpusMaxBitrate(Number((e.target as HTMLInputElement).value))}
+                className="w-full"
+              />
+            </div>
+
+            {/* Compression Level Slider */}
+            <div>
+              <div className="flex justify-between text-sm">
+                <Text id="settings.compressionLevel">Compression Level</Text>
+                <span className="font-mono">{settings.opusCompressionLevel.value}</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="10"
+                step="1"
+                value={settings.opusCompressionLevel.value}
+                onChange={(e) => settings.setOpusCompressionLevel(Number((e.target as HTMLInputElement).value))}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                <Text id="settings.compressionLevelHint" />
+              </p>
+            </div>
           </div>
         </>
       )}
