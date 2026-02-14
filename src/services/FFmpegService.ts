@@ -15,6 +15,10 @@ export interface AudioProcessingConfig {
   compressor: boolean;
   fadeIn: boolean;
   stereoWidth: boolean;
+  // Opus encoding settings (optional, uses defaults if not provided)
+  opusMinBitrate?: number;
+  opusMaxBitrate?: number;
+  opusCompressionLevel?: number;
 }
 
 const CDN_MIRRORS = defaultConfig.ffmpeg.cdnMirrors;

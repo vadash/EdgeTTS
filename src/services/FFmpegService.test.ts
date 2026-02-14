@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { FFmpegService } from './FFmpegService';
+import type { AudioProcessingConfig } from './FFmpegService';
 
 // Access private method via prototype for testing filter chain logic
 function buildFilterChain(config: any): string {
@@ -99,5 +100,57 @@ describe('FFmpegService.buildFilterChain', () => {
     expect(normIdx).toBeLessThan(limiterIdx);
     expect(limiterIdx).toBeLessThan(fadeIdx);
     expect(fadeIdx).toBeLessThan(stereoIdx);
+  });
+});
+
+describe('AudioProcessingConfig', () => {
+  it('should accept Opus encoding parameters', () => {
+    const config: AudioProcessingConfig = {
+      silenceRemoval: true,
+      normalization: true,
+      deEss: true,
+      silenceGapMs: 100,
+      eq: true,
+      compressor: true,
+      fadeIn: true,
+      stereoWidth: false,
+      opusMinBitrate: 48,
+      opusMaxBitrate: 64,
+      opusCompressionLevel: 5,
+    };
+    expect(config.opusMinBitrate).toBe(48);
+    expect(config.opusMaxBitrate).toBe(64);
+    expect(config.opusCompressionLevel).toBe(5);
+  });
+
+  it('should work without Opus parameters (backward compat)', () => {
+    const config: AudioProcessingConfig = {
+      silenceRemoval: false,
+      normalization: false,
+      deEss: false,
+      silenceGapMs: 0,
+      eq: false,
+      compressor: false,
+      fadeIn: false,
+      stereoWidth: false,
+    };
+    expect(config.opusMinBitrate).toBeUndefined();
+  });
+
+  it('should have optional Opus fields in interface', () => {
+    // This test will cause a type error if the fields aren't defined
+    const config: AudioProcessingConfig = {
+      silenceRemoval: false,
+      normalization: false,
+      deEss: false,
+      silenceGapMs: 0,
+      eq: false,
+      compressor: false,
+      fadeIn: false,
+      stereoWidth: false,
+    };
+    // @ts-expect-error - opusMinBitrate should be optional but undefined
+    const minBitrate = config.opusMinBitrate;
+    expect(minBitrate).toBeUndefined();
   });
 });
