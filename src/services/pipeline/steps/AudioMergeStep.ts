@@ -87,8 +87,9 @@ export class AudioMergeStep extends BasePipelineStep {
       stereoWidth: this.options.stereoWidth,
     });
 
-    // Calculate total chunks for progress
-    const totalChunks = assignments?.length ?? audioMap.size;
+    // Use audioMap.size: assignments includes filtered-out non-pronounceable
+    // entries, but audioMap only contains actually generated audio chunks
+    const totalChunks = audioMap.size;
 
     this.reportProgress(0, totalChunks, 'Merging audio...');
 
