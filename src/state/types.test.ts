@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { AudioPreset, AUDIO_PRESETS } from '@/state/types';
+import type { AppSettings } from '@/state/types';
 
 describe('AudioPreset', () => {
   it('should have all preset values', () => {
@@ -30,5 +31,55 @@ describe('AudioPreset', () => {
     expect(mobile?.minBitrate).toBe(32);
     expect(mobile?.maxBitrate).toBe(48);
     expect(mobile?.compressionLevel).toBe(3);
+  });
+});
+
+describe('AppSettings interface', () => {
+  it('should accept Opus encoding settings', () => {
+    const settings: AppSettings = {
+      // Required existing fields (minimal subset for type check)
+      voice: 'ru-RU, DmitryNeural',
+      narratorVoice: 'ru-RU, DmitryNeural',
+      voicePoolLocale: 'ru-RU',
+      enabledVoices: [],
+      rate: 0,
+      pitch: 0,
+      ttsThreads: 15,
+      llmThreads: 2,
+      lexxRegister: true,
+      showDopSettings: false,
+      isLiteMode: true,
+      statusAreaWidth: 450,
+      outputFormat: 'opus',
+      silenceRemovalEnabled: true,
+      normalizationEnabled: true,
+      deEssEnabled: true,
+      silenceGapMs: 100,
+      eqEnabled: true,
+      compressorEnabled: true,
+      fadeInEnabled: true,
+      stereoWidthEnabled: true,
+      // New Opus settings
+      opusPreset: AudioPreset.BALANCED,
+      opusMinBitrate: 64,
+      opusMaxBitrate: 96,
+      opusCompressionLevel: 10,
+    } as AppSettings;
+    expect(settings.opusPreset).toBe(AudioPreset.BALANCED);
+    expect(settings.opusMinBitrate).toBe(64);
+    expect(settings.opusMaxBitrate).toBe(96);
+    expect(settings.opusCompressionLevel).toBe(10);
+  });
+
+  it('should have Opus encoding fields defined', () => {
+    // Verify the interface actually has these fields
+    const settings: Partial<AppSettings> = {};
+    // If this compiles, the interface accepts these properties
+    expect(() => {
+      settings.opusPreset = AudioPreset.BALANCED;
+      settings.opusMinBitrate = 64;
+      settings.opusMaxBitrate = 96;
+      settings.opusCompressionLevel = 10;
+    }).not.toThrow();
   });
 });

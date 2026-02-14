@@ -84,6 +84,11 @@ export interface AppSettings {
   compressorEnabled: boolean;
   fadeInEnabled: boolean;
   stereoWidthEnabled: boolean;
+  // Opus encoding settings
+  opusPreset: AudioPreset;
+  opusMinBitrate: number;
+  opusMaxBitrate: number;
+  opusCompressionLevel: number;
 }
 
 export interface ProcessedBook {
