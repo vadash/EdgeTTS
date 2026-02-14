@@ -82,6 +82,7 @@
     "streamingHint": "Stream responses in real-time",
     "reasoning": "Reasoning Mode",
     "reasoningHint": "Enable extended reasoning for complex tasks",
+    "copySettings": "Copy to other stages",
     "temperature": "Temperature",
     "temperatureHint": "Controls randomness (0 = deterministic)",
     "topP": "Top-P",

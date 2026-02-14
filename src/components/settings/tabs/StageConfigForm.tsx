@@ -25,6 +25,7 @@ interface StageConfigFormProps {
   onTestConnection: (useStreaming: boolean) => void;
   testing?: boolean;
   testResult?: TestResult | null;
+  onCopySettings?: () => void;
 }
 
 export function StageConfigForm({
@@ -36,6 +37,7 @@ export function StageConfigForm({
   onTestConnection,
   testing,
   testResult,
+  onCopySettings,
 }: StageConfigFormProps) {
   const isReasoningEnabled = !!config.reasoning;
 
@@ -46,6 +48,17 @@ export function StageConfigForm({
 
   return (
     <div className="space-y-4">
+      {/* Copy Settings Button */}
+      {onCopySettings && (
+        <Button
+          onClick={onCopySettings}
+          variant="secondary"
+          className="w-full"
+        >
+          📋 <Text id="llm.copySettings">Copy to other stages</Text>
+        </Button>
+      )}
+
       {/* API Key */}
       <div className="space-y-1">
         <label className="input-label">
