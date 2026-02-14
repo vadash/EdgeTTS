@@ -1,6 +1,7 @@
 import { Text } from 'preact-i18n';
 import { useSettings, useConversion } from '@/stores';
 import { Toggle, Button } from '@/components/common';
+import { AudioPreset, AUDIO_PRESETS } from '@/state/types';
 
 export function AudioTab() {
   const settings = useSettings();
@@ -31,6 +32,37 @@ export function AudioTab() {
           <Text id="settings.outputFormatHint">Opus offers better quality at smaller file sizes</Text>
         </p>
       </div>
+
+      {/* Opus Encoding Settings - Presets */}
+      {settings.outputFormat.value === 'opus' && (
+        <>
+          <div className="space-y-4 p-4 bg-primary rounded-lg border border-border">
+            <div className="font-medium">
+              <Text id="settings.opusEncoding">Opus Encoding</Text>
+            </div>
+            <p className="text-xs text-gray-500">
+              <Text id="settings.opusEncodingHint" />
+            </p>
+
+            {/* Preset Buttons */}
+            <div className="grid grid-cols-4 gap-2">
+              {AUDIO_PRESETS.map(preset => (
+                <button
+                  key={preset.name}
+                  onClick={() => settings.setOpusPreset(preset.name)}
+                  className={`text-xs p-2 rounded ${
+                    settings.opusPreset.value === preset.name
+                      ? 'bg-accent text-white'
+                      : 'bg-primary-secondary'
+                  }`}
+                >
+                  <Text id={preset.labelId} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Opus-only settings */}
       {settings.outputFormat.value === 'opus' && (
