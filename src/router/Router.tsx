@@ -1,15 +1,14 @@
 import type { FunctionalComponent, ComponentChildren } from 'preact';
-import { isConvertRoute, isSettingsRoute, isLogsRoute, isAboutRoute, isChangelogRoute } from './useRoute';
+import { isConvertRoute, isSettingsRoute, isLogsRoute, isAboutRoute } from './useRoute';
 
 interface RouterProps {
   convertView: ComponentChildren;
   settingsView: ComponentChildren;
   logsView: ComponentChildren;
   aboutView: ComponentChildren;
-  changelogView: ComponentChildren;
 }
 
-export function Router({ convertView, settingsView, logsView, aboutView, changelogView }: RouterProps) {
+export function Router({ convertView, settingsView, logsView, aboutView }: RouterProps) {
   if (isSettingsRoute.value) {
     return <>{settingsView}</>;
   }
@@ -18,9 +17,6 @@ export function Router({ convertView, settingsView, logsView, aboutView, changel
   }
   if (isAboutRoute.value) {
     return <>{aboutView}</>;
-  }
-  if (isChangelogRoute.value) {
-    return <>{changelogView}</>;
   }
   return <>{convertView}</>;
 }

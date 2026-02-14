@@ -1,5 +1,5 @@
 import { Text } from 'preact-i18n';
-import { navigate, isConvertRoute, isSettingsRoute, isLogsRoute, isAboutRoute, isChangelogRoute } from '@/router';
+import { navigate, isConvertRoute, isSettingsRoute, isAboutRoute } from '@/router';
 import { useLanguage } from '@/stores';
 import type { SupportedLocale } from '@/stores/LanguageStore';
 
@@ -50,16 +50,6 @@ export function Header() {
               }`}
           >
             <Text id="nav.about">About</Text>
-          </button>
-          <button
-            onClick={() => navigate('changelog')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
-              ${isChangelogRoute.value
-                ? 'bg-accent text-white'
-                : 'text-gray-400 hover:text-white hover:bg-primary-tertiary'
-              }`}
-          >
-            <Text id="nav.changelog">Changelog</Text>
           </button>
         </nav>
 
