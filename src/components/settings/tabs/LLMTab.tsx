@@ -76,6 +76,19 @@ export function LLMTab() {
     llm.setStageField(stage, field, value);
   };
 
+  const handleCopySettings = (sourceStage: LLMStage) => {
+    const sourceConfig = llm[sourceStage].value;
+    const targetStages: LLMStage[] = ['extract', 'merge', 'assign'].filter(s => s !== sourceStage);
+
+    for (const target of targetStages) {
+      llm.setStageField(target, 'apiKey', sourceConfig.apiKey);
+      llm.setStageField(target, 'apiUrl', sourceConfig.apiUrl);
+      llm.setStageField(target, 'model', sourceConfig.model);
+      llm.setStageField(target, 'temperature', sourceConfig.temperature);
+      llm.setStageField(target, 'topP', sourceConfig.topP);
+    }
+  };
+
   const renderStageForm = (stage: LLMStage) => {
     const stageState = testState[stage];
     return (
@@ -88,6 +101,7 @@ export function LLMTab() {
         onTestConnection={(useStreaming) => handleTestConnection(stage, useStreaming)}
         testing={stageState.testing}
         testResult={stageState.result}
+        onCopySettings={() => handleCopySettings(stage)}
       />
     );
   };
