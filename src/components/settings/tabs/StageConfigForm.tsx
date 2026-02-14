@@ -52,7 +52,7 @@ export function StageConfigForm({
       {onCopySettings && (
         <Button
           onClick={onCopySettings}
-          variant="secondary"
+          variant="default"
           className="w-full"
         >
           📋 <Text id="llm.copySettings">Copy to other stages</Text>

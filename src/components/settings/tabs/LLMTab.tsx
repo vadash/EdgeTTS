@@ -78,7 +78,7 @@ export function LLMTab() {
 
   const handleCopySettings = (sourceStage: LLMStage) => {
     const sourceConfig = llm[sourceStage].value;
-    const targetStages: LLMStage[] = ['extract', 'merge', 'assign'].filter(s => s !== sourceStage);
+    const targetStages = ['extract', 'merge', 'assign'].filter<LLMStage>((s): s is LLMStage => s !== sourceStage);
 
     for (const target of targetStages) {
       llm.setStageField(target, 'apiKey', sourceConfig.apiKey);

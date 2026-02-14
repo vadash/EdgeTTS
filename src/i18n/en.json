@@ -6,8 +6,7 @@
     "convert": "Convert",
     "settings": "Settings",
     "logs": "Logs",
-    "about": "About",
-    "changelog": "Changelog"
+    "about": "About"
   },
   "settings": {
     "toggle": "Settings",
