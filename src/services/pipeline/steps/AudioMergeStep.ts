@@ -18,6 +18,10 @@ export interface AudioMergeStepOptions {
   compressor: boolean;
   fadeIn: boolean;
   stereoWidth: boolean;
+  // Opus encoding settings
+  opusMinBitrate?: number;
+  opusMaxBitrate?: number;
+  opusCompressionLevel?: number;
   ffmpegService: IFFmpegService;
   createAudioMerger: (config: MergerConfig) => IAudioMerger;
 }
@@ -85,6 +89,9 @@ export class AudioMergeStep extends BasePipelineStep {
       compressor: this.options.compressor,
       fadeIn: this.options.fadeIn,
       stereoWidth: this.options.stereoWidth,
+      opusMinBitrate: this.options.opusMinBitrate,
+      opusMaxBitrate: this.options.opusMaxBitrate,
+      opusCompressionLevel: this.options.opusCompressionLevel,
     });
 
     // Use audioMap.size: assignments includes filtered-out non-pronounceable

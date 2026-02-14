@@ -112,6 +112,10 @@ export interface MergerConfig {
   compressor: boolean;
   fadeIn: boolean;
   stereoWidth: boolean;
+  // Opus encoding settings
+  opusMinBitrate?: number;
+  opusMaxBitrate?: number;
+  opusCompressionLevel?: number;
 }
 
 /**
@@ -227,6 +231,10 @@ export interface AudioProcessingOptions {
   compressor: boolean;
   fadeIn: boolean;
   stereoWidth: boolean;
+  // Opus encoding settings
+  opusMinBitrate?: number;
+  opusMaxBitrate?: number;
+  opusCompressionLevel?: number;
 }
 
 /**

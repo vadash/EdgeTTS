@@ -90,6 +90,9 @@ export class ConversionOrchestrator {
         compressor: this.stores.settings.compressorEnabled.value,
         fadeIn: this.stores.settings.fadeInEnabled.value,
         stereoWidth: this.stores.settings.stereoWidthEnabled.value,
+        opusMinBitrate: this.stores.settings.opusMinBitrate.value,
+        opusMaxBitrate: this.stores.settings.opusMaxBitrate.value,
+        opusCompressionLevel: this.stores.settings.opusCompressionLevel.value,
 
         // Per-stage LLM settings
         extractConfig: {

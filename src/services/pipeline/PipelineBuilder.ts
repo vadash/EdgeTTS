@@ -60,6 +60,10 @@ export interface PipelineBuilderOptions {
   compressor: boolean;
   fadeIn: boolean;
   stereoWidth: boolean;
+  // Opus encoding settings
+  opusMinBitrate?: number;
+  opusMaxBitrate?: number;
+  opusCompressionLevel?: number;
 
   // Per-stage LLM settings
   extractConfig: StageLLMConfig;
@@ -204,6 +208,9 @@ export class PipelineBuilder implements IPipelineBuilder {
         compressor: options.compressor,
         fadeIn: options.fadeIn,
         stereoWidth: options.stereoWidth,
+        opusMinBitrate: options.opusMinBitrate,
+        opusMaxBitrate: options.opusMaxBitrate,
+        opusCompressionLevel: options.opusCompressionLevel,
         ffmpegService: this.ffmpegService,
         createAudioMerger: (cfg: MergerConfig) => this.audioMergerFactory.create(cfg),
       })
