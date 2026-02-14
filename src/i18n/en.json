@@ -24,6 +24,7 @@
     "silenceRemoval": "Remove Silence",
     "normalization": "Normalize Audio",
     "language": "Language",
+    "speedInfo": "Speed varies by voice. Adjust playback speed in the audio player.",
     "voicesEnabled": "voices enabled",
     "enableAll": "Enable All",
     "disableAll": "Disable All",

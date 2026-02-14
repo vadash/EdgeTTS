@@ -29,25 +29,12 @@ export function GeneralTab() {
         </div>
       </div>
 
-      {/* Speed */}
-      <Slider
-        label="settings.rate"
-        value={settings.rate.value}
-        min={-50}
-        max={100}
-        onChange={(v) => settings.setRate(v)}
-        formatValue={(v) => v >= 0 ? `+${v}%` : `${v}%`}
-      />
-
-      {/* Pitch */}
-      <Slider
-        label="settings.pitch"
-        value={settings.pitch.value}
-        min={-50}
-        max={50}
-        onChange={(v) => settings.setPitch(v)}
-        formatValue={(v) => v >= 0 ? `+${v}Hz` : `${v}Hz`}
-      />
+      {/* Speed Info */}
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+        <p className="text-sm text-blue-300">
+          ℹ️ <Text id="settings.speedInfo">Speed varies by voice. Adjust playback speed in the audio player.</Text>
+        </p>
+      </div>
 
       {/* TTS Threads */}
       <Slider
