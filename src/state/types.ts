@@ -1,5 +1,58 @@
 // TypeScript interfaces for EdgeTTS application
 
+// Audio Presets for Opus encoding
+export enum AudioPreset {
+  MAX_QUALITY = 'max_quality',
+  BALANCED = 'balanced',
+  FAST = 'fast',
+  MOBILE = 'mobile',
+  CUSTOM = 'custom'
+}
+
+export interface AudioPresetConfig {
+  name: AudioPreset;
+  labelId: string;
+  descriptionId: string;
+  minBitrate: number;
+  maxBitrate: number;
+  compressionLevel: number;
+}
+
+export const AUDIO_PRESETS: AudioPresetConfig[] = [
+  {
+    name: AudioPreset.MAX_QUALITY,
+    labelId: 'settings.preset.maxQuality',
+    descriptionId: 'settings.preset.maxQualityDesc',
+    minBitrate: 128,
+    maxBitrate: 128,
+    compressionLevel: 10,
+  },
+  {
+    name: AudioPreset.BALANCED,
+    labelId: 'settings.preset.balanced',
+    descriptionId: 'settings.preset.balancedDesc',
+    minBitrate: 64,
+    maxBitrate: 96,
+    compressionLevel: 10,
+  },
+  {
+    name: AudioPreset.FAST,
+    labelId: 'settings.preset.fast',
+    descriptionId: 'settings.preset.fastDesc',
+    minBitrate: 48,
+    maxBitrate: 64,
+    compressionLevel: 5,
+  },
+  {
+    name: AudioPreset.MOBILE,
+    labelId: 'settings.preset.mobile',
+    descriptionId: 'settings.preset.mobileDesc',
+    minBitrate: 32,
+    maxBitrate: 48,
+    compressionLevel: 3,
+  },
+];
+
 export interface VoiceOption {
   locale: string;
   name: string;
