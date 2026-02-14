@@ -22,6 +22,7 @@ export type ErrorCode =
   | 'FFMPEG_PROCESS_ERROR'
   | 'FFMPEG_NOT_AVAILABLE'
   // File system errors
+  | 'NO_DIRECTORY'
   | 'FILE_SYSTEM_ERROR'
   | 'FILE_PERMISSION_DENIED'
   | 'FILE_NOT_FOUND'
@@ -55,6 +56,7 @@ export const errorMessages: Record<ErrorCode, string> = {
   FFMPEG_PROCESS_ERROR: 'FFmpeg processing failed',
   FFMPEG_NOT_AVAILABLE: 'FFmpeg is not available',
   // File system
+  NO_DIRECTORY: 'No output directory selected',
   FILE_SYSTEM_ERROR: 'File system error',
   FILE_PERMISSION_DENIED: 'File permission denied',
   FILE_NOT_FOUND: 'File not found',

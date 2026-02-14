@@ -43,6 +43,20 @@ export class ConversionOrchestrator {
       throw new AppError('LLM_NOT_CONFIGURED', 'LLM API key not configured');
     }
 
+    // Require directory handle - download mode is not supported
+    const directoryHandle = this.stores.data.directoryHandle.value;
+    if (!directoryHandle) {
+      throw new AppError('NO_DIRECTORY', 'Please select an output directory before converting');
+    }
+
+    // Clean up leftover _temp_work from previous runs
+    try {
+      await directoryHandle.removeEntry('_temp_work', { recursive: true });
+      this.logger.info('Cleaned up leftover _temp_work directory');
+    } catch {
+      // Expected if no leftover temp dir exists
+    }
+
     // Detect language explicitly before conversion
     const detectedLang = this.stores.data.detectLanguageFromContent();
 

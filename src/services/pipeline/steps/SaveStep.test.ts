@@ -133,11 +133,11 @@ describe('SaveStep', () => {
   });
 
   describe('dropsContextKeys', () => {
-    it('declares assignments, characters, voiceMap, and directoryHandle as droppable', () => {
+    it('declares assignments, characters, and voiceMap as droppable', () => {
       expect(step.dropsContextKeys).toContain('assignments');
       expect(step.dropsContextKeys).toContain('characters');
       expect(step.dropsContextKeys).toContain('voiceMap');
-      expect(step.dropsContextKeys).toContain('directoryHandle');
+      expect(step.dropsContextKeys).not.toContain('directoryHandle');
     });
   });
 });
