@@ -85,6 +85,65 @@ describe('SettingsStore', () => {
     });
   });
 
+  describe('Opus encoding setters', () => {
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    it('setOpusPreset should update all values to preset config', () => {
+      store.setOpusPreset('max_quality' as any);
+      expect(store.opusPreset.value).toBe('max_quality');
+      expect(store.opusMinBitrate.value).toBe(128);
+      expect(store.opusMaxBitrate.value).toBe(128);
+      expect(store.opusCompressionLevel.value).toBe(10);
+    });
+
+    it('setOpusPreset(BALANCED) should use balanced config', () => {
+      store.setOpusPreset('balanced' as any);
+      expect(store.opusPreset.value).toBe('balanced');
+      expect(store.opusMinBitrate.value).toBe(64);
+      expect(store.opusMaxBitrate.value).toBe(96);
+      expect(store.opusCompressionLevel.value).toBe(10);
+    });
+
+    it('setOpusPreset(FAST) should use fast config', () => {
+      store.setOpusPreset('fast' as any);
+      expect(store.opusPreset.value).toBe('fast');
+      expect(store.opusMinBitrate.value).toBe(48);
+      expect(store.opusMaxBitrate.value).toBe(64);
+      expect(store.opusCompressionLevel.value).toBe(5);
+    });
+
+    it('setOpusPreset(MOBILE) should use mobile config', () => {
+      store.setOpusPreset('mobile' as any);
+      expect(store.opusPreset.value).toBe('mobile');
+      expect(store.opusMinBitrate.value).toBe(32);
+      expect(store.opusMaxBitrate.value).toBe(48);
+      expect(store.opusCompressionLevel.value).toBe(3);
+    });
+
+    it('setOpusMinBitrate should switch preset to CUSTOM', () => {
+      store.setOpusPreset('balanced' as any);
+      store.setOpusMinBitrate(72);
+      expect(store.opusPreset.value).toBe('custom');
+      expect(store.opusMinBitrate.value).toBe(72);
+    });
+
+    it('setOpusMaxBitrate should switch preset to CUSTOM', () => {
+      store.setOpusPreset('balanced' as any);
+      store.setOpusMaxBitrate(128);
+      expect(store.opusPreset.value).toBe('custom');
+      expect(store.opusMaxBitrate.value).toBe(128);
+    });
+
+    it('setOpusCompressionLevel should switch preset to CUSTOM', () => {
+      store.setOpusPreset('balanced' as any);
+      store.setOpusCompressionLevel(7);
+      expect(store.opusPreset.value).toBe('custom');
+      expect(store.opusCompressionLevel.value).toBe(7);
+    });
+  });
+
   describe('computed properties', () => {
     it('rateDisplay should format positive rates with +', () => {
       store.setRate(25);

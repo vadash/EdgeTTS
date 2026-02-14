@@ -222,6 +222,37 @@ export class SettingsStore {
     this.save();
   }
 
+  // ========== Opus Encoding Setters ==========
+
+  setOpusPreset(value: AudioPreset): void {
+    const config = AUDIO_PRESETS.find(p => p.name === value);
+    if (!config) return;
+
+    this.opusPreset.value = value;
+    this.opusMinBitrate.value = config.minBitrate;
+    this.opusMaxBitrate.value = config.maxBitrate;
+    this.opusCompressionLevel.value = config.compressionLevel;
+    this.save();
+  }
+
+  setOpusMinBitrate(value: number): void {
+    this.opusMinBitrate.value = value;
+    this.opusPreset.value = AudioPreset.CUSTOM;
+    this.save();
+  }
+
+  setOpusMaxBitrate(value: number): void {
+    this.opusMaxBitrate.value = value;
+    this.opusPreset.value = AudioPreset.CUSTOM;
+    this.save();
+  }
+
+  setOpusCompressionLevel(value: number): void {
+    this.opusCompressionLevel.value = value;
+    this.opusPreset.value = AudioPreset.CUSTOM;
+    this.save();
+  }
+
   // ========== Text Processing Setters ==========
 
   setLexxRegister(value: boolean): void {
