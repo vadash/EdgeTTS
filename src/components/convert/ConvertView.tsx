@@ -3,6 +3,7 @@ import { QuickVoiceSelect } from './QuickVoiceSelect';
 import { ConvertButton } from './ConvertButton';
 import { TextEditor } from './TextEditor';
 import { VoiceReviewModal } from './VoiceReviewModal';
+import { ResumeModal } from './ResumeModal';
 import { StatusPanel } from '@/components/status';
 import { useLLM } from '@/stores';
 
