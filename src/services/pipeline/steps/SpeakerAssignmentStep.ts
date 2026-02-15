@@ -86,7 +86,7 @@ export class SpeakerAssignmentStep extends BasePipelineStep {
       return {
         ...context,
         assignments,
-        tempDirHandle,
+        ...(tempDirHandle && { tempDirHandle }),
       };
     } finally {
       signal.removeEventListener('abort', abortHandler);

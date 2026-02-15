@@ -74,6 +74,9 @@ export interface PipelineBuilderOptions {
   // Data
   detectedLanguage: string;
   directoryHandle: FileSystemDirectoryHandle | null;
+
+  // Resume: skip LLM steps when resuming with cached state
+  skipLLMSteps?: boolean;
 }
 
 /**
@@ -167,28 +170,35 @@ export class PipelineBuilder implements IPipelineBuilder {
     };
 
     // Build pipeline configuration declaratively
-    const config = pipelineConfig()
-      .addStep(StepNames.CHARACTER_EXTRACTION, {
-        llmOptions: extractLLMOptions,
-        createLLMService: (opts: LLMServiceFactoryOptions) => this.llmServiceFactory.create(opts),
-        textBlockSplitter: this.textBlockSplitter,
-      })
-      .addStep(StepNames.VOICE_ASSIGNMENT, {
-        narratorVoice: options.narratorVoice,
-        detectedLanguage: options.detectedLanguage,
-        enabledVoices: options.enabledVoices,
-        createVoiceAssigner: (narratorVoice: string, locale: string, enabledVoices?: string[]) =>
-          this.voiceAssignerFactory.createWithFilteredPool(narratorVoice, locale, enabledVoices),
-      })
-      .addStep(StepNames.SPEAKER_ASSIGNMENT, {
-        llmOptions: assignLLMOptions,
-        createLLMService: (opts: LLMServiceFactoryOptions) => this.llmServiceFactory.create(opts),
-        textBlockSplitter: this.textBlockSplitter,
-      })
-      .addStep(StepNames.VOICE_REMAPPING, {
-        narratorVoice: options.narratorVoice,
-        pool: this.voicePoolBuilder.buildPool(options.detectedLanguage, options.enabledVoices),
-      })
+    let builder = pipelineConfig();
+
+    // Add LLM steps only if not resuming with cached state
+    if (!options.skipLLMSteps) {
+      builder = builder
+        .addStep(StepNames.CHARACTER_EXTRACTION, {
+          llmOptions: extractLLMOptions,
+          createLLMService: (opts: LLMServiceFactoryOptions) => this.llmServiceFactory.create(opts),
+          textBlockSplitter: this.textBlockSplitter,
+        })
+        .addStep(StepNames.VOICE_ASSIGNMENT, {
+          narratorVoice: options.narratorVoice,
+          detectedLanguage: options.detectedLanguage,
+          enabledVoices: options.enabledVoices,
+          createVoiceAssigner: (narratorVoice: string, locale: string, enabledVoices?: string[]) =>
+            this.voiceAssignerFactory.createWithFilteredPool(narratorVoice, locale, enabledVoices),
+        })
+        .addStep(StepNames.SPEAKER_ASSIGNMENT, {
+          llmOptions: assignLLMOptions,
+          createLLMService: (opts: LLMServiceFactoryOptions) => this.llmServiceFactory.create(opts),
+          textBlockSplitter: this.textBlockSplitter,
+        })
+        .addStep(StepNames.VOICE_REMAPPING, {
+          narratorVoice: options.narratorVoice,
+          pool: this.voicePoolBuilder.buildPool(options.detectedLanguage, options.enabledVoices),
+        });
+    }
+
+    const config = builder
       .addStep(StepNames.TEXT_SANITIZATION, {})
       .addStep(StepNames.DICTIONARY_PROCESSING, {
         caseSensitive: options.lexxRegister,

@@ -7,9 +7,11 @@ import type { Stores } from '@/stores';
 import type { ILogger, IVoicePoolBuilder } from '@/services/interfaces';
 import type { IPipelineBuilder } from '@/services/pipeline';
 import type { PipelineContext, PipelineProgress } from '@/services/pipeline/types';
-import type { ProcessedBook } from '@/state/types';
+import type { ProcessedBook, SpeakerAssignment } from '@/state/types';
 import { StepNames } from './pipeline';
 import { AppError, noContentError, insufficientVoicesError } from '@/errors';
+import { checkResumeState, writeSignature, loadPipelineState } from './pipeline/resumeCheck';
+import type { SignatureSettings } from './pipeline/jobSignature';
 
 /**
  * Orchestrates the full TTS conversion workflow using pipeline architecture
@@ -49,12 +51,47 @@ export class ConversionOrchestrator {
       throw new AppError('NO_DIRECTORY', 'Please select an output directory before converting');
     }
 
-    // Clean up leftover _temp_work from previous runs
-    try {
-      await directoryHandle.removeEntry('_temp_work', { recursive: true });
-      this.logger.info('Cleaned up leftover _temp_work directory');
-    } catch {
-      // Expected if no leftover temp dir exists
+    // Check for resumable state from previous run
+    const sigSettings: SignatureSettings = {
+      voice: `Microsoft Server Speech Text to Speech Voice (${this.stores.settings.voice.value})`,
+      rate: this.stores.settings.rate.value >= 0 ? `+${this.stores.settings.rate.value}%` : `${this.stores.settings.rate.value}%`,
+      pitch: this.stores.settings.pitch.value >= 0 ? `+${this.stores.settings.pitch.value}Hz` : `${this.stores.settings.pitch.value}Hz`,
+      outputFormat: this.stores.settings.outputFormat.value,
+      opusBitrate: `${this.stores.settings.opusMinBitrate.value?.toString() ?? '24'}-${this.stores.settings.opusMaxBitrate.value?.toString() ?? '64'}k`,
+    };
+
+    // Check for resume state
+    // TODO: Task 8 - Add modal confirmation via ConversionStore.awaitResumeConfirmation()
+    const resumeInfo = await checkResumeState(directoryHandle, text, sigSettings);
+
+    let skipLLMSteps = false;
+    let resumedAssignments: SpeakerAssignment[] | undefined;
+    let resumedVoiceMap: Map<string, string> | undefined;
+
+    if (resumeInfo) {
+      // Resume detected - load LLM state if available
+      if (resumeInfo.hasLLMState) {
+        const pipelineState = await loadPipelineState(directoryHandle);
+        if (pipelineState) {
+          skipLLMSteps = true;
+          resumedAssignments = pipelineState.assignments;
+          resumedVoiceMap = new Map(Object.entries(pipelineState.characterVoiceMap));
+          this.logger.info('Resuming with cached LLM state');
+        }
+      }
+      if (resumeInfo.cachedChunks > 0) {
+        this.logger.info(`Resuming with ${resumeInfo.cachedChunks} cached chunks`);
+      }
+    } else {
+      // Fresh start - clean _temp_work and write new signature
+      try {
+        await directoryHandle.removeEntry('_temp_work', { recursive: true });
+        this.logger.info('Cleaned up _temp_work directory');
+      } catch {
+        // Expected if no temp dir exists
+      }
+      await writeSignature(directoryHandle, text, sigSettings);
+      this.logger.info('Wrote job signature for new conversion');
     }
 
     // Detect language explicitly before conversion
@@ -141,6 +178,9 @@ export class ConversionOrchestrator {
         // Data
         detectedLanguage: detectedLang,
         directoryHandle: this.stores.data.directoryHandle.value,
+
+        // Resume: skip LLM steps when resuming with cached state
+        skipLLMSteps,
       });
 
       // Create initial context
@@ -150,6 +190,8 @@ export class ConversionOrchestrator {
         dictionaryRules: this.stores.data.dictionaryRaw.value,
         detectedLanguage: detectedLang,
         directoryHandle: this.stores.data.directoryHandle.value,
+        ...(resumedAssignments && { assignments: resumedAssignments }),
+        ...(resumedVoiceMap && { voiceMap: resumedVoiceMap }),
       };
 
       // Set up progress callback

@@ -243,7 +243,7 @@ describe('SpeakerAssignmentStep', () => {
       // Should not throw even without directoryHandle
       const result = await step.execute(context, createNeverAbortSignal());
       expect(result.assignments).toBeDefined();
-      expect(result.tempDirHandle).toBeNull();
+      expect(result.tempDirHandle).toBeUndefined();
     });
   });
 });

@@ -1,4 +1,5 @@
 import { generateSignature, signaturesMatch, type SignatureSettings, type JobSignature } from './jobSignature';
+import type { SpeakerAssignment } from '@/state/types';
 
 export interface ResumeInfo {
   cachedChunks: number;
@@ -10,7 +11,7 @@ export interface ResumeInfo {
 export type ResumeCheckResult = ResumeInfo | null;
 
 export interface PipelineState {
-  assignments: Array<{ text: string; speaker: string; voiceId: string }>;
+  assignments: SpeakerAssignment[];
   characterVoiceMap: Record<string, string>;
   fileNames: Array<[string, number]>;
 }

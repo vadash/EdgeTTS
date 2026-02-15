@@ -66,7 +66,7 @@ describe('checkResumeState', () => {
     // Write pipeline state
     const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
     const stateWritable = await stateFile.createWritable();
-    await stateWritable.write(JSON.stringify({ assignments: [], characterVoiceMap: {}, fileNames: [] }));
+    await stateWritable.write(JSON.stringify({ assignments: [{ text: 'Hi', sentenceIndex: 0, speaker: 'Narrator', voiceId: 'en-US-AriaNeural' }], characterVoiceMap: { Narrator: 'en-US-AriaNeural' }, fileNames: [] }));
     await stateWritable.close();
 
     const result = await checkResumeState(dirHandle, 'Hello', settings);
