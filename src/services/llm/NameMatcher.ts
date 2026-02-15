@@ -27,3 +27,54 @@ export function levenshtein(a: string, b: string): number {
   }
   return matrix[an][bn];
 }
+
+/**
+ * Find maximum pairings between two sets of names using greedy bipartite matching
+ * @param setA First set of names
+ * @param setB Second set of names
+ * @param maxEdits Maximum Levenshtein distance for a valid pairing
+ * @returns Array of [indexInSetA, indexInSetB] pairs, each name used at most once
+ */
+export function findMaxPairings(
+  setA: string[],
+  setB: string[],
+  maxEdits: number
+): [number, number][] {
+  // Build adjacency matrix: distance for each pair
+  const matrix: number[][] = [];
+  for (let i = 0; i < setA.length; i++) {
+    matrix[i] = [];
+    for (let j = 0; j < setB.length; j++) {
+      const dist = levenshtein(
+        setA[i].toLowerCase(),
+        setB[j].toLowerCase()
+      );
+      matrix[i][j] = dist <= maxEdits ? dist : Infinity;
+    }
+  }
+
+  // Greedy: pick smallest distances first, no row/col reuse
+  const pairings: [number, number][] = [];
+  const usedRows = new Set<number>();
+  const usedCols = new Set<number>();
+
+  const cells: [number, number, number][] = [];
+  for (let i = 0; i < matrix.length; i++) {
+    for (let j = 0; j < matrix[i].length; j++) {
+      if (matrix[i][j] < Infinity) {
+        cells.push([i, j, matrix[i][j]]);
+      }
+    }
+  }
+  cells.sort((a, b) => a[2] - b[2]);  // Sort by distance ascending
+
+  for (const [row, col] of cells) {
+    if (!usedRows.has(row) && !usedCols.has(col)) {
+      pairings.push([row, col]);
+      usedRows.add(row);
+      usedCols.add(col);
+    }
+  }
+
+  return pairings;
+}
