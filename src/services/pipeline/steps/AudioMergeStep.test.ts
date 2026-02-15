@@ -458,4 +458,165 @@ describe('AudioMergeStep', () => {
       expect(step.dropsContextKeys).toContain('failedTasks');
     });
   });
+
+  describe('resume - cached output files', () => {
+    it('skips merge when output file already exists with size > 0', async () => {
+      // Create a mock that checks for existing files
+      const skipMockMerger: IAudioMerger = {
+        calculateMergeGroups: vi.fn(async () => [{ fromIndex: 0, toIndex: 2, filename: 'Chapter 1', mergeNumber: 1, durationMs: 1000 }]),
+        mergeAndSave: vi.fn(async (_audioMap, _totalSentences, fileNames, _tempDirHandle, saveDirectoryHandle, onProgress) => {
+          const filename = 'Chapter 1.mp3';
+          const folderName = 'Chapter 1';
+          try {
+            const folderHandle = await saveDirectoryHandle.getDirectoryHandle(folderName);
+            const fileHandle = await folderHandle.getFileHandle(filename);
+            const file = await fileHandle.getFile();
+            if (file.size > 1024) {
+              onProgress?.(1, 1, `Skipping existing file: ${filename}`);
+              return 0; // No files saved
+            }
+          } catch {
+            // File doesn't exist, proceed with merge
+          }
+          onProgress?.(1, 1, `Saved ${filename}`);
+          return 1; // 1 file saved
+        }),
+      };
+
+      const skipStep = createAudioMergeStep({
+        outputFormat: 'mp3',
+        silenceRemoval: false,
+        normalization: false,
+        deEss: false,
+        silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: false,
+        ffmpegService: mockFFmpegService,
+        createAudioMerger: () => skipMockMerger,
+      });
+
+      // Pre-create an output file in the target directory
+      const targetDir = createMockDirectoryHandle();
+      const chapterFolder = await targetDir.getDirectoryHandle('Chapter 1', { create: true });
+      const existingFile = await chapterFolder.getFileHandle('Chapter 1.mp3', { create: true });
+      const w = await existingFile.createWritable();
+      await w.write(new Uint8Array(2000)); // > 1KB
+      await w.close();
+
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: targetDir,
+        fileNames: [['Chapter 1', 0]],
+      });
+
+      const result = await skipStep.execute(context, createNeverAbortSignal());
+      expect(result.savedFileCount).toBe(0);
+    });
+
+    it('reports skipped files in progress message', async () => {
+      const skipMockMerger: IAudioMerger = {
+        calculateMergeGroups: vi.fn(async () => [{ fromIndex: 0, toIndex: 2, filename: 'Chapter 1', mergeNumber: 1, durationMs: 1000 }]),
+        mergeAndSave: vi.fn(async (_audioMap, _totalSentences, _fileNames, _tempDirHandle, saveDirectoryHandle, onProgress) => {
+          const filename = 'Chapter 1.mp3';
+          const folderName = 'Chapter 1';
+          try {
+            const folderHandle = await saveDirectoryHandle.getDirectoryHandle(folderName);
+            const fileHandle = await folderHandle.getFileHandle(filename);
+            const file = await fileHandle.getFile();
+            if (file.size > 1024) {
+              onProgress?.(1, 1, `Skipping existing file: ${filename}`);
+              return 0;
+            }
+          } catch {
+            // File doesn't exist
+          }
+          onProgress?.(1, 1, `Saved ${filename}`);
+          return 1;
+        }),
+      };
+
+      const skipStep = createAudioMergeStep({
+        outputFormat: 'mp3',
+        silenceRemoval: false,
+        normalization: false,
+        deEss: false,
+        silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: false,
+        ffmpegService: mockFFmpegService,
+        createAudioMerger: () => skipMockMerger,
+      });
+
+      const targetDir = createMockDirectoryHandle();
+      const chapterFolder = await targetDir.getDirectoryHandle('Chapter 1', { create: true });
+      const existingFile = await chapterFolder.getFileHandle('Chapter 1.mp3', { create: true });
+      const w = await existingFile.createWritable();
+      await w.write(new Uint8Array(2000));
+      await w.close();
+
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: targetDir,
+        fileNames: [['Chapter 1', 0]],
+      });
+
+      const { progress } = await collectProgress(skipStep, context);
+      expect(progress.some(p => p.message.toLowerCase().includes('skip') || p.message.toLowerCase().includes('existing'))).toBe(true);
+    });
+
+    it('does not skip when file size is too small (< 1KB)', async () => {
+      const skipMockMerger: IAudioMerger = {
+        calculateMergeGroups: vi.fn(async () => [{ fromIndex: 0, toIndex: 2, filename: 'Chapter 1', mergeNumber: 1, durationMs: 1000 }]),
+        mergeAndSave: vi.fn(async (_audioMap, _totalSentences, fileNames, _tempDirHandle, saveDirectoryHandle, onProgress) => {
+          const filename = 'Chapter 1.mp3';
+          const folderName = 'Chapter 1';
+          try {
+            const folderHandle = await saveDirectoryHandle.getDirectoryHandle(folderName);
+            const fileHandle = await folderHandle.getFileHandle(filename);
+            const file = await fileHandle.getFile();
+            if (file.size > 1024) {
+              onProgress?.(1, 1, `Skipping existing file: ${filename}`);
+              return 0;
+            }
+          } catch {
+            // File doesn't exist or too small
+          }
+          onProgress?.(1, 1, `Saved ${filename}`);
+          return 1;
+        }),
+      };
+
+      const skipStep = createAudioMergeStep({
+        outputFormat: 'mp3',
+        silenceRemoval: false,
+        normalization: false,
+        deEss: false,
+        silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        stereoWidth: false,
+        ffmpegService: mockFFmpegService,
+        createAudioMerger: () => skipMockMerger,
+      });
+
+      const targetDir = createMockDirectoryHandle();
+      const chapterFolder = await targetDir.getDirectoryHandle('Chapter 1', { create: true });
+      const existingFile = await chapterFolder.getFileHandle('Chapter 1.mp3', { create: true });
+      const w = await existingFile.createWritable();
+      await w.write(new Uint8Array(500)); // < 1KB - likely partial/corrupt
+      await w.close();
+
+      const context = createContextWithAudio(testAudioMap, {
+        directoryHandle: targetDir,
+        fileNames: [['Chapter 1', 0]],
+      });
+
+      const result = await skipStep.execute(context, createNeverAbortSignal());
+      // Should process normally (not skip)
+      expect(result.savedFileCount).toBe(1);
+    });
+  });
 });

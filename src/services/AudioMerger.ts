@@ -365,6 +365,46 @@ export class AudioMerger implements IAudioMerger {
   }
 
   /**
+   * Check if a file exists and has content (> 1KB to avoid partial writes)
+   */
+  private async fileExistsWithContent(
+    directoryHandle: FileSystemDirectoryHandle,
+    filename: string,
+    folderName: string
+  ): Promise<boolean> {
+    try {
+      const folderHandle = await directoryHandle.getDirectoryHandle(folderName);
+      const fileHandle = await folderHandle.getFileHandle(filename);
+      const file = await fileHandle.getFile();
+      return file.size > 1024; // > 1KB indicates a complete file
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Generate the expected filename for a merge group
+   */
+  private generateGroupFilename(group: MergeGroup, totalGroups: number): string {
+    const sanitizedName = sanitizeFilename(group.filename);
+    const extension = this.config.outputFormat;
+
+    if (totalGroups === 1) {
+      return `${sanitizedName}.${extension}`;
+    } else {
+      const paddedNum = String(group.mergeNumber).padStart(4, '0');
+      return `${sanitizedName} ${paddedNum}.${extension}`;
+    }
+  }
+
+  /**
+   * Get folder name from group filename
+   */
+  private getFolderName(group: MergeGroup): string {
+    return sanitizeFilename(group.filename);
+  }
+
+  /**
    * Merge and save all audio immediately to disk
    * Each file is saved as soon as it's merged to minimize RAM usage
    * Returns the number of files saved
@@ -392,10 +432,22 @@ export class AudioMerger implements IAudioMerger {
 
     const groups = await this.calculateMergeGroups(audioMap, totalSentences, fileNames, tempDirHandle);
     let savedCount = 0;
+    let skippedCount = 0;
 
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
       const durationMin = Math.round(group.durationMs / 60000);
+      const expectedFilename = this.generateGroupFilename(group, groups.length);
+      const folderName = this.getFolderName(group);
+
+      // Check if file already exists
+      const fileExists = await this.fileExistsWithContent(saveDirectoryHandle, expectedFilename, folderName);
+      if (fileExists) {
+        onProgress?.(i + 1, groups.length, `Skipping existing file: ${expectedFilename}`);
+        skippedCount++;
+        continue;
+      }
+
       onProgress?.(i + 1, groups.length, `Processing part ${i + 1}/${groups.length} (~${durationMin} min)`);
 
       const merged = await this.mergeAudioGroupAsync(
@@ -412,6 +464,10 @@ export class AudioMerger implements IAudioMerger {
         onProgress?.(i + 1, groups.length, `Saved ${merged.filename}`);
         savedCount++;
       }
+    }
+
+    if (skippedCount > 0) {
+      onProgress?.(groups.length, groups.length, `Skipped ${skippedCount} existing file(s), saved ${savedCount}`);
     }
 
     return savedCount;
