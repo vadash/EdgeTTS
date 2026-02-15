@@ -1,3 +1,7 @@
+import type { LLMCharacter } from '@/state/types';
+import type { CharacterEntry } from '@/state/types';
+import { MAX_NAME_EDITS, MIN_NAME_PAIRINGS } from '@/state/types';
+
 /**
  * Calculate Levenshtein distance between two strings
  * @param a First string
@@ -77,4 +81,31 @@ export function findMaxPairings(
   }
 
   return pairings;
+}
+
+/**
+ * Match character against profile using multi-pairing algorithm
+ * @param char Character from current session
+ * @param profile Existing character entries from previous sessions
+ * @returns Matching entry only if at least MIN_NAME_PAIRINGS valid pairings found
+ */
+export function matchCharacter(
+  char: LLMCharacter,
+  profile: Record<string, CharacterEntry>
+): CharacterEntry | undefined {
+  const charNames = [char.canonicalName, ...char.variations];
+
+  for (const entry of Object.values(profile)) {
+    const entryNames = [entry.canonicalName, ...entry.aliases];
+
+    // Find maximum pairings between the two name sets
+    const pairings = findMaxPairings(charNames, entryNames, MAX_NAME_EDITS);
+
+    // Need at least MIN_NAME_PAIRINGS independent matches
+    if (pairings.length >= MIN_NAME_PAIRINGS) {
+      return entry;
+    }
+  }
+
+  return undefined;
 }
