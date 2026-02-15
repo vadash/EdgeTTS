@@ -62,9 +62,31 @@ export class SpeakerAssignmentStep extends BasePipelineStep {
 
       this.reportProgress(blocks.length, blocks.length, `Assigned speakers to ${assignments.length} sentence(s)`);
 
+      // Save pipeline state to _temp_work for resume capability
+      let tempDirHandle: FileSystemDirectoryHandle | null = null;
+      const directoryHandle = context.directoryHandle ?? null;
+      if (directoryHandle) {
+        try {
+          tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work', { create: true });
+          const stateFile = await tempDirHandle.getFileHandle('pipeline_state.json', { create: true });
+          const writable = await stateFile.createWritable();
+          const state = {
+            assignments,
+            characterVoiceMap: Object.fromEntries(voiceMap),
+            fileNames: context.fileNames,
+          };
+          await writable.write(JSON.stringify(state));
+          await writable.close();
+          this.reportProgress(blocks.length, blocks.length, 'Saved pipeline state for resume');
+        } catch {
+          // Non-fatal: resume just won't have LLM cache
+        }
+      }
+
       return {
         ...context,
         assignments,
+        tempDirHandle,
       };
     } finally {
       signal.removeEventListener('abort', abortHandler);
