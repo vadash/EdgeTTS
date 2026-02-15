@@ -61,7 +61,6 @@ export class ConversionOrchestrator {
     };
 
     // Check for resume state
-    // TODO: Task 8 - Add modal confirmation via ConversionStore.awaitResumeConfirmation()
     const resumeInfo = await checkResumeState(directoryHandle, text, sigSettings);
 
     let skipLLMSteps = false;
@@ -69,18 +68,34 @@ export class ConversionOrchestrator {
     let resumedVoiceMap: Map<string, string> | undefined;
 
     if (resumeInfo) {
-      // Resume detected - load LLM state if available
-      if (resumeInfo.hasLLMState) {
-        const pipelineState = await loadPipelineState(directoryHandle);
-        if (pipelineState) {
-          skipLLMSteps = true;
-          resumedAssignments = pipelineState.assignments;
-          resumedVoiceMap = new Map(Object.entries(pipelineState.characterVoiceMap));
-          this.logger.info('Resuming with cached LLM state');
+      // Resume detected - show modal and wait for user confirmation
+      const confirmed = await this.stores.conversion.awaitResumeConfirmation(resumeInfo);
+      if (!confirmed) {
+        this.stores.conversion.cancel();
+        this.logger.info('User cancelled resume, starting fresh');
+        // Clean _temp_work and write new signature
+        try {
+          await directoryHandle.removeEntry('_temp_work', { recursive: true });
+          this.logger.info('Cleaned up _temp_work directory');
+        } catch {
+          // Expected if no temp dir exists
         }
-      }
-      if (resumeInfo.cachedChunks > 0) {
-        this.logger.info(`Resuming with ${resumeInfo.cachedChunks} cached chunks`);
+        await writeSignature(directoryHandle, text, sigSettings);
+        this.logger.info('Wrote job signature for new conversion');
+      } else {
+        // User confirmed resume - load LLM state if available
+        if (resumeInfo.hasLLMState) {
+          const pipelineState = await loadPipelineState(directoryHandle);
+          if (pipelineState) {
+            skipLLMSteps = true;
+            resumedAssignments = pipelineState.assignments;
+            resumedVoiceMap = new Map(Object.entries(pipelineState.characterVoiceMap));
+            this.logger.info('Resuming with cached LLM state');
+          }
+        }
+        if (resumeInfo.cachedChunks > 0) {
+          this.logger.info(`Resuming with ${resumeInfo.cachedChunks} cached chunks`);
+        }
       }
     } else {
       // Fresh start - clean _temp_work and write new signature

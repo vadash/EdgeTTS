@@ -10,7 +10,7 @@ export { DataStore, createDataStore } from './DataStore';
 export { LanguageStore, createLanguageStore } from './LanguageStore';
 
 // Store types
-export type { ConversionStatus, Progress, ConversionError } from './ConversionStore';
+export type { ConversionStatus, Progress, ConversionError, ResumeInfo } from './ConversionStore';
 export type { LLMProcessingStatus } from './LLMStore';
 export type { SupportedLocale } from './LanguageStore';
 

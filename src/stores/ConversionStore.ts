@@ -34,6 +34,16 @@ export interface ConversionError {
 }
 
 /**
+ * Resume information for cached session
+ */
+export interface ResumeInfo {
+  cachedChunks: number;
+  totalChunks: number;
+  cachedOutputFiles: number;
+  hasLLMState: boolean;
+}
+
+/**
  * Conversion Store - manages conversion process state
  */
 export class ConversionStore {
@@ -63,6 +73,10 @@ export class ConversionStore {
   readonly ffmpegLoaded = signal<boolean>(false);
   readonly ffmpegLoading = signal<boolean>(false);
   readonly ffmpegError = signal<string | null>(null);
+
+  // Resume state
+  readonly resumeInfo = signal<ResumeInfo | null>(null);
+  readonly resumeResolve = signal<((confirmed: boolean) => void) | null>(null);
 
   // ========== Computed Properties ==========
 
@@ -226,6 +240,36 @@ export class ConversionStore {
   setFFmpegError(error: string | null): void {
     this.ffmpegError.value = error;
     this.ffmpegLoading.value = false;
+  }
+
+  // ========== Resume State ==========
+
+  /**
+   * Show resume modal and wait for user confirmation
+   */
+  awaitResumeConfirmation(info: ResumeInfo): Promise<boolean> {
+    this.resumeInfo.value = info;
+    return new Promise<boolean>((resolve) => {
+      this.resumeResolve.value = resolve;
+    });
+  }
+
+  /**
+   * User confirmed resume - continue with cached state
+   */
+  confirmResume(): void {
+    this.resumeResolve.value?.(true);
+    this.resumeInfo.value = null;
+    this.resumeResolve.value = null;
+  }
+
+  /**
+   * User cancelled resume - start fresh
+   */
+  cancelResume(): void {
+    this.resumeResolve.value?.(false);
+    this.resumeInfo.value = null;
+    this.resumeResolve.value = null;
   }
 
   // ========== Utility Methods ==========
