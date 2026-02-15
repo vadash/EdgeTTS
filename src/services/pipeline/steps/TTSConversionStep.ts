@@ -59,6 +59,51 @@ export class TTSConversionStep extends BasePipelineStep {
     const audioMap = new Map<number, string>();
     const failedTasks = new Set<number>();
 
+    // Pre-scan for cached chunks in _temp_work
+    let tempDirHandle: FileSystemDirectoryHandle | null = null;
+
+    try {
+      tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work');
+    } catch {
+      // No temp dir yet - will be created by worker pool
+    }
+
+    if (tempDirHandle) {
+      for (const chunk of chunks) {
+        const filename = `chunk_${String(chunk.partIndex).padStart(4, '0')}.bin`;
+        try {
+          const handle = await tempDirHandle.getFileHandle(filename);
+          const file = await handle.getFile();
+          if (file.size > 0) {
+            audioMap.set(chunk.partIndex, filename);
+          }
+        } catch {
+          // File doesn't exist, will be processed
+        }
+      }
+
+      if (audioMap.size > 0) {
+        this.reportProgress(audioMap.size, chunks.length,
+          `Resuming: found ${audioMap.size}/${chunks.length} cached chunks`);
+      }
+    }
+
+    // Filter out cached chunks
+    const remainingChunks = chunks.filter(c => !audioMap.has(c.partIndex));
+
+    if (remainingChunks.length === 0) {
+      this.reportProgress(chunks.length, chunks.length, 'All chunks cached, skipping TTS');
+      if (!tempDirHandle) {
+        throw new Error('Temp directory handle not available');
+      }
+      return {
+        ...context,
+        audioMap,
+        tempDirHandle,
+        failedTasks: new Set<number>(),
+      };
+    }
+
     // Create abort handler
     const abortHandler = () => {
       this.workerPool?.clear();
@@ -114,7 +159,7 @@ export class TTSConversionStep extends BasePipelineStep {
         });
 
         // Build tasks
-        const tasks: PoolTask[] = chunks.map((chunk) => {
+        const tasks: PoolTask[] = remainingChunks.map((chunk) => {
           let filename = fileNames[0]?.[0] ?? 'audio';
           for (const [name, boundaryIndex] of fileNames) {
             if (chunk.partIndex >= boundaryIndex && boundaryIndex > 0) {
@@ -135,15 +180,15 @@ export class TTSConversionStep extends BasePipelineStep {
       });
 
       // Get the temp directory handle from worker pool
-      const tempDirHandle = this.workerPool!.getTempDirHandle();
-      if (!tempDirHandle) {
+      const workerTempDirHandle = this.workerPool!.getTempDirHandle();
+      if (!workerTempDirHandle) {
         throw new Error('Temp directory handle not available after TTS conversion');
       }
 
       return {
         ...context,
         audioMap,
-        tempDirHandle,
+        tempDirHandle: workerTempDirHandle,
         failedTasks,
       };
     } finally {

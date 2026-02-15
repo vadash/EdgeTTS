@@ -312,4 +312,88 @@ describe('TTSConversionStep', () => {
       expect(capturedTasks[0].filename).toBe('audio');
     });
   });
+
+  describe('resume - cached chunks', () => {
+    it('skips chunks that already exist on disk', async () => {
+      // Create a context where _temp_work already has chunk files
+      const dirHandle = createMockDirectoryHandle();
+      const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
+
+      // Pre-create chunk_0000.bin (simulating a cached chunk)
+      const chunkFile = await tempDir.getFileHandle('chunk_0000.bin', { create: true });
+      const w = await chunkFile.createWritable();
+      await w.write(new Uint8Array([1, 2, 3]));
+      await w.close();
+
+      const assignments: SpeakerAssignment[] = [
+        { sentenceIndex: 0, text: 'Cached sentence.', speaker: 'Narrator', voiceId: 'en-US-AriaNeural' },
+        { sentenceIndex: 1, text: 'New sentence.', speaker: 'Narrator', voiceId: 'en-US-AriaNeural' },
+      ];
+
+      const context = createContextWithAssignments(assignments, {
+        directoryHandle: dirHandle,
+      });
+
+      await step.execute(context, createNeverAbortSignal());
+
+      // Only 1 task should have been sent to worker pool (the non-cached one)
+      expect(capturedTasks.length).toBe(1);
+      expect(capturedTasks[0]).toMatchObject({ partIndex: 1 });
+    });
+
+    it('skips worker pool entirely when all chunks cached', async () => {
+      // All chunks pre-exist → no worker pool needed
+      const dirHandle = createMockDirectoryHandle();
+      const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
+
+      const chunkFile = await tempDir.getFileHandle('chunk_0000.bin', { create: true });
+      const w = await chunkFile.createWritable();
+      await w.write(new Uint8Array([1, 2, 3]));
+      await w.close();
+
+      const assignments: SpeakerAssignment[] = [
+        { sentenceIndex: 0, text: 'Only sentence.', speaker: 'Narrator', voiceId: 'en-US-AriaNeural' },
+      ];
+
+      const context = createContextWithAssignments(assignments, {
+        directoryHandle: dirHandle,
+      });
+
+      const result = await step.execute(context, createNeverAbortSignal());
+
+      expect(result.audioMap!.size).toBe(1);
+      // Worker pool should not have been created or should have 0 tasks
+      expect(capturedTasks.length).toBe(0);
+    });
+
+    it('reports progress for cached chunks immediately', async () => {
+      const dirHandle = createMockDirectoryHandle();
+      const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
+
+      // Pre-create two cached chunks
+      for (let i = 0; i < 2; i++) {
+        const chunkFile = await tempDir.getFileHandle(`chunk_000${i}.bin`, { create: true });
+        const w = await chunkFile.createWritable();
+        await w.write(new Uint8Array([1, 2, 3]));
+        await w.close();
+      }
+
+      const assignments: SpeakerAssignment[] = [
+        { sentenceIndex: 0, text: 'First cached.', speaker: 'Narrator', voiceId: 'en-US-AriaNeural' },
+        { sentenceIndex: 1, text: 'Second cached.', speaker: 'Narrator', voiceId: 'en-US-AriaNeural' },
+        { sentenceIndex: 2, text: 'New sentence.', speaker: 'Narrator', voiceId: 'en-US-AriaNeural' },
+      ];
+
+      const context = createContextWithAssignments(assignments, {
+        directoryHandle: dirHandle,
+      });
+
+      const { progress } = await collectProgress(step, context);
+
+      // Verify progress includes "found X cached chunks" message
+      const resumeMessage = progress.find(p => p.message.includes('Resuming'));
+      expect(resumeMessage).toBeDefined();
+      expect(resumeMessage!.message).toContain('2');
+    });
+  });
 });
