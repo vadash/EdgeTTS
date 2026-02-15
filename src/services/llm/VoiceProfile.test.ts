@@ -261,3 +261,64 @@ describe('importProfile', () => {
     }).toThrow();
   });
 });
+
+import { IMPORTANCE_THRESHOLD } from '@/state/types';
+
+describe('isCharacterVisible', () => {
+  it('returns false for characters below threshold', () => {
+    const entry: CharacterEntry = {
+      canonicalName: 'Minor',
+      voice: 'en-US-GuyNeural',
+      gender: 'male',
+      aliases: [],
+      lines: 1,
+      percentage: 0.003, // Below 0.5% (0.5% = 0.005)
+      lastSeenIn: 'BOOK1',
+      bookAppearances: 1
+    };
+
+    expect(isCharacterVisible(entry)).toBe(false);
+  });
+
+  it('returns true for characters at or above threshold', () => {
+    const entry1: CharacterEntry = {
+      canonicalName: 'Important',
+      voice: 'en-US-GuyNeural',
+      gender: 'male',
+      aliases: [],
+      lines: 10,
+      percentage: 0.5, // Exactly threshold
+      lastSeenIn: 'BOOK1',
+      bookAppearances: 1
+    };
+
+    const entry2: CharacterEntry = {
+      canonicalName: 'Main',
+      voice: 'en-US-GuyNeural',
+      gender: 'male',
+      aliases: [],
+      lines: 100,
+      percentage: 15.0,
+      lastSeenIn: 'BOOK1',
+      bookAppearances: 1
+    };
+
+    expect(isCharacterVisible(entry1)).toBe(true);
+    expect(isCharacterVisible(entry2)).toBe(true);
+  });
+
+  it('uses IMPORTANCE_THRESHOLD constant', () => {
+    const entry: CharacterEntry = {
+      canonicalName: 'Threshold',
+      voice: 'en-US-GuyNeural',
+      gender: 'male',
+      aliases: [],
+      lines: 5,
+      percentage: IMPORTANCE_THRESHOLD,
+      lastSeenIn: 'BOOK1',
+      bookAppearances: 1
+    };
+
+    expect(isCharacterVisible(entry)).toBe(true);
+  });
+});

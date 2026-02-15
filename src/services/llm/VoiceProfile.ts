@@ -1,6 +1,7 @@
 import type { VoiceProfileFile, LLMCharacter, SpeakerAssignment, CharacterEntry } from '@/state/types';
 import { matchCharacter } from './NameMatcher';
 import { countSpeakingFrequency } from './CharacterUtils';
+import { IMPORTANCE_THRESHOLD } from '@/state/types';
 
 /**
  * Export to cumulative profile format (version 2)
@@ -124,4 +125,13 @@ export function importProfile(
   }
 
   return { voiceMap, matchedCharacters, unmatchedCharacters };
+}
+
+/**
+ * Check if character should be visible in UI
+ * @param entry Character entry from profile
+ * @returns true if percentage >= IMPORTANCE_THRESHOLD
+ */
+export function isCharacterVisible(entry: CharacterEntry): boolean {
+  return entry.percentage >= IMPORTANCE_THRESHOLD;
 }
