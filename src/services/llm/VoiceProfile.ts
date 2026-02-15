@@ -1,4 +1,4 @@
-import type { VoiceProfileFile, LLMCharacter, SpeakerAssignment, CharacterEntry } from '@/state/types';
+import type { VoiceProfileFile, LLMCharacter, SpeakerAssignment, CharacterEntry, VoiceOption, VoiceAssignment as VoiceAssignmentResult } from '@/state/types';
 import { matchCharacter } from './NameMatcher';
 import { countSpeakingFrequency } from './CharacterUtils';
 import { IMPORTANCE_THRESHOLD } from '@/state/types';
@@ -134,4 +134,47 @@ export function importProfile(
  */
 export function isCharacterVisible(entry: CharacterEntry): boolean {
   return entry.percentage >= IMPORTANCE_THRESHOLD;
+}
+
+/**
+ * Tiered voice assignment
+ * Top N characters get unique voices, remaining characters share voices
+ * @param characters Character entries sorted by importance (will be re-sorted)
+ * @param availableVoices Available voice options
+ * @param narratorVoice Narrator voice to exclude from assignment
+ * @returns Map of character name to VoiceAssignment
+ */
+export function assignVoicesTiered(
+  characters: CharacterEntry[],
+  availableVoices: VoiceOption[],
+  narratorVoice: string
+): Map<string, VoiceAssignmentResult> {
+
+  // 1. Filter out narrator, sort by lines descending
+  const sorted = characters
+    .filter(c => c.voice !== narratorVoice)
+    .sort((a, b) => b.lines - a.lines);
+
+  const result = new Map<string, VoiceAssignmentResult>();
+  const voiceCount = availableVoices.length;
+
+  // 2. Top N get unique voices
+  for (let i = 0; i < Math.min(voiceCount, sorted.length); i++) {
+    result.set(sorted[i].canonicalName, {
+      character: sorted[i].canonicalName,
+      voice: availableVoices[i].fullValue,
+      shared: false
+    });
+  }
+
+  // 3. Rest get shared voices (cycle through all)
+  for (let i = voiceCount; i < sorted.length; i++) {
+    result.set(sorted[i].canonicalName, {
+      character: sorted[i].canonicalName,
+      voice: availableVoices[i % voiceCount].fullValue,
+      shared: true
+    });
+  }
+
+  return result;
 }

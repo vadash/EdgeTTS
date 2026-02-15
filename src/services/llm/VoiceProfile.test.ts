@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { exportToProfile, importProfile, isCharacterVisible } from './VoiceProfile';
-import type { VoiceProfileFile, LLMCharacter, SpeakerAssignment, CharacterEntry } from '@/state/types';
+import { exportToProfile, importProfile, isCharacterVisible, assignVoicesTiered } from './VoiceProfile';
+import type { VoiceProfileFile, LLMCharacter, SpeakerAssignment, CharacterEntry, VoiceOption } from '@/state/types';
 
 describe('exportToProfile', () => {
   it('creates new profile when existingProfile is null', () => {
@@ -320,5 +320,115 @@ describe('isCharacterVisible', () => {
     };
 
     expect(isCharacterVisible(entry)).toBe(true);
+  });
+});
+
+describe('assignVoicesTiered', () => {
+  const createVoiceOptions = (): VoiceOption[] => [
+    { locale: 'en-US', name: 'Voice1', fullValue: 'voice-1', gender: 'male' },
+    { locale: 'en-US', name: 'Voice2', fullValue: 'voice-2', gender: 'male' },
+    { locale: 'en-US', name: 'Voice3', fullValue: 'voice-3', gender: 'male' },
+  ];
+
+  const createCharacterEntries = (): CharacterEntry[] => [
+    { canonicalName: 'Main1', voice: '', gender: 'male', aliases: [], lines: 100, percentage: 50, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+    { canonicalName: 'Main2', voice: '', gender: 'male', aliases: [], lines: 80, percentage: 40, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+    { canonicalName: 'Main3', voice: '', gender: 'male', aliases: [], lines: 60, percentage: 30, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+    { canonicalName: 'Minor1', voice: '', gender: 'male', aliases: [], lines: 5, percentage: 2.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+    { canonicalName: 'Minor2', voice: '', gender: 'male', aliases: [], lines: 3, percentage: 1.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+  ];
+
+  it('assigns unique voices to top N characters (N = voice count)', () => {
+    const voices = createVoiceOptions();
+    const characters = createCharacterEntries();
+    const narratorVoice = 'narrator-voice';
+
+    const result = assignVoicesTiered(characters, voices, narratorVoice);
+
+    // Top 3 get unique voices
+    expect(result.get('Main1')?.shared).toBe(false);
+    expect(result.get('Main2')?.shared).toBe(false);
+    expect(result.get('Main3')?.shared).toBe(false);
+
+    // They should have different voices
+    const main1Voice = result.get('Main1')?.voice;
+    const main2Voice = result.get('Main2')?.voice;
+    const main3Voice = result.get('Main3')?.voice;
+    expect(new Set([main1Voice, main2Voice, main3Voice]).size).toBe(3);
+  });
+
+  it('assigns shared voices to remaining characters', () => {
+    const voices = createVoiceOptions();
+    const characters = createCharacterEntries();
+    const narratorVoice = 'narrator-voice';
+
+    const result = assignVoicesTiered(characters, voices, narratorVoice);
+
+    // Minor characters should be marked as shared
+    expect(result.get('Minor1')?.shared).toBe(true);
+    expect(result.get('Minor2')?.shared).toBe(true);
+  });
+
+  it('cycles through voices for shared assignments', () => {
+    const voices = createVoiceOptions();
+    const characters: CharacterEntry[] = [
+      ...createCharacterEntries().slice(0, 3), // 3 main characters
+      { canonicalName: 'Minor1', voice: '', gender: 'male', aliases: [], lines: 1, percentage: 0.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+      { canonicalName: 'Minor2', voice: '', gender: 'male', aliases: [], lines: 1, percentage: 0.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+      { canonicalName: 'Minor3', voice: '', gender: 'male', aliases: [], lines: 1, percentage: 0.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+      { canonicalName: 'Minor4', voice: '', gender: 'male', aliases: [], lines: 1, percentage: 0.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+    ];
+    const narratorVoice = 'narrator-voice';
+
+    const result = assignVoicesTiered(characters, voices, narratorVoice);
+
+    // Minor 1-4 should cycle through voices 1-3
+    const minorVoices = ['Minor1', 'Minor2', 'Minor3', 'Minor4'].map(
+      name => result.get(name)?.voice
+    );
+    // All should be one of the available voices
+    for (const voice of minorVoices) {
+      expect(voices.map(v => v.fullValue)).toContain(voice);
+    }
+  });
+
+  it('sorts characters by line count descending', () => {
+    const voices = createVoiceOptions();
+    const characters: CharacterEntry[] = [
+      { canonicalName: 'LowLines', voice: '', gender: 'male', aliases: [], lines: 5, percentage: 2.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+      { canonicalName: 'HighLines', voice: '', gender: 'male', aliases: [], lines: 200, percentage: 80, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+      { canonicalName: 'MidLines', voice: '', gender: 'male', aliases: [], lines: 100, percentage: 50, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+    ];
+    const narratorVoice = 'narrator-voice';
+
+    const result = assignVoicesTiered(characters, voices, narratorVoice);
+
+    // All 3 characters get unique voices (3 voices, 3 characters)
+    expect(result.get('HighLines')?.shared).toBe(false);
+    expect(result.get('MidLines')?.shared).toBe(false);
+    expect(result.get('LowLines')?.shared).toBe(false);
+
+    // Verify they have different voices
+    const highVoice = result.get('HighLines')?.voice;
+    const midVoice = result.get('MidLines')?.voice;
+    const lowVoice = result.get('LowLines')?.voice;
+    expect(new Set([highVoice, midVoice, lowVoice]).size).toBe(3);
+  });
+
+  it('filters out narrator voice from assignments', () => {
+    const voices = createVoiceOptions();
+    const characters: CharacterEntry[] = [
+      { canonicalName: 'Narrator', voice: 'narrator-voice', gender: 'male', aliases: [], lines: 500, percentage: 90, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+      { canonicalName: 'Character', voice: '', gender: 'male', aliases: [], lines: 50, percentage: 10, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+    ];
+    const narratorVoice = 'narrator-voice';
+
+    const result = assignVoicesTiered(characters, voices, narratorVoice);
+
+    // Narrator should not be in result
+    expect(result.has('Narrator')).toBe(false);
+
+    // Character should get unique voice (since narrator filtered out)
+    expect(result.get('Character')?.shared).toBe(false);
   });
 });
