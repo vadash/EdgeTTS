@@ -5,61 +5,137 @@ import type { PipelineContext, IPipelineStep, ProgressCallback } from '@/service
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 import type { MergedFile } from '@/services/interfaces';
 
-/**
- * Create a mock FileSystemDirectoryHandle for testing
- */
-export function createMockDirectoryHandle(): FileSystemDirectoryHandle {
-  const files = new Map<string, Uint8Array>();
+interface SharedMockState {
+  files: Map<string, Uint8Array>;
+  subdirs: Map<string, FileSystemDirectoryHandle>;
+}
 
-  const mockFileHandle = (name: string): FileSystemFileHandle => ({
+function createMockFile(
+  name: string,
+  files: Map<string, Uint8Array>
+): FileSystemFileHandle {
+  return {
     kind: 'file',
     name,
     isSameEntry: async () => false,
     getFile: async () => {
       const data = files.get(name) ?? new Uint8Array([]);
-      return new File([data], name, { type: 'audio/mpeg' });
+      // Create a mock File with text() method
+      const file = {
+        name,
+        type: 'application/octet-stream',
+        size: data.length,
+        arrayBuffer: async () => data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
+        text: async () => new TextDecoder().decode(data),
+        slice: () => file,
+        stream: () => new ReadableStream(),
+      } as File;
+      return file;
     },
-    createWritable: async () => ({
-      write: async (data: BufferSource | Blob | string) => {
-        if (data instanceof ArrayBuffer) {
-          files.set(name, new Uint8Array(data));
-        } else if (data instanceof Blob) {
-          const buffer = await data.arrayBuffer();
-          files.set(name, new Uint8Array(buffer));
-        }
-      },
-      close: async () => {},
-      seek: async () => {},
-      truncate: async () => {},
-      abort: async () => {},
-      locked: false,
-      getWriter: () => ({ write: async () => {}, close: async () => {}, abort: async () => {}, closed: Promise.resolve(), desiredSize: 0, ready: Promise.resolve(), releaseLock: () => {} } as unknown as WritableStreamDefaultWriter<unknown>),
-    } as unknown as FileSystemWritableFileStream),
+    createWritable: async () => {
+      let chunks: Uint8Array[] = [];
+      return {
+        write: async (data: BufferSource | Blob | string) => {
+          if (typeof data === 'string') {
+            chunks.push(new TextEncoder().encode(data));
+          } else if (data instanceof Uint8Array) {
+            chunks.push(data);
+          } else if (data instanceof ArrayBuffer) {
+            chunks.push(new Uint8Array(data));
+          } else if (data instanceof Blob) {
+            const buffer = await data.arrayBuffer();
+            chunks.push(new Uint8Array(buffer));
+          }
+        },
+        close: async () => {
+          const combined = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+          let offset = 0;
+          for (const chunk of chunks) {
+            combined.set(chunk, offset);
+            offset += chunk.length;
+          }
+          files.set(name, combined);
+        },
+        seek: async () => {},
+        truncate: async () => {},
+        abort: async () => {},
+        locked: false,
+        getWriter: () => ({ write: async () => {}, close: async () => {}, abort: async () => {}, closed: Promise.resolve(), desiredSize: 0, ready: Promise.resolve(), releaseLock: () => {} } as unknown as WritableStreamDefaultWriter<unknown>),
+      } as unknown as FileSystemWritableFileStream;
+    },
     queryPermission: async () => 'granted' as PermissionState,
     requestPermission: async () => 'granted' as PermissionState,
-  } as FileSystemFileHandle);
+  } as FileSystemFileHandle;
+}
+
+function createMockDirectoryHandleWithState(
+  state: SharedMockState,
+  name: string = 'test-dir'
+): FileSystemDirectoryHandle {
+  const { files, subdirs } = state;
 
   const mockDirHandle: FileSystemDirectoryHandle = {
     kind: 'directory',
-    name: 'test-dir',
+    name,
     isSameEntry: async () => false,
-    getDirectoryHandle: async (name: string, options?: { create?: boolean }) => {
-      return createMockDirectoryHandle();
+    getDirectoryHandle: async (subdirName: string, options?: { create?: boolean }) => {
+      if (subdirs.has(subdirName)) {
+        return subdirs.get(subdirName)!;
+      }
+      const newDir = createMockDirectoryHandleWithState(state, subdirName);
+      subdirs.set(subdirName, newDir);
+      return newDir;
     },
-    getFileHandle: async (name: string, options?: { create?: boolean }) => {
-      return mockFileHandle(name);
+    getFileHandle: async (fileName: string, options?: { create?: boolean }) => {
+      return createMockFile(fileName, files);
     },
     removeEntry: async () => {},
     resolve: async () => null,
-    keys: async function* () {},
-    values: async function* () {},
-    entries: async function* () {},
-    [Symbol.asyncIterator]: async function* () {},
+    keys: async function* () {
+      yield* files.keys();
+      yield* subdirs.keys();
+    },
+    values: async function* () {
+      for (const [fname] of files) {
+        yield createMockFile(fname, files);
+      }
+      for (const [, handle] of subdirs) {
+        yield handle;
+      }
+    },
+    entries: async function* () {
+      for (const fname of files.keys()) {
+        yield [fname, createMockFile(fname, files)] as [string, FileSystemHandle];
+      }
+      for (const [sname, handle] of subdirs) {
+        yield [sname, handle] as [string, FileSystemHandle];
+      }
+    },
+    [Symbol.asyncIterator]: async function* () {
+      for (const fname of files.keys()) {
+        yield [fname, createMockFile(fname, files)] as [string, FileSystemHandle];
+      }
+      for (const [sname, handle] of subdirs) {
+        yield [sname, handle] as [string, FileSystemHandle];
+      }
+    },
     queryPermission: async () => 'granted' as PermissionState,
     requestPermission: async () => 'granted' as PermissionState,
   } as FileSystemDirectoryHandle;
 
   return mockDirHandle;
+}
+
+/**
+ * Create a mock FileSystemDirectoryHandle for testing
+ * Supports nested directories with shared state
+ */
+export function createMockDirectoryHandle(): FileSystemDirectoryHandle {
+  const state: SharedMockState = {
+    files: new Map<string, Uint8Array>(),
+    subdirs: new Map<string, FileSystemDirectoryHandle>(),
+  };
+  return createMockDirectoryHandleWithState(state);
 }
 
 /**
