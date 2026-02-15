@@ -432,3 +432,14 @@ describe('assignVoicesTiered', () => {
     expect(result.get('Character')?.shared).toBe(false);
   });
 });
+
+describe('Module exports', () => {
+  it('exports all required functions', async () => {
+    const module = await import('./VoiceProfile');
+
+    expect(typeof module.exportToProfile).toBe('function');
+    expect(typeof module.importProfile).toBe('function');
+    expect(typeof module.isCharacterVisible).toBe('function');
+    expect(typeof module.assignVoicesTiered).toBe('function');
+  });
+});
