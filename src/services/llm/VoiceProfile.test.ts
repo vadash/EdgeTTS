@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { exportToProfile, importProfile, isCharacterVisible } from './VoiceProfile';
-import type { VoiceProfileFile, LLMCharacter, SpeakerAssignment } from '@/state/types';
+import type { VoiceProfileFile, LLMCharacter, SpeakerAssignment, CharacterEntry } from '@/state/types';
 
 describe('exportToProfile', () => {
   it('creates new profile when existingProfile is null', () => {
@@ -141,5 +141,123 @@ describe('exportToProfile', () => {
     expect(profile.totalLines).toBe(101);
     expect(profile.characters['harry'].lines).toBe(51);
     expect(Math.abs(profile.characters['harry'].percentage - 50.495)).toBeLessThan(0.01);
+  });
+});
+
+describe('importProfile', () => {
+  it('returns empty maps for empty profile', () => {
+    const profile: VoiceProfileFile = {
+      version: 2,
+      narrator: 'en-US-GuyNeural',
+      totalLines: 0,
+      characters: {}
+    };
+
+    const characters: LLMCharacter[] = [
+      { canonicalName: 'Harry', variations: [], gender: 'male' }
+    ];
+
+    const result = importProfile(JSON.stringify(profile), characters);
+
+    expect(result.voiceMap.size).toBe(0);
+    expect(result.matchedCharacters.size).toBe(0);
+    expect(result.unmatchedCharacters).toHaveLength(1);
+  });
+
+  it('matches characters by exact name', () => {
+    const profile: VoiceProfileFile = {
+      version: 2,
+      narrator: 'en-US-GuyNeural',
+      totalLines: 100,
+      characters: {
+        'harry': {
+          canonicalName: 'Harry',
+          voice: 'en-GB-RyanNeural',
+          gender: 'male',
+          aliases: ['Harry P.', 'Potter'],
+          lines: 50,
+          percentage: 50,
+          lastSeenIn: 'BOOK1',
+          bookAppearances: 1
+        }
+      }
+    };
+
+    const characters: LLMCharacter[] = [
+      { canonicalName: 'Harry', variations: ['Potter'], gender: 'male' }
+    ];
+
+    const result = importProfile(JSON.stringify(profile), characters);
+
+    expect(result.voiceMap.get('Harry')).toBe('en-GB-RyanNeural');
+    expect(result.matchedCharacters.has('Harry')).toBe(true);
+    expect(result.unmatchedCharacters).toHaveLength(0);
+  });
+
+  it('matches characters with alias variations', () => {
+    const profile: VoiceProfileFile = {
+      version: 2,
+      narrator: 'en-US-GuyNeural',
+      totalLines: 100,
+      characters: {
+        'mae': {
+          canonicalName: 'Mae',
+          voice: 'en-US-JennyNeural',
+          gender: 'female',
+          aliases: ['Mai'],
+          lines: 50,
+          percentage: 50,
+          lastSeenIn: 'BOOK1',
+          bookAppearances: 1
+        }
+      }
+    };
+
+    // May/Mae/TheMay vs Mae/Mai - should match with 2 pairings
+    const characters: LLMCharacter[] = [
+      { canonicalName: 'May', variations: ['Mae', 'The May'], gender: 'female' }
+    ];
+
+    const result = importProfile(JSON.stringify(profile), characters);
+
+    expect(result.voiceMap.get('May')).toBe('en-US-JennyNeural');
+    expect(result.matchedCharacters.has('May')).toBe(true);
+  });
+
+  it('leaves unmatched characters in unmatchedCharacters array', () => {
+    const profile: VoiceProfileFile = {
+      version: 2,
+      narrator: 'en-US-GuyNeural',
+      totalLines: 100,
+      characters: {
+        'harry': {
+          canonicalName: 'Harry',
+          voice: 'en-GB-RyanNeural',
+          gender: 'male',
+          aliases: [],
+          lines: 50,
+          percentage: 50,
+          lastSeenIn: 'BOOK1',
+          bookAppearances: 1
+        }
+      }
+    };
+
+    const characters: LLMCharacter[] = [
+      { canonicalName: 'Harry', variations: [], gender: 'male' },
+      { canonicalName: 'Ron', variations: [], gender: 'male' }
+    ];
+
+    const result = importProfile(JSON.stringify(profile), characters);
+
+    expect(result.voiceMap.get('Harry')).toBe('en-GB-RyanNeural');
+    expect(result.unmatchedCharacters).toContain('Ron');
+    expect(result.unmatchedCharacters).toHaveLength(1);
+  });
+
+  it('throws on invalid JSON', () => {
+    expect(() => {
+      importProfile('invalid json', []);
+    }).toThrow();
   });
 });

@@ -83,3 +83,45 @@ export function exportToProfile(
 
   return JSON.stringify(output, null, 2);
 }
+
+/**
+ * Import profile and match against current session's characters
+ * @param profileJson JSON string from voices.json file
+ * @param currentCharacters Characters extracted from current session
+ * @returns Object with voiceMap, matchedCharacters, and unmatchedCharacters
+ */
+export function importProfile(
+  profileJson: string,
+  currentCharacters: LLMCharacter[]
+): {
+  voiceMap: Map<string, string>;
+  matchedCharacters: Set<string>;
+  unmatchedCharacters: string[];
+} {
+  const profile: VoiceProfileFile = JSON.parse(profileJson);
+
+  const voiceMap = new Map<string, string>();
+  const matchedCharacters = new Set<string>();
+  const unmatchedCharacters: string[] = [];
+
+  for (const char of currentCharacters) {
+    // First try exact canonical name match
+    let matchedEntry = Object.values(profile.characters).find(
+      entry => entry.canonicalName === char.canonicalName
+    );
+
+    // If no exact match, try fuzzy matching via matchCharacter
+    if (!matchedEntry) {
+      matchedEntry = matchCharacter(char, profile.characters);
+    }
+
+    if (matchedEntry) {
+      voiceMap.set(char.canonicalName, matchedEntry.voice);
+      matchedCharacters.add(char.canonicalName);
+    } else {
+      unmatchedCharacters.push(char.canonicalName);
+    }
+  }
+
+  return { voiceMap, matchedCharacters, unmatchedCharacters };
+}
