@@ -6,8 +6,11 @@
 /** Minimum speaking percentage to show character in UI (below = hidden but kept in JSON) */
 const IMPORTANCE_THRESHOLD = 0.005; // 0.5%
 
-/** Minimum similarity ratio for name matching (Levenshtein-based) */
-const NAME_MATCH_THRESHOLD = 0.6; // 60%
+/** Maximum Levenshtein distance for a single name pair to be considered a match */
+const MAX_NAME_EDITS = 2;
+
+/** Minimum number of independent pairings required to declare a character match */
+const MIN_NAME_PAIRINGS = 2;
 ```
 
 ## 1. Problem Statement
@@ -237,14 +240,23 @@ function assignVoicesTiered(
 
 ```typescript
 /**
- * Calculate similarity ratio between two names (Levenshtein-based)
- * Returns 0-1, where 1 is identical match
+ * Calculate Levenshtein distance between two strings
  */
-export function similarityRatio(a: string, b: string): number;
+export function levenshtein(a: string, b: string): number;
 
 /**
- * Find best matching character entry from profile
- * Cross-compares canonical name + aliases
+ * Find maximum pairings between two name sets (bipartite matching)
+ * Returns pairs where each name used at most once and distance ≤ maxEdits
+ */
+export function findMaxPairings(
+  setA: string[],
+  setB: string[],
+  maxEdits: number
+): [number, number][];
+
+/**
+ * Find matching character entry from profile using multi-pairing algorithm
+ * Returns entry only if at least MIN_NAME_PAIRINGS valid pairings found
  */
 export function matchCharacter(
   char: LLMCharacter,
@@ -374,9 +386,29 @@ function exportToProfile(
 }
 ```
 
-## 7. Name Matching (Levenshtein Distance)
+## 7. Name Matching (Multi-Pairing Levenshtein)
 
-### Similarity Calculation
+### The Problem with Single-Best Match
+
+Using only the best similarity score has issues:
+
+```
+"May" vs "Mae" → distance=1 → ratio=0.67 → MATCH
+"May" vs "Mai" → distance=1 → ratio=0.67 → MATCH
+```
+
+Both pass threshold, but "May" and "Mai" are different names. We need stronger evidence.
+
+### Solution: Multiple Independent Pairings
+
+**Rule:** A character match requires at least `MIN_NAME_PAIRINGS` (2) distinct pairings where:
+- Each pairing has Levenshtein distance ≤ `MAX_NAME_EDITS` (2)
+- Each name from set A is used at most once
+- Each name from set B is used at most once
+
+This is a **bipartite matching problem** - find maximum pairings between two sets.
+
+### Algorithm
 
 ```typescript
 /**
@@ -407,73 +439,136 @@ function levenshtein(a: string, b: string): number {
 }
 
 /**
- * Calculate similarity ratio (0 to 1, higher is better)
- * 1.0 = identical, 0.0 = completely different
+ * Find maximum pairings between two sets of names using greedy bipartite matching
+ * Returns pairs of [indexInSetA, indexInSetB] where distance ≤ maxEdits
  */
-function similarityRatio(a: string, b: string): number {
-  const maxLen = Math.max(a.length, b.length);
-  if (maxLen === 0) return 1;
-  const dist = levenshtein(a.toLowerCase(), b.toLowerCase());
-  return 1 - (dist / maxLen);
+function findMaxPairings(
+  setA: string[],
+  setB: string[],
+  maxEdits: number
+): [number, number][] {
+
+  // Build adjacency matrix: distance for each pair
+  const matrix: number[][] = [];
+  for (let i = 0; i < setA.length; i++) {
+    matrix[i] = [];
+    for (let j = 0; j < setB.length; j++) {
+      const dist = levenshtein(
+        setA[i].toLowerCase(),
+        setB[j].toLowerCase()
+      );
+      matrix[i][j] = dist <= maxEdits ? dist : Infinity;
+    }
+  }
+
+  // Greedy: pick smallest distances first, no row/col reuse
+  const pairings: [number, number][] = [];
+  const usedRows = new Set<number>();
+  const usedCols = new Set<number>();
+
+  const cells: [number, number, number][] = [];
+  for (let i = 0; i < matrix.length; i++) {
+    for (let j = 0; j < matrix[i].length; j++) {
+      if (matrix[i][j] < Infinity) {
+        cells.push([i, j, matrix[i][j]]);
+      }
+    }
+  }
+  cells.sort((a, b) => a[2] - b[2]);  // Sort by distance ascending
+
+  for (const [row, col] of cells) {
+    if (!usedRows.has(row) && !usedCols.has(col)) {
+      pairings.push([row, col]);
+      usedRows.add(row);
+      usedCols.add(col);
+    }
+  }
+
+  return pairings;
 }
-```
 
-### Matching Algorithm (Cross-Compare All)
-
-**Key insight:** Compare ALL combinations of:
-- `char.canonicalName` + `char.variations`
-- VS
-- `entry.canonicalName` + `entry.aliases`
-
-Find the best match above threshold.
-
-```typescript
+/**
+ * Match character against profile using multi-pairing algorithm
+ * Returns entry only if at least MIN_NAME_PAIRINGS valid pairings found
+ */
 function matchCharacter(
   char: LLMCharacter,
   profile: Record<string, CharacterEntry>
 ): CharacterEntry | undefined {
 
-  let bestMatch: CharacterEntry | undefined;
-  let bestScore = 0;
-
-  // Build list of all names for this character
   const charNames = [char.canonicalName, ...char.variations];
 
   for (const entry of Object.values(profile)) {
-    // Build list of all names for profile entry
     const entryNames = [entry.canonicalName, ...entry.aliases];
 
-    // Try all combinations
-    for (const cn of charNames) {
-      for (const en of entryNames) {
-        const score = similarityRatio(cn, en);
-        if (score > bestScore && score >= NAME_MATCH_THRESHOLD) {
-          bestScore = score;
-          bestMatch = entry;
-        }
-      }
+    // Find maximum pairings between the two name sets
+    const pairings = findMaxPairings(charNames, entryNames, MAX_NAME_EDITS);
+
+    // Need at least MIN_NAME_PAIRINGS independent matches
+    if (pairings.length >= MIN_NAME_PAIRINGS) {
+      return entry;
     }
   }
 
-  return bestMatch;
+  return undefined;
 }
 ```
 
+### Visual Example
+
+**Current book character:** `["May", "Mae", "The May"]` (3 names)
+**Profile entry:** `["Mae", "Mai"]` (2 names)
+
+Distance matrix (values = Levenshtein distance):
+
+```
+                Profile
+           ┌──────┬──────┐
+           │ Mae  │ Mai  │
+    ┌──────┼──────┼──────┐
+    │ May  │  1   │  1   │
+Book├──────┼──────┼──────┤
+    │ Mae  │  0   │  2   │
+    ├──────┼──────┼──────┤
+    │TheMay│  5   │  6   │
+    └──────┴──────┴──────┘
+```
+
+**Valid pairings (distance ≤ 2):**
+- (Mae, Mae) = 0 ✓
+- (May, Mae) = 1 ✓
+- (May, Mai) = 1 ✓
+- (Mae, Mai) = 2 ✓
+
+**Greedy matching (smallest distances first):**
+1. Pick (Mae, Mae) distance 0
+2. Pick (May, Mai) distance 1
+3. Remaining: May already used, Mae already used
+
+**Result:** 2 pairings found → ≥ MIN_NAME_PAIRINGS → **MATCH ✓**
+
 ### Examples
 
-| Profile | Book 2 Extracts | Similarity | Match? |
-|---------|-----------------|------------|--------|
-| "Harry Potter" | "Harry Potter" | 1.00 | ✓ |
-| "Captain John Smith" | "John Smith" | 0.72 | ✓ |
-| "Professor Dumbledore" | "Dumbledore" | 0.68 | ✓ |
-| "Lord Voldemort" | "Voldemort" | 0.67 | ✓ |
-| "Harry Potter" | "The Boy Who Lived" | 0.15 | ✗ |
-| "John Smith" | "John Jones" | 0.67 | ✗ (false positive?) |
+| Set A (Current) | Set B (Profile) | Valid Pairings | Count | Match? |
+|-----------------|-----------------|----------------|-------|--------|
+| `[May, Mae, TheMay]` | `[Mae, Mai]` | (Mae,Mae), (May,Mai) | 2 | ✓ |
+| `[Harry]` | `[Harry]` | (Harry,Harry) | 1 | ✗ (need 2) |
+| `[Harry, Potter]` | `[Harry, Potter]` | (Harry,Harry), (Potter,Potter) | 2 | ✓ |
+| `[John, Johnny]` | `[Jon, Jonathan]` | (John,Jon), (Johnny,Jonathan) | 2 | ✓ |
+| `[Smith]` | `[Smyth, Schmidt]` | (Smith,Smyth) | 1 | ✗ (need 2) |
+| `[Dr Smith, Smith]` | `[Smith, Dr John Smith]` | (Smith,Smith), (DrSmith,DrJohnSmith) | 2 | ✓ |
 
-**Note:** "John Smith" vs "John Jones" gives 0.67 but shouldn't match. However:
-- The `aliases` field helps - if user adds "Jones" as alias for "John Smith", it won't create duplicate
-- User can manually resolve conflicts
-- This is acceptable edge case for simplicity
+**Key insight:** Characters with multiple name variations (aliases) match more reliably. Single-name characters require exact match or manual intervention.
+
+### Edge Cases
+
+| Scenario | Handling |
+|----------|----------|
+| Only 1 name on either side | Cannot auto-match (need 2 pairings). User assigns manually or adds aliases. |
+| Exact match + variations | Exact match (dist=0) counts first, then we find one more variation. |
+| Same name appears twice in aliases | Deduplicate before matching (use Set). |
+| All distances = 0 (identical sets) | All pairings valid, count = min(lenA, lenB). |
+| One set much larger than other | Maximum possible pairings = min(lenA, lenB). |
 
 ## 8. Risks & Edge Cases
 
@@ -493,10 +588,10 @@ function matchCharacter(
 ## 9. Implementation Checklist
 
 - [ ] Add `VoiceProfileFile` and `CharacterEntry` types to `types.ts`
-- [ ] Add `IMPORTANCE_THRESHOLD` and `NAME_MATCH_THRESHOLD` constants
+- [ ] Add `IMPORTANCE_THRESHOLD`, `MAX_NAME_EDITS`, and `MIN_NAME_PAIRINGS` constants
 - [ ] Implement `levenshtein()` function
-- [ ] Implement `similarityRatio()` function
-- [ ] Implement `matchCharacter()` function with cross-comparison
+- [ ] Implement `findMaxPairings()` function (greedy bipartite matching)
+- [ ] Implement `matchCharacter()` function with multi-pairing algorithm
 - [ ] Implement `exportToProfile()` function with merge logic
 - [ ] Implement `importProfile()` function with matching
 - [ ] Implement `isCharacterVisible()` helper
@@ -507,7 +602,7 @@ function matchCharacter(
   - [ ] Filter characters by `IMPORTANCE_THRESHOLD`
   - [ ] Show SHARED badge for shared voices
   - [ ] Show `lastSeenIn` metadata (optional)
-- [ ] Add unit tests for Levenshtein matching edge cases
+- [ ] Add unit tests for multi-pairing matching edge cases
 - [ ] Add unit tests for percentage calculation
 - [ ] Add unit tests for tiered voice assignment
 
