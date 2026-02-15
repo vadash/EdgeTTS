@@ -83,3 +83,51 @@ describe('AppSettings interface', () => {
     }).not.toThrow();
   });
 });
+
+import type { VoiceProfileFile, CharacterEntry, VoiceAssignment } from '@/state/types';
+
+describe('VoiceProfile Types', () => {
+  it('should define VoiceProfileFile type', () => {
+    const profile: VoiceProfileFile = {
+      version: 2,
+      narrator: 'en-US-GuyNeural',
+      totalLines: 1000,
+      characters: {
+        'harry_potter': {
+          canonicalName: 'Harry Potter',
+          voice: 'en-GB-RyanNeural',
+          gender: 'male',
+          aliases: ['Harry', 'Potter'],
+          lines: 150,
+          percentage: 15.0,
+          lastSeenIn: 'BOOK1',
+          bookAppearances: 1
+        }
+      }
+    };
+    expect(profile.version).toBe(2);
+  });
+
+  it('should define CharacterEntry type', () => {
+    const entry: CharacterEntry = {
+      canonicalName: 'Harry Potter',
+      voice: 'en-GB-RyanNeural',
+      gender: 'male',
+      aliases: ['Harry'],
+      lines: 100,
+      percentage: 10.0,
+      lastSeenIn: 'BOOK1',
+      bookAppearances: 1
+    };
+    expect(entry.canonicalName).toBe('Harry Potter');
+  });
+
+  it('should define VoiceAssignment type', () => {
+    const assignment: VoiceAssignment = {
+      character: 'Harry Potter',
+      voice: 'en-GB-RyanNeural',
+      shared: false
+    };
+    expect(assignment.shared).toBe(false);
+  });
+});

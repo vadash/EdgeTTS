@@ -247,3 +247,33 @@ export interface ProcessedBookWithVoices {
   allSentences: string[];
   fullText: string;
 }
+
+// Voice Profile Types (v2)
+export interface VoiceProfileFile {
+  version: 2;
+  narrator: string;
+  totalLines: number;
+  characters: Record<string, CharacterEntry>;
+}
+
+export interface CharacterEntry {
+  canonicalName: string;
+  voice: string;
+  gender: 'male' | 'female' | 'unknown';
+  aliases: string[];
+  lines: number;
+  percentage: number;
+  lastSeenIn: string;
+  bookAppearances: number;
+}
+
+export interface VoiceAssignment {
+  character: string;
+  voice: string;
+  shared: boolean;
+}
+
+// Voice Profile Constants
+export const IMPORTANCE_THRESHOLD = 0.005; // 0.5%
+export const MAX_NAME_EDITS = 2;
+export const MIN_NAME_PAIRINGS = 2;
