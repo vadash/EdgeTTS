@@ -199,6 +199,9 @@ export class PipelineBuilder implements IPipelineBuilder {
     }
 
     const config = builder
+      .addStep(StepNames.SAVE, {
+        narratorVoice: options.narratorVoice,
+      })
       .addStep(StepNames.TEXT_SANITIZATION, {})
       .addStep(StepNames.DICTIONARY_PROCESSING, {
         caseSensitive: options.lexxRegister,
@@ -223,9 +226,6 @@ export class PipelineBuilder implements IPipelineBuilder {
         opusCompressionLevel: options.opusCompressionLevel,
         ffmpegService: this.ffmpegService,
         createAudioMerger: (cfg: MergerConfig) => this.audioMergerFactory.create(cfg),
-      })
-      .addStep(StepNames.SAVE, {
-        narratorVoice: options.narratorVoice,
       })
       .addStep(StepNames.CLEANUP, {
         logger: this.logger,
