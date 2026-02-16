@@ -10,11 +10,10 @@ import { useVoicePreview } from '@/hooks/useVoicePreview';
 import { Button } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
 import {
-  importFromJSON,
-  applyImportedMappings,
+  importProfile,
   readJSONFile,
   randomizeBelowVoices,
-} from '@/services/VoiceMappingService';
+} from '@/services/llm/VoiceProfile';
 
 interface VoiceReviewModalProps {
   onConfirm: () => void;
@@ -108,17 +107,22 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
     try {
       setImportError(null);
       const json = await readJSONFile(file);
-      const { entries } = importFromJSON(json);
+      const { voiceMap: importedMap, matchedCharacters, unmatchedCharacters } = importProfile(json, characters);
 
-      // Apply imported mappings to current characters
-      const newMap = applyImportedMappings(entries, characters, voiceMap);
+      // Merge imported voices into current map
+      const newMap = new Map(voiceMap);
+      for (const [name, voice] of importedMap) {
+        newMap.set(name, voice);
+      }
       llm.setVoiceMap(newMap);
 
-      logs.info(`Imported ${entries.length} voice mapping(s) from ${file.name}`);
+      const matchCount = matchedCharacters.size;
+      const unmatchCount = unmatchedCharacters.length;
+      logs.info(`Imported voices: ${matchCount} matched, ${unmatchCount} unmatched from ${file.name}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Import failed';
       setImportError(message);
-      logs.error(`Failed to import voice mapping: ${message}`);
+      logs.error(`Failed to import voice profile: ${message}`);
     }
 
     input.value = '';
