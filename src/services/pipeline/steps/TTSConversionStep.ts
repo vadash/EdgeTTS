@@ -70,7 +70,7 @@ export class TTSConversionStep extends BasePipelineStep {
 
     if (tempDirHandle) {
       for (const chunk of chunks) {
-        const filename = `chunk_${String(chunk.partIndex).padStart(4, '0')}.bin`;
+        const filename = `chunk_${String(chunk.partIndex).padStart(6, '0')}.bin`;
         try {
           const handle = await tempDirHandle.getFileHandle(filename);
           const file = await handle.getFile();

@@ -319,8 +319,8 @@ describe('TTSConversionStep', () => {
       const dirHandle = createMockDirectoryHandle();
       const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
 
-      // Pre-create chunk_0000.bin (simulating a cached chunk)
-      const chunkFile = await tempDir.getFileHandle('chunk_0000.bin', { create: true });
+      // Pre-create chunk_000000.bin (simulating a cached chunk)
+      const chunkFile = await tempDir.getFileHandle('chunk_000000.bin', { create: true });
       const w = await chunkFile.createWritable();
       await w.write(new Uint8Array([1, 2, 3]));
       await w.close();
@@ -346,7 +346,7 @@ describe('TTSConversionStep', () => {
       const dirHandle = createMockDirectoryHandle();
       const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
 
-      const chunkFile = await tempDir.getFileHandle('chunk_0000.bin', { create: true });
+      const chunkFile = await tempDir.getFileHandle('chunk_000000.bin', { create: true });
       const w = await chunkFile.createWritable();
       await w.write(new Uint8Array([1, 2, 3]));
       await w.close();
@@ -372,7 +372,7 @@ describe('TTSConversionStep', () => {
 
       // Pre-create two cached chunks
       for (let i = 0; i < 2; i++) {
-        const chunkFile = await tempDir.getFileHandle(`chunk_000${i}.bin`, { create: true });
+        const chunkFile = await tempDir.getFileHandle(`chunk_${String(i).padStart(6, '0')}.bin`, { create: true });
         const w = await chunkFile.createWritable();
         await w.write(new Uint8Array([1, 2, 3]));
         await w.close();
