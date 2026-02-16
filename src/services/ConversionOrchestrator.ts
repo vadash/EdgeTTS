@@ -7,7 +7,7 @@ import type { Stores } from '@/stores';
 import type { ILogger, IVoicePoolBuilder } from '@/services/interfaces';
 import type { IPipelineBuilder } from '@/services/pipeline';
 import type { PipelineContext, PipelineProgress } from '@/services/pipeline/types';
-import type { ProcessedBook, SpeakerAssignment } from '@/state/types';
+import type { ProcessedBook, SpeakerAssignment, LLMCharacter } from '@/state/types';
 import { StepNames } from './pipeline';
 import { AppError, noContentError, insufficientVoicesError } from '@/errors';
 import { checkResumeState, loadPipelineState } from './pipeline/resumeCheck';
@@ -56,6 +56,7 @@ export class ConversionOrchestrator {
     let skipLLMSteps = false;
     let resumedAssignments: SpeakerAssignment[] | undefined;
     let resumedVoiceMap: Map<string, string> | undefined;
+    let resumedCharacters: LLMCharacter[] | undefined;
 
     if (resumeInfo) {
       // Resume detected - show modal and wait for user confirmation
@@ -77,6 +78,7 @@ export class ConversionOrchestrator {
             skipLLMSteps = true;
             resumedAssignments = pipelineState.assignments;
             resumedVoiceMap = new Map(Object.entries(pipelineState.characterVoiceMap));
+            resumedCharacters = pipelineState.characters;
             this.logger.info('Resuming with cached LLM state');
           }
         }
@@ -192,6 +194,7 @@ export class ConversionOrchestrator {
         directoryHandle: this.stores.data.directoryHandle.value,
         ...(resumedAssignments && { assignments: resumedAssignments }),
         ...(resumedVoiceMap && { voiceMap: resumedVoiceMap }),
+        ...(resumedCharacters && { characters: resumedCharacters }),
       };
 
       // Set up progress callback

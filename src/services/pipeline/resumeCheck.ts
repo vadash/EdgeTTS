@@ -1,4 +1,4 @@
-import type { SpeakerAssignment } from '@/state/types';
+import type { SpeakerAssignment, LLMCharacter } from '@/state/types';
 
 export interface ResumeInfo {
   cachedChunks: number;
@@ -10,6 +10,7 @@ export type ResumeCheckResult = ResumeInfo | null;
 export interface PipelineState {
   assignments: SpeakerAssignment[];
   characterVoiceMap: Record<string, string>;
+  characters?: LLMCharacter[];
   fileNames: Array<[string, number]>;
 }
 

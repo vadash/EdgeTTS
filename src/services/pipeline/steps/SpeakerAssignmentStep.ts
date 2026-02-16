@@ -73,6 +73,7 @@ export class SpeakerAssignmentStep extends BasePipelineStep {
           const state = {
             assignments,
             characterVoiceMap: Object.fromEntries(voiceMap),
+            characters,
             fileNames: context.fileNames,
           };
           await writable.write(JSON.stringify(state));
