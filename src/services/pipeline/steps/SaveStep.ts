@@ -3,7 +3,7 @@
 // Audio files are now saved progressively by AudioMergeStep
 
 import { BasePipelineStep, PipelineContext } from '../types';
-import { exportToJSONSorted } from '@/services/VoiceMappingService';
+import { exportToProfile } from '@/services/llm/VoiceProfile';
 import { withPermissionRetry } from '@/services/FileSystemRetry';
 
 /**
@@ -20,7 +20,7 @@ export interface SaveStepOptions {
 export class SaveStep extends BasePipelineStep {
   readonly name = 'save';
   protected readonly requiredContextKeys: (keyof PipelineContext)[] = [];
-  readonly dropsContextKeys: (keyof PipelineContext)[] = ['assignments', 'characters', 'voiceMap'];
+  readonly dropsContextKeys: (keyof PipelineContext)[] = [];
 
   constructor(private options: SaveStepOptions) {
     super();
@@ -29,10 +29,7 @@ export class SaveStep extends BasePipelineStep {
   async execute(context: PipelineContext, signal: AbortSignal): Promise<PipelineContext> {
     this.checkCancelled(signal);
 
-    const { savedFileCount, directoryHandle, characters, voiceMap, assignments, fileNames } = context;
-
-    // Audio files already saved by AudioMergeStep
-    this.reportProgress(1, 1, `${savedFileCount ?? 0} audio file(s) saved`);
+    const { directoryHandle, characters, voiceMap, assignments, fileNames, existingProfile } = context;
 
     // Save voice mapping JSON if we have character data and a directory
     if (directoryHandle && characters && voiceMap && assignments) {
@@ -41,7 +38,14 @@ export class SaveStep extends BasePipelineStep {
         const fileName = `${bookName}.json`;
         await withPermissionRetry(directoryHandle, async () => {
           const bookFolder = await directoryHandle.getDirectoryHandle(bookName, { create: true });
-          const json = exportToJSONSorted(characters, voiceMap, assignments, this.options.narratorVoice);
+          const json = exportToProfile(
+            existingProfile ?? null,
+            characters,
+            voiceMap,
+            assignments,
+            this.options.narratorVoice,
+            bookName
+          );
 
           const fileHandle = await bookFolder.getFileHandle(fileName, { create: true });
           const writable = await fileHandle.createWritable();

@@ -18,35 +18,20 @@ describe('SaveStep', () => {
   });
 
   describe('execute', () => {
-    it('reports saved file count from context', async () => {
-      const context = createTestContext({
-        savedFileCount: 5,
-      });
-
-      const { progress } = await collectProgress(step, context);
-
-      expect(progress[0].message).toContain('5');
-      expect(progress[0].message).toContain('audio file');
-    });
-
     it('preserves existing context properties', async () => {
       const context = createTestContext({
         text: 'Original text.',
-        savedFileCount: 3,
         audioMap: new Map([[0, 'chunk_000000.bin']]),
       });
 
       const result = await step.execute(context, createNeverAbortSignal());
 
       expect(result.text).toBe('Original text.');
-      expect(result.savedFileCount).toBe(3);
       expect(result.audioMap?.size).toBe(1);
     });
 
     it('returns context unchanged', async () => {
-      const context = createTestContext({
-        savedFileCount: 2,
-      });
+      const context = createTestContext({});
 
       const result = await step.execute(context, createNeverAbortSignal());
 
@@ -58,12 +43,11 @@ describe('SaveStep', () => {
     it('saves voice mapping when character data is present', async () => {
       const mockHandle = createMockDirectoryHandle();
       const context = createTestContext({
-        savedFileCount: 1,
         directoryHandle: mockHandle,
         fileNames: [['TestBook', 0]],
-        characters: [{ code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] }],
-        voiceMap: new Map([['A', 'en-US-JennyNeural']]),
-        assignments: [{ sentenceIndex: 0, text: 'Hello', speaker: 'A', voiceId: 'en-US-JennyNeural' }],
+        characters: [{ canonicalName: 'Alice', gender: 'female', variations: [] }],
+        voiceMap: new Map([['Alice', 'en-US-JennyNeural']]),
+        assignments: [{ sentenceIndex: 0, text: 'Hello', speaker: 'Alice', voiceId: 'en-US-JennyNeural' }],
       });
 
       const { progress } = await collectProgress(step, context);
@@ -74,7 +58,6 @@ describe('SaveStep', () => {
     it('does not save voice mapping when no characters', async () => {
       const mockHandle = createMockDirectoryHandle();
       const context = createTestContext({
-        savedFileCount: 1,
         directoryHandle: mockHandle,
       });
 
@@ -87,9 +70,7 @@ describe('SaveStep', () => {
 
   describe('progress reporting', () => {
     it('reports progress', async () => {
-      const context = createTestContext({
-        savedFileCount: 2,
-      });
+      const context = createTestContext({});
 
       const { progress } = await collectProgress(step, context);
 
@@ -97,24 +78,12 @@ describe('SaveStep', () => {
     });
 
     it('reports complete', async () => {
-      const context = createTestContext({
-        savedFileCount: 2,
-      });
+      const context = createTestContext({});
 
       const { progress } = await collectProgress(step, context);
 
       const finalProgress = progress[progress.length - 1];
       expect(finalProgress.message.toLowerCase()).toContain('complete');
-    });
-
-    it('handles zero files gracefully', async () => {
-      const context = createTestContext({
-        savedFileCount: 0,
-      });
-
-      const { progress } = await collectProgress(step, context);
-
-      expect(progress[0].message).toContain('0');
     });
   });
 
@@ -123,9 +92,7 @@ describe('SaveStep', () => {
       const controller = createTestAbortController();
       controller.abort();
 
-      const context = createTestContext({
-        savedFileCount: 2,
-      });
+      const context = createTestContext({});
 
       await expect(step.execute(context, controller.signal))
         .rejects.toThrow();
@@ -133,11 +100,8 @@ describe('SaveStep', () => {
   });
 
   describe('dropsContextKeys', () => {
-    it('declares assignments, characters, and voiceMap as droppable', () => {
-      expect(step.dropsContextKeys).toContain('assignments');
-      expect(step.dropsContextKeys).toContain('characters');
-      expect(step.dropsContextKeys).toContain('voiceMap');
-      expect(step.dropsContextKeys).not.toContain('directoryHandle');
+    it('does not drop any context keys (TTS data must persist)', () => {
+      expect(step.dropsContextKeys).toEqual([]);
     });
   });
 });
