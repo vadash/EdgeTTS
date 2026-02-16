@@ -1,7 +1,7 @@
 // Pipeline Types
 // Defines interfaces for the conversion pipeline architecture
 
-import type { LLMCharacter, SpeakerAssignment, TextBlock } from '@/state/types';
+import type { LLMCharacter, SpeakerAssignment, TextBlock, VoiceProfileFile } from '@/state/types';
 
 // ============================================================================
 // Base Context Types
@@ -128,6 +128,9 @@ export interface PipelineContext {
 
   // Directory handle for saving
   directoryHandle?: FileSystemDirectoryHandle | null;
+
+  // Loaded voice profile (for cumulative series export)
+  existingProfile?: VoiceProfileFile | null;
 }
 
 /**
