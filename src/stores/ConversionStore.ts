@@ -38,8 +38,6 @@ export interface ConversionError {
  */
 export interface ResumeInfo {
   cachedChunks: number;
-  totalChunks: number;
-  cachedOutputFiles: number;
   hasLLMState: boolean;
 }
 

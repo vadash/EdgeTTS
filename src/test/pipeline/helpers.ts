@@ -82,11 +82,20 @@ function createMockDirectoryHandleWithState(
       if (subdirs.has(subdirName)) {
         return subdirs.get(subdirName)!;
       }
-      const newDir = createMockDirectoryHandleWithState(state, subdirName);
+      if (!options?.create) {
+        throw new DOMException('Directory not found', 'NotFoundError');
+      }
+      const newDir = createMockDirectoryHandleWithState(
+        { files: new Map(), subdirs: new Map() },
+        subdirName
+      );
       subdirs.set(subdirName, newDir);
       return newDir;
     },
     getFileHandle: async (fileName: string, options?: { create?: boolean }) => {
+      if (!files.has(fileName) && !options?.create) {
+        throw new DOMException('File not found', 'NotFoundError');
+      }
       return createMockFile(fileName, files);
     },
     removeEntry: async () => {},

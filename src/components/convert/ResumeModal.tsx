@@ -1,10 +1,7 @@
-import { Text } from 'preact-i18n';
 import { Button } from '@/components/common';
 
 export interface ResumeInfo {
   cachedChunks: number;
-  totalChunks: number;
-  cachedOutputFiles: number;
   hasLLMState: boolean;
 }
 
@@ -27,9 +24,6 @@ export function ResumeModal({ info, onContinue, onCancel }: ResumeModalProps) {
           )}
           {info.cachedChunks > 0 && (
             <p>{info.cachedChunks} audio chunks cached.</p>
-          )}
-          {info.cachedOutputFiles > 0 && (
-            <p>{info.cachedOutputFiles} output files already exist.</p>
           )}
         </div>
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">

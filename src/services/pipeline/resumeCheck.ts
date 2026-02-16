@@ -1,10 +1,7 @@
-import { generateSignature, signaturesMatch, type SignatureSettings, type JobSignature } from './jobSignature';
 import type { SpeakerAssignment } from '@/state/types';
 
 export interface ResumeInfo {
   cachedChunks: number;
-  totalChunks: number;
-  cachedOutputFiles: number;
   hasLLMState: boolean;
 }
 
@@ -59,10 +56,13 @@ async function fileExists(dir: FileSystemDirectoryHandle, name: string): Promise
   }
 }
 
+/**
+ * Check if _temp_work has resumable state.
+ * Resume = _temp_work directory exists with pipeline_state.json.
+ * 1 folder = 1 book, no signature/hash comparison needed.
+ */
 export async function checkResumeState(
   dirHandle: FileSystemDirectoryHandle,
-  text: string,
-  settings: SignatureSettings,
   log?: (msg: string) => void
 ): Promise<ResumeCheckResult> {
   const tempDir = await tryGetDirectory(dirHandle, '_temp_work');
@@ -71,50 +71,19 @@ export async function checkResumeState(
     return null;
   }
 
-  const savedSig = await tryReadJSON<JobSignature>(tempDir, 'job_signature.json');
-  if (!savedSig) {
-    log?.('Resume check: no job_signature.json found (or unreadable)');
-    return null;
-  }
-
-  const currentSig = generateSignature(text, settings);
-  if (!signaturesMatch(savedSig, currentSig)) {
-    // Log which fields differ for debugging
-    const diffs: string[] = [];
-    if (savedSig.version !== currentSig.version) diffs.push(`version: ${savedSig.version} → ${currentSig.version}`);
-    if (savedSig.textHash !== currentSig.textHash) diffs.push(`textHash: ${savedSig.textHash} → ${currentSig.textHash}`);
-    if (savedSig.voice !== currentSig.voice) diffs.push(`voice: ${savedSig.voice} → ${currentSig.voice}`);
-    if (savedSig.rate !== currentSig.rate) diffs.push(`rate: ${savedSig.rate} → ${currentSig.rate}`);
-    if (savedSig.pitch !== currentSig.pitch) diffs.push(`pitch: ${savedSig.pitch} → ${currentSig.pitch}`);
-    if (savedSig.outputFormat !== currentSig.outputFormat) diffs.push(`outputFormat: ${savedSig.outputFormat} → ${currentSig.outputFormat}`);
-    if (savedSig.opusBitrate !== currentSig.opusBitrate) diffs.push(`opusBitrate: ${savedSig.opusBitrate} → ${currentSig.opusBitrate}`);
-    log?.(`Resume check: signature mismatch — ${diffs.join(', ')}`);
+  const hasLLMState = await fileExists(tempDir, 'pipeline_state.json');
+  if (!hasLLMState) {
+    log?.('Resume check: _temp_work exists but no pipeline_state.json');
     return null;
   }
 
   const cachedChunks = await countChunkFiles(tempDir);
-  const hasLLMState = await fileExists(tempDir, 'pipeline_state.json');
 
-  log?.(`Resume check: valid cache found (${cachedChunks} chunks, LLM state: ${hasLLMState})`);
+  log?.(`Resume check: resumable state found (${cachedChunks} cached chunks, LLM state: ${hasLLMState})`);
   return {
     cachedChunks,
-    totalChunks: (savedSig as any).chunkCount ?? 0,
-    cachedOutputFiles: 0, // counted later by merge step
     hasLLMState,
   };
-}
-
-export async function writeSignature(
-  dirHandle: FileSystemDirectoryHandle,
-  text: string,
-  settings: SignatureSettings
-): Promise<void> {
-  const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
-  const sig = generateSignature(text, settings);
-  const fileHandle = await tempDir.getFileHandle('job_signature.json', { create: true });
-  const writable = await fileHandle.createWritable();
-  await writable.write(JSON.stringify(sig));
-  await writable.close();
 }
 
 export async function loadPipelineState(
