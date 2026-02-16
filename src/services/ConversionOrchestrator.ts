@@ -222,6 +222,9 @@ export class ConversionOrchestrator {
         // Get the (potentially modified) voice map from the store
         const reviewedVoiceMap = this.stores.llm.characterVoiceMap.value;
 
+        // Get the loaded profile for cumulative export
+        const existingProfile = this.stores.llm.loadedProfile.value;
+
         // Re-remap assignments with user's voice choices
         const remappedAssignments = ctx.assignments?.map(a => ({
           ...a,
@@ -230,11 +233,12 @@ export class ConversionOrchestrator {
             : reviewedVoiceMap.get(a.speaker) ?? this.stores.settings.narratorVoice.value,
         }));
 
-        // Return context with updated voice map and re-mapped assignments
+        // Return context with updated voice map, re-mapped assignments, and existing profile
         return {
           ...ctx,
           voiceMap: reviewedVoiceMap,
           assignments: remappedAssignments,
+          existingProfile,
         };
       });
 

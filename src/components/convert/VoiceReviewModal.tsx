@@ -4,7 +4,7 @@
 import { useState, useRef } from 'preact/hooks';
 import { signal } from '@preact/signals';
 import { Text } from 'preact-i18n';
-import type { LLMCharacter } from '@/state/types';
+import type { LLMCharacter, VoiceProfileFile } from '@/state/types';
 import { useSettings, useLLM, useLogs, useData } from '@/stores';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
 import { Button } from '@/components/common';
@@ -115,6 +115,10 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
         newMap.set(name, voice);
       }
       llm.setVoiceMap(newMap);
+
+      // Store the parsed profile for cumulative merge during export
+      const parsed = JSON.parse(json) as VoiceProfileFile;
+      llm.setLoadedProfile(parsed);
 
       const matchCount = matchedCharacters.size;
       const unmatchCount = unmatchedCharacters.length;

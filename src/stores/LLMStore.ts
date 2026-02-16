@@ -2,7 +2,7 @@
 // Manages LLM settings and character detection state
 
 import { signal, computed } from '@preact/signals';
-import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
+import type { LLMCharacter, SpeakerAssignment, VoiceProfileFile } from '@/state/types';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
 import type { LogStore } from './LogStore';
 import { StorageKeys } from '@/config/storage';
@@ -95,6 +95,7 @@ export class LLMStore {
   readonly detectedCharacters = signal<LLMCharacter[]>([]);
   readonly characterVoiceMap = signal<Map<string, string>>(new Map());
   readonly speakerAssignments = signal<SpeakerAssignment[]>([]);
+  readonly loadedProfile = signal<VoiceProfileFile | null>(null);
 
   // Voice review state
   readonly pendingReview = signal<boolean>(false);
@@ -258,6 +259,10 @@ export class LLMStore {
 
   setSpeakerAssignments(assignments: SpeakerAssignment[]): void {
     this.speakerAssignments.value = assignments;
+  }
+
+  setLoadedProfile(profile: VoiceProfileFile | null): void {
+    this.loadedProfile.value = profile;
   }
 
   // ========== Voice Review Actions ==========
