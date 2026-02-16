@@ -100,21 +100,26 @@ export function importProfile(
   matchedCharacters: Set<string>;
   unmatchedCharacters: string[];
 } {
-  const profile: VoiceProfileFile = JSON.parse(profileJson);
+  const profile = JSON.parse(profileJson);
 
+  if (profile.version !== 2) {
+    throw new Error('Unsupported voice profile format. Re-export from a current session.');
+  }
+
+  const voiceProfile = profile as VoiceProfileFile;
   const voiceMap = new Map<string, string>();
   const matchedCharacters = new Set<string>();
   const unmatchedCharacters: string[] = [];
 
   for (const char of currentCharacters) {
     // First try exact canonical name match
-    let matchedEntry = Object.values(profile.characters).find(
+    let matchedEntry = Object.values(voiceProfile.characters).find(
       entry => entry.canonicalName === char.canonicalName
     );
 
     // If no exact match, try fuzzy matching via matchCharacter
     if (!matchedEntry) {
-      matchedEntry = matchCharacter(char, profile.characters);
+      matchedEntry = matchCharacter(char, voiceProfile.characters);
     }
 
     if (matchedEntry) {

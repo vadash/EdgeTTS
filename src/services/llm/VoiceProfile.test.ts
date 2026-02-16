@@ -260,6 +260,29 @@ describe('importProfile', () => {
       importProfile('invalid json', []);
     }).toThrow();
   });
+
+  it('throws on v1 format with clear error message', () => {
+    const v1Json = JSON.stringify({
+      version: 1,
+      narrator: 'en-US, GuyNeural',
+      voices: [{ name: 'Harry', voice: 'en-GB-RyanNeural', gender: 'male' }]
+    });
+
+    expect(() => {
+      importProfile(v1Json, []);
+    }).toThrow('Unsupported voice profile format. Re-export from a current session.');
+  });
+
+  it('throws on missing version field', () => {
+    const noVersionJson = JSON.stringify({
+      narrator: 'en-US, GuyNeural',
+      characters: {}
+    });
+
+    expect(() => {
+      importProfile(noVersionJson, []);
+    }).toThrow('Unsupported voice profile format');
+  });
 });
 
 import { IMPORTANCE_THRESHOLD } from '@/state/types';
