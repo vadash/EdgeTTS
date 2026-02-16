@@ -443,3 +443,14 @@ describe('Module exports', () => {
     expect(typeof module.assignVoicesTiered).toBe('function');
   });
 });
+
+describe('Module exports (moved utilities)', () => {
+  it('exports moved utility functions', async () => {
+    const module = await import('./VoiceProfile');
+
+    expect(typeof module.sortVoicesByPriority).toBe('function');
+    expect(typeof module.randomizeBelowVoices).toBe('function');
+    expect(typeof module.downloadJSON).toBe('function');
+    expect(typeof module.readJSONFile).toBe('function');
+  });
+});
