@@ -61,7 +61,7 @@ export class ConversionOrchestrator {
     };
 
     // Check for resume state
-    const resumeInfo = await checkResumeState(directoryHandle, text, sigSettings);
+    const resumeInfo = await checkResumeState(directoryHandle, text, sigSettings, (msg) => this.logger.info(msg));
 
     let skipLLMSteps = false;
     let resumedAssignments: SpeakerAssignment[] | undefined;

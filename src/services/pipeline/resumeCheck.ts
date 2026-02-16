@@ -62,20 +62,40 @@ async function fileExists(dir: FileSystemDirectoryHandle, name: string): Promise
 export async function checkResumeState(
   dirHandle: FileSystemDirectoryHandle,
   text: string,
-  settings: SignatureSettings
+  settings: SignatureSettings,
+  log?: (msg: string) => void
 ): Promise<ResumeCheckResult> {
   const tempDir = await tryGetDirectory(dirHandle, '_temp_work');
-  if (!tempDir) return null;
+  if (!tempDir) {
+    log?.('Resume check: no _temp_work directory found');
+    return null;
+  }
 
   const savedSig = await tryReadJSON<JobSignature>(tempDir, 'job_signature.json');
-  if (!savedSig) return null;
+  if (!savedSig) {
+    log?.('Resume check: no job_signature.json found (or unreadable)');
+    return null;
+  }
 
   const currentSig = generateSignature(text, settings);
-  if (!signaturesMatch(savedSig, currentSig)) return null;
+  if (!signaturesMatch(savedSig, currentSig)) {
+    // Log which fields differ for debugging
+    const diffs: string[] = [];
+    if (savedSig.version !== currentSig.version) diffs.push(`version: ${savedSig.version} → ${currentSig.version}`);
+    if (savedSig.textHash !== currentSig.textHash) diffs.push(`textHash: ${savedSig.textHash} → ${currentSig.textHash}`);
+    if (savedSig.voice !== currentSig.voice) diffs.push(`voice: ${savedSig.voice} → ${currentSig.voice}`);
+    if (savedSig.rate !== currentSig.rate) diffs.push(`rate: ${savedSig.rate} → ${currentSig.rate}`);
+    if (savedSig.pitch !== currentSig.pitch) diffs.push(`pitch: ${savedSig.pitch} → ${currentSig.pitch}`);
+    if (savedSig.outputFormat !== currentSig.outputFormat) diffs.push(`outputFormat: ${savedSig.outputFormat} → ${currentSig.outputFormat}`);
+    if (savedSig.opusBitrate !== currentSig.opusBitrate) diffs.push(`opusBitrate: ${savedSig.opusBitrate} → ${currentSig.opusBitrate}`);
+    log?.(`Resume check: signature mismatch — ${diffs.join(', ')}`);
+    return null;
+  }
 
   const cachedChunks = await countChunkFiles(tempDir);
   const hasLLMState = await fileExists(tempDir, 'pipeline_state.json');
 
+  log?.(`Resume check: valid cache found (${cachedChunks} chunks, LLM state: ${hasLLMState})`);
   return {
     cachedChunks,
     totalChunks: (savedSig as any).chunkCount ?? 0,
