@@ -431,7 +431,7 @@ This plan implements cumulative voice profiles for audiobook series processing. 
    * Match character against profile using multi-pairing algorithm
    * @param char Character from current session
    * @param profile Existing character entries from previous sessions
-   * @returns Matching entry only if at least MIN_NAME_PAIRINGS valid pairings found
+   * @returns Matching entry only if at least requiredPairings valid pairings found
    */
   export function matchCharacter(
     char: LLMCharacter,
@@ -445,8 +445,13 @@ This plan implements cumulative voice profiles for audiobook series processing. 
       // Find maximum pairings between the two name sets
       const pairings = findMaxPairings(charNames, entryNames, MAX_NAME_EDITS);
 
-      // Need at least MIN_NAME_PAIRINGS independent matches
-      if (pairings.length >= MIN_NAME_PAIRINGS) {
+      // Calculate dynamic threshold: max(MIN_NAME_PAIRINGS, min(M, N) - 1)
+      const requiredPairings = Math.max(
+        MIN_NAME_PAIRINGS,
+        Math.min(charNames.length, entryNames.length) - 1
+      );
+
+      if (pairings.length >= requiredPairings) {
         return entry;
       }
     }
@@ -457,7 +462,7 @@ This plan implements cumulative voice profiles for audiobook series processing. 
 
 **Step 4: Verify (Green)**
 - Command: `npm test src/services/llm/NameMatcher.test.ts`
-- Expect: PASS (19 tests total)
+- Expect: PASS (24 tests total)
 
 **Step 5: Git Commit**
 - Command: `git add src/services/llm/NameMatcher.ts src/services/llm/NameMatcher.test.ts && git commit -m "feat: implement character matching with multi-pairing algorithm"`

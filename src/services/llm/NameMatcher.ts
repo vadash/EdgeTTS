@@ -87,7 +87,7 @@ export function findMaxPairings(
  * Match character against profile using multi-pairing algorithm
  * @param char Character from current session
  * @param profile Existing character entries from previous sessions
- * @returns Matching entry only if at least MIN_NAME_PAIRINGS valid pairings found
+ * @returns Matching entry only if at least requiredPairings valid pairings found
  */
 export function matchCharacter(
   char: LLMCharacter,
@@ -101,8 +101,13 @@ export function matchCharacter(
     // Find maximum pairings between the two name sets
     const pairings = findMaxPairings(charNames, entryNames, MAX_NAME_EDITS);
 
-    // Need at least MIN_NAME_PAIRINGS independent matches
-    if (pairings.length >= MIN_NAME_PAIRINGS) {
+    // Calculate dynamic threshold: max(MIN_NAME_PAIRINGS, min(M, N) - 1)
+    const requiredPairings = Math.max(
+      MIN_NAME_PAIRINGS,
+      Math.min(charNames.length, entryNames.length) - 1
+    );
+
+    if (pairings.length >= requiredPairings) {
       return entry;
     }
   }

@@ -13,6 +13,22 @@ const MAX_NAME_EDITS = 2;
 const MIN_NAME_PAIRINGS = 2;
 ```
 
+**Dynamic pairing threshold:**
+```
+requiredPairings = max(MIN_NAME_PAIRINGS, min(M, N) - 1)
+```
+- `M` = number of names in current character (canonical + variations)
+- `N` = number of names in profile entry (canonical + aliases)
+- Threshold scales with name data available, but never drops below `MIN_NAME_PAIRINGS`
+
+| M (set A) | N (set B) | min(M,N) | min-1 | requiredPairings |
+|-----------|-----------|----------|-------|------------------|
+| 4 | 9 | 4 | 3 | **3** |
+| 4 | 4 | 4 | 3 | **3** |
+| 3 | 5 | 3 | 2 | **2** |
+| 2 | 10 | 2 | 1 | **2** (capped by MIN_NAME_PAIRINGS) |
+| 1 | 1 | 1 | 0 | **2** (capped by MIN_NAME_PAIRINGS) |
+
 ## 1. Problem Statement
 
 **Current Issues:**
@@ -489,7 +505,7 @@ function findMaxPairings(
 
 /**
  * Match character against profile using multi-pairing algorithm
- * Returns entry only if at least MIN_NAME_PAIRINGS valid pairings found
+ * Returns entry only if at least requiredPairings valid pairings found
  */
 function matchCharacter(
   char: LLMCharacter,
@@ -504,8 +520,13 @@ function matchCharacter(
     // Find maximum pairings between the two name sets
     const pairings = findMaxPairings(charNames, entryNames, MAX_NAME_EDITS);
 
-    // Need at least MIN_NAME_PAIRINGS independent matches
-    if (pairings.length >= MIN_NAME_PAIRINGS) {
+    // Calculate dynamic threshold: max(MIN_NAME_PAIRINGS, min(M, N) - 1)
+    const requiredPairings = Math.max(
+      MIN_NAME_PAIRINGS,
+      Math.min(charNames.length, entryNames.length) - 1
+    );
+
+    if (pairings.length >= requiredPairings) {
       return entry;
     }
   }
@@ -549,22 +570,24 @@ Book├──────┼──────┼──────┤
 
 ### Examples
 
-| Set A (Current) | Set B (Profile) | Valid Pairings | Count | Match? |
-|-----------------|-----------------|----------------|-------|--------|
-| `[May, Mae, TheMay]` | `[Mae, Mai]` | (Mae,Mae), (May,Mai) | 2 | ✓ |
-| `[Harry]` | `[Harry]` | (Harry,Harry) | 1 | ✗ (need 2) |
-| `[Harry, Potter]` | `[Harry, Potter]` | (Harry,Harry), (Potter,Potter) | 2 | ✓ |
-| `[John, Johnny]` | `[Jon, Jonathan]` | (John,Jon), (Johnny,Jonathan) | 2 | ✓ |
-| `[Smith]` | `[Smyth, Schmidt]` | (Smith,Smyth) | 1 | ✗ (need 2) |
-| `[Dr Smith, Smith]` | `[Smith, Dr John Smith]` | (Smith,Smith), (DrSmith,DrJohnSmith) | 2 | ✓ |
+| Set A (Current) | Set B (Profile) | Valid Pairings | M | N | Required | Match? |
+|-----------------|-----------------|----------------|---|---|----------|--------|
+| `[May, Mae, TheMay]` | `[Mae, Mai]` | (Mae,Mae), (May,Mai) | 3 | 2 | 2 | ✓ |
+| `[Harry]` | `[Harry]` | (Harry,Harry) | 1 | 1 | 2 | ✗ (need 2) |
+| `[Harry, Potter]` | `[Harry, Potter]` | (Harry,Harry), (Potter,Potter) | 2 | 2 | 2 | ✓ |
+| `[John, Johnny]` | `[Jon, Jonathan]` | (John,Jon), (Johnny,Jonathan) | 2 | 2 | 2 | ✓ |
+| `[Smith]` | `[Smyth, Schmidt]` | (Smith,Smyth) | 1 | 2 | 2 | ✗ (need 2) |
+| `[Dr Smith, Smith]` | `[Smith, Dr John Smith]` | (Smith,Smith), (DrSmith,DrJohnSmith) | 2 | 2 | 2 | ✓ |
+| `[A, B, C, D]` | `[W, X, Y, Z, 1, 2, 3, 4, 5]` | (A,W), (B,X), (C,Y) | 4 | 9 | 3 | ✓ (need 3) |
+| `[A, B, C, D]` | `[W, X, Y, Z]` | (A,W), (B,X) | 4 | 4 | 3 | ✗ (need 3) |
 
-**Key insight:** Characters with multiple name variations (aliases) match more reliably. Single-name characters require exact match or manual intervention.
+**Key insight:** Characters with multiple name variations (aliases) match more reliably, and the required pairings scales with the available name data. A character with 4 names matching against 9 names needs 3 pairings, while two characters with 2 names each only need 2 pairings.
 
 ### Edge Cases
 
 | Scenario | Handling |
 |----------|----------|
-| Only 1 name on either side | Cannot auto-match (need 2 pairings). User assigns manually or adds aliases. |
+| Only 1 name on either side | Cannot auto-match (need 2 pairings, but max possible = 1). User assigns manually or adds aliases. |
 | Exact match + variations | Exact match (dist=0) counts first, then we find one more variation. |
 | Same name appears twice in aliases | Deduplicate before matching (use Set). |
 | All distances = 0 (identical sets) | All pairings valid, count = min(lenA, lenB). |

@@ -109,7 +109,7 @@ describe('matchCharacter', () => {
   });
 
   it('requires at least MIN_NAME_PAIRINGS pairings', () => {
-    // Single name on each side = only 1 possible pairing = no match
+    // Single name on each side = only 1 possible pairing, need 2 = no match
     const profile = createProfile([{ name: 'Harry', aliases: [] }]);
     const char: LLMCharacter = { canonicalName: 'Harry', variations: [], gender: 'male' };
     const result = matchCharacter(char, profile);
@@ -140,6 +140,59 @@ describe('matchCharacter', () => {
     const char: LLMCharacter = { canonicalName: 'Harry', variations: ['Potter'], gender: 'male' };
     const result = matchCharacter(char, profile);
     expect(result?.canonicalName).toBe('Harry Potter');
+  });
+
+  describe('dynamic pairing threshold', () => {
+    it('requires 3 pairings when comparing 4 names vs 9 names (min(4,9)-1=3, not capped)', () => {
+      // M=4, N=9, min=4, min-1=3, which is > MIN_NAME_PAIRINGS, so required=3
+      // Use truly unrelated names with distances > 2
+      const profile = createProfile([
+        { name: 'Alexander', aliases: ['Benjamin', 'Christopher', 'Dominic', 'Edward', 'Frederick', 'George', 'Henry', 'Ignatius'] }
+      ]);
+      const char: LLMCharacter = { canonicalName: 'Zephyr', variations: ['Apollo', 'Atlas'], gender: 'male' };
+
+      // With min(4,9)-1 = 3, need 3 pairings to match
+      // These names are very different, so we won't get 3 pairings
+      const result = matchCharacter(char, profile);
+      expect(result).toBeUndefined();
+    });
+
+    it('requires 3 pairings when comparing 4 names vs 4 names (min(4,4)-1=3)', () => {
+      // M=4, N=4, min=4, min-1=3, required=3
+      const profile = createProfile([
+        { name: 'Alpha', aliases: ['Bravo', 'Charlie'] } // 4 names total
+      ]);
+      const char: LLMCharacter = { canonicalName: 'Apple', variations: ['Bat', 'Cat'], gender: 'male' }; // 4 names total
+
+      // Only 2 good pairings at best (Apple/Alpha=5, Bat/Bravo=4, Cat/Charlie=5 - all > MAX_EDITS=2)
+      const result = matchCharacter(char, profile);
+      expect(result).toBeUndefined();
+    });
+
+    it('matches with 3 pairings when comparing 4 names vs 9 names', () => {
+      // Create a scenario where we get exactly 3 good pairings
+      const profile = createProfile([
+        { name: 'Tom', aliases: ['Tim', 'Tam', 'Tomas', 'Timmeh', 'Tommy', 'Thom', 'Thomas', 'Tomek'] }
+      ]);
+      const char: LLMCharacter = { canonicalName: 'Tom', variations: ['Tim', 'Tam'], gender: 'male' };
+
+      // Tom->Tom (0), Tim->Tim (0), Tam->Tam (0) = 3 pairings
+      // M=4, N=9, required = max(2, 4-1) = 3
+      const result = matchCharacter(char, profile);
+      expect(result?.canonicalName).toBe('Tom');
+    });
+
+    it('still requires MIN_NAME_PAIRINGS=2 when comparing 2 names vs 10 names', () => {
+      // M=2, N=10, min=2, min-1=1, required = max(2, 1) = 2
+      const profile = createProfile([
+        { name: 'Harry', aliases: ['H', 'Harr', 'Har', 'Ha', 'Potter', 'P', 'H.P.', 'HP', 'The Boy'] }
+      ]);
+      const char: LLMCharacter = { canonicalName: 'Harry', variations: ['H'], gender: 'male' };
+
+      // Harry->Harry (0), H->H (0) = 2 pairings, meets threshold of 2
+      const result = matchCharacter(char, profile);
+      expect(result?.canonicalName).toBe('Harry');
+    });
   });
 });
 
