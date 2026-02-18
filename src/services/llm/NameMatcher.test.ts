@@ -108,12 +108,42 @@ describe('matchCharacter', () => {
     expect(result?.canonicalName).toBe('Harry Potter');
   });
 
-  it('requires at least MIN_NAME_PAIRINGS pairings', () => {
-    // Single name on each side = only 1 possible pairing, need 2 = no match
+  it('matches when canonical name exactly matches profile entry (single name)', () => {
+    // Exact canonical match bypasses multi-pairing requirement
     const profile = createProfile([{ name: 'Harry', aliases: [] }]);
     const char: LLMCharacter = { canonicalName: 'Harry', variations: [], gender: 'male' };
     const result = matchCharacter(char, profile);
-    expect(result).toBeUndefined(); // Only 1 pairing, need MIN_NAME_PAIRINGS=2
+    expect(result?.canonicalName).toBe('Harry');
+  });
+
+  it('matches when canonical name matches a profile alias', () => {
+    const profile = createProfile([{
+      name: 'Erick Flatt',
+      aliases: ['Erick', 'Archmage', 'Flatt']
+    }]);
+    const char: LLMCharacter = { canonicalName: 'Erick', variations: [], gender: 'male' };
+    const result = matchCharacter(char, profile);
+    expect(result?.canonicalName).toBe('Erick Flatt');
+  });
+
+  it('matches canonical name case-insensitively', () => {
+    const profile = createProfile([{ name: 'HARRY', aliases: [] }]);
+    const char: LLMCharacter = { canonicalName: 'harry', variations: [], gender: 'male' };
+    const result = matchCharacter(char, profile);
+    expect(result?.canonicalName).toBe('HARRY');
+  });
+
+  it('does not match when only a variation matches (not canonical)', () => {
+    // "Dad" is a variation of current char, matches alias in profile,
+    // but canonical "John" doesn't match anything — no shortcut
+    const profile = createProfile([{
+      name: 'Erick Flatt',
+      aliases: ['Dad', 'Archmage']
+    }]);
+    const char: LLMCharacter = { canonicalName: 'John', variations: ['Dad'], gender: 'male' };
+    const result = matchCharacter(char, profile);
+    // Falls through to fuzzy matching, which won't find 2 pairings
+    expect(result).toBeUndefined();
   });
 
   it('matches with multiple alias pairings', () => {

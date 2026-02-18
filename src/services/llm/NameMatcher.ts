@@ -94,11 +94,17 @@ export function matchCharacter(
   profile: Record<string, CharacterEntry>
 ): CharacterEntry | undefined {
   const charNames = [char.canonicalName, ...char.variations];
+  const canonicalLower = char.canonicalName.toLowerCase();
 
   for (const entry of Object.values(profile)) {
     const entryNames = [entry.canonicalName, ...entry.aliases];
 
-    // Find maximum pairings between the two name sets
+    // Shortcut: if canonical name exactly matches any profile name, immediate match
+    if (entryNames.some(n => n.toLowerCase() === canonicalLower)) {
+      return entry;
+    }
+
+    // Fuzzy: find maximum pairings between the two name sets
     const pairings = findMaxPairings(charNames, entryNames, MAX_NAME_EDITS);
 
     // Calculate dynamic threshold: max(MIN_NAME_PAIRINGS, min(M, N) - 1)
