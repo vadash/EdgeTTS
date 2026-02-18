@@ -1,6 +1,50 @@
 import type { LLMValidationResult, LLMCharacter } from '@/state/types';
 import { extractJSON, stripThinkingTags } from '@/utils/llmUtils';
 
+export interface RepairResult {
+  characters: Array<{ canonicalName: string; variations: string[]; gender: string }>;
+  repaired: boolean;
+  warnings: string[];
+}
+
+/**
+ * Auto-repair common LLM extraction errors.
+ * Mutates entries in-place for efficiency, returns metadata.
+ */
+export function repairExtractCharacters(chars: any[]): RepairResult {
+  const warnings: string[] = [];
+  const validGenders = ['male', 'female', 'unknown'];
+
+  // Filter out entries with no canonicalName
+  const filtered = chars.filter(c => {
+    if (!c.canonicalName || typeof c.canonicalName !== 'string' || !c.canonicalName.trim()) {
+      warnings.push('Dropped character with empty/missing canonicalName');
+      return false;
+    }
+    return true;
+  });
+
+  for (const char of filtered) {
+    // Repair variations
+    if (!char.variations || !Array.isArray(char.variations)) {
+      char.variations = [char.canonicalName];
+      warnings.push(`Auto-repaired variations for "${char.canonicalName}"`);
+    }
+
+    // Repair gender
+    if (!validGenders.includes(char.gender)) {
+      char.gender = 'unknown';
+      warnings.push(`Auto-repaired gender for "${char.canonicalName}" → "unknown"`);
+    }
+  }
+
+  return {
+    characters: filtered,
+    repaired: warnings.length > 0,
+    warnings,
+  };
+}
+
 /**
  * Validate Extract response (character extraction)
  */
