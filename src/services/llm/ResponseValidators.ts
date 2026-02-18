@@ -94,45 +94,137 @@ export interface IndexMergeResponse {
  * Format: {"merges": [[keepIdx, absorbIdx1, absorbIdx2], ...]}
  * Indices are 0-based matching input list (0 to N-1)
  * Single-element groups are auto-filtered (tolerate LLM mistakes)
+ *
+ * Auto-repairs:
+ * - Duplicate indices within a group (e.g., [6, 6] → [6])
+ * - Duplicate indices across groups (keeps first occurrence)
+ * - Single-element groups (removed)
+ * - Invalid indices (out of range, non-integer)
+ * - Array instead of object format
  */
 export function validateMergeResponse(response: string, characters: LLMCharacter[]): LLMValidationResult {
-  const errors: string[] = [];
   const charCount = characters.length;
+  const repair = repairMergeResponse(response, charCount);
+
+  // Check if any warnings indicate unrecoverable errors
+  const hasCriticalErrors = repair.warnings.some(w =>
+    w.includes('Failed to parse') || w.includes('array instead of object')
+  );
+
+  if (hasCriticalErrors) {
+    return {
+      valid: false,
+      errors: repair.warnings,
+    };
+  }
+
+  // Return repaired response if there were any repairs
+  const result: LLMValidationResult = { valid: true, errors: [] };
+
+  if (repair.warnings.length > 0) {
+    result.repairedResponse = repair.repaired;
+    result.errors = repair.warnings; // Include warnings as info
+  }
+
+  return result;
+}
+
+/**
+ * Auto-repair common LLM merge errors.
+ * Handles: duplicate indices, single-element groups, invalid indices
+ */
+export function repairMergeResponse(response: string, charCount: number): { repaired: string; warnings: string[] } {
+  const warnings: string[] = [];
 
   try {
+    // Try to extract and parse the JSON
     const cleaned = extractJSON(response);
-    const parsed = JSON.parse(cleaned) as IndexMergeResponse;
+    let parsed: any;
 
-    if (!parsed.merges || !Array.isArray(parsed.merges)) {
-      errors.push('Response must have a "merges" array');
-      return { valid: false, errors };
+    // Try to parse as JSON
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      // If parse fails, try to recover by extracting JSON from the array-of-strings format
+      // Some LLMs output: ["<thinking>", "text", "..."]
+      return {
+        repaired: '{"merges":[]}',
+        warnings: ['Failed to parse merge response as JSON, returning empty merges'],
+      };
     }
 
-    const usedIndices = new Set<number>();
+    // Handle case where LLM returned an array instead of object
+    if (Array.isArray(parsed)) {
+      return {
+        repaired: '{"merges":[]}',
+        warnings: ['LLM returned array instead of object with merges key'],
+      };
+    }
 
-    // Auto-filter single-element groups (tolerate LLM mistakes)
-    const validGroups = parsed.merges.filter(g => Array.isArray(g) && g.length >= 2);
+    if (!parsed.merges || !Array.isArray(parsed.merges)) {
+      return {
+        repaired: '{"merges":[]}',
+        warnings: ['Response missing merges array'],
+      };
+    }
 
-    for (let i = 0; i < validGroups.length; i++) {
-      const group = validGroups[i];
+    const validGroups: number[][] = [];
+    const seenIndices = new Set<number>();
+
+    for (let i = 0; i < parsed.merges.length; i++) {
+      const group = parsed.merges[i];
+
+      if (!Array.isArray(group)) {
+        warnings.push(`Merge ${i}: not an array, skipping`);
+        continue;
+      }
+
+      // Filter out single-element groups and duplicate-within-group
+      const uniqueIndices = new Set<number>();
+      const validIndices: number[] = [];
 
       for (const idx of group) {
         if (typeof idx !== 'number' || !Number.isInteger(idx)) {
-          errors.push(`Merge ${i}: index "${idx}" is not an integer`);
-        } else if (idx < 0 || idx >= charCount) {
-          errors.push(`Merge ${i}: index ${idx} out of range [0-${charCount - 1}]`);
-        } else if (usedIndices.has(idx)) {
-          errors.push(`Merge ${i}: duplicate index ${idx}`);
-        } else {
-          usedIndices.add(idx);
+          warnings.push(`Merge ${i}: non-integer index "${idx}", skipping`);
+          continue;
         }
+        if (idx < 0 || idx >= charCount) {
+          warnings.push(`Merge ${i}: index ${idx} out of range [0-${charCount - 1}], skipping`);
+          continue;
+        }
+        // Skip duplicates within the same group (e.g., [6, 6])
+        if (uniqueIndices.has(idx)) {
+          warnings.push(`Merge ${i}: duplicate index ${idx} within group, deduplicating`);
+          continue;
+        }
+        // Skip indices already used in other groups (e.g., index 96 in multiple groups)
+        if (seenIndices.has(idx)) {
+          warnings.push(`Merge ${i}: index ${idx} already in previous merge group, removing from this group`);
+          continue;
+        }
+        uniqueIndices.add(idx);
+        seenIndices.add(idx);
+        validIndices.push(idx);
+      }
+
+      // Only add groups with 2+ unique valid indices
+      if (validIndices.length >= 2) {
+        validGroups.push(validIndices);
+      } else if (validIndices.length === 1) {
+        warnings.push(`Merge ${i}: only 1 valid index after filtering, skipping`);
       }
     }
-  } catch (e) {
-    errors.push(`Invalid JSON: ${(e as Error).message}`);
-  }
 
-  return { valid: errors.length === 0, errors };
+    return {
+      repaired: JSON.stringify({ merges: validGroups }),
+      warnings,
+    };
+  } catch (e) {
+    return {
+      repaired: '{"merges":[]}',
+      warnings: [`Parse error: ${(e as Error).message}`],
+    };
+  }
 }
 
 /**
@@ -153,44 +245,38 @@ export function parseMergeResponse(response: string): number[][] {
 /**
  * Validate Assign response (sparse format: index:code lines)
  * Uses 0-based indexing (0 to sentenceCount-1)
+ *
+ * Auto-repairs:
+ * - Incomplete lines like "7", "15", "5:" (removes them)
+ * - Numeric codes that look like character indices (e.g., "72", "104", "129")
+ * - Unknown codes (filters them out)
  */
 export function validateAssignResponse(
   response: string,
   sentenceCount: number,
   codeToName: Map<string, string>
 ): LLMValidationResult {
-  const errors: string[] = [];
   const minIndex = 0;
   const maxIndex = sentenceCount - 1;
 
-  // Strip thinking/scratchpad tags first
-  const cleaned = stripThinkingTags(response);
+  // Build set of valid codes for auto-repair
+  const validCodes = new Set(codeToName.keys());
 
-  // Empty response - we can't validate without knowing which have dialogue
-  // Just check we got SOME assignments
-  if (!cleaned.trim()) {
-    errors.push('Empty response');
-    return { valid: false, errors };
-  }
+  // Apply auto-repair first
+  const repaired = repairAssignResponse(response, validCodes);
+  const cleaned = stripThinkingTags(repaired);
 
+  const errors: string[] = [];
   const assignedIndices = new Set<number>();
+  const unknownCodes = new Set<string>();
 
+  // Check the repaired response
   for (const line of cleaned.trim().split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // More lenient regex: accept [123]:X or 123:X, and optional stuff after code
-    // Handles: "123:A", "[123]:A", "123:A (name)", "54:FEMALE_UNNAMED"
     const match = trimmed.match(/^\[?(\d+)\]?:([A-Za-z0-9_]+)/);
-    if (!match) {
-      // Skip incomplete lines like "0:", "3:", "7" (model truncation) - don't error
-      // These are handled by repairAssignResponse
-      if (/^\[?\d+\]?:$/.test(trimmed) || /^\d+$/.test(trimmed)) {
-        continue;
-      }
-      errors.push(`Invalid format: "${trimmed}". Expected: index:code`);
-      continue;
-    }
+    if (!match) continue;
 
     const index = parseInt(match[1]);
     const code = match[2];
@@ -201,24 +287,44 @@ export function validateAssignResponse(
       assignedIndices.add(index);
     }
 
+    // Track unknown codes (shouldn't exist after repair, but check anyway)
     if (!codeToName.has(code)) {
-      errors.push(`Unknown code "${code}"`);
+      unknownCodes.add(code);
     }
+  }
+
+  // If we have unknown codes after repair, that's an error
+  for (const code of unknownCodes) {
+    errors.push(`Unknown code "${code}"`);
   }
 
   // Require at least some valid assignments
   if (assignedIndices.size === 0) {
     errors.push('No valid assignments found');
+    return { valid: false, errors };
   }
 
-  return { valid: errors.length === 0, errors };
+  const result: LLMValidationResult = { valid: errors.length === 0, errors };
+
+  // If we repaired anything, include the repaired response
+  if (repaired !== response) {
+    result.repairedResponse = repaired;
+  }
+
+  return result;
 }
 
 /**
  * Repair incomplete assign responses
  * Fixes truncated lines like "7", "15", "5:" by removing them
+ *
+ * Also filters out numeric codes that look like character indices (e.g., "72", "104", "129")
+ * which the LLM sometimes outputs instead of the proper speaker codes (A, B, C, etc.)
  */
-export function repairAssignResponse(response: string): string {
+export function repairAssignResponse(
+  response: string,
+  validCodes?: Set<string>
+): string {
   const cleaned = stripThinkingTags(response);
   const lines: string[] = [];
 
@@ -229,6 +335,23 @@ export function repairAssignResponse(response: string): string {
     // Check for valid format: index:code
     const match = trimmed.match(/^\[?(\d+)\]?:([A-Za-z0-9_]+)/);
     if (match) {
+      const code = match[2];
+
+      // If validCodes provided, check if code is valid
+      if (validCodes && validCodes.size > 0) {
+        // Check if code looks like a raw character index (2-3 digit number)
+        // These are NOT valid speaker codes (A, B, C, etc.)
+        if (/^\d{2,3}$/.test(code) && !validCodes.has(code)) {
+          // Skip this line - the LLM used a character index instead of a speaker code
+          continue;
+        }
+        // Also skip if code is definitely not in our valid set
+        if (!validCodes.has(code)) {
+          // Could be a case issue or unknown code - skip
+          continue;
+        }
+      }
+
       lines.push(trimmed);
     }
     // Skip invalid/incomplete lines - they'll be handled by retry or fallback

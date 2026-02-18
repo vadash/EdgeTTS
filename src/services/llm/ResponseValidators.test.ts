@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { repairExtractCharacters, repairAssignResponse } from './ResponseValidators';
+import { repairExtractCharacters, repairAssignResponse, repairMergeResponse, validateMergeResponse, validateAssignResponse } from './ResponseValidators';
+import type { LLMCharacter } from '@/state/types';
 
 describe('repairExtractCharacters', () => {
   it('adds gender "unknown" when gender is missing', () => {
@@ -188,5 +189,150 @@ describe('repairAssignResponse', () => {
     const response = '<thinking>\nLet me think...\n</thinking>\n0:A\n1:B\n2:C';
     const result = repairAssignResponse(response);
     expect(result).toBe('0:A\n1:B\n2:C');
+  });
+
+  it('filters out numeric codes that look like character indices', () => {
+    const response = '0:A\n1:72\n2:B\n3:104\n4:C\n5:129';
+    const validCodes = new Set(['A', 'B', 'C']);
+    const result = repairAssignResponse(response, validCodes);
+    expect(result).toBe('0:A\n2:B\n4:C');
+  });
+
+  it('filters unknown codes when validCodes provided', () => {
+    const response = '0:A\n1:X7\n2:B\n3:Z\n4:C';
+    const validCodes = new Set(['A', 'B', 'C']);
+    const result = repairAssignResponse(response, validCodes);
+    expect(result).toBe('0:A\n2:B\n4:C');
+  });
+
+  it('handles real-world log example: block 25 (unknown code X7)', () => {
+    // From logs: "Unknown code \"X7\""
+    const response = '0:X63\n1:C\n2:X7\n3:A';
+    const validCodes = new Set(['A', 'B', 'C']);
+    const result = repairAssignResponse(response, validCodes);
+    expect(result).toContain('1:C');
+    expect(result).toContain('3:A');
+    // X63 and X7 should be filtered as unknown
+    expect(result).not.toContain('X63');
+    expect(result).not.toContain('X7');
+  });
+
+  it('handles real-world log example: block 30 (numeric codes)', () => {
+    // From logs: "Unknown code \"72\""
+    const response = '0:5\n1:5\n2:5\n3:5\n4:5\n5:5\n6:5\n7:5\n8:72\n9:A';
+    const validCodes = new Set(['A', 'B', 'C']);
+    const result = repairAssignResponse(response, validCodes);
+    // Only A should remain (5 and 72 are filtered)
+    expect(result).toBe('9:A');
+  });
+});
+
+describe('repairMergeResponse', () => {
+  it('removes duplicate indices within a group', () => {
+    const response = '{"merges":[[6,6],[9,9],[10,10],[11,11]]}';
+    const charCount = 168;
+    const result = repairMergeResponse(response, charCount);
+    const parsed = JSON.parse(result.repaired);
+    expect(parsed.merges).toHaveLength(0); // All single elements after dedup
+    expect(result.warnings.some(w => w.includes('duplicate'))).toBe(true);
+  });
+
+  it('handles duplicate indices across groups', () => {
+    const response = '{"merges":[[96,107],[106,96]]}';
+    const charCount = 168;
+    const result = repairMergeResponse(response, charCount);
+    const parsed = JSON.parse(result.repaired);
+    // First group keeps 96, second group should only have 106
+    expect(parsed.merges).toHaveLength(1);
+    expect(parsed.merges[0]).toEqual([96, 107]);
+    expect(result.warnings.some(w => w.includes('already in previous merge'))).toBe(true);
+  });
+
+  it('handles real-world log example: duplicate index 96', () => {
+    // From logs: "Merge 18: duplicate index 96"
+    const response = '{"merges":[[0,15],[4,124],[7,91],[9,163],[11,92],[14,49],[16,95],[19,88],[21,130],[26,141],[34,40],[41,51],[42,97],[50,98],[54,87],[55,89],[63,101],[96,107],[106,96],[108,135],[113,114],[122,133],[123,134]]}';
+    const charCount = 168;
+    const result = repairMergeResponse(response, charCount);
+    const parsed = JSON.parse(result.repaired);
+    // Should remove the duplicate 96 from second group
+    expect(parsed.merges).toBeDefined();
+    // Check that 96 only appears once
+    const allIndices = parsed.merges.flat();
+    const count96 = allIndices.filter(i => i === 96).length;
+    expect(count96).toBe(1);
+  });
+
+  it('handles array instead of object', () => {
+    const response = '["<thinking>","Let me analyze"]';
+    const charCount = 168;
+    const result = repairMergeResponse(response, charCount);
+    expect(result.repaired).toBe('{"merges":[]}');
+    expect(result.warnings.some(w => w.includes('array instead of object'))).toBe(true);
+  });
+
+  it('filters out single-element groups', () => {
+    const response = '{"merges":[[0,15],[4],[7,91]]}';
+    const charCount = 168;
+    const result = repairMergeResponse(response, charCount);
+    const parsed = JSON.parse(result.repaired);
+    expect(parsed.merges).toHaveLength(2);
+    expect(parsed.merges[0]).toEqual([0, 15]);
+    expect(parsed.merges[1]).toEqual([7, 91]);
+  });
+
+  it('handles indices out of range', () => {
+    const response = '{"merges":[[0,15],[4,999]]}';
+    const charCount = 168;
+    const result = repairMergeResponse(response, charCount);
+    const parsed = JSON.parse(result.repaired);
+    expect(parsed.merges).toHaveLength(1);
+    expect(parsed.merges[0]).toEqual([0, 15]);
+    expect(result.warnings.some(w => w.includes('out of range'))).toBe(true);
+  });
+});
+
+describe('validateMergeResponse with auto-repair', () => {
+  it('returns valid with repaired response for duplicate indices', () => {
+    const response = '{"merges":[[0,15],[96,107],[106,96]]}';
+    const characters = Array.from({ length: 168 }, (_, i) => ({
+      canonicalName: `Char${i}`,
+      variations: [`Char${i}`],
+      gender: 'male' as const,
+    }));
+    const result = validateMergeResponse(response, characters);
+    expect(result.valid).toBe(true);
+    expect(result.repairedResponse).toBeDefined();
+  });
+
+  it('returns valid=true for clean response', () => {
+    const response = '{"merges":[[0,15],[4,124]]}';
+    const characters = Array.from({ length: 168 }, (_, i) => ({
+      canonicalName: `Char${i}`,
+      variations: [`Char${i}`],
+      gender: 'male' as const,
+    }));
+    const result = validateMergeResponse(response, characters);
+    expect(result.valid).toBe(true);
+    expect(result.repairedResponse).toBeUndefined();
+  });
+});
+
+describe('validateAssignResponse with auto-repair', () => {
+  it('filters numeric codes and returns valid with repaired response', () => {
+    const response = '0:A\n1:72\n2:B\n3:104\n4:C';
+    const codeToName = new Map([['A', 'Alice'], ['B', 'Bob'], ['C', 'Charlie']]);
+    const result = validateAssignResponse(response, 100, codeToName);
+    expect(result.valid).toBe(true);
+    expect(result.repairedResponse).toBeDefined();
+    expect(result.repairedResponse).toContain('0:A');
+    expect(result.repairedResponse).not.toContain('72');
+  });
+
+  it('returns invalid if no valid assignments remain after repair', () => {
+    const response = '0:72\n1:104\n2:129';
+    const codeToName = new Map([['A', 'Alice'], ['B', 'Bob']]);
+    const result = validateAssignResponse(response, 100, codeToName);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('No valid assignments'))).toBe(true);
   });
 });

@@ -92,9 +92,12 @@ export class MergePromptStrategy implements IPromptStrategy<MergeContext, number
     return validateMergeResponse(response, context.characters);
   }
 
-  parseResponse(response: string, _context: MergeContext): number[][] {
+  parseResponse(response: string, context: MergeContext): number[][] {
+    // Validate and repair the response first
+    const validation = validateMergeResponse(response, context.characters);
+    const finalResponse = validation.repairedResponse || response;
     // Returns 0-based indices
-    return parseMergeResponse(response);
+    return parseMergeResponse(finalResponse);
   }
 }
 
@@ -116,10 +119,16 @@ export class AssignPromptStrategy implements IPromptStrategy<AssignContext, Assi
   }
 
   parseResponse(response: string, context: AssignContext): AssignResult {
-    // Repair incomplete lines before parsing
-    const repaired = repairAssignResponse(response);
+    // Repair incomplete lines and invalid codes before parsing
+    const validCodes = new Set(context.codeToName.keys());
+    const repaired = repairAssignResponse(response, validCodes);
+
+    // If validation returned a repaired response, use that
+    const validation = validateAssignResponse(response, context.sentenceCount, context.codeToName);
+    const finalResponse = validation.repairedResponse || repaired;
+
     return {
-      speakerMap: parseAssignResponse(repaired, context.codeToName),
+      speakerMap: parseAssignResponse(finalResponse, context.codeToName),
     };
   }
 }
