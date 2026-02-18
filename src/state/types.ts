@@ -237,6 +237,7 @@ export interface SpeakerAssignment {
 export interface LLMValidationResult {
   valid: boolean;
   errors: string[];
+  repairedResponse?: string;
 }
 
 export interface ProcessedBookWithVoices {

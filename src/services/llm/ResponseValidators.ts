@@ -46,7 +46,7 @@ export function repairExtractCharacters(chars: any[]): RepairResult {
 }
 
 /**
- * Validate Extract response (character extraction)
+ * Validate Extract response (character extraction) with auto-repair
  */
 export function validateExtractResponse(response: string): LLMValidationResult {
   const errors: string[] = [];
@@ -61,26 +61,27 @@ export function validateExtractResponse(response: string): LLMValidationResult {
       return { valid: false, errors };
     }
 
-    for (let i = 0; i < parsed.characters.length; i++) {
-      const char = parsed.characters[i];
+    // Auto-repair fixable issues
+    const repair = repairExtractCharacters(parsed.characters);
 
-      if (!char.canonicalName || typeof char.canonicalName !== 'string') {
-        errors.push(`Character ${i}: missing or invalid "canonicalName"`);
-      }
-
-      if (!char.variations || !Array.isArray(char.variations)) {
-        errors.push(`Character ${i}: missing or invalid "variations" array`);
-      }
-
-      if (!['male', 'female', 'unknown'].includes(char.gender)) {
-        errors.push(`Character ${i}: gender must be "male", "female", or "unknown"`);
-      }
+    if (repair.characters.length === 0) {
+      errors.push('No valid characters remain after repair');
+      return { valid: false, errors };
     }
+
+    // Build result
+    const result: LLMValidationResult = { valid: true, errors: [] };
+
+    if (repair.repaired) {
+      parsed.characters = repair.characters;
+      result.repairedResponse = JSON.stringify(parsed);
+    }
+
+    return result;
   } catch (e) {
     errors.push(`Invalid JSON: ${(e as Error).message}`);
+    return { valid: false, errors };
   }
-
-  return { valid: errors.length === 0, errors };
 }
 
 // Index-based merge response type

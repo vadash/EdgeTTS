@@ -86,3 +86,68 @@ describe('repairExtractCharacters', () => {
     expect(result.characters).toHaveLength(2);
   });
 });
+
+import { validateExtractResponse } from './ResponseValidators';
+
+describe('validateExtractResponse with auto-repair', () => {
+  it('returns valid=true for response missing gender (auto-repaired)', () => {
+    const response = '{"characters":[{"canonicalName":"Erick","variations":["Erick"]}]}';
+    const result = validateExtractResponse(response);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+    expect(result.repairedResponse).toBeDefined();
+  });
+
+  it('returns valid=true for response with null variations (auto-repaired)', () => {
+    const response = '{"characters":[{"canonicalName":"Rats","variations":null}]}';
+    const result = validateExtractResponse(response);
+    expect(result.valid).toBe(true);
+    expect(result.repairedResponse).toBeDefined();
+    const parsed = JSON.parse(result.repairedResponse!);
+    expect(parsed.characters[0].variations).toEqual(['Rats']);
+    expect(parsed.characters[0].gender).toBe('unknown');
+  });
+
+  it('returns valid=true with no repairedResponse when input is already valid', () => {
+    const response = '{"characters":[{"canonicalName":"Erick","variations":["Erick"],"gender":"male"}]}';
+    const result = validateExtractResponse(response);
+    expect(result.valid).toBe(true);
+    expect(result.repairedResponse).toBeUndefined();
+  });
+
+  it('returns valid=false when characters array is missing entirely', () => {
+    const response = '{"data": "something"}';
+    const result = validateExtractResponse(response);
+    expect(result.valid).toBe(false);
+  });
+
+  it('returns valid=false when all characters have no canonicalName', () => {
+    const response = '{"characters":[{"canonicalName":""}]}';
+    const result = validateExtractResponse(response);
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toContain('No valid characters remain');
+  });
+
+  it('returns valid=false for completely invalid JSON', () => {
+    const response = 'not json at all and really broken';
+    const result = validateExtractResponse(response);
+    expect(result.valid).toBe(false);
+  });
+
+  it('repairs real-world log example: block 9 (3 retries in original run)', () => {
+    // From logs: gender missing, variations present
+    const response = '{"characters":[{"canonicalName":"Erick","variations":["Erick","Erick Flatt"]}]}';
+    const result = validateExtractResponse(response);
+    expect(result.valid).toBe(true);
+    const parsed = JSON.parse(result.repairedResponse!);
+    expect(parsed.characters[0].gender).toBe('unknown');
+  });
+
+  it('repairs real-world log example: block 10 (null variations)', () => {
+    const response = '{"characters":[{"canonicalName":"Rats","variations":null}]}';
+    const result = validateExtractResponse(response);
+    expect(result.valid).toBe(true);
+    const parsed = JSON.parse(result.repairedResponse!);
+    expect(parsed.characters[0].variations).toEqual(['Rats']);
+  });
+});
