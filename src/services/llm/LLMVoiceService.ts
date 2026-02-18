@@ -431,16 +431,9 @@ export class LLMVoiceService {
     codeToName: Map<string, string>
   ): Promise<SpeakerAssignment[]> {
     this.logger?.debug(`[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`);
-    const hasSpeech = block.sentences.some(p => hasSpeechSymbols(p));
 
-    if (!hasSpeech) {
-      return block.sentences.map((text, i) => ({
-        sentenceIndex: block.sentenceStartIndex + i,
-        text,
-        speaker: 'narrator',
-        voiceId: this.options.narratorVoice,
-      }));
-    }
+    // Always send blocks to LLM so it has full context for speaker assignment
+    // (even blocks without obvious speech symbols may contain thoughts, telepathy, etc.)
 
     // Use 0-based indexing for LLM (most models prefer this)
     const numberedParagraphs = block.sentences
@@ -535,8 +528,8 @@ export class LLMVoiceService {
     return block.sentences.map((text, i) => {
       const absoluteIndex = block.sentenceStartIndex + i;
       const relativeIndex = i; // 0-based
-      const hasSpeech = hasSpeechSymbols(text);
-      const speaker = hasSpeech ? (relativeMap.get(relativeIndex) || 'narrator') : 'narrator';
+      // Trust the LLM's assignment regardless of speech symbols
+      const speaker = relativeMap.get(relativeIndex) || 'narrator';
       return {
         sentenceIndex: absoluteIndex,
         text,
