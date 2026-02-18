@@ -41,24 +41,35 @@ export function buildAssignPrompt(
     const aliases = char.variations.filter((v) => v !== char.canonicalName);
     const genderInfo = char.gender !== 'unknown' ? ` [${char.gender}]` : '';
     if (aliases.length > 0) {
-      return `- \`${code}\` = ${char.canonicalName}${genderInfo} (aliases: ${aliases.join(', ')})`;
+      return `- ${code} = ${char.canonicalName}${genderInfo} (aliases: ${aliases.join(', ')})`;
     }
-    return `- \`${code}\` = ${char.canonicalName}${genderInfo}`;
+    return `- ${code} = ${char.canonicalName}${genderInfo}`;
   });
 
   // Get unnamed codes
   const unnamedEntries = Array.from(nameToCode.entries())
     .filter(([name]) => name.includes('UNNAMED'))
-    .map(([name, code]) => `- \`${code}\` = ${name}`);
+    .map(([name, code]) => `- ${code} = ${name}`);
+
+  const characterLinesStr = characterLines.join('\n');
+  const unnamedEntriesStr = unnamedEntries.join('\n');
 
   // Build system prompt from template parts
   const system = LLM_PROMPTS.assign.systemPrefix
-    .replace('{{characterLines}}', characterLines.join('\n'))
-    .replace('{{unnamedEntries}}', unnamedEntries.join('\n'))
-    + LLM_PROMPTS.assign.systemSuffix;
+    .replace('{{characterLines}}', characterLinesStr)
+    .replace('{{unnamedEntries}}', unnamedEntriesStr)
+    + LLM_PROMPTS.assign.systemSuffix
+      .replace('{{characterLines}}', characterLinesStr)
+      .replace('{{unnamedEntries}}', unnamedEntriesStr);
+
+  // Also replace in user template
+  const user = LLM_PROMPTS.assign.userTemplate
+    .replace('{{paragraphs}}', numberedParagraphs)
+    .replace('{{characterLines}}', characterLinesStr)
+    .replace('{{unnamedEntries}}', unnamedEntriesStr);
 
   return {
     system,
-    user: LLM_PROMPTS.assign.userTemplate.replace('{{paragraphs}}', numberedParagraphs),
+    user,
   };
 }

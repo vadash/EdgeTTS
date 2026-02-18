@@ -143,6 +143,8 @@ Evidence-based assignment:
 - Monsters/Dragons → male (unless pronouns indicate otherwise)
 - No evidence → **unknown**
 
+**CRITICAL: Every character MUST have a gender field.** Use exactly "male", "female", or "unknown".
+
 ---
 
 ## CRITICAL WARNINGS
@@ -193,22 +195,18 @@ Only include characters whose ACTUAL WORDS appear in dialogue markers.
 ## OUTPUT FORMAT
 
 <output_format>
-Output ONLY valid JSON. No markdown, no explanations.
+Output ONLY valid JSON. No markdown code blocks, no explanations.
 
-{
-  "characters": [
-    {
-      "canonicalName": "string",
-      "variations": ["string", "array"],
-      "gender": "male" | "female" | "unknown"
-    }
-  ]
-}
+{"characters":[{"canonicalName":"Name","variations":["Name"],"gender":"male"}]}
 
 Requirements:
+- Output must start with { and end with }
 - canonicalName: Primary name
 - variations: ALL names/titles used (MUST include canonicalName)
-- gender: Exactly "male", "female", or "unknown"
+- gender: Exactly "male", "female", or "unknown" - REQUIRED for every character
+- ALWAYS include ALL 3 fields for each character
+
+ALWAYS output at least one character. If no named speakers found, use "Narrator" or "Protagonist".
 </output_format>
 
 <examples>
@@ -319,7 +317,9 @@ CRITICAL REMINDERS:
 - [Level Up] = System → DO extract
 - "Hello, John" → John is listener, NOT speaker
 - Names inside quotes = vocative (listener)
+- ALWAYS output at least one character
+- Output plain JSON, no markdown
 
-Output valid JSON only.
+Output valid JSON only:
 </final_instruction>`,
 };

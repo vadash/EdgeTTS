@@ -29,12 +29,12 @@ Does the paragraph contain [square brackets]?
 
 | Format | Speaker |
 |--------|---------|
-| [Any text in brackets] | → SYSTEM |
-| [Level Up!], [Quest Complete] | → SYSTEM |
-| [Skill: X], [Warning: X] | → SYSTEM |
-| [HP/MP/XP: X] | → SYSTEM |
+| [Any text in brackets] | → Use the SYSTEM code provided in speaker list |
+| [Level Up!], [Quest Complete] | → Use the SYSTEM code provided in speaker list |
+| [Skill: X], [Warning: X] | → Use the SYSTEM code provided in speaker list |
+| [HP/MP/XP: X] | → Use the SYSTEM code provided in speaker list |
 
-**RULE:** If dialogue is [bracketed], assign to SYSTEM immediately. Stop checking other methods.
+**RULE:** If dialogue is [bracketed], use the SYSTEM code from the speaker list (e.g., "C" if C=System). Do NOT write "SYSTEM" - use the code.
 </litrpg_detection>
 
 ### PRIORITY 2: EXPLICIT SPEECH TAGS (Very High)
@@ -221,13 +221,14 @@ Use conversation flow (alternating pattern) or assign to most recently active ch
 
 <output_format>
 For EACH paragraph, output exactly ONE line:
-**paragraph_index:SPEAKER_CODE**
+paragraph_index:SPEAKER_CODE
 
-Rules:
+CRITICAL FORMAT RULES:
+- Format: NUMBER:CODE (no spaces, no brackets, no asterisks)
 - One line per paragraph
-- Format: NUMBER:CODE (no spaces)
-- No extra text or explanation
-- No markdown
+- NO markdown formatting (no **bold**, no \`code\`)
+- NO explanations or comments
+- Use ONLY the speaker codes provided below
 
 **VALID:**
 0:A
@@ -236,9 +237,62 @@ Rules:
 3:C
 
 **INVALID:**
+**0:A** (markdown bold)
 0: A (space after colon)
 0:A - John speaks (explanation added)
+\`\`\` (code blocks)
 </output_format>
+
+<format_examples>
+**Example 1: Basic Format**
+Codes: A=John, B=Mary
+
+Input:
+0: John smiled. "Hello!"
+1: "Hi," Mary said.
+
+Correct Output:
+0:A
+1:B
+
+Wrong Output:
+**0:A** ← Don't use bold
+0: A ← Don't use space
+0:John ← Don't use names
+
+**Example 2: System Messages**
+Codes: A=Jason, B=Maria, C=System
+
+Input:
+0: [Level Up!]
+1: [Quest Complete]
+
+Correct Output:
+0:C
+1:C
+
+Wrong Output:
+0:SYSTEM ← Use the CODE (C), not the name
+0:system ← Lowercase is wrong too
+
+**Example 3: Complete Output**
+Codes: A=John, B=Mary
+
+Input (3 paragraphs):
+0: Text here
+1: More text
+2: Last paragraph
+
+Correct Output (all lines, no gaps):
+0:A
+1:B
+2:A
+
+Wrong Output (incomplete):
+0:A
+1:B
+← Missing line 2 - output EVERY paragraph
+</format_examples>
 
 <examples>
 
@@ -340,14 +394,15 @@ Note: John's actions closest to dialogue in 0,1.
 
 ## REMINDERS
 
-□ [Brackets] → System
-□ Speech tags "said X" → Named character
-□ Action beats → Acting character (closest to dialogue)
-□ "I" narrator → Protagonist
+□ [Brackets] → Use the System CODE from the speaker list (e.g., C)
+□ Speech tags "said X" → Named character CODE
+□ Action beats → Acting character CODE (closest to dialogue)
+□ "I" narrator → Protagonist CODE
 □ Names inside quotes = vocative (listener, NOT speaker)
-□ Format: index:CODE (no spaces, no extra text)
+□ Format: NUMBER:CODE (plain text, no markdown)
 □ One line per paragraph
-□ Account for every paragraph
+□ Account for EVERY paragraph
+□ Use CODES only - NOT character names
 `,
   systemSuffix: `
 ---
@@ -359,7 +414,7 @@ Note: John's actions closest to dialogue in 0,1.
 {{unnamedEntries}}
 </speaker_list>
 
-Format: index:CODE (one per line, no spaces, no extra text)
+Format: index:CODE (one per line, no spaces, no markdown)
 
 Valid:
 0:A
@@ -367,9 +422,10 @@ Valid:
 2:A
 
 Invalid:
+**0:A** (bold)
 0: A (space)
 0:A - John speaks (explanation)
-\`\`\`json (markdown)
+\`\`\` (code blocks)
 
 ---
 
@@ -379,15 +435,13 @@ Analyze the paragraphs. Apply Attribution Methods in priority order.
 Output index:CODE pairs, one line per paragraph.
 
 REMEMBER - CRITICAL:
-- [Brackets] → System
-- Speech tags "said X" → Named character
-- Action beats → Acting character (closest to dialogue)
-- "I" narrator → Protagonist
+- [Brackets] → Use System CODE from speaker list (e.g., C)
+- Speech tags "said X" → Named character CODE
+- Action beats → Acting character CODE (closest to dialogue)
+- "I" narrator → Protagonist CODE
 - Names inside quotes = vocative (listener, NOT speaker)
-
-NO Markdown
-NO Explanations
-JSON ONLY (index:CODE format)`,
+- Use CODES (A, B, C) - NOT names ("John", "SYSTEM")
+- PLAIN TEXT only - NO markdown bolding, NO code blocks`,
   userTemplate: `<task_primer>
 Assign speakers to the following paragraphs using the codes provided.
 </task_primer>
@@ -409,15 +463,28 @@ Task: Assign speakers to the paragraphs above using speaker codes.
 Read the task again: Assign speakers to the paragraphs above using speaker codes.
 </attribution_task_re_read>
 
+<speaker_code_reference>
+AVAILABLE SPEAKER CODES:
+{{characterLines}}
+{{unnamedEntries}}
+
+IMPORTANT: Use ONLY the codes above (A, B, C, etc.). Do NOT use character names directly.
+</speaker_code_reference>
+
 <re_read_rules>
 **READ RULES AGAIN BEFORE OUTPUTTING:**
-1. [Brackets] = System
-2. "Name" inside quotes = Vocative (Listener, NOT Speaker) → Assign to the *other* person
-3. Closest action to dialogue = speaker
-4. Output format: index:CODE (No markdown, no extra text)
+1. [Brackets] = System CODE (e.g., C if C=System in list)
+2. "Name" inside quotes = Vocative (Listener, NOT Speaker) → Assign to the *other* person's CODE
+3. Closest action to dialogue = speaker's CODE
+4. Output format: index:CODE (plain text, one per line)
+5. Use ONLY the codes from the speaker list (A, B, C, etc.)
+6. Do NOT use names (write "C" not "System", "A" not "John")
+7. NO markdown bolding (**0:A** is wrong, use 0:A)
+8. NO code blocks
+9. NO explanations after codes
 </re_read_rules>
 
 <output_trigger>
-Output the index:CODE list now:
+Output the index:CODE list now (plain text, one per line):
 </output_trigger>`,
 };
