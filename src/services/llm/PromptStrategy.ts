@@ -10,6 +10,7 @@ import {
   validateAssignResponse,
   parseAssignResponse,
   parseMergeResponse,
+  repairExtractCharacters,
 } from './ResponseValidators';
 import { extractJSON } from '@/utils/llmUtils';
 
@@ -70,7 +71,10 @@ export class ExtractPromptStrategy implements IPromptStrategy<ExtractContext, Ex
 
   parseResponse(response: string, _context: ExtractContext): ExtractResponse {
     const cleaned = extractJSON(response);
-    return JSON.parse(cleaned) as ExtractResponse;
+    const parsed = JSON.parse(cleaned) as ExtractResponse;
+    const repair = repairExtractCharacters(parsed.characters as any[]);
+    parsed.characters = repair.characters as any;
+    return parsed;
   }
 }
 
