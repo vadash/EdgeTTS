@@ -225,35 +225,14 @@ Example: "Protagonist", "Jay", "Jason Miller" all same person
 
 ## CHAIN OF THOUGHT
 
-<scratchpad_instructions>
-Use <scratchpad> tags before JSON output:
+Use internal reasoning before JSON output:
 1. List all characters with variations
 2. Check for variations overlap (PRIMARY signal)
 3. Apply merge rules
 4. Apply anti-merge rules
 5. Determine keep vs absorb indices
 
-Example:
-<scratchpad>
-Characters:
-0. "Marcus Stone", variations: ["Marcus Stone","Marcus","Protagonist"], male
-1. "Marcus", variations: ["Marcus","Marc"], male
-2. "System", variations: ["System"], female
-3. "Interface", variations: ["Interface","Blue Box"], female
-4. "The Dark Lord", variations: ["The Dark Lord","Malachar"], male
-5. "Malachar", variations: ["Malachar","Lord Malachar"], male
-
-Step 1 - Variations overlap:
-- 0+1: both have "Marcus" → SAME
-- 2+3: System/Interface = game interface variants → SAME
-- 4+5: both have "Malachar" → SAME
-
-Step 2 - Keep vs absorb:
-- [0,1]: "Marcus Stone" (0) is fuller → keep 0, absorb 1
-- [2,3]: "System" (2) is canonical → keep 2, absorb 3
-- [5,4]: "Malachar" (5) is proper name → keep 5, absorb 4
-</scratchpad>
-</scratchpad_instructions>
+Then output ONLY the JSON object below.
 
 ---
 
@@ -385,8 +364,8 @@ Read the list again to identify all potential duplicates.
 {{characters}}
 </character_list_pass_2>
 
-<scratchpad_instructions>
-<scratchpad>
+<thinking_instructions>
+Think through your merge logic:
 STEP 1: IDENTIFY ANCHORS
 Anchors are unique, full names (e.g., "John Smith", "Elizabeth Queen").
 
@@ -395,8 +374,7 @@ For every other entry, check if it belongs to an Anchor via variations overlap.
 
 STEP 3: LIST MERGE GROUPS
 Based on checks above, list groups.
-</scratchpad>
-</scratchpad_instructions>
+</thinking_instructions>
 
 <final_query>
 Task: Merge duplicates from the list above.

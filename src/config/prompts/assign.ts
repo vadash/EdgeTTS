@@ -403,6 +403,7 @@ Note: John's actions closest to dialogue in 0,1.
 □ One line per paragraph
 □ Account for EVERY paragraph
 □ Use CODES only - NOT character names
+□ COMPLETE EVERY LINE - never stop mid-output like "7:" or "15"
 `,
   systemSuffix: `
 ---
@@ -485,6 +486,11 @@ IMPORTANT: Use ONLY the codes above (A, B, C, etc.). Do NOT use character names 
 </re_read_rules>
 
 <output_trigger>
-Output the index:CODE list now (plain text, one per line):
+CRITICAL - OUTPUT EVERY LINE:
+Output the index:CODE list now (plain text, one per line).
+
+YOU MUST OUTPUT A LINE FOR EVERY PARAGRAPH.
+DO NOT STOP MID-OUTPUT.
+DO NOT LEAVE INCOMPLETE LINES LIKE "7:" OR "15".
 </output_trigger>`,
 };

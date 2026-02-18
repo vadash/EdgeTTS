@@ -11,6 +11,7 @@ import {
   parseAssignResponse,
   parseMergeResponse,
   repairExtractCharacters,
+  repairAssignResponse,
 } from './ResponseValidators';
 import { extractJSON } from '@/utils/llmUtils';
 
@@ -115,8 +116,10 @@ export class AssignPromptStrategy implements IPromptStrategy<AssignContext, Assi
   }
 
   parseResponse(response: string, context: AssignContext): AssignResult {
+    // Repair incomplete lines before parsing
+    const repaired = repairAssignResponse(response);
     return {
-      speakerMap: parseAssignResponse(response, context.codeToName),
+      speakerMap: parseAssignResponse(repaired, context.codeToName),
     };
   }
 }

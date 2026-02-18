@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { repairExtractCharacters } from './ResponseValidators';
+import { repairExtractCharacters, repairAssignResponse } from './ResponseValidators';
 
 describe('repairExtractCharacters', () => {
   it('adds gender "unknown" when gender is missing', () => {
@@ -149,5 +149,44 @@ describe('validateExtractResponse with auto-repair', () => {
     expect(result.valid).toBe(true);
     const parsed = JSON.parse(result.repairedResponse!);
     expect(parsed.characters[0].variations).toEqual(['Rats']);
+  });
+});
+
+describe('repairAssignResponse', () => {
+  it('filters out incomplete lines like "7"', () => {
+    const response = '0:A\n1:A\n2:A\n3:A\n4:H\n5:B\n6:A\n7';
+    const result = repairAssignResponse(response);
+    expect(result).toBe('0:A\n1:A\n2:A\n3:A\n4:H\n5:B\n6:A');
+  });
+
+  it('filters out incomplete lines like "15"', () => {
+    const response = '0:A\n1:A\n2:A\n3:A\n4:H\n5:B\n6:A\n7:b\n8:E\n9:A\n10:E\n11:A\n12:B\n13:A\n14:H\n15';
+    const result = repairAssignResponse(response);
+    expect(result).toContain('0:A');
+    expect(result).toContain('14:H');
+    expect(result).not.toContain('15');
+  });
+
+  it('filters out incomplete lines like "7:"', () => {
+    const response = '0:A\n1:A\n2:A\n3:A\n4:A\n5:F\n6:';
+    const result = repairAssignResponse(response);
+    expect(result).toBe('0:A\n1:A\n2:A\n3:A\n4:A\n5:F');
+  });
+
+  it('keeps valid lines with brackets', () => {
+    const response = '[0]:A\n[1]:B\n2:C';
+    const result = repairAssignResponse(response);
+    expect(result).toBe('[0]:A\n[1]:B\n2:C');
+  });
+
+  it('handles empty response', () => {
+    const result = repairAssignResponse('');
+    expect(result).toBe('');
+  });
+
+  it('handles thinking tags', () => {
+    const response = '<thinking>\nLet me think...\n</thinking>\n0:A\n1:B\n2:C';
+    const result = repairAssignResponse(response);
+    expect(result).toBe('0:A\n1:B\n2:C');
   });
 });

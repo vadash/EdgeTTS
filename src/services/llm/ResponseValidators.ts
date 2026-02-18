@@ -183,8 +183,9 @@ export function validateAssignResponse(
     // Handles: "123:A", "[123]:A", "123:A (name)", "54:FEMALE_UNNAMED"
     const match = trimmed.match(/^\[?(\d+)\]?:([A-Za-z0-9_]+)/);
     if (!match) {
-      // Skip incomplete lines like "0:" or "3:" (model uncertainty) - don't error
-      if (/^\[?\d+\]?:$/.test(trimmed)) {
+      // Skip incomplete lines like "0:", "3:", "7" (model truncation) - don't error
+      // These are handled by repairAssignResponse
+      if (/^\[?\d+\]?:$/.test(trimmed) || /^\d+$/.test(trimmed)) {
         continue;
       }
       errors.push(`Invalid format: "${trimmed}". Expected: index:code`);
@@ -211,6 +212,29 @@ export function validateAssignResponse(
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Repair incomplete assign responses
+ * Fixes truncated lines like "7", "15", "5:" by removing them
+ */
+export function repairAssignResponse(response: string): string {
+  const cleaned = stripThinkingTags(response);
+  const lines: string[] = [];
+
+  for (const line of cleaned.trim().split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Check for valid format: index:code
+    const match = trimmed.match(/^\[?(\d+)\]?:([A-Za-z0-9_]+)/);
+    if (match) {
+      lines.push(trimmed);
+    }
+    // Skip invalid/incomplete lines - they'll be handled by retry or fallback
+  }
+
+  return lines.join('\n');
 }
 
 /**
