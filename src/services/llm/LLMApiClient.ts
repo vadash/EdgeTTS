@@ -232,8 +232,8 @@ export class LLMApiClient {
     previousErrors: string[] = [],
     pass: PassType = 'extract'
   ): Promise<string> {
-    const messages: Array<{ role: 'user'; content: string }> = [
-      { role: 'user', content: prompt.system },
+    const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+      { role: 'system', content: prompt.system },
       { role: 'user', content: prompt.user },
     ];
 
