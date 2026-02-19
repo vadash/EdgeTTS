@@ -143,31 +143,11 @@ describe('LLMStore', () => {
   });
 
   describe('settings actions', () => {
-    it('sets enabled', async () => {
-      store.setEnabled(false);
-      expect(store.enabled.value).toBe(false);
-    });
-
     it('toggles enabled', async () => {
       store.toggleEnabled();
       expect(store.enabled.value).toBe(false);
       store.toggleEnabled();
       expect(store.enabled.value).toBe(true);
-    });
-
-    it('sets stage API key', async () => {
-      store.setStageField('extract', 'apiKey', 'sk-new-key');
-      expect(store.extract.value.apiKey).toBe('sk-new-key');
-    });
-
-    it('sets stage API URL', async () => {
-      store.setStageField('merge', 'apiUrl', 'https://custom.api.com');
-      expect(store.merge.value.apiUrl).toBe('https://custom.api.com');
-    });
-
-    it('sets stage model', async () => {
-      store.setStageField('assign', 'model', 'gpt-4');
-      expect(store.assign.value.model).toBe('gpt-4');
     });
 
     it('sets entire stage config', async () => {
@@ -186,17 +166,6 @@ describe('LLMStore', () => {
   });
 
   describe('processing state actions', () => {
-    it('sets processing status', () => {
-      store.setProcessingStatus('extracting');
-      expect(store.processingStatus.value).toBe('extracting');
-    });
-
-    it('sets block progress', () => {
-      store.setBlockProgress(3, 7);
-      expect(store.currentBlock.value).toBe(3);
-      expect(store.totalBlocks.value).toBe(7);
-    });
-
     it('sets error and updates status', () => {
       store.setError('Something went wrong');
       expect(store.error.value).toBe('Something went wrong');

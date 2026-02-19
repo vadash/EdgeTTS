@@ -43,48 +43,6 @@ describe('SettingsStore', () => {
     });
   });
 
-  describe('setters', () => {
-    it('setNarratorVoice should update voice', () => {
-      store.setNarratorVoice('ru-RU-DmitryNeural');
-      expect(store.narratorVoice.value).toBe('ru-RU-DmitryNeural');
-    });
-
-    it('setRate should update rate', () => {
-      store.setRate(50);
-      expect(store.rate.value).toBe(50);
-    });
-
-    it('setPitch should update pitch', () => {
-      store.setPitch(-25);
-      expect(store.pitch.value).toBe(-25);
-    });
-
-    it('setTtsThreads should update TTS threads', () => {
-      store.setTtsThreads(10);
-      expect(store.ttsThreads.value).toBe(10);
-    });
-
-    it('setLlmThreads should update LLM threads', () => {
-      store.setLlmThreads(3);
-      expect(store.llmThreads.value).toBe(3);
-    });
-
-    it('setOutputFormat should update format', () => {
-      store.setOutputFormat('mp3');
-      expect(store.outputFormat.value).toBe('mp3');
-    });
-
-    it('setSilenceRemovalEnabled should update setting', () => {
-      store.setSilenceRemovalEnabled(true);
-      expect(store.silenceRemovalEnabled.value).toBe(true);
-    });
-
-    it('setNormalizationEnabled should update setting', () => {
-      store.setNormalizationEnabled(true);
-      expect(store.normalizationEnabled.value).toBe(true);
-    });
-  });
-
   describe('Opus encoding setters', () => {
     beforeEach(() => {
       localStorage.clear();

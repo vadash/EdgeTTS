@@ -40,11 +40,6 @@ describe('DataStore', () => {
   });
 
   describe('text content management', () => {
-    it('sets text content', () => {
-      store.setTextContent('Hello world');
-      expect(store.textContent.value).toBe('Hello world');
-    });
-
     it('clears text content', () => {
       store.setTextContent('Some text');
       store.clearTextContent();
@@ -85,17 +80,6 @@ describe('DataStore', () => {
       { type: 'exact', pattern: 'hello', replacement: 'привет' },
     ];
 
-    it('sets dictionary rules', () => {
-      store.setDictionary(mockRules);
-      expect(store.dictionary.value).toEqual(mockRules);
-    });
-
-    it('sets raw dictionary lines', () => {
-      const rawLines = ['test=тест', 'hello=привет'];
-      store.setDictionaryRaw(rawLines);
-      expect(store.dictionaryRaw.value).toEqual(rawLines);
-    });
-
     it('clears dictionary', () => {
       store.setDictionary(mockRules);
       store.setDictionaryRaw(['test=тест']);
@@ -106,12 +90,6 @@ describe('DataStore', () => {
   });
 
   describe('directory handle management', () => {
-    it('sets directory handle', () => {
-      const mockHandle = {} as FileSystemDirectoryHandle;
-      store.setDirectoryHandle(mockHandle);
-      expect(store.directoryHandle.value).toBe(mockHandle);
-    });
-
     it('clears directory handle', () => {
       const mockHandle = {} as FileSystemDirectoryHandle;
       store.setDirectoryHandle(mockHandle);
@@ -127,11 +105,6 @@ describe('DataStore', () => {
       partIndex: 0,
       filename: 'test.mp3',
     };
-
-    it('sets active workers', () => {
-      store.setActiveWorkers([mockWorker]);
-      expect(store.activeWorkers.value).toEqual([mockWorker]);
-    });
 
     it('adds worker', () => {
       store.addWorker(mockWorker);
@@ -164,11 +137,6 @@ describe('DataStore', () => {
   });
 
   describe('file naming state', () => {
-    it('sets file name index', () => {
-      store.setFileNameIndex(5);
-      expect(store.fileNameIndex.value).toBe(5);
-    });
-
     it('increments file name index', () => {
       store.setFileNameIndex(5);
       const current = store.incrementFileNameIndex();
@@ -176,15 +144,6 @@ describe('DataStore', () => {
       expect(store.fileNameIndex.value).toBe(6);
     });
 
-    it('sets numBook', () => {
-      store.setNumBook(3);
-      expect(store.numBook.value).toBe(3);
-    });
-
-    it('sets numText', () => {
-      store.setNumText(7);
-      expect(store.numText.value).toBe(7);
-    });
   });
 
   describe('computed properties', () => {

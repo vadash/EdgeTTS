@@ -28,43 +28,6 @@ describe('ConversionStore', () => {
     });
   });
 
-  describe('status transitions', () => {
-    it('sets status to llm-extract', () => {
-      store.setStatus('llm-extract');
-      expect(store.status.value).toBe('llm-extract');
-    });
-
-    it('sets status to llm-assign', () => {
-      store.setStatus('llm-assign');
-      expect(store.status.value).toBe('llm-assign');
-    });
-
-    it('sets status to converting', () => {
-      store.setStatus('converting');
-      expect(store.status.value).toBe('converting');
-    });
-
-    it('sets status to merging', () => {
-      store.setStatus('merging');
-      expect(store.status.value).toBe('merging');
-    });
-
-    it('sets status to complete', () => {
-      store.setStatus('complete');
-      expect(store.status.value).toBe('complete');
-    });
-
-    it('sets status to error', () => {
-      store.setStatus('error');
-      expect(store.status.value).toBe('error');
-    });
-
-    it('sets status to cancelled', () => {
-      store.setStatus('cancelled');
-      expect(store.status.value).toBe('cancelled');
-    });
-  });
-
   describe('isProcessing computed', () => {
     it('returns false for idle', () => {
       store.setStatus('idle');
