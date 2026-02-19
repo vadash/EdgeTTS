@@ -4,6 +4,7 @@ import type { LLMValidationResult } from '@/state/types';
 import { getRetryDelay, defaultConfig } from '@/config';
 import type { ILogger } from '../interfaces';
 import { stripThinkingTags, extractJSON } from '@/utils/llmUtils';
+import { DebugLogger } from './DebugLogger';
 
 export interface LLMApiClientOptions {
   apiKey: string;
@@ -13,7 +14,7 @@ export interface LLMApiClientOptions {
   reasoning?: 'auto' | 'high' | 'medium' | 'low';
   temperature?: number;
   topP?: number;
-  directoryHandle?: FileSystemDirectoryHandle | null;
+  debugLogger?: DebugLogger;
   logger?: ILogger;
 }
 
@@ -52,14 +53,13 @@ export class LLMApiClient {
   private options: LLMApiClientOptions;
   private logger?: ILogger;
   private client: OpenAI;
-  private extractLogged = false;
-  private mergeLogged = false;
-  private assignLogged = false;
+  private debugLogger?: DebugLogger;
   private provider: string;
 
   constructor(options: LLMApiClientOptions) {
     this.options = options;
     this.logger = options.logger;
+    this.debugLogger = options.debugLogger;
     this.provider = detectProvider(options.apiUrl, options.model);
 
     // Custom fetch that strips SDK headers (some proxies block them)
@@ -127,9 +127,7 @@ export class LLMApiClient {
    * Reset logging flags for new conversion
    */
   resetLogging(): void {
-    this.extractLogged = false;
-    this.mergeLogged = false;
-    this.assignLogged = false;
+    this.debugLogger?.resetLogging();
   }
 
   /**
@@ -267,12 +265,8 @@ export class LLMApiClient {
     applyProviderFixes(requestBody, this.provider);
 
     // Save request log (first call only per pass type)
-    if (pass === 'extract' && !this.extractLogged) {
-      this.saveLog('extract_request.json', requestBody);
-    } else if (pass === 'merge' && !this.mergeLogged) {
-      this.saveLog('merge_request.json', requestBody);
-    } else if (pass === 'assign' && !this.assignLogged) {
-      this.saveLog('assign_request.json', requestBody);
+    if (this.debugLogger?.shouldLog(pass)) {
+      this.debugLogger.saveLog(`${pass}_request.json`, requestBody);
     }
 
     // Make API call
@@ -298,15 +292,9 @@ export class LLMApiClient {
     };
 
     // Save response log (first call only per pass type)
-    if (pass === 'extract' && !this.extractLogged) {
-      this.saveLog('extract_response.json', data);
-      this.extractLogged = true;
-    } else if (pass === 'merge' && !this.mergeLogged) {
-      this.saveLog('merge_response.json', data);
-      this.mergeLogged = true;
-    } else if (pass === 'assign' && !this.assignLogged) {
-      this.saveLog('assign_response.json', data);
-      this.assignLogged = true;
+    if (this.debugLogger?.shouldLog(pass)) {
+      this.debugLogger.saveLog(`${pass}_response.json`, data);
+      this.debugLogger.markLogged(pass);
     }
 
     if (!content) {
@@ -320,22 +308,6 @@ export class LLMApiClient {
 
     // Extract JSON from response (handle markdown code blocks)
     return extractJSON(content);
-  }
-
-  /**
-   * Save log file to logs folder
-   */
-  private async saveLog(filename: string, content: object): Promise<void> {
-    if (!this.options.directoryHandle) return;
-    try {
-      const logsFolder = await this.options.directoryHandle.getDirectoryHandle('logs', { create: true });
-      const fileHandle = await logsFolder.getFileHandle(filename, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(JSON.stringify(content, null, 2));
-      await writable.close();
-    } catch (e) {
-      this.logger?.warn('Failed to save log', { error: e instanceof Error ? e.message : String(e) });
-    }
   }
 
   /**

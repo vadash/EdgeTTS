@@ -7,6 +7,7 @@ import type {
 import type { ILogger, ProgressCallback } from '../interfaces';
 import { defaultConfig } from '@/config';
 import { LLMApiClient } from './LLMApiClient';
+import { DebugLogger } from './DebugLogger';
 import { buildCodeMapping, mergeCharacters, applyMergeGroups } from './CharacterUtils';
 import { majorityVote, buildMergeConsensus } from './votingConsensus';
 import {
@@ -131,6 +132,7 @@ export class LLMVoiceService {
     }
     this.options = options;
     this.logger = options.logger;
+    const debugLogger = new DebugLogger(options.directoryHandle, options.logger);
     this.apiClient = new LLMApiClient({
       apiKey: options.apiKey,
       apiUrl: options.apiUrl,
@@ -139,7 +141,7 @@ export class LLMVoiceService {
       reasoning: options.reasoning,
       temperature: options.temperature,
       topP: options.topP,
-      directoryHandle: options.directoryHandle,
+      debugLogger,
       logger: options.logger,
     });
 
@@ -154,7 +156,7 @@ export class LLMVoiceService {
           reasoning: mergeConfig.reasoning ?? options.reasoning,
           temperature: mergeConfig.temperature ?? options.temperature,
           topP: mergeConfig.topP ?? options.topP,
-          directoryHandle: options.directoryHandle,
+          debugLogger,
           logger: options.logger,
         })
       : this.apiClient;
@@ -497,7 +499,7 @@ export class LLMVoiceService {
       reasoning: this.options.mergeConfig?.reasoning ?? this.options.reasoning,
       temperature: temperature,
       topP: this.options.mergeConfig?.topP ?? this.options.topP,
-      directoryHandle: this.options.directoryHandle,
+      debugLogger: new DebugLogger(this.options.directoryHandle, this.logger),
       logger: this.logger,
     });
 
