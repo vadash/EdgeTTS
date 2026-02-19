@@ -2,31 +2,31 @@
 
 ## Overview
 A local-first Text-to-Speech app using Edge TTS, FFmpeg (WASM), and LLMs for character voice assignment.
-**Stack:** TypeScript, Preact (via Vite), Tailwind CSS, IndexedDB (Storage), @preact/signals (State).
+**Stack:** TypeScript, Preact (via Vite/Webpack), Tailwind CSS, IndexedDB, @preact/signals.
 
-## Commands
-- **Run Dev:** `npm run dev`
-- **Build:** `npm run build`
-- **Test:** `npm test` (Vitest)
-- **Test Real LLM:** `npm run test:real` (Requires API keys)
-- **Typecheck:** `npm run typecheck`
-
-## Architecture Data Flow
+## Core Architecture
 1. **Input:** File/Text -> `TextBlockSplitter`
 2. **Analysis:** LLM Service -> Extract Chars -> Assign Speakers
 3. **Pipeline:** `ConversionOrchestrator` -> Runs steps (Extract, Assign, TTS, Merge)
-4. **TTS:** `TTSWorkerPool` -> Edge TTS WebSocket -> Audio Chunks (saved to temp FS)
+4. **TTS:** `TTSWorkerPool` -> Edge TTS WebSocket -> Audio Chunks (fs: `_temp_work`)
 5. **Merge:** `AudioMerger` -> FFmpeg (Opus/MP3) -> Final File
 
-## Key Directories
-- `src/di`: Dependency Injection container (ServiceContainer).
-- `src/services/pipeline`: Core conversion logic using Step pattern.
-- `src/stores`: Global state using Preact Signals.
-- `src/components`: UI components (Functional, Preact).
+## Key Commands
+- `npm run dev`: Start dev server (Webpack)
+- `npm run build`: Production build
+- `npm test`: Run unit tests (Vitest)
+- `npm run test:real`: Run integration tests against real LLM APIs
+- `npm run typecheck`: TypeScript validation
 
-## Code Style & Conventions
-- **State:** Use `@preact/signals` for global/complex state. Use `useState` only for local UI toggles.
-- **Async:** Use `async/await`. Handle errors with `AppError` class.
+## Code Standards
+- **Async:** Use `async/await`. Handle known errors with `AppError` class.
 - **Imports:** Use `@/` alias for `src/`.
-- **I18n:** Use `preact-i18n` (`<Text id="..." />`).
-- **Files:** Browser File System Access API is used heavily. Handle permissions carefully.
+- **Formatting:** Prettier/ESLint defaults apply.
+- **Filesystem:** Browser File System Access API is used heavily. Always handle permission errors via `withPermissionRetry`.
+
+## Directory Map
+- `src/di`: Dependency Injection container (`ServiceContainer`).
+- `src/services/pipeline`: Core conversion logic using Step pattern.
+- `src/services/llm`: Prompt engineering and API interaction.
+- `src/stores`: Global state (`@preact/signals`).
+- `src/components`: UI components.

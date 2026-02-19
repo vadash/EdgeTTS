@@ -1,20 +1,20 @@
-# UI Component Guidelines
+# Components Guide
 
-## Framework: Preact
-- Use `import { h } from 'preact'` implies JSX.
-- **Signals:** Prefer `signal` and `computed` over `useState` for performance.
-- **Accessing Stores:** Use hooks: `useSettings()`, `useData()`, `useLLM()` from `@/stores`.
+## Tech Stack
+- **Framework:** Preact (Functional Components).
+- **Styling:** Tailwind CSS.
+- **State:** `@preact/signals` (use signals directly in JSX, rarely `useState`).
+- **I18n:** `preact-i18n` (`<Text id="..." />`).
 
-## Styling
-- **Tailwind:** Use utility classes. Avoid inline styles.
-- **Theme:** Use `bg-primary`, `bg-primary-secondary`, `text-accent` for theming (defined in `tailwind.config.js`).
-- **Responsive:** Mobile-first approaches.
+## Guidelines
+1. **Hooks:** Place complex logic in `src/hooks/` if reusable, or local `useCallback`/`useRef`.
+2. **Signals:** Do not unwrap signals (`.value`) inside JSX unless necessary; pass the signal directly if the component supports it, or access `.value` for primitives.
+3. **Structure:**
+   - `common/`: Reusable primitives (Buttons, Inputs).
+   - `layout/`: App shell, headers.
+   - `convert/`, `settings/`, `status/`: Feature-specific views.
+4. **Performance:** This is a local-first app. Avoid heavy computations in render. Use `computed` signals for derived state.
 
-## Component Structure
-- **Container/View:** Holds logic and connects to stores (e.g., `ConvertView.tsx`).
-- **Presentational:** Receives props, renders UI (e.g., `Button.tsx`).
-- **Text:** Always wrap strings in `<Text id="..." />` for i18n.
-
-## Gotchas
-- **File Input:** Input values must be reset manually (`input.value = ''`) to allow re-uploading the same file.
-- **Browser APIs:** Directory handles are non-serializable. Do not try to persist them to `localStorage`.
+## Theme
+- Dark mode supported via Tailwind `dark:` classes.
+- Colors defined in `tailwind.config.js` (primary, accent, border).

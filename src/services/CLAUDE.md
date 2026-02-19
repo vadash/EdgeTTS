@@ -1,21 +1,21 @@
-# Services & Logic Guidelines
+# Services & Architecture
 
-## Dependency Injection (DI)
-- **Pattern:** Inversify-lite style (`src/di/ServiceContainer.ts`).
-- **Registration:** All services must be registered in `src/di/ServiceContext.tsx`.
-- **Usage:** In React components, use `useService(ServiceTypes.Name)`. In classes, inject via constructor.
-- **Interfaces:** Always define interfaces in `interfaces.ts` before implementing classes.
+## Dependency Injection
+- This project uses a custom DI container (`src/di/ServiceContainer.ts`).
+- **Registration:** Register services in `src/di/ServiceContainer.ts`.
+- **Consumption:** Use `useService(ServiceTypes.Name)` in hooks or constructor injection in classes.
 
-## Pipeline Architecture
-- Located in `src/services/pipeline`.
-- **Steps:** Logic is broken into discrete steps (e.g., `TTSConversionStep`, `AudioMergeStep`).
-- **Context:** Data flows via `PipelineContext` object. Steps read from it and return a modified copy.
-- **Lazy Loading:** Steps should not hold heavy data in memory; write to `tempDirHandle` immediately.
+## The Conversion Pipeline
+Located in `src/services/pipeline/`.
+- **Pattern:** Sequential Step pattern.
+- **Data Flow:** `PipelineContext` is passed and mutated through steps.
+- **Resume:** State is saved to `_temp_work/pipeline_state.json`. `resumeCheck.ts` handles logic.
 
-## Audio & FFmpeg
-- **FFmpeg:** Loaded lazily via `FFmpegService`. Always check `isAvailable()` before use.
-- **Merging:** Use `AudioMerger`. Do not load all chunks into RAM. Read from disk -> Process -> Write to disk.
+## Critical Services
+- **TTSWorkerPool:** Manages concurrency (`p-queue`) and WebSocket connections (`generic-pool`). Handles "Ladder" logic (scaling up/down based on success).
+- **AudioMerger:** Handles FFmpeg (WASM). *Note:* reads/writes to disk immediately to prevent OOM.
+- **KeepAwake:** Prevents browser throttling using AudioContext and WakeLock.
 
-## LLM Integration
-- **Strategies:** Use `PromptStrategy` pattern for different tasks (Extract, Merge, Assign).
-- **Retry:** Use `LLMApiClient` with `p-retry` for robust API calls.
+## Error Handling
+- Use `AppError` for typed errors.
+- Network calls should use `withRetry` utility (`src/utils/asyncUtils.ts`).
