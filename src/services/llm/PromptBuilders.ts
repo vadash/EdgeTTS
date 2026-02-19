@@ -54,19 +54,14 @@ export function buildAssignPrompt(
   const characterLinesStr = characterLines.join('\n');
   const unnamedEntriesStr = unnamedEntries.join('\n');
 
-  // Build system prompt from template parts
-  const system = LLM_PROMPTS.assign.systemPrefix
-    .replace('{{characterLines}}', characterLinesStr)
-    .replace('{{unnamedEntries}}', unnamedEntriesStr)
-    + LLM_PROMPTS.assign.systemSuffix
-      .replace('{{characterLines}}', characterLinesStr)
-      .replace('{{unnamedEntries}}', unnamedEntriesStr);
+  const system = LLM_PROMPTS.assign.system
+    .replaceAll('{{characterLines}}', characterLinesStr)
+    .replaceAll('{{unnamedEntries}}', unnamedEntriesStr);
 
-  // Also replace in user template
   const user = LLM_PROMPTS.assign.userTemplate
-    .replace('{{paragraphs}}', numberedParagraphs)
-    .replace('{{characterLines}}', characterLinesStr)
-    .replace('{{unnamedEntries}}', unnamedEntriesStr);
+    .replaceAll('{{paragraphs}}', numberedParagraphs)
+    .replaceAll('{{characterLines}}', characterLinesStr)
+    .replaceAll('{{unnamedEntries}}', unnamedEntriesStr);
 
   return {
     system,

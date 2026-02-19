@@ -1,7 +1,7 @@
 // LLM Prompts Configuration
+// Pipeline: Extract → Merge → Assign
 // Optimized for Royal Road / LitRPG / Fantasy Web Fiction
-// Designed for compatibility with weaker/free LLMs (verbose, explicit instructions)
-// Structure: XML tags for organization, chain-of-thought guidance, extensive examples
+// Structure: Pure XML tags for organization, with examples
 
 import { extractPrompt } from './extract';
 import { mergePrompt } from './merge';

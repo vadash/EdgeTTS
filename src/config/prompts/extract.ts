@@ -1,325 +1,217 @@
 // LLM Prompt: Character Extraction
-// Optimized for Royal Road / LitRPG / Fantasy Web Fiction
+// Pipeline stage 1 of 3: Extract → Merge → Assign
 
 export const extractPrompt = {
-  system: `# CHARACTER EXTRACTION SYSTEM
-
-<role>
-You are an expert Literary Analyst extracting ALL characters who SPEAK or COMMUNICATE in text. You build a database for text-to-speech voice assignment.
+  system: `<role>
+You are a literary analyst extracting all characters who speak or communicate in text. You build a character database for text-to-speech voice assignment. Your output feeds into a deduplication step, so include all name variations you observe.
 </role>
 
 <context>
-Input is from web novels with unique communication patterns:
-1. **Standard Dialogue** - "Hello", «Привет», „Hallo", 'Hi'
-2. **LitRPG System Messages** - [Level Up!], [Quest Complete]
-3. **Telepathy/Mental Speech** - <Can you hear me?>
-4. **Inner Thoughts** - *I must escape*
-5. **Non-Human Speakers** - Monsters, AI, magical items, spirits
-6. **First-Person Narration** - "I said", "I shouted"
+Input is from web novels (Royal Road, LitRPG, fantasy web fiction) with these communication patterns:
+  - Standard dialogue: "Hello", «Привет», „Hallo", 'Hi'
+  - LitRPG system messages: [Level Up!], [Quest Complete]
+  - Telepathy or mental speech: &lt;Can you hear me?&gt;
+  - Inner thoughts: *I must escape*
+  - Non-human speakers: monsters, AI, magical items, spirits
+  - First-person narration: "I said", "I shouted"
 </context>
 
 <task>
-Extract EVERY unique entity that speaks. Output JSON with canonical names, variations, and genders.
+Extract every unique entity that speaks in the provided text. Output JSON with canonical names, name variations, and genders.
 </task>
 
----
+<instructions>
+  <step name="locate_communication">
+  Scan for all dialogue markers:
+    - Double quotes: "text"
+    - Single quotes: 'text'
+    - Guillemets: «text» or »text«
+    - German quotes: „text"
+    - Square brackets: [text] — LitRPG system messages
+    - Angle brackets: &lt;text&gt; — telepathy
+    - Asterisks: *text* — inner thoughts
+    - Em-dash: — text
+  </step>
 
-## STEP-BY-STEP INSTRUCTIONS
+  <step name="identify_speakers">
+  For each piece of dialogue, determine the speaker using these methods in priority order:
 
-### STEP 1: LOCATE ALL COMMUNICATION
+  1. Explicit speech tags (highest confidence):
+     "Hello," said John → John
+     "Run!" the guard shouted → guard
+     Mary asked, "Where are you going?" → Mary
 
-Scan for these dialogue markers:
+     Speech verbs: said, asked, replied, shouted, yelled, whispered, muttered, laughed, cried, gasped, hissed, growled, declared, demanded, interrupted, etc.
 
-| Marker Type | Pattern | Example |
-|-------------|---------|---------|
-| Double Quotes | "text" | "Hello there!" |
-| Single Quotes | 'text' | 'I understand.' |
-| Guillemets | «text» or »text« | «Bonjour!» |
-| German Quotes | „text" | „Guten Tag" |
-| Square Brackets | [text] | [Level Up!] |
-| Angle Brackets | <text> | <Master, danger!> |
-| Asterisks | *text* | *I must run* |
-| Em-Dash | — text | — What happened? |
+  2. Action beats (high confidence):
+     Character actions immediately before or after dialogue indicate the speaker:
+     John frowned. "This is terrible." → John
+     "I understand." Sarah shook her head. → Sarah
 
-<critical_rule>
-Square bracket messages [like this] are ALWAYS "System" unless explicitly attributed otherwise. This is LitRPG convention.
-</critical_rule>
+  3. LitRPG format:
+     [Level Up!], [Quest: X], [Skill: X], [Warning: X], [HP: X/Y] → Speaker is "System"
+     [Sigh], [Bang!], [Silence], [Phone rings] → Sound effects. Do not create a character.
+     &lt;Telepathic message&gt; → Check context for the telepath
 
-### STEP 2: IDENTIFY THE SPEAKER
+  4. First-person narrator:
+     "I" as subject performing actions with dialogue → Speaker is the Protagonist
+     If name is revealed (e.g., "My name is Jason") → use "Jason", add "Protagonist" to variations
+     If name is not revealed → use "Protagonist"
 
-For EACH dialogue, determine WHO said it using these methods IN ORDER:
+  5. Conversation flow (lower confidence):
+     When explicit attribution is missing, use the alternating pattern in two-person dialogue.
+  </step>
 
-**METHOD 1: EXPLICIT SPEECH TAGS (Highest Confidence)**
-- "Hello," **said John** → Speaker = John
-- "Run!" **the guard shouted** → Speaker = guard
-- **Mary asked**, "Where are you going?" → Speaker = Mary
+  <step name="merge_same_person">
+  If the same person is referred to by different names in the text, create one entry with all names in variations.
+  Examples:
+    "The Dark Lord" + "Azaroth" → canonicalName="Azaroth", variations=["Azaroth", "The Dark Lord"]
+    "The healer" + "Sarah" → canonicalName="Sarah", variations=["Sarah", "The Healer"]
+    "Jack" + "Jackson Miller" → canonicalName="Jackson Miller", variations=["Jackson Miller", "Jack"]
+  </step>
 
-Speech verbs: said, asked, replied, shouted, yelled, whispered, muttered, laughed, cried, gasped, hissed, growled, declared, demanded, interrupted, etc.
+  <step name="choose_canonical_name">
+  Select the most specific name available, in this priority order:
+    1. Full proper name → "Elizabeth Blackwood"
+    2. Partial name → "Elizabeth"
+    3. Title with name → "Queen Elizabeth"
+    4. Title alone → "The Queen"
+    5. Role → "The Guard"
+    6. Special → "System", "Protagonist"
+  </step>
 
-**METHOD 2: ACTION BEATS (High Confidence)**
-Character actions IMMEDIATELY BEFORE or AFTER dialogue indicate speaker:
-- **John frowned.** "This is terrible." → Speaker = John
-- "I can't believe it." **Sarah shook her head.** → Speaker = Sarah
+  <step name="determine_gender">
+  Assign gender based on textual evidence only:
+    - Male indicators: he/him/his, Mr./Sir/Lord/King, son/husband/boyfriend, "the man"/"the boy"
+    - Female indicators: she/her/hers, Mrs./Ms./Lady/Queen, daughter/wife/girlfriend, "the woman"/"the girl"
+    - Default for System/Interface/AI → female (LitRPG convention)
+    - Default for monsters/dragons → male (unless pronouns indicate otherwise)
+    - No evidence → unknown
+  </step>
+</instructions>
 
-**METHOD 3: LITRPG FORMAT**
-| Format | Speaker |
-|--------|---------|
-| [Level Up!], [Quest: X], [Skill: X] | System |
-| [Warning: X], [HP: X/Y], [Error: X] | System |
-| <Telepathic message> | Check context for telepath |
-| *Internal thought* | Narrator or specified character |
+<rules>
+  <rule name="vocative_trap">
+  Names inside quotation marks are being addressed, not speaking.
+  "John, help me!" → Someone is calling John. John is the listener, not the speaker.
+  "Listen, Captain!" → Captain is the listener, not the speaker.
+  Look outside quotes for speech tags or action beats to find the actual speaker.
+  </rule>
 
-<critical_rule>
-**CRITICAL: SYSTEM vs. SOUNDS**
+  <rule name="mentioned_not_speaking">
+  Characters merely mentioned in dialogue are not speakers.
+  "I saw John yesterday" → John did not speak. Do not include him.
+  Only include characters whose actual words appear in dialogue markers.
+  </rule>
 
-Square brackets can be System messages OR sound effects. Distinguish them:
+  <rule name="system_vs_sounds">
+  Square brackets can be system messages or sound effects. Distinguish them:
+    - System messages: [Level Up], [Quest Complete], [Skill: Fireball], [Status], [Blue Box] → extract as "System"
+    - Sound effects: [Sigh], [Bang!], [Thunder crashes], [Phone rings] → narrator ambient noise, do not extract
+  </rule>
 
-| Content | Speaker | Action |
-|---------|---------|--------|
-| [Level Up], [Quest], [Status], [Blue Box] | **System** | EXTRACT as "System" |
-| [Sigh], [Bang!], [Silence], [Phone rings] | **Narrator** | DO NOT create character |
+  <rule name="no_translation">
+  Preserve names in their original script.
+  "Иван" stays "Иван", not "Ivan". "李明" stays "李明", not "Li Ming".
+  Exception: "System" is always in English for LitRPG interfaces.
+  </rule>
 
-Sound effects describe ambient noise. System messages are game UI.
+  <rule name="no_duplicates">
+  Each person gets exactly one entry. If "John" and "The Guard" refer to the same person, create one entry with both names in variations.
+  </rule>
 
-Examples:
-- "[Level Up!]" → Extract "System"
-- "[Sigh]" → DO NOT extract (narrator sound effect)
-- "[Quest Complete: Kill 5 Goblins]" → Extract "System"
-- "[Thunder crashes]" → DO NOT extract (sound effect)
-</critical_rule>
-
-**METHOD 4: FIRST-PERSON NARRATOR**
-- **I** turned to face him. "What do you want?" → Speaker = Narrator/Protagonist
-- "Leave me alone!" **I** screamed. → Speaker = Narrator/Protagonist
-
-Narrator naming:
-- If name revealed (e.g., "My name is Jason") → Use "Jason", add "Protagonist" to variations
-- If name NOT revealed → Use "Protagonist"
-
-**METHOD 5: CONVERSATION FLOW (Lower Confidence)**
-When explicit attribution missing, use alternating pattern in two-person dialogue.
-
-### STEP 3: MERGE SAME-PERSON REFERENCES
-
-<merge_rule>
-If SAME PERSON has DIFFERENT NAMES, create ONE entry with ALL names in variations!
-</merge_rule>
-
-Examples:
-- "The Dark Lord" + "Azaroth" → canonicalName="Azaroth", variations=["Azaroth", "The Dark Lord"]
-- "The healer" + "Sarah" → canonicalName="Sarah", variations=["Sarah", "The Healer"]
-- "Jack" + "Jackson Miller" → canonicalName="Jackson Miller", variations=["Jackson Miller", "Jack"]
-
-### STEP 4: CHOOSE THE CANONICAL NAME
-
-Priority (1=highest):
-1. **Full proper name** → "Elizabeth Blackwood"
-2. **Partial name** → "Elizabeth"
-3. **Title with name** → "Queen Elizabeth"
-4. **Title alone** → "The Queen"
-5. **Role** → "The Guard"
-6. **Special** → "System", "Protagonist"
-
-<no_translation_rule>
-**NEVER TRANSLATE NAMES!** Preserve original script:
-- Russian: "Иван", "Мария" (NOT "Ivan", "Maria")
-- Chinese: "李明" (NOT "Li Ming")
-Exception: "System" always in English for LitRPG interfaces.
-</no_translation_rule>
-
-### STEP 5: DETERMINE GENDER
-
-Evidence-based assignment:
-
-| Evidence | Male | Female |
-|----------|------|--------|
-| Pronouns | he, him, his | she, her, hers |
-| Titles | Mr., Sir, Lord, King, Father | Mrs., Ms., Lady, Queen, Mother |
-| Relation | son, husband, boyfriend | daughter, wife, girlfriend |
-| Description | "the man", "the boy" | "the woman", "the girl" |
-
-**Default genders:**
-- System/Interface/AI → **female** (LitRPG convention)
-- Monsters/Dragons → male (unless pronouns indicate otherwise)
-- No evidence → **unknown**
-
-**CRITICAL: Every character MUST have a gender field.** Use exactly "male", "female", or "unknown".
-
----
-
-## CRITICAL WARNINGS
-
-### THE VOCATIVE TRAP (MOST COMMON ERROR)
-
-Names INSIDE quotation marks are being ADDRESSED, not speaking!
-
-**WRONG:**
-- "John, help me!" → John is NOT the speaker (someone is calling John)
-- "Listen, Captain!" → Captain is NOT the speaker
-
-**CORRECT:**
-Look OUTSIDE quotes for speech tags or action beats to find actual speaker.
-
-### MENTIONED ≠ SPEAKING
-
-"I saw John yesterday" → John is NOT speaking (merely mentioned)
-Only include characters whose ACTUAL WORDS appear in dialogue markers.
-
-### DUPLICATE ENTRIES
-
-"John" and "The Guard" (when John IS the guard) must be ONE entry with both in variations.
-
----
-
-## DO vs DO NOT
-
-<do_list>
-✓ Include every character who speaks dialogue
-✓ Include narrator/protagonist if they speak in first-person
-✓ Include System for [bracketed LitRPG messages]
-✓ Merge same-person references into ONE entry
-✓ Use most specific proper name as canonicalName
-✓ Base gender on evidence; use "unknown" if none
-</do_list>
-
-<do_not_list>
-✗ DO NOT include characters only mentioned, never speaking
-✗ DO NOT treat vocative names (inside quotes) as speakers
-✗ DO NOT create duplicate entries for same person
-✗ DO NOT guess gender without evidence
-✗ DO NOT add any text outside the JSON
-</do_not_list>
-
----
-
-## OUTPUT FORMAT
+  <rule name="minimum_output">
+  Always output at least one character. If no named speakers are found, use "Narrator" or "Protagonist".
+  </rule>
+</rules>
 
 <output_format>
-Output ONLY valid JSON. No markdown code blocks, no explanations.
+Output only valid JSON. No markdown code blocks, no explanations, no text outside the JSON.
 
-{"characters":[{"canonicalName":"Name","variations":["Name"],"gender":"male"}]}
+Schema:
+{"characters":[{"canonicalName":"string","variations":["string"],"gender":"male|female|unknown"}]}
 
-Requirements:
-- Output must start with { and end with }
-- canonicalName: Primary name
-- variations: ALL names/titles used (MUST include canonicalName)
-- gender: Exactly "male", "female", or "unknown" - REQUIRED for every character
-- ALWAYS include ALL 3 fields for each character
-
-ALWAYS output at least one character. If no named speakers found, use "Narrator" or "Protagonist".
+Field requirements:
+  - canonicalName: the primary name chosen by the priority in step choose_canonical_name
+  - variations: all names and titles used for this character, including canonicalName itself
+  - gender: exactly "male", "female", or "unknown" — required for every character
+  - All 3 fields are required for every character entry
+  - Output starts with { and ends with }
 </output_format>
 
 <examples>
+  <example name="simple_dialogue">
+  Input:
+  John smiled at her. "Good morning!"
+  "Morning," Mary replied with a yawn.
 
-**Example 1: Simple Dialogue**
-Input:
-John smiled at her. "Good morning!"
-"Morning," Mary replied with a yawn.
+  Output:
+  {"characters":[{"canonicalName":"John","variations":["John"],"gender":"male"},{"canonicalName":"Mary","variations":["Mary"],"gender":"female"}]}
+  </example>
 
-Output:
-{"characters": [{"canonicalName": "John", "variations": ["John"], "gender": "male"}, {"canonicalName": "Mary", "variations": ["Mary"], "gender": "female"}]}
+  <example name="litrpg_with_system">
+  Input:
+  [Level Up! You have reached Level 10]
+  Jason pumped his fist. "Finally!"
+  "Congratulations," the guide nodded. Later: "Thank you, Master Chen," Jason bowed.
 
-**Example 2: LitRPG with System**
-Input:
-[Level Up! You have reached Level 10]
-Jason pumped his fist. "Finally!"
-"Congratulations," the guide nodded. Later: "Thank you, Master Chen," Jason bowed.
+  Output:
+  {"characters":[{"canonicalName":"System","variations":["System"],"gender":"female"},{"canonicalName":"Jason","variations":["Jason"],"gender":"male"},{"canonicalName":"Master Chen","variations":["Master Chen","The Guide","Guide"],"gender":"unknown"}]}
+  </example>
 
-Output:
-{"characters": [{"canonicalName": "System", "variations": ["System"], "gender": "female"}, {"canonicalName": "Jason", "variations": ["Jason"], "gender": "male"}, {"canonicalName": "Master Chen", "variations": ["Master Chen", "The Guide", "Guide"], "gender": "unknown"}]}
+  <example name="first_person_telepathy">
+  Input:
+  &lt;Master, enemies approach&gt; my familiar's voice echoed.
+  I gripped my staff. "How many?"
+  &lt;A dozen, Master&gt;
 
-**Example 3: First-Person with Telepathy**
-Input:
-<Master, enemies approach> my familiar's voice echoed.
-I gripped my staff. "How many?"
-<A dozen, Master>
+  Output:
+  {"characters":[{"canonicalName":"Familiar","variations":["Familiar"],"gender":"unknown"},{"canonicalName":"Protagonist","variations":["Protagonist"],"gender":"unknown"}]}
+  </example>
 
-Output:
-{"characters": [{"canonicalName": "Familiar", "variations": ["Familiar"], "gender": "unknown"}, {"canonicalName": "Protagonist", "variations": ["Protagonist"], "gender": "unknown"}]}
+  <example name="title_name_merge">
+  Input:
+  The Dark Lord rose. "Who dares disturb me?"
+  "Lord Azaroth, we bring news," Commander Reynolds said.
+  Azaroth's eyes narrowed. "Speak."
 
-**Example 4: Title + Name Merge**
-Input:
-The Dark Lord rose. "Who dares disturb me?"
-"Lord Azaroth, we bring news," Commander Reynolds said.
-Azaroth's eyes narrowed. "Speak."
+  Output:
+  {"characters":[{"canonicalName":"Azaroth","variations":["Azaroth","The Dark Lord","Lord Azaroth"],"gender":"male"},{"canonicalName":"Commander Reynolds","variations":["Commander Reynolds","Reynolds"],"gender":"unknown"}]}
+  </example>
 
-Output:
-{"characters": [{"canonicalName": "Azaroth", "variations": ["Azaroth", "The Dark Lord", "Lord Azaroth"], "gender": "male"}, {"canonicalName": "Commander Reynolds", "variations": ["Commander Reynolds", "Reynolds"], "gender": "unknown"}]}
+  <example name="non_english">
+  Input:
+  Иван нахмурился. «Это плохие новости».
+  «Согласна», — ответила Мария.
 
-**Example 5: Non-English (Russian)**
-Input:
-Иван нахмурился. «Это плохие новости».
-«Согласна», — ответила Мария.
+  Output:
+  {"characters":[{"canonicalName":"Иван","variations":["Иван"],"gender":"male"},{"canonicalName":"Мария","variations":["Мария"],"gender":"female"}]}
+  </example>
 
-Output:
-{"characters": [{"canonicalName": "Иван", "variations": ["Иван"], "gender": "male"}, {"canonicalName": "Мария", "variations": ["Мария"], "gender": "female"}]}
+  <example name="mentioned_not_speaking">
+  Input:
+  "Have you seen Marcus?" Sarah asked.
+  The guard shook his head. "Not since yesterday."
 
-**Example 6: Mentioned Not Speaking**
-Input:
-"Have you seen Marcus?" Sarah asked.
-The guard shook his head. "Not since yesterday."
+  Output:
+  {"characters":[{"canonicalName":"Sarah","variations":["Sarah"],"gender":"female"},{"canonicalName":"Guard","variations":["Guard","The Guard"],"gender":"unknown"}]}
 
-Output:
-{"characters": [{"canonicalName": "Sarah", "variations": ["Sarah"], "gender": "female"}, {"canonicalName": "Guard", "variations": ["Guard", "The Guard"], "gender": "unknown"}]}
+  Marcus is only mentioned, never speaks — not included.
+  </example>
+</examples>`,
 
-Note: Marcus is only mentioned, never speaks - NOT included.
-
-</examples>
-
----
-
-## FINAL CHECKLIST
-
-□ Every speaking character included
-□ Narrator included if speaks (as name or "Protagonist")
-□ System included for [bracketed messages]
-□ Same-person references merged
-□ Gender based on evidence or "unknown"
-□ No non-speaking characters included
-□ Valid JSON output only
-□ If <2 characters found, verify you didn't miss Narrator or System
-
-<remember>
-REMEMBER:
-- [Sigh] = Sound effect → DO NOT extract
-- [Level Up] = System → DO extract
-- "Hello, John" → John is listener, NOT speaker
-- Names inside quotes = vocative (listener)
-</remember>
-`,
-  userTemplate: `<task_primer>
-Extract ALL speaking characters from the text below.
-</task_primer>
-
-<text_input>
+  userTemplate: `<input_text>
 {{text}}
-</text_input>
+</input_text>
 
-<instruction_re_read>
-Read the text above again to ensure no character is missed.
-</instruction_re_read>
+<task_instructions>
+Extract every unique entity that speaks in the text above.
 
-<text_input_re_read>
-{{text}}
-</text_input_re_read>
-
-<final_instruction>
-Task: Extract EVERY unique entity that speaks.
-Read the task again: Extract EVERY unique entity that speaks.
-
-CANDIDATE PROSECUTION - For EVERY potential name:
-1. Did they speak out loud or think? NO → Ignore
-2. Is the name ONLY inside quotes? ("Hello, John") YES → Vocative, Ignore
-3. Is it [bracketed]? [Level Up] → System. [Sigh] → Sound effect, Ignore.
-
-CRITICAL REMINDERS:
-- [Sigh] = Sound effect → DO NOT extract
-- [Level Up] = System → DO extract
-- "Hello, John" → John is listener, NOT speaker
-- Names inside quotes = vocative (listener)
-- ALWAYS output at least one character
-- Output plain JSON, no markdown
+For each potential character, verify:
+  1. Did they actually speak or communicate? If not, do not include them.
+  2. Is the name only inside quotes (e.g., "Hello, John")? If so, that is a vocative — the name is the listener, not the speaker.
+  3. Is it a square bracket message? [Level Up] → System. [Sigh] → sound effect, ignore.
 
 Output valid JSON only:
-</final_instruction>`,
+</task_instructions>`,
 };
