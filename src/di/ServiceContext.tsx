@@ -20,7 +20,7 @@ import { LLMVoiceService } from '@/services/llm';
 import { TTSWorkerPool } from '@/services/TTSWorkerPool';
 import { AudioMerger } from '@/services/AudioMerger';
 import { PipelineRunner } from '@/services/pipeline/PipelineRunner';
-import { PipelineBuilder, createDefaultStepRegistry } from '@/services/pipeline';
+import { PipelineBuilder } from '@/services/pipeline';
 import { ReusableEdgeTTSService } from '@/services/ReusableEdgeTTSService';
 import type { LogStore } from '@/stores/LogStore';
 
@@ -228,10 +228,7 @@ export function createProductionContainer(
   // Register PipelineBuilder (singleton)
   container.registerSingleton<IPipelineBuilder>(
     ServiceTypes.PipelineBuilder,
-    () => {
-      const stepRegistry = createDefaultStepRegistry();
-      return new PipelineBuilder(container, stepRegistry);
-    }
+    () => new PipelineBuilder(container)
   );
 
   // Register factories for per-conversion services

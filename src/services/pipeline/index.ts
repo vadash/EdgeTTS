@@ -1,5 +1,5 @@
 // Pipeline Module
-// Export all pipeline-related functionality
+// Simplified - exports pipeline types, runner, builder, and steps
 
 export type {
   PipelineContext,
@@ -13,23 +13,8 @@ export type {
 export { BasePipelineStep } from './types';
 export { PipelineRunner, createPipelineRunner } from './PipelineRunner';
 
-// Step registry for plugin-like extensibility
-export { StepRegistry, createStepRegistry, type StepFactory } from './StepRegistry';
+// Pipeline builder with StepNames constants
+export { PipelineBuilder, createPipelineBuilder, type IPipelineBuilder, type PipelineBuilderOptions, StepNames, type StepName } from './PipelineBuilder';
 
-// Declarative pipeline configuration
-export {
-  buildPipelineFromConfig,
-  pipelineConfig,
-  PipelineConfigBuilder,
-  type PipelineConfig,
-  type StepConfig,
-} from './PipelineConfig';
-
-// Default registry with built-in steps
-export { createDefaultStepRegistry, StepNames, type StepName } from './DefaultStepRegistry';
-
-// Pipeline builder
-export { PipelineBuilder, createPipelineBuilder, type IPipelineBuilder, type PipelineBuilderOptions } from './PipelineBuilder';
-
-// Steps will be exported here as they are created
+// Steps
 export * from './steps';
