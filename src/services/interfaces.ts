@@ -329,18 +329,6 @@ export interface VoicePool {
   female: string[];
 }
 
-/**
- * Voice assigner for mapping characters to voices
- */
-export interface IVoiceAssigner {
-  /** Assign voices to detected characters from LLM extraction */
-  assignVoicesFromLLMCharacters(characters: LLMCharacter[]): Map<string, string>;
-  /** Get the narrator voice */
-  getNarratorVoice(): string;
-  /** Reset all assignments */
-  reset(): void;
-}
-
 // ============================================================================
 // File Converter Interface
 // ============================================================================
@@ -505,25 +493,3 @@ export interface IReusableTTSServiceFactory {
   create(): IReusableTTSService;
 }
 
-// ============================================================================
-// VoiceAssigner Factory Interface
-// ============================================================================
-
-/**
- * Options for creating a VoiceAssigner
- */
-export interface VoiceAssignerOptions {
-  narratorVoice: string;
-  locale?: string;
-  voicePool?: VoicePool;
-}
-
-/**
- * Factory for creating VoiceAssigner instances
- */
-export interface IVoiceAssignerFactory {
-  /** Create a new VoiceAssigner instance */
-  create(options: VoiceAssignerOptions): IVoiceAssigner;
-  /** Create with filtered pool (detected language + multilingual, filtered by enabled voices) */
-  createWithFilteredPool(narratorVoice: string, language: string, enabledVoices?: string[]): IVoiceAssigner;
-}

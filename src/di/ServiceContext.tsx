@@ -9,7 +9,7 @@ import { StorageKeys } from '@/config/storage';
 
 // Import service implementations
 // Note: EdgeTTSService, TTSWorkerPool, AudioMerger, LLMVoiceService,
-// VoiceAssigner, and FileConverter are created per-conversion by the orchestrator,
+// and FileConverter are created per-conversion by the orchestrator,
 // not pre-registered in the container.
 import { FFmpegService } from '@/services/FFmpegService';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
@@ -19,7 +19,6 @@ import { VoicePoolBuilder } from '@/services/VoicePoolBuilder';
 import { LLMVoiceService } from '@/services/llm';
 import { TTSWorkerPool } from '@/services/TTSWorkerPool';
 import { AudioMerger } from '@/services/AudioMerger';
-import { VoiceAssigner } from '@/services/VoiceAssigner';
 import { PipelineRunner } from '@/services/pipeline/PipelineRunner';
 import { PipelineBuilder, createDefaultStepRegistry } from '@/services/pipeline';
 import { ReusableEdgeTTSService } from '@/services/ReusableEdgeTTSService';
@@ -34,11 +33,9 @@ import type {
   ILLMServiceFactory,
   IWorkerPoolFactory,
   IAudioMergerFactory,
-  IVoiceAssignerFactory,
   IReusableTTSService,
   LLMServiceFactoryOptions,
   MergerConfig,
-  VoiceAssignerOptions,
 } from '@/services/interfaces';
 import type { WorkerPoolOptions } from '@/services/TTSWorkerPool';
 import type { IPipelineRunner } from '@/services/pipeline/types';
@@ -267,19 +264,6 @@ export function createProductionContainer(
     }
   );
 
-  // Register VoiceAssigner factory
-  container.registerSingleton<IVoiceAssignerFactory>(
-    ServiceTypes.VoiceAssignerFactory,
-    () => {
-      const voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
-      return {
-        create: (options: VoiceAssignerOptions) => new VoiceAssigner(voicePoolBuilder, options),
-        createWithFilteredPool: (narratorVoice: string, language: string, enabledVoices?: string[]) =>
-          VoiceAssigner.createWithFilteredPool(voicePoolBuilder, narratorVoice, language, enabledVoices),
-      };
-    }
-  );
-
   return container;
 }
 
@@ -291,7 +275,6 @@ export interface ServiceOverrides {
   logger?: ILogger;
   secureStorage?: ISecureStorage;
   ffmpegService?: IFFmpegService;
-  voiceAssignerFactory?: IVoiceAssignerFactory;
   voicePoolBuilder?: IVoicePoolBuilder;
 }
 
@@ -341,23 +324,6 @@ export function createTestContainer(overrides: ServiceOverrides = {}): ServiceCo
     container.registerSingleton<IVoicePoolBuilder>(
       ServiceTypes.VoicePoolBuilder,
       () => new VoicePoolBuilder()
-    );
-  }
-
-  // Register VoiceAssigner factory
-  if (overrides.voiceAssignerFactory) {
-    container.registerInstance(ServiceTypes.VoiceAssignerFactory, overrides.voiceAssignerFactory);
-  } else {
-    container.registerSingleton<IVoiceAssignerFactory>(
-      ServiceTypes.VoiceAssignerFactory,
-      () => {
-        const voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
-        return {
-          create: (options: VoiceAssignerOptions) => new VoiceAssigner(voicePoolBuilder, options),
-          createWithFilteredPool: (narratorVoice: string, language: string, enabledVoices?: string[]) =>
-            VoiceAssigner.createWithFilteredPool(voicePoolBuilder, narratorVoice, language, enabledVoices),
-        };
-      }
     );
   }
 

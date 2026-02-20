@@ -16,7 +16,6 @@ import type {
   ILLMServiceFactory,
   IWorkerPoolFactory,
   IAudioMergerFactory,
-  IVoiceAssignerFactory,
   ITextBlockSplitter,
   IVoicePoolBuilder,
 } from '@/services/interfaces';
@@ -104,25 +103,6 @@ export function createTestContainer(options: TestContainerOptions = {}): {
         saveMergedFiles: async () => {},
       }),
     })
-  );
-
-  container.registerSingleton<IVoiceAssignerFactory>(
-    ServiceTypes.VoiceAssignerFactory,
-    () => {
-      const voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
-      return {
-        create: (opts) => ({
-          assignVoicesFromLLMCharacters: () => new Map(),
-          getNarratorVoice: () => opts.narratorVoice,
-          reset: () => {},
-        }),
-        createWithFilteredPool: (narratorVoice, _language?, _enabledVoices?) => ({
-          assignVoicesFromLLMCharacters: () => new Map(),
-          getNarratorVoice: () => narratorVoice,
-          reset: () => {},
-        }),
-      };
-    }
   );
 
   return { container, mocks };

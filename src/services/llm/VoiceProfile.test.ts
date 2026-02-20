@@ -368,15 +368,15 @@ describe('assignVoicesTiered', () => {
 
     const result = assignVoicesTiered(characters, voices, narratorVoice);
 
-    // Top 3 get unique voices
-    expect(result.get('Main1')?.shared).toBe(false);
-    expect(result.get('Main2')?.shared).toBe(false);
-    expect(result.get('Main3')?.shared).toBe(false);
+    // Top 3 get unique voices (function returns Map<string, string>)
+    expect(result.get('Main1')).toBeDefined();
+    expect(result.get('Main2')).toBeDefined();
+    expect(result.get('Main3')).toBeDefined();
 
     // They should have different voices
-    const main1Voice = result.get('Main1')?.voice;
-    const main2Voice = result.get('Main2')?.voice;
-    const main3Voice = result.get('Main3')?.voice;
+    const main1Voice = result.get('Main1');
+    const main2Voice = result.get('Main2');
+    const main3Voice = result.get('Main3');
     expect(new Set([main1Voice, main2Voice, main3Voice]).size).toBe(3);
   });
 
@@ -387,9 +387,9 @@ describe('assignVoicesTiered', () => {
 
     const result = assignVoicesTiered(characters, voices, narratorVoice);
 
-    // Minor characters should be marked as shared
-    expect(result.get('Minor1')?.shared).toBe(true);
-    expect(result.get('Minor2')?.shared).toBe(true);
+    // Minor characters should get voices (they cycle through the pool)
+    expect(result.get('Minor1')).toBeDefined();
+    expect(result.get('Minor2')).toBeDefined();
   });
 
   it('cycles through voices for shared assignments', () => {
@@ -407,7 +407,7 @@ describe('assignVoicesTiered', () => {
 
     // Minor 1-4 should cycle through voices 1-3
     const minorVoices = ['Minor1', 'Minor2', 'Minor3', 'Minor4'].map(
-      name => result.get(name)?.voice
+      name => result.get(name)
     );
     // All should be one of the available voices
     for (const voice of minorVoices) {
@@ -427,14 +427,14 @@ describe('assignVoicesTiered', () => {
     const result = assignVoicesTiered(characters, voices, narratorVoice);
 
     // All 3 characters get unique voices (3 voices, 3 characters)
-    expect(result.get('HighLines')?.shared).toBe(false);
-    expect(result.get('MidLines')?.shared).toBe(false);
-    expect(result.get('LowLines')?.shared).toBe(false);
+    expect(result.get('HighLines')).toBeDefined();
+    expect(result.get('MidLines')).toBeDefined();
+    expect(result.get('LowLines')).toBeDefined();
 
     // Verify they have different voices
-    const highVoice = result.get('HighLines')?.voice;
-    const midVoice = result.get('MidLines')?.voice;
-    const lowVoice = result.get('LowLines')?.voice;
+    const highVoice = result.get('HighLines');
+    const midVoice = result.get('MidLines');
+    const lowVoice = result.get('LowLines');
     expect(new Set([highVoice, midVoice, lowVoice]).size).toBe(3);
   });
 
@@ -451,8 +451,8 @@ describe('assignVoicesTiered', () => {
     // Narrator should not be in result
     expect(result.has('Narrator')).toBe(false);
 
-    // Character should get unique voice (since narrator filtered out)
-    expect(result.get('Character')?.shared).toBe(false);
+    // Character should get a voice
+    expect(result.get('Character')).toBeDefined();
   });
 });
 

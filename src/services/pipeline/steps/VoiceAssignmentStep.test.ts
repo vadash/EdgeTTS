@@ -1,34 +1,27 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { VoiceAssignmentStep, createVoiceAssignmentStep } from './VoiceAssignmentStep';
 import { createTestContext, createNeverAbortSignal, createTestAbortController, collectProgress, createContextWithCharacters } from '@/test/pipeline/helpers';
-import type { IVoiceAssigner, LLMCharacter } from '@/services/interfaces';
+import type { LLMCharacter, VoicePool } from '@/state/types';
 
 describe('VoiceAssignmentStep', () => {
   let step: VoiceAssignmentStep;
-  let mockVoiceAssigner: IVoiceAssigner;
-
-  const createMockAssigner = (voiceMap: Map<string, string>): IVoiceAssigner => ({
-    assignVoicesFromLLMCharacters: vi.fn(() => voiceMap),
-    getNarratorVoice: vi.fn(() => 'narrator-voice'),
-    reset: vi.fn(),
-  });
+  let testPool: VoicePool;
 
   const testCharacters: LLMCharacter[] = [
-    { code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] },
-    { code: 'B', canonicalName: 'Bob', gender: 'male', aliases: [] },
+    { code: 'A', canonicalName: 'Alice', gender: 'female', variations: [] },
+    { code: 'B', canonicalName: 'Bob', gender: 'male', variations: [] },
+    { code: 'C', canonicalName: 'Charlie', gender: 'male', variations: ['Charles'] },
   ];
 
   beforeEach(() => {
-    const defaultVoiceMap = new Map([
-      ['Alice', 'voice-female-1'],
-      ['Bob', 'voice-male-1'],
-    ]);
-    mockVoiceAssigner = createMockAssigner(defaultVoiceMap);
+    testPool = {
+      male: ['male-1', 'male-2', 'male-3'],
+      female: ['female-1', 'female-2', 'female-3'],
+    };
 
     step = createVoiceAssignmentStep({
       narratorVoice: 'narrator-voice-id',
-      detectedLanguage: 'en',
-      createVoiceAssigner: () => mockVoiceAssigner,
+      pool: testPool,
     });
   });
 
@@ -39,21 +32,25 @@ describe('VoiceAssignmentStep', () => {
   });
 
   describe('execute', () => {
-    it('assigns voices to characters', async () => {
+    it('assigns voices to characters based on gender', async () => {
       const context = createContextWithCharacters(testCharacters);
       const result = await step.execute(context, createNeverAbortSignal());
 
       expect(result.voiceMap).toBeDefined();
-      expect(result.voiceMap!.size).toBe(2);
-      expect(result.voiceMap!.get('Alice')).toBe('voice-female-1');
-      expect(result.voiceMap!.get('Bob')).toBe('voice-male-1');
-    });
+      expect(result.voiceMap!.size).toBeGreaterThan(0);
 
-    it('calls voice assigner with characters', async () => {
-      const context = createContextWithCharacters(testCharacters);
-      await step.execute(context, createNeverAbortSignal());
+      // Alice should get a female voice
+      const aliceVoice = result.voiceMap!.get('Alice');
+      expect(testPool.female).toContain(aliceVoice);
 
-      expect(mockVoiceAssigner.assignVoicesFromLLMCharacters).toHaveBeenCalledWith(testCharacters);
+      // Bob and Charlie should get male voices
+      const bobVoice = result.voiceMap!.get('Bob');
+      const charlieVoice = result.voiceMap!.get('Charlie');
+      expect(testPool.male).toContain(bobVoice);
+      expect(testPool.male).toContain(charlieVoice);
+
+      // Charlie's variation should map to same voice
+      expect(result.voiceMap!.get('Charles')).toBe(charlieVoice);
     });
 
     it('preserves existing context properties', async () => {
@@ -69,39 +66,23 @@ describe('VoiceAssignmentStep', () => {
       expect(result.characters).toEqual(testCharacters);
     });
 
-    it('uses detected language from context', async () => {
-      let usedLocale: string | undefined;
-      const stepWithLocaleCapture = createVoiceAssignmentStep({
-        narratorVoice: 'narrator',
-        detectedLanguage: 'en',
-        createVoiceAssigner: (narrator, locale) => {
-          usedLocale = locale;
-          return mockVoiceAssigner;
-        },
-      });
+    it('assigns unique voices to each character', async () => {
+      const context = createContextWithCharacters(testCharacters);
+      const result = await step.execute(context, createNeverAbortSignal());
 
-      const context = createContextWithCharacters(testCharacters, { detectedLanguage: 'ru' });
-      await stepWithLocaleCapture.execute(context, createNeverAbortSignal());
-
-      expect(usedLocale).toBe('ru');
+      const voices = new Set(result.voiceMap!.values());
+      // Should have at least 3 unique voices (one per character)
+      // Plus possibly unnamed voices
+      expect(voices.size).toBeGreaterThanOrEqual(3);
     });
 
-    it('falls back to options language when context has no detected language', async () => {
-      let usedLocale: string | undefined;
-      const stepWithLocaleCapture = createVoiceAssignmentStep({
-        narratorVoice: 'narrator',
-        detectedLanguage: 'de',
-        createVoiceAssigner: (narrator, locale) => {
-          usedLocale = locale;
-          return mockVoiceAssigner;
-        },
-      });
+    it('adds unnamed speaker mappings', async () => {
+      const context = createContextWithCharacters(testCharacters);
+      const result = await step.execute(context, createNeverAbortSignal());
 
-      // Explicitly set detectedLanguage to undefined to trigger fallback
-      const context = createContextWithCharacters(testCharacters, { detectedLanguage: undefined as any });
-      await stepWithLocaleCapture.execute(context, createNeverAbortSignal());
-
-      expect(usedLocale).toBe('de');
+      expect(result.voiceMap!.has('MALE_UNNAMED')).toBe(true);
+      expect(result.voiceMap!.has('FEMALE_UNNAMED')).toBe(true);
+      expect(result.voiceMap!.has('UNKNOWN_UNNAMED')).toBe(true);
     });
   });
 
@@ -143,7 +124,7 @@ describe('VoiceAssignmentStep', () => {
       const { progress } = await collectProgress(step, context);
 
       const finalProgress = progress[progress.length - 1];
-      expect(finalProgress.message).toContain('2 voice');
+      expect(finalProgress.message).toContain('3 character');
     });
   });
 

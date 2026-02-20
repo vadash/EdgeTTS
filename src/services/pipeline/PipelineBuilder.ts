@@ -16,7 +16,6 @@ import type {
   ILLMServiceFactory,
   IWorkerPoolFactory,
   IAudioMergerFactory,
-  IVoiceAssignerFactory,
   IVoicePoolBuilder,
   ILogger,
   LLMServiceFactoryOptions,
@@ -95,7 +94,6 @@ export class PipelineBuilder implements IPipelineBuilder {
   private llmServiceFactory: ILLMServiceFactory;
   private workerPoolFactory: IWorkerPoolFactory;
   private audioMergerFactory: IAudioMergerFactory;
-  private voiceAssignerFactory: IVoiceAssignerFactory;
   private voicePoolBuilder: IVoicePoolBuilder;
   private ffmpegService: IFFmpegService;
   private logger: ILogger;
@@ -108,7 +106,6 @@ export class PipelineBuilder implements IPipelineBuilder {
     this.llmServiceFactory = container.get<ILLMServiceFactory>(ServiceTypes.LLMServiceFactory);
     this.workerPoolFactory = container.get<IWorkerPoolFactory>(ServiceTypes.WorkerPoolFactory);
     this.audioMergerFactory = container.get<IAudioMergerFactory>(ServiceTypes.AudioMergerFactory);
-    this.voiceAssignerFactory = container.get<IVoiceAssignerFactory>(ServiceTypes.VoiceAssignerFactory);
     this.voicePoolBuilder = container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder);
     this.ffmpegService = container.get<IFFmpegService>(ServiceTypes.FFmpegService);
     this.logger = container.get<ILogger>(ServiceTypes.Logger);
@@ -182,10 +179,7 @@ export class PipelineBuilder implements IPipelineBuilder {
         })
         .addStep(StepNames.VOICE_ASSIGNMENT, {
           narratorVoice: options.narratorVoice,
-          detectedLanguage: options.detectedLanguage,
-          enabledVoices: options.enabledVoices,
-          createVoiceAssigner: (narratorVoice: string, locale: string, enabledVoices?: string[]) =>
-            this.voiceAssignerFactory.createWithFilteredPool(narratorVoice, locale, enabledVoices),
+          pool: this.voicePoolBuilder.buildPool(options.detectedLanguage, options.enabledVoices),
         })
         .addStep(StepNames.SPEAKER_ASSIGNMENT, {
           llmOptions: assignLLMOptions,

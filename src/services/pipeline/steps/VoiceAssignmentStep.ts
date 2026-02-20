@@ -2,22 +2,21 @@
 // Assigns voices to detected characters based on gender and locale
 
 import { BasePipelineStep, PipelineContext } from '../types';
-import type { IVoiceAssigner, VoicePool } from '@/services/interfaces';
+import type { VoicePool } from '@/services/interfaces';
 import type { LLMCharacter } from '@/state/types';
+import { allocateByGender } from '@/services/VoiceAllocator';
 
 /**
  * Options for VoiceAssignmentStep
  */
 export interface VoiceAssignmentStepOptions {
   narratorVoice: string;
-  detectedLanguage: string;
-  enabledVoices?: string[];
-  createVoiceAssigner: (narratorVoice: string, locale: string, enabledVoices?: string[]) => IVoiceAssigner;
+  pool: VoicePool;
 }
 
 /**
  * Assigns unique voices to detected characters
- * Uses VoiceAssigner with locale-filtered voice pools
+ * Uses simple gender-based allocation before speaker assignment
  */
 export class VoiceAssignmentStep extends BasePipelineStep {
   readonly name = 'voice-assignment';
@@ -41,18 +40,10 @@ export class VoiceAssignmentStep extends BasePipelineStep {
 
     this.reportProgress(0, characters.length, 'Assigning voices to characters...');
 
-    // Create voice assigner with filtered pool
-    const assigner = this.options.createVoiceAssigner(
-      this.options.narratorVoice,
-      context.detectedLanguage || this.options.detectedLanguage,
-      this.options.enabledVoices
-    );
+    // Allocate voices by gender
+    const { voiceMap, uniqueCount } = allocateByGender(characters, this.options);
 
-    // Assign voices
-    const voiceMap = assigner.assignVoicesFromLLMCharacters(characters);
-
-    const uniqueVoices = new Set(voiceMap.values()).size;
-    this.reportProgress(characters.length, characters.length, `Assigned ${uniqueVoices} voice(s) to ${characters.length} character(s)`);
+    this.reportProgress(characters.length, characters.length, `Assigned ${uniqueCount} voice(s) to ${characters.length} character(s)`);
 
     return {
       ...context,
