@@ -106,11 +106,6 @@ export interface TTSWorker {
   mp3Saved: boolean;
 }
 
-export interface ThreadsInfo {
-  count: number;
-  maxCount: number;
-}
-
 export interface TTSConfig {
   voice: string;
   pitch: string;
@@ -158,34 +153,12 @@ declare global {
   }
 }
 
-// Multi-voice types
-export type SpeakerType = 'narrator' | 'character';
-
-export interface DialogueSegment {
-  text: string;
-  speaker: string;           // 'narrator' or character name
-  speakerType: SpeakerType;
-  gender: 'male' | 'female' | 'unknown';
-  originalIndex: number;
-}
-
+// Character Info (for non-LLM voice assignment - still used by VoiceAssigner)
 export interface CharacterInfo {
   name: string;
   gender: 'male' | 'female' | 'unknown';
   occurrences: number;
   assignedVoice?: string;
-}
-
-export interface ParsedDialogue {
-  segments: DialogueSegment[];
-  characters: Map<string, CharacterInfo>;
-}
-
-export interface VoiceAnnotatedChunk {
-  text: string;
-  voice: string;
-  partIndex: number;
-  speaker: string;
 }
 
 export interface VoicePool {
@@ -238,15 +211,6 @@ export interface LLMValidationResult {
   valid: boolean;
   errors: string[];
   repairedResponse?: string;
-}
-
-export interface ProcessedBookWithVoices {
-  chunks: VoiceAnnotatedChunk[];
-  characters: Map<string, CharacterInfo>;
-  voiceAssignments: Map<string, string>;
-  fileNames: Array<[string, number]>;
-  allSentences: string[];
-  fullText: string;
 }
 
 // Voice Profile Types (v2)

@@ -2,10 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   VoicePoolBuilder,
   buildVoicePool,
-  buildFilteredPool,
-  getFilteredVoices,
-  getMaleVoices,
-  getFemaleVoices,
   getRandomVoice,
 } from './VoicePoolBuilder';
 
@@ -23,11 +19,18 @@ describe('VoicePoolBuilder', () => {
       );
       expect(hasEnglishOrMultilingual).toBe(true);
     });
+
+    it('respects enabledVoices allowlist', () => {
+      const builder = new VoicePoolBuilder();
+      const pool = builder.buildPool('en', ['en-US, GuyNeural']);
+
+      expect([...pool.male, ...pool.female]).toEqual(['en-US, GuyNeural']);
+    });
   });
 
   describe('buildVoicePool', () => {
     it('filters by locale prefix', () => {
-      const pool = buildVoicePool('en');
+      const pool = buildVoicePool({ language: 'en' });
 
       expect(pool.male.length).toBeGreaterThan(0);
       expect(pool.female.length).toBeGreaterThan(0);
@@ -36,22 +39,19 @@ describe('VoicePoolBuilder', () => {
     });
 
     it('separates male and female voices', () => {
-      const pool = buildVoicePool('en');
+      const pool = buildVoicePool({ language: 'en' });
 
-      // All voices in male pool should be unique
       const uniqueMale = new Set(pool.male);
       expect(uniqueMale.size).toBe(pool.male.length);
 
-      // All voices in female pool should be unique
       const uniqueFemale = new Set(pool.female);
       expect(uniqueFemale.size).toBe(pool.female.length);
 
-      // No overlap between male and female
       const maleSet = new Set(pool.male);
       pool.female.forEach(v => expect(maleSet.has(v)).toBe(false));
     });
 
-    it('returns all voices when no locale specified', () => {
+    it('returns all voices when no options specified', () => {
       const pool = buildVoicePool();
       const totalVoices = pool.male.length + pool.female.length;
 
@@ -59,101 +59,80 @@ describe('VoicePoolBuilder', () => {
     });
 
     it('returns empty pools for non-existent locale', () => {
-      const pool = buildVoicePool('xx');
+      const pool = buildVoicePool({ language: 'xx' });
 
       expect(pool.male).toHaveLength(0);
       expect(pool.female).toHaveLength(0);
     });
-  });
 
-  describe('buildFilteredPool', () => {
-    it('includes multilingual voices', () => {
-      const pool = buildFilteredPool('ru');
+    it('includes multilingual voices when flag set', () => {
+      const pool = buildVoicePool({ language: 'ru', includeMultilingual: true });
 
-      // Should include Russian voices
       const hasRussian = [...pool.male, ...pool.female].some(v => v.startsWith('ru'));
       expect(hasRussian).toBe(true);
 
-      // Should also include multilingual voices
       const hasMultilingual = [...pool.male, ...pool.female].some(v =>
         v.includes('Multilingual')
       );
       expect(hasMultilingual).toBe(true);
     });
 
-    it('defaults to English when no language specified', () => {
-      const pool = buildFilteredPool();
+    it('does not include multilingual voices when flag not set', () => {
+      const poolWithout = buildVoicePool({ language: 'ru', includeMultilingual: false });
+      const poolWith = buildVoicePool({ language: 'ru', includeMultilingual: true });
 
-      const hasEnglish = [...pool.male, ...pool.female].some(v => v.startsWith('en'));
-      expect(hasEnglish).toBe(true);
+      expect(poolWith.male.length + poolWith.female.length)
+        .toBeGreaterThan(poolWithout.male.length + poolWithout.female.length);
     });
-  });
 
-  describe('getFilteredVoices', () => {
-    it('returns combined male and female voices', () => {
-      const voices = getFilteredVoices('en');
-      const pool = buildFilteredPool('en');
+    it('respects enabledVoices allowlist', () => {
+      const pool = buildVoicePool({
+        language: 'en',
+        enabledVoices: ['en-US, GuyNeural', 'en-US, JennyNeural'],
+      });
 
-      expect(voices.length).toBe(pool.male.length + pool.female.length);
-    });
-  });
-
-  describe('getMaleVoices', () => {
-    it('returns only male voices', () => {
-      const voices = getMaleVoices('en');
-
-      expect(voices.length).toBeGreaterThan(0);
-      voices.forEach(v => expect(v.startsWith('en')).toBe(true));
-    });
-  });
-
-  describe('getFemaleVoices', () => {
-    it('returns only female voices', () => {
-      const voices = getFemaleVoices('en');
-
-      expect(voices.length).toBeGreaterThan(0);
-      voices.forEach(v => expect(v.startsWith('en')).toBe(true));
+      expect([...pool.male, ...pool.female].sort()).toEqual(['en-US, GuyNeural', 'en-US, JennyNeural']);
     });
   });
 
   describe('getRandomVoice', () => {
     it('returns male voice for male gender', () => {
-      const voice = getRandomVoice('male', 'en');
-      const maleVoices = getMaleVoices('en');
+      const voice = getRandomVoice('male', { language: 'en' });
+      const pool = buildVoicePool({ language: 'en' });
 
-      expect(maleVoices).toContain(voice);
+      expect(pool.male).toContain(voice);
     });
 
     it('returns female voice for female gender', () => {
-      const voice = getRandomVoice('female', 'en');
-      const femaleVoices = getFemaleVoices('en');
+      const voice = getRandomVoice('female', { language: 'en' });
+      const pool = buildVoicePool({ language: 'en' });
 
-      expect(femaleVoices).toContain(voice);
+      expect(pool.female).toContain(voice);
     });
 
     it('returns any voice for unknown gender', () => {
-      const voice = getRandomVoice('unknown', 'en');
-      const allVoices = [...getMaleVoices('en'), ...getFemaleVoices('en')];
+      const voice = getRandomVoice('unknown', { language: 'en' });
+      const pool = buildVoicePool({ language: 'en' });
+      const allVoices = [...pool.male, ...pool.female];
 
       expect(allVoices).toContain(voice);
     });
 
     it('respects exclusion set', () => {
-      const maleVoices = getMaleVoices('en');
-      const excluded = new Set(maleVoices.slice(0, maleVoices.length - 1));
+      const pool = buildVoicePool({ language: 'en' });
+      const excluded = new Set(pool.male.slice(0, pool.male.length - 1));
 
-      const voice = getRandomVoice('male', 'en', excluded);
+      const voice = getRandomVoice('male', { language: 'en' }, excluded);
 
       expect(excluded.has(voice)).toBe(false);
     });
 
     it('falls back to full pool when all voices excluded', () => {
-      const maleVoices = getMaleVoices('en');
-      const excluded = new Set(maleVoices);
+      const pool = buildVoicePool({ language: 'en' });
+      const excluded = new Set(pool.male);
 
-      // Should still return a voice from the pool
-      const voice = getRandomVoice('male', 'en', excluded);
-      expect(maleVoices).toContain(voice);
+      const voice = getRandomVoice('male', { language: 'en' }, excluded);
+      expect(pool.male).toContain(voice);
     });
   });
 });

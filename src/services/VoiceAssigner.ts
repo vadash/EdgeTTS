@@ -92,19 +92,6 @@ export class VoiceAssigner implements IVoiceAssigner {
   }
 
   /**
-   * Assign voices to all characters from parsed dialogue
-   */
-  assignVoicesFromCharacters(characters: Map<string, CharacterInfo>): void {
-    // Sort by occurrences (more frequent characters get assigned first for better variety)
-    const sorted = Array.from(characters.entries())
-      .sort((a, b) => b[1].occurrences - a[1].occurrences);
-
-    for (const [name, info] of sorted) {
-      this.assignVoice(name, info.gender);
-    }
-  }
-
-  /**
    * Assign voices to characters from LLM extraction result
    * Returns a map of canonical name -> voice ID
    */

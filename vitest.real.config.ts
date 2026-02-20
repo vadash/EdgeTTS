@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'node',
     include: ['src/test/llm-real.test.ts'],
     globals: true,
-    testTimeout: 120000,
+    testTimeout: 300000,
   },
   resolve: {
     alias: {

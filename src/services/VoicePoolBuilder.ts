@@ -4,29 +4,38 @@ import type { DetectedLanguage } from '../utils/languageDetection';
 import type { IVoicePoolBuilder } from './interfaces';
 
 /**
- * VoicePoolBuilder class implementing IVoicePoolBuilder interface
+ * Build options for voice pool
  */
-export class VoicePoolBuilder implements IVoicePoolBuilder {
-  /**
-   * Build voice pool filtered by locale and enabled voices
-   */
-  buildPool(locale: string, enabledVoices?: string[]): VoicePool {
-    return buildFilteredPool(locale as DetectedLanguage, enabledVoices);
-  }
+export interface VoicePoolOptions {
+  /** Language/locale filter (e.g., 'en', 'ru') */
+  language?: string;
+  /** Include multilingual voices in addition to language match */
+  includeMultilingual?: boolean;
+  /** Only include voices in this allowlist */
+  enabledVoices?: string[];
 }
 
 /**
- * Builds a voice pool filtered by locale and separated by gender
+ * Builds a voice pool filtered by language, separated by gender
+ * - If language specified, filters by locale prefix
+ * - If includeMultilingual=true, also includes voices with 'Multilingual' in name
+ * - If enabledVoices provided, only includes those voices
  */
-export function buildVoicePool(locale?: string, enabledVoices?: string[]): VoicePool {
+export function buildVoicePool(options: VoicePoolOptions = {}): VoicePool {
+  const { language, includeMultilingual = false, enabledVoices } = options;
+
   // Start with enabled voices or all voices
   let baseVoices = enabledVoices && enabledVoices.length > 0
     ? voices.filter(v => enabledVoices.includes(v.fullValue))
     : voices;
 
-  // Filter by locale if specified
-  const filtered = locale
-    ? baseVoices.filter(v => v.locale.startsWith(locale.split('-')[0]))
+  // Filter by language
+  const filtered = language
+    ? baseVoices.filter(v => {
+        const matchesLang = v.locale.startsWith(language.split('-')[0]);
+        const matchesMulti = includeMultilingual && v.name.includes('Multilingual');
+        return matchesLang || matchesMulti;
+      })
     : baseVoices;
 
   return {
@@ -36,59 +45,14 @@ export function buildVoicePool(locale?: string, enabledVoices?: string[]): Voice
 }
 
 /**
- * Builds a filtered voice pool for LLM voice assignment
- * Includes voices matching the detected language + multilingual voices
- * Respects user's enabled voices selection
- */
-export function buildFilteredPool(language: DetectedLanguage = 'en', enabledVoices?: string[]): VoicePool {
-  // Start with enabled voices or all voices
-  const baseVoices = enabledVoices && enabledVoices.length > 0
-    ? voices.filter(v => enabledVoices.includes(v.fullValue))
-    : voices;
-
-  // Filter by language + multilingual
-  const filtered = baseVoices.filter(v =>
-    v.locale.startsWith(language) ||
-    v.name.includes('Multilingual')
-  );
-
-  return {
-    male: filtered.filter(v => v.gender === 'male').map(v => v.fullValue),
-    female: filtered.filter(v => v.gender === 'female').map(v => v.fullValue),
-  };
-}
-
-/**
- * Get all voices from the filtered pool
- */
-export function getFilteredVoices(language: DetectedLanguage = 'en'): string[] {
-  const pool = buildFilteredPool(language);
-  return [...pool.male, ...pool.female];
-}
-
-/**
- * Get all male voices, optionally filtered by locale
- */
-export function getMaleVoices(locale?: string): string[] {
-  return buildVoicePool(locale).male;
-}
-
-/**
- * Get all female voices, optionally filtered by locale
- */
-export function getFemaleVoices(locale?: string): string[] {
-  return buildVoicePool(locale).female;
-}
-
-/**
  * Get a random voice from the pool based on gender
  */
 export function getRandomVoice(
   gender: 'male' | 'female' | 'unknown',
-  locale?: string,
+  options: VoicePoolOptions = {},
   excludeVoices: Set<string> = new Set()
 ): string {
-  const pool = buildVoicePool(locale);
+  const pool = buildVoicePool(options);
 
   let candidates: string[];
   if (gender === 'male') {
@@ -96,11 +60,10 @@ export function getRandomVoice(
   } else if (gender === 'female') {
     candidates = pool.female.filter(v => !excludeVoices.has(v));
   } else {
-    // For unknown gender, pick from both pools
     candidates = [...pool.male, ...pool.female].filter(v => !excludeVoices.has(v));
   }
 
-  // If all voices are excluded, fall back to the full pool
+  // If all excluded, fall back to full pool
   if (candidates.length === 0) {
     candidates = gender === 'male' ? pool.male :
                  gender === 'female' ? pool.female :
@@ -108,4 +71,14 @@ export function getRandomVoice(
   }
 
   return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+/**
+ * VoicePoolBuilder class implementing IVoicePoolBuilder interface for DI
+ * Delegates to buildVoicePool with includeMultilingual=true for LLM
+ */
+export class VoicePoolBuilder implements IVoicePoolBuilder {
+  buildPool(locale: string, enabledVoices?: string[]): VoicePool {
+    return buildVoicePool({ language: locale, includeMultilingual: true, enabledVoices });
+  }
 }
