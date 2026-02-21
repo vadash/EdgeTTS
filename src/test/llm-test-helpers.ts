@@ -164,13 +164,28 @@ export async function runAssign(
 }
 
 /**
- * Find assignment by text content
+ * Normalize quotes for text matching (smart quotes -> straight quotes)
+ * Handles: " " ' ' ` ` and various Unicode quote characters
+ */
+function normalizeQuotes(text: string): string {
+  return text
+    // Double quotes
+    .replace(/[\u201C\u201D\u201E\u00AB\u00BB]/g, '"')
+    // Single quotes/apostrophes (right single quote is most common apostrophe)
+    .replace(/[\u2018\u2019\u201A\u201B\u2039\u203A\u02BC\u2032\uFF07]/g, "'")
+    // Em dash -> hyphen
+    .replace(/[\u2014\u2015\u2212]/g, '-');
+}
+
+/**
+ * Find assignment by text content (normalizes quotes for matching)
  */
 export function findAssignment(
   assignments: SpeakerAssignment[],
   textContains: string
 ): SpeakerAssignment | undefined {
-  return assignments.find(a => a.text.includes(textContains));
+  const normalizedSearch = normalizeQuotes(textContains);
+  return assignments.find(a => normalizeQuotes(a.text).includes(normalizedSearch));
 }
 
 /**
