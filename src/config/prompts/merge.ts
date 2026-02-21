@@ -136,19 +136,22 @@ Review the character list. Identify entries referring to the same entity. Output
 </rules>
 
 <output_format>
-Output only valid JSON. No markdown, no explanations.
-
-Schema:
-{"merges":[[keepIndex, absorbIndex1, absorbIndex2, ...]]}
+Output only valid JSON that matches this exact schema structure:
+{
+  "reasoning": "Brief explanation of merge decisions (or null if straightforward)",
+  "merges": [[index1, index2, ...], [index3, index4, ...], ...]
+}
 
 Rules:
+  - reasoning: optional explanation of your merge logic (can be null)
   - merges: array of merge groups (empty [] if no merges needed)
-  - Each group: array of character indices (0-based)
-  - First index = character to keep (most specific name)
+  - Each group: array of character indices (0-based), must have 2 or more indices
+  - First index in each group = character to keep (most specific name)
   - Remaining indices = characters to absorb
   - Characters not in any group stay unchanged automatically
   - Each index appears in at most one group
-  - Each group has at least 2 indices
+  - Each group must have at least 2 indices (single-element groups are invalid)
+  - Return null for reasoning if merges are obvious
 </output_format>
 
 <examples>
@@ -257,6 +260,6 @@ Apply these checks in order:
 
 Confidence rule: merge only if 90%+ sure. When in doubt, do not merge.
 
-Output valid JSON only:
+Output JSON matching the schema: {reasoning, merges}
 </task_instructions>`,
 };

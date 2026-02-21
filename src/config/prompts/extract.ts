@@ -126,17 +126,25 @@ Extract every unique entity that speaks in the provided text. Output JSON with c
 </rules>
 
 <output_format>
-Output only valid JSON. No markdown code blocks, no explanations, no text outside the JSON.
-
-Schema:
-{"characters":[{"canonicalName":"string","variations":["string"],"gender":"male|female|unknown"}]}
+Output only valid JSON that matches this exact schema structure:
+{
+  "reasoning": "Brief explanation of your analysis (or null if none)",
+  "characters": [
+    {
+      "canonicalName": "Character's primary name",
+      "variations": ["array of name variations"],
+      "gender": "male" | "female" | "unknown"
+    }
+  ]
+}
 
 Field requirements:
-  - canonicalName: the primary name chosen by the priority in step choose_canonical_name
+  - reasoning: optional explanation of your extraction process (can be null)
+  - characters: array of character objects (must contain at least one character)
+  - canonicalName: the primary name chosen by the priority in step choose_canonical_name, must be non-empty
   - variations: all names and titles used for this character, including canonicalName itself
   - gender: exactly "male", "female", or "unknown" — required for every character
-  - All 3 fields are required for every character entry
-  - Output starts with { and ends with }
+  - Return null for reasoning if no additional explanation needed
 </output_format>
 
 <examples>
@@ -212,6 +220,6 @@ For each potential character, verify:
   2. Is the name only inside quotes (e.g., "Hello, John")? If so, that is a vocative — the name is the listener, not the speaker.
   3. Is it a square bracket message? [Level Up] → System. [Sigh] → sound effect, ignore.
 
-Output valid JSON only:
+Output JSON matching the schema: {reasoning, characters}
 </task_instructions>`,
 };

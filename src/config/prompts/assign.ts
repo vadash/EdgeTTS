@@ -127,30 +127,33 @@ For each numbered paragraph, analyze content and context to determine which char
 </speaker_list>
 
 <output_format>
-For each paragraph, output exactly one line:
-index:CODE
+Output only valid JSON that matches this exact schema structure:
+{
+  "reasoning": "Brief explanation of assignments (or null if straightforward)",
+  "assignments": {"0": "CODE", "5": "CODE", ...}
+}
 
 Format rules:
-  - Format is NUMBER:CODE with no spaces, no brackets, no asterisks
-  - One line per paragraph, every paragraph accounted for
-  - Use only the speaker codes from the speaker list above (A, B, C, etc.)
-  - Do not use character names — use their codes
-  - No markdown formatting (no bold, no code blocks)
-  - No explanations or comments after the code
-  - Plain text only
+  - reasoning: optional explanation of your attribution logic (can be null)
+  - assignments: sparse object mapping paragraph indices to speaker codes
+  - Keys are paragraph indices as strings (0-based): "0", "1", "2", etc.
+  - Values are speaker codes from the list above: "A", "B", "C", etc.
+  - Only include indices where a specific character speaks
+  - Omit indices that are narration/ambient text (they default to narrator)
+  - Use only codes, not character names
+  - Return null for reasoning if assignments are obvious
 
 Valid output:
-0:A
-1:B
-2:A
-3:C
+{
+  "reasoning": null,
+  "assignments": {"0": "A", "1": "B", "5": "C"}
+}
+(Paragraphs 2, 3, 4 are narration and not included)
 
 Invalid output:
-**0:A**       (markdown bold)
-0: A          (space after colon)
-0:A - John    (explanation added)
-0:John        (name instead of code)
-0:SYSTEM      (name instead of code)
+{"0": "John"}    (name instead of code)
+{"0": "SYSTEM"}  (name instead of code)
+{"0": "A", "1": "A", "2": "A", "3": "A", ...} (narration indices should be omitted for sparse format)
 </output_format>
 
 <examples>
@@ -163,10 +166,7 @@ Invalid output:
   3: "No, just tired." Mary shook her head.
 
   Output:
-  0:A
-  1:B
-  2:A
-  3:B
+  {"reasoning": null, "assignments": {"0": "A", "1": "B", "2": "A", "3": "B"}}
   </example>
 
   <example name="litrpg_system">
@@ -179,11 +179,7 @@ Invalid output:
   4: [Warning: Mana low]
 
   Output:
-  0:C
-  1:C
-  2:A
-  3:B
-  4:C
+  {"reasoning": "System messages use C, dialogue uses A and B", "assignments": {"0": "C", "1": "C", "2": "A", "3": "B", "4": "C"}}
   </example>
 
   <example name="vocative_trap">
@@ -195,10 +191,7 @@ Invalid output:
   3: I watched them. "Both of you, calm down."
 
   Output:
-  0:A
-  1:B
-  2:A
-  3:C
+  {"reasoning": "John is being addressed (vocative), not speaking, in paragraphs 0 and 2", "assignments": {"0": "A", "1": "B", "2": "A", "3": "C"}}
 
   "John" in paragraphs 0 and 2 is vocative (Sarah calling John), not John speaking.
   </example>
@@ -212,10 +205,7 @@ Invalid output:
   3: "Then we fight," I declared.
 
   Output:
-  0:B
-  1:A
-  2:B
-  3:A
+  {"reasoning": "Angle brackets indicate telepathic messages from Familiar", "assignments": {"0": "B", "1": "A", "2": "B", "3": "A"}}
   </example>
 
   <example name="conversation_flow">
@@ -228,11 +218,7 @@ Invalid output:
   4: "Mandarin, Dad. Barely."
 
   Output:
-  0:B
-  1:A
-  2:B
-  3:A
-  4:B
+  {"reasoning": "Alternating pattern, Dad in paragraph 4 confirms Jane speaking to Erick", "assignments": {"0": "B", "1": "A", "2": "B", "3": "A", "4": "B"}}
 
   No explicit tags. Alternating pattern applies. "Dad" vocative in paragraph 4 confirms Jane is speaking to Erick.
   </example>
@@ -245,11 +231,22 @@ Invalid output:
   2: "Thank you." Sarah took a seat.
 
   Output:
-  0:B
-  1:B
-  2:A
+  {"reasoning": "John's actions are closest to dialogue in paragraphs 0 and 1", "assignments": {"0": "B", "1": "B", "2": "A"}}
 
   John's actions are closest to the dialogue in paragraphs 0 and 1.
+  </example>
+
+  <example name="sparse_format">
+  Codes: A=Alice, C=System
+
+  0: [Alert: Intruder detected]
+  1: The alarm blared throughout the facility.
+  2: Alice ran toward the exit. "We need to leave now!"
+
+  Output:
+  {"reasoning": "Paragraph 1 is narration with no dialogue", "assignments": {"0": "C", "2": "A"}}
+
+  Note: Index "1" is omitted because paragraph 1 has no dialogue (just narration).
   </example>
 </examples>`,
 
@@ -271,8 +268,9 @@ Key reminders:
   - Closest action to dialogue determines the speaker
   - "I" narrator → use the Protagonist code
   - Use codes only (A, B, C), not character names
-  - Plain text, one index:CODE per line, every paragraph accounted for
+  - Output sparse JSON: include only indices where dialogue occurs
+  - Omit indices that are pure narration/ambient text
 
-Output the index:CODE pairs now:
+Output the JSON object with reasoning and assignments now:
 </task_instructions>`,
 };
