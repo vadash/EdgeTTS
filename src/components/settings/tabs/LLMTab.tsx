@@ -86,6 +86,7 @@ export function LLMTab() {
       llm.setStageField(target, 'model', sourceConfig.model);
       llm.setStageField(target, 'temperature', sourceConfig.temperature);
       llm.setStageField(target, 'topP', sourceConfig.topP);
+      llm.setStageField(target, 'repeatPrompt', sourceConfig.repeatPrompt);
     }
   };
 
