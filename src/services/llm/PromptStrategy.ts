@@ -2,18 +2,10 @@
 // Pure functions for character extraction, merging, and speaker assignment
 
 import type { LLMPrompt } from './LLMApiClient';
-import type { LLMCharacter, LLMValidationResult, ExtractResponse } from '@/state/types';
+import type { LLMCharacter } from '@/state/types';
+import type { ExtractResponse, MergeResponse, AssignResponse } from './schemas';
 import { LLM_PROMPTS } from '@/config/prompts';
-import {
-  validateExtractResponse as validateExtractResp,
-  validateMergeResponse as validateMergeResp,
-  validateAssignResponse as validateAssignResp,
-  parseAssignResponse as parseAssignResponseInternal,
-  parseMergeResponse as parseMergeResponseInternal,
-  repairExtractCharacters,
-  repairAssignResponse,
-} from './ResponseValidators';
-import { extractJSON } from '@/utils/llmUtils';
+import { ExtractSchema, MergeSchema, AssignSchema } from './schemas';
 
 // ============================================================================
 // Context Types
@@ -96,29 +88,28 @@ export function buildAssignPrompt(
 }
 
 // ============================================================================
-// Response Parsing
+// Response Parsing (simplified - no repair needed)
 // ============================================================================
 
-export function parseExtractResponse(response: string): ExtractResponse {
-  const cleaned = extractJSON(response);
-  const parsed = JSON.parse(cleaned) as ExtractResponse;
-  const repair = repairExtractCharacters(parsed.characters as any[]);
-  parsed.characters = repair.characters as any;
-  return parsed;
+export function parseExtractResponse(response: unknown): ExtractResponse {
+  return ExtractSchema.parse(response);
 }
 
-export function parseMergeResponse(response: string, context: MergeContext): number[][] {
-  const validation = validateMergeResp(response, context.characters);
-  const finalResponse = validation.repairedResponse || response;
-  return parseMergeResponseInternal(finalResponse);
+export function parseMergeResponse(response: unknown): MergeResponse {
+  return MergeSchema.parse(response);
 }
 
-export function parseAssignResponse(response: string, context: AssignContext): AssignResult {
-  const validCodes = new Set(context.codeToName.keys());
-  const repaired = repairAssignResponse(response, validCodes);
-  const validation = validateAssignResp(response, context.sentenceCount, context.codeToName);
-  const finalResponse = validation.repairedResponse || repaired;
-  return {
-    speakerMap: parseAssignResponseInternal(finalResponse, context.codeToName),
-  };
+export function parseAssignResponse(response: unknown, context: AssignContext): AssignResult {
+  const parsed = AssignSchema.parse(response);
+
+  // Convert sparse object to Map
+  const speakerMap = new Map<number, string>();
+  for (const [key, code] of Object.entries(parsed.assignments)) {
+    const index = parseInt(key, 10);
+    if (context.codeToName.has(code)) {
+      speakerMap.set(index, code);
+    }
+  }
+
+  return { speakerMap };
 }
