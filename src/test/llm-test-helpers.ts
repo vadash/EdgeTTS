@@ -55,9 +55,22 @@ export function validateConfig(): void {
 }
 
 /**
- * Create LLMVoiceService instance
+ * Get repeatPrompt setting from environment variable
+ * @returns boolean value from REPEAT_PROMPT env var (default: false)
  */
-export function createService(): LLMVoiceService {
+export function getRepeatPrompt(): boolean {
+  const envVal = process.env.REPEAT_PROMPT;
+  if (envVal === undefined || envVal === '') {
+    return false;
+  }
+  return envVal === 'true' || envVal === '1';
+}
+
+/**
+ * Create LLMVoiceService instance
+ * @param repeatPrompt - Optional override for repeatPrompt (defaults to REPEAT_PROMPT env var)
+ */
+export function createService(repeatPrompt?: boolean): LLMVoiceService {
   validateConfig();
   return new LLMVoiceService({
     apiKey: testConfig.apiKey,
@@ -69,6 +82,7 @@ export function createService(): LLMVoiceService {
     temperature: testConfig.temperature,
     topP: testConfig.topP,
     useVoting: testConfig.useVoting,
+    repeatPrompt: repeatPrompt ?? getRepeatPrompt(),
     logger: testLogger,
   });
 }
