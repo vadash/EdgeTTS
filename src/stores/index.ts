@@ -7,7 +7,8 @@ export * as ConversionStoreModule from './ConversionStore';
 export * as LLMStoreModule from './LLMStore';
 
 // Store classes (for LogStore, DataStore, LanguageStore which are still class-based)
-export { LogStore, createLogStore } from './LogStore';
+export type { LoggerStore } from '@/services/Logger';
+export { createLoggerStore } from '@/services/Logger';
 export { DataStore, createDataStore } from './DataStore';
 export { LanguageStore, createLanguageStore } from './LanguageStore';
 

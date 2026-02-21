@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { FFmpegService } from './FFmpegService';
 import type { AudioProcessingConfig } from './FFmpegService';
-import { LogStore } from '@/stores/LogStore';
+import { LoggerStore } from '@/services/Logger';
 import { AudioPreset } from '@/state/types';
 
 describe('AudioProcessingConfig', () => {
@@ -58,7 +58,7 @@ describe('AudioProcessingConfig', () => {
 
 describe('FFmpegService Opus integration', () => {
   it('should use custom Opus settings when provided', async () => {
-    const logStore = new LogStore();
+    const logStore = new LoggerStore();
     const service = new FFmpegService(logStore);
 
     // Mock FFmpeg for testing - collect all args into a flat array
@@ -116,7 +116,7 @@ describe('FFmpegService Opus integration', () => {
   });
 
   it('should use default Opus settings when not provided', async () => {
-    const logStore = new LogStore();
+    const logStore = new LoggerStore();
     const service = new FFmpegService(logStore);
 
     const allCalls: string[] = [];

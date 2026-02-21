@@ -4,7 +4,7 @@
 import { signal, computed, effect } from '@preact/signals';
 import type { AppSettings, AudioPreset } from '@/state/types';
 import { AUDIO_PRESETS } from '@/state/types';
-import type { LogStore } from './LogStore';
+import type { LoggerStore } from '@/services/Logger';
 import { StorageKeys } from '@/config/storage';
 
 // ============================================================================

@@ -4,7 +4,7 @@
 import { signal, computed } from '@preact/signals';
 import type { LLMCharacter, SpeakerAssignment, VoiceProfileFile } from '@/state/types';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
-import type { LogStore } from './LogStore';
+import type { LoggerStore } from '@/services/Logger';
 import { StorageKeys } from '@/config/storage';
 
 // ============================================================================
@@ -194,7 +194,7 @@ function scheduleSave(): void {
   }
 }
 
-export async function loadSettings(logStore: LogStore): Promise<void> {
+export async function loadSettings(logStore: LoggerStore): Promise<void> {
   try {
     const saved = localStorage.getItem(StorageKeys.llmSettings);
     if (!saved) return;

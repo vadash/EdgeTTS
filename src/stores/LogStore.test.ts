@@ -1,14 +1,14 @@
-// LogStore Tests
-// Test the LogStore functionality
+// LoggerStore Tests
+// Test the LoggerStore functionality
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { LogStore } from '@/stores/LogStore';
+import { LoggerStore } from '@/services/Logger';
 
-describe('LogStore', () => {
-  let store: LogStore;
+describe('LoggerStore', () => {
+  let store: LoggerStore;
 
   beforeEach(() => {
-    store = new LogStore();
+    store = new LoggerStore();
   });
 
   describe('add', () => {

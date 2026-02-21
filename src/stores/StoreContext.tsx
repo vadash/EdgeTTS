@@ -4,7 +4,7 @@
 import { createContext, ComponentChildren } from 'preact';
 import { useContext } from 'preact/hooks';
 
-import { LogStore } from './LogStore';
+import type { LoggerStore } from '@/services/Logger';
 import { DataStore } from './DataStore';
 import { LanguageStore } from './LanguageStore';
 
@@ -12,7 +12,7 @@ import { LanguageStore } from './LanguageStore';
 import * as SettingsStore from './SettingsStore';
 import * as ConversionStore from './ConversionStore';
 import * as LLMStore from './LLMStore';
-import { createLogStore } from './LogStore';
+import { createLoggerStore } from './LoggerStore';
 import { createDataStore } from './DataStore';
 import { createLanguageStore } from './LanguageStore';
 
@@ -142,7 +142,7 @@ export interface Stores {
   llm: typeof LLMStore;
 
   // Class-based stores
-  logs: LogStore;
+  logs: LoggerStore;
   data: DataStore;
   language: LanguageStore;
 }
@@ -347,7 +347,7 @@ export function useLLM() {
 /**
  * Hook to get log store (class-based)
  */
-export function useLogs(): LogStore {
+export function useLogs(): LoggerStore {
   const stores = useStores();
   return stores.logs;
 }
@@ -376,7 +376,7 @@ export function useLanguage(): LanguageStore {
  * Create all stores with default configuration
  */
 export function createStores(): Stores {
-  const logs = createLogStore();
+  const logs = createLoggerStore();
 
   return {
     settings: SettingsStore,
