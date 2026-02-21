@@ -103,7 +103,7 @@ export interface IWorkerPool {
  * Configuration for audio merging
  */
 export interface MergerConfig {
-  outputFormat: 'mp3' | 'opus';
+  outputFormat: 'opus';
   silenceRemoval: boolean;
   normalization: boolean;
   deEss: boolean;

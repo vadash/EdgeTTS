@@ -60,7 +60,7 @@ export interface PipelineBuilderOptions {
   llmThreads: number;
   enabledVoices: string[];
   lexxRegister: boolean;
-  outputFormat: 'mp3' | 'opus';
+  outputFormat: 'opus';
   silenceRemoval: boolean;
   normalization: boolean;
   deEss: boolean;

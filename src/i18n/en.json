@@ -42,7 +42,6 @@
     "reset": "Reset Settings",
     "resetHint": "Restore all settings to their default values",
     "resetButton": "Reset to Defaults",
-    "outputFormatHint": "Opus offers better quality at smaller file sizes",
     "silenceRemovalHint": "Remove long pauses from audio",
     "normalizationHint": "Balance audio levels (includes limiter)",
     "deEss": "De-Ess",

@@ -9,7 +9,7 @@ import type { IAudioMerger, MergerConfig, IFFmpegService } from '@/services/inte
  * Options for AudioMergeStep
  */
 export interface AudioMergeStepOptions {
-  outputFormat: 'mp3' | 'opus';
+  outputFormat: 'opus';
   silenceRemoval: boolean;
   normalization: boolean;
   deEss: boolean;
@@ -60,27 +60,22 @@ export class AudioMergeStep extends BasePipelineStep {
       throw new Error('Save directory handle required');
     }
 
-    // Determine output format
-    let useOpus = this.options.outputFormat === 'opus';
+    // Load FFmpeg for Opus encoding
+    this.reportProgress(0, 1, 'Loading FFmpeg for Opus encoding...');
 
-    // Load FFmpeg if using Opus
-    if (useOpus) {
-      this.reportProgress(0, 1, 'Loading FFmpeg for Opus encoding...');
+    const loaded = await this.options.ffmpegService.load((msg) => {
+      this.reportProgress(0, 1, msg);
+    });
 
-      const loaded = await this.options.ffmpegService.load((msg) => {
-        this.reportProgress(0, 1, msg);
-      });
-
-      if (!loaded) {
-        throw new Error('FFmpeg failed to load. Cannot encode to Opus.');
-      }
+    if (!loaded) {
+      throw new Error('FFmpeg failed to load. Cannot encode to Opus.');
     }
 
     this.checkCancelled(signal);
 
     // Create merger with final config
     const merger = this.options.createAudioMerger({
-      outputFormat: useOpus ? 'opus' : 'mp3',
+      outputFormat: 'opus',
       silenceRemoval: this.options.silenceRemoval,
       normalization: this.options.normalization,
       deEss: this.options.deEss,

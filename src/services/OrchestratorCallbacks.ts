@@ -25,7 +25,7 @@ export interface OrchestratorInput {
   llmThreads: number;
   enabledVoices: string[];
   lexxRegister: boolean;
-  outputFormat: 'mp3' | 'opus';
+  outputFormat: 'opus';
   silenceRemoval: boolean;
   normalization: boolean;
   deEss: boolean;

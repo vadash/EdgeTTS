@@ -4,7 +4,7 @@
 
 import { defaultConfig } from '@/config';
 import { sanitizeFilename } from '@/utils/fileUtils';
-import { findSyncWord, parseMP3Duration, skipID3v2Tag } from './MP3Parser';
+import { parseMP3Duration } from './MP3Parser';
 import { withPermissionRetry } from './FileSystemRetry';
 import type { IFFmpegService, IAudioMerger, MergeProgressCallback } from './interfaces';
 
@@ -24,7 +24,7 @@ export interface MergeGroup {
 }
 
 export interface MergerConfig {
-  outputFormat: 'mp3' | 'opus';
+  outputFormat: 'opus';
   silenceRemoval: boolean;
   normalization: boolean;
   deEss: boolean;
@@ -219,62 +219,6 @@ export class AudioMerger implements IAudioMerger {
   }
 
   /**
-   * Merge audio data for a group (sync, MP3 only)
-   * Reads chunks from disk one by one
-   */
-  private async mergeAudioGroupSync(
-    audioMap: Map<number, string>,
-    group: MergeGroup,
-    totalGroups: number,
-    tempDirHandle: FileSystemDirectoryHandle
-  ): Promise<MergedFile | null> {
-    // Pass 1: Read chunks, calculate stripped sizes
-    interface ChunkInfo {
-      data: Uint8Array;
-      audioOffset: number;
-    }
-
-    const chunkInfos: ChunkInfo[] = [];
-    let totalStrippedSize = 0;
-
-    for (let i = group.fromIndex; i <= group.toIndex; i++) {
-      const chunkFilename = audioMap.get(i);
-      if (!chunkFilename) continue;
-
-      const data = await this.readChunkFromDisk(chunkFilename, tempDirHandle);
-      const id3Offset = skipID3v2Tag(data);
-      const syncOffset = findSyncWord(data, id3Offset);
-      const audioOffset = syncOffset >= 0 ? syncOffset : id3Offset;
-
-      const strippedLength = data.length - audioOffset;
-      if (strippedLength > 0) {
-        chunkInfos.push({ data, audioOffset });
-        totalStrippedSize += strippedLength;
-      }
-    }
-
-    if (totalStrippedSize === 0) return null;
-
-    // Pass 2: Allocate exact buffer and copy stripped data
-    const combined = new Uint8Array(totalStrippedSize);
-    let offset = 0;
-    for (const { data, audioOffset } of chunkInfos) {
-      const length = data.length - audioOffset;
-      combined.set(data.subarray(audioOffset), offset);
-      offset += length;
-    }
-
-    const filename = this.generateFilename(group, totalGroups, 'mp3');
-
-    return {
-      filename,
-      blob: new Blob([combined.buffer], { type: 'audio/mpeg' }),
-      fromIndex: group.fromIndex,
-      toIndex: group.toIndex,
-    };
-  }
-
-  /**
    * Merge audio data for a group with FFmpeg processing (async)
    * Reads chunks from disk one by one to minimize memory
    * Missing chunks are replaced with silence placeholders
@@ -310,46 +254,35 @@ export class AudioMerger implements IAudioMerger {
     if (chunks.every(c => c === null)) return null;
 
     // Use FFmpeg for Opus encoding
-    if (this.config.outputFormat === 'opus' && this.ffmpegService.isAvailable()) {
-      try {
-        const processedAudio = await this.ffmpegService.processAudio(
-          chunks,
-          {
-            silenceRemoval: this.config.silenceRemoval,
-            normalization: this.config.normalization,
-            deEss: this.config.deEss,
-            silenceGapMs: this.config.silenceGapMs,
-            eq: this.config.eq,
-            compressor: this.config.compressor,
-            fadeIn: this.config.fadeIn,
-            stereoWidth: this.config.stereoWidth,
-            opusMinBitrate: this.config.opusMinBitrate,
-            opusMaxBitrate: this.config.opusMaxBitrate,
-            opusCompressionLevel: this.config.opusCompressionLevel,
-          },
-          onProgress
-        );
+    const processedAudio = await this.ffmpegService.processAudio(
+      chunks,
+      {
+        silenceRemoval: this.config.silenceRemoval,
+        normalization: this.config.normalization,
+        deEss: this.config.deEss,
+        silenceGapMs: this.config.silenceGapMs,
+        eq: this.config.eq,
+        compressor: this.config.compressor,
+        fadeIn: this.config.fadeIn,
+        stereoWidth: this.config.stereoWidth,
+        opusMinBitrate: this.config.opusMinBitrate,
+        opusMaxBitrate: this.config.opusMaxBitrate,
+        opusCompressionLevel: this.config.opusCompressionLevel,
+      },
+      onProgress
+    );
 
-        const filename = this.generateFilename(group, totalGroups, 'opus');
+    const filename = this.generateFilename(group, totalGroups, 'opus');
 
-        // Create a new Uint8Array to ensure it's a standard ArrayBuffer (not SharedArrayBuffer)
-        const outputArray = new Uint8Array(processedAudio);
+    // Create a new Uint8Array to ensure it's a standard ArrayBuffer (not SharedArrayBuffer)
+    const outputArray = new Uint8Array(processedAudio);
 
-        return {
-          filename,
-          blob: new Blob([outputArray], { type: 'audio/opus' }),
-          fromIndex: group.fromIndex,
-          toIndex: group.toIndex,
-        };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        onProgress?.(`FFmpeg error, falling back to MP3: ${msg}`);
-        // Fall through to MP3 fallback
-      }
-    }
-
-    // MP3 fallback - simple concatenation
-    return this.mergeAudioGroupSync(audioMap, group, totalGroups, tempDirHandle);
+    return {
+      filename,
+      blob: new Blob([outputArray], { type: 'audio/opus' }),
+      fromIndex: group.fromIndex,
+      toIndex: group.toIndex,
+    };
   }
 
   private generateFilename(group: MergeGroup, totalGroups: number, extension: string): string {

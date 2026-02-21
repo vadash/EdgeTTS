@@ -105,7 +105,8 @@ export function ExportImportTab() {
       if (s.pitch !== undefined) settings.setPitch(s.pitch as number);
       if (s.ttsThreads !== undefined) settings.setTtsThreads(s.ttsThreads as number);
       if (s.llmThreads !== undefined) settings.setLlmThreads(s.llmThreads as number);
-      if (s.outputFormat) settings.setOutputFormat(s.outputFormat as 'mp3' | 'opus');
+      // outputFormat is always 'opus' now, skip importing
+
       if (s.silenceRemovalEnabled !== undefined) settings.setSilenceRemovalEnabled(s.silenceRemovalEnabled as boolean);
       if (s.normalizationEnabled !== undefined) settings.setNormalizationEnabled(s.normalizationEnabled as boolean);
       if (s.lexxRegister !== undefined) settings.setLexxRegister(s.lexxRegister as boolean);

@@ -59,7 +59,7 @@ export class SettingsStore {
   // Processing settings
   readonly ttsThreads = signal<number>(defaultSettings.ttsThreads);
   readonly llmThreads = signal<number>(defaultSettings.llmThreads);
-  readonly outputFormat = signal<'mp3' | 'opus'>(defaultSettings.outputFormat);
+  readonly outputFormat = signal<'opus'>(defaultSettings.outputFormat);
   readonly silenceRemovalEnabled = signal<boolean>(defaultSettings.silenceRemovalEnabled);
   readonly normalizationEnabled = signal<boolean>(defaultSettings.normalizationEnabled);
   readonly deEssEnabled = signal<boolean>(defaultSettings.deEssEnabled);
@@ -139,11 +139,6 @@ export class SettingsStore {
 
   setLlmThreads(value: number): void {
     this.llmThreads.value = value;
-    this.save();
-  }
-
-  setOutputFormat(value: 'mp3' | 'opus'): void {
-    this.outputFormat.value = value;
     this.save();
   }
 

@@ -52,7 +52,6 @@ const defaultStageConfig: StageConfig = {
  * LLM settings for persistence (new format with per-stage configs)
  */
 interface LLMSettings {
-  enabled: boolean;
   useVoting: boolean;
   extract: StageConfig;
   merge: StageConfig;
@@ -63,7 +62,6 @@ interface LLMSettings {
  * Default LLM settings
  */
 const defaultLLMSettings: LLMSettings = {
-  enabled: true,
   useVoting: false,
   extract: { ...defaultStageConfig },
   merge: { ...defaultStageConfig },
@@ -77,7 +75,6 @@ export class LLMStore {
   private readonly logStore: LogStore;
 
   // Global settings (persisted)
-  readonly enabled = signal<boolean>(defaultLLMSettings.enabled);
   readonly useVoting = signal<boolean>(defaultLLMSettings.useVoting);
 
   // Per-stage configurations (persisted)
@@ -155,16 +152,6 @@ export class LLMStore {
   });
 
   // ========== Settings Actions ==========
-
-  setEnabled(value: boolean): void {
-    this.enabled.value = value;
-    this.saveSettings();
-  }
-
-  toggleEnabled(): void {
-    this.enabled.value = !this.enabled.value;
-    this.saveSettings();
-  }
 
   setUseVoting(value: boolean): void {
     this.useVoting.value = value;
@@ -332,7 +319,6 @@ export class LLMStore {
    */
   reset(): void {
     this.resetProcessingState();
-    this.enabled.value = defaultLLMSettings.enabled;
     this.useVoting.value = defaultLLMSettings.useVoting;
     this.extract.value = { ...defaultStageConfig };
     this.merge.value = { ...defaultStageConfig };
@@ -354,7 +340,6 @@ export class LLMStore {
       ]);
 
       const settings: LLMSettings = {
-        enabled: this.enabled.value,
         useVoting: this.useVoting.value,
         extract: { ...this.extract.value, apiKey: extractKey },
         merge: { ...this.merge.value, apiKey: mergeKey },
@@ -380,7 +365,6 @@ export class LLMStore {
 
       const settings = JSON.parse(saved);
 
-      this.enabled.value = settings.enabled ?? defaultLLMSettings.enabled;
       this.useVoting.value = settings.useVoting ?? defaultLLMSettings.useVoting;
 
       for (const stage of ['extract', 'merge', 'assign'] as const) {

@@ -3,7 +3,7 @@ import { Text } from 'preact-i18n';
 import { useLLM } from '@/stores';
 import { useLogger } from '@/di/ServiceContext';
 import { LLMVoiceService } from '@/services/llm';
-import { Toggle, Tabs, TabPanel, Button } from '@/components/common';
+import { Tabs, TabPanel, Button } from '@/components/common';
 import { LLMHelp } from './LLMHelp';
 import { StageConfigForm, type TestResult } from './StageConfigForm';
 import type { LLMStage, StageConfig } from '@/stores/LLMStore';
@@ -108,23 +108,17 @@ export function LLMTab() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Master Toggle */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🤖</span>
-          <div>
-            <h3 className="font-semibold">
-              <Text id="llm.title">LLM Voice Assignment</Text>
-            </h3>
-            <p className="text-sm text-gray-400">
-              <Text id="llm.description">Use AI to detect characters and assign voices</Text>
-            </p>
-          </div>
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <span className="text-2xl">🤖</span>
+        <div>
+          <h3 className="font-semibold">
+            <Text id="llm.title">LLM Voice Assignment</Text>
+          </h3>
+          <p className="text-sm text-gray-400">
+            <Text id="llm.description">Use AI to detect characters and assign voices</Text>
+          </p>
         </div>
-        <Toggle
-          checked={llm.enabled.value}
-          onChange={(v) => llm.setEnabled(v)}
-        />
       </div>
 
       {/* Stage description */}

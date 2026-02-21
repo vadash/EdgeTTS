@@ -74,7 +74,7 @@ export interface AppSettings {
   isLiteMode: boolean;
   statusAreaWidth: number;
   // Audio processing settings
-  outputFormat: 'mp3' | 'opus';
+  outputFormat: 'opus';
   silenceRemovalEnabled: boolean;
   normalizationEnabled: boolean;
   deEssEnabled: boolean;

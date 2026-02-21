@@ -23,7 +23,7 @@ export interface TestStoresState {
     rate?: number;
     pitch?: number;
     maxThreads?: number;
-    outputFormat?: 'mp3' | 'opus';
+    outputFormat?: 'opus';
     silenceRemovalEnabled?: boolean;
     normalizationEnabled?: boolean;
     lexxRegister?: boolean;
@@ -38,7 +38,6 @@ export interface TestStoresState {
     // Note: detectedLanguage is computed from textContent, not settable directly
   };
   llm?: {
-    enabled?: boolean;
     apiUrl?: string;
     model?: string;
   };
@@ -91,9 +90,16 @@ export function renderWithProviders(
   // Apply initial LLM state
   if (options.stores?.llm) {
     const l = options.stores.llm;
-    if (l.enabled !== undefined) stores.llm.enabled.value = l.enabled;
-    if (l.apiUrl !== undefined) stores.llm.apiUrl.value = l.apiUrl;
-    if (l.model !== undefined) stores.llm.model.value = l.model;
+    if (l.apiUrl !== undefined) {
+      stores.llm.extract.value = { ...stores.llm.extract.value, apiUrl: l.apiUrl };
+      stores.llm.merge.value = { ...stores.llm.merge.value, apiUrl: l.apiUrl };
+      stores.llm.assign.value = { ...stores.llm.assign.value, apiUrl: l.apiUrl };
+    }
+    if (l.model !== undefined) {
+      stores.llm.extract.value = { ...stores.llm.extract.value, model: l.model };
+      stores.llm.merge.value = { ...stores.llm.merge.value, model: l.model };
+      stores.llm.assign.value = { ...stores.llm.assign.value, model: l.model };
+    }
   }
 
   const { container: serviceContainer, mocks } = createTestContainer(options.services);

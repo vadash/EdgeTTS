@@ -26,10 +26,6 @@ describe('LLMStore', () => {
   });
 
   describe('initial state', () => {
-    it('starts with enabled true', () => {
-      expect(store.enabled.value).toBe(true);
-    });
-
     it('starts with empty API keys for all stages', () => {
       expect(store.extract.value.apiKey).toBe('');
       expect(store.merge.value.apiKey).toBe('');
@@ -143,13 +139,6 @@ describe('LLMStore', () => {
   });
 
   describe('settings actions', () => {
-    it('toggles enabled', async () => {
-      store.toggleEnabled();
-      expect(store.enabled.value).toBe(false);
-      store.toggleEnabled();
-      expect(store.enabled.value).toBe(true);
-    });
-
     it('sets entire stage config', async () => {
       const config = {
         apiKey: 'sk-test',
@@ -262,12 +251,10 @@ describe('LLMStore', () => {
       store.setStageField('extract', 'apiKey', 'sk-key');
       store.setStageField('extract', 'apiUrl', 'https://custom.api.com');
       store.setStageField('extract', 'model', 'gpt-4');
-      store.setEnabled(false);
       store.setProcessingStatus('extracting');
 
       store.reset();
 
-      expect(store.enabled.value).toBe(true);
       expect(store.extract.value.apiKey).toBe('');
       expect(store.extract.value.apiUrl).toBe('https://api.openai.com/v1');
       expect(store.extract.value.model).toBe('gpt-4o-mini');
@@ -280,14 +267,12 @@ describe('LLMStore', () => {
       store.setStageField('extract', 'apiKey', 'sk-test');
       store.setStageField('extract', 'apiUrl', 'https://custom.api.com');
       store.setStageField('extract', 'model', 'gpt-4');
-      store.setEnabled(false);
 
       await store.saveSettings();
 
       const saved = localStorage.getItem(StorageKeys.llmSettings);
       expect(saved).toBeTruthy();
       const parsed = JSON.parse(saved!);
-      expect(parsed.enabled).toBe(false);
       expect(parsed.extract.apiKey).toBe('encrypted:sk-test');
       expect(parsed.extract.apiUrl).toBe('https://custom.api.com');
       expect(parsed.extract.model).toBe('gpt-4');
@@ -295,7 +280,6 @@ describe('LLMStore', () => {
 
     it('loads settings from localStorage', async () => {
       localStorage.setItem(StorageKeys.llmSettings, JSON.stringify({
-        enabled: false,
         useVoting: false,
         extract: {
           apiKey: 'encrypted:sk-loaded',
@@ -328,7 +312,6 @@ describe('LLMStore', () => {
 
       await store.loadSettings();
 
-      expect(store.enabled.value).toBe(false);
       expect(store.extract.value.apiKey).toBe('sk-loaded');
       expect(store.extract.value.apiUrl).toBe('https://loaded.api.com');
       expect(store.extract.value.model).toBe('gpt-3.5-turbo');
@@ -343,7 +326,6 @@ describe('LLMStore', () => {
 
       await store.loadSettings();
 
-      expect(store.enabled.value).toBe(true);
       expect(store.extract.value.apiKey).toBe('');
       expect(store.extract.value.apiUrl).toBe('https://api.openai.com/v1');
       expect(store.extract.value.model).toBe('gpt-4o-mini');
@@ -352,7 +334,6 @@ describe('LLMStore', () => {
     it('handles missing localStorage gracefully', async () => {
       await store.loadSettings();
       // Should not throw and keep defaults
-      expect(store.enabled.value).toBe(true);
     });
   });
 

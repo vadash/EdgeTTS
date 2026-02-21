@@ -30,7 +30,7 @@ describe('AudioMergeStep', () => {
     mockAudioMerger = createMockMerger(1);
 
     step = createAudioMergeStep({
-      outputFormat: 'mp3',
+      outputFormat: 'opus',
       silenceRemoval: false,
       normalization: false,
       deEss: false,
@@ -111,33 +111,7 @@ describe('AudioMergeStep', () => {
   });
 
   describe('output format', () => {
-    it('uses MP3 format by default', async () => {
-      const context = createContextWithAudio(testAudioMap, {
-        directoryHandle: createMockDirectoryHandle(),
-      });
-      await step.execute(context, createNeverAbortSignal());
-
-      expect(capturedConfig?.outputFormat).toBe('mp3');
-    });
-
-    it('uses Opus format when specified and FFmpeg loads', async () => {
-      step = createAudioMergeStep({
-        outputFormat: 'opus',
-        silenceRemoval: false,
-        normalization: false,
-        deEss: false,
-        silenceGapMs: 0,
-        eq: false,
-        compressor: false,
-        fadeIn: false,
-        stereoWidth: false,
-        ffmpegService: mockFFmpegService,
-        createAudioMerger: (config) => {
-          capturedConfig = config;
-          return mockAudioMerger;
-        },
-      });
-
+    it('uses Opus format and loads FFmpeg', async () => {
       const context = createContextWithAudio(testAudioMap, {
         directoryHandle: createMockDirectoryHandle(),
       });
@@ -147,25 +121,8 @@ describe('AudioMergeStep', () => {
       expect(capturedConfig?.outputFormat).toBe('opus');
     });
 
-    it('throws when FFmpeg fails to load for Opus', async () => {
+    it('throws when FFmpeg fails to load', async () => {
       mockFFmpegService.load.mockResolvedValue(false);
-
-      step = createAudioMergeStep({
-        outputFormat: 'opus',
-        silenceRemoval: false,
-        normalization: false,
-        deEss: false,
-        silenceGapMs: 0,
-        eq: false,
-        compressor: false,
-        fadeIn: false,
-        stereoWidth: false,
-        ffmpegService: mockFFmpegService,
-        createAudioMerger: (config) => {
-          capturedConfig = config;
-          return mockAudioMerger;
-        },
-      });
 
       const context = createContextWithAudio(testAudioMap, {
         directoryHandle: createMockDirectoryHandle(),
@@ -173,15 +130,6 @@ describe('AudioMergeStep', () => {
 
       await expect(step.execute(context, createNeverAbortSignal()))
         .rejects.toThrow('FFmpeg failed to load');
-    });
-
-    it('does not load FFmpeg for MP3 format', async () => {
-      const context = createContextWithAudio(testAudioMap, {
-        directoryHandle: createMockDirectoryHandle(),
-      });
-      await step.execute(context, createNeverAbortSignal());
-
-      expect(mockFFmpegService.load).not.toHaveBeenCalled();
     });
   });
 
@@ -318,7 +266,7 @@ describe('AudioMergeStep', () => {
 
     it('passes stereoWidth option', async () => {
       step = createAudioMergeStep({
-        outputFormat: 'mp3',
+        outputFormat: 'opus',
         silenceRemoval: false,
         normalization: false,
         deEss: false,
@@ -465,7 +413,7 @@ describe('AudioMergeStep', () => {
       const skipMockMerger: IAudioMerger = {
         calculateMergeGroups: vi.fn(async () => [{ fromIndex: 0, toIndex: 2, filename: 'Chapter 1', mergeNumber: 1, durationMs: 1000 }]),
         mergeAndSave: vi.fn(async (_audioMap, _totalSentences, fileNames, _tempDirHandle, saveDirectoryHandle, onProgress) => {
-          const filename = 'Chapter 1.mp3';
+          const filename = 'Chapter 1.opus';
           const folderName = 'Chapter 1';
           try {
             const folderHandle = await saveDirectoryHandle.getDirectoryHandle(folderName);
@@ -500,7 +448,7 @@ describe('AudioMergeStep', () => {
       // Pre-create an output file in the target directory
       const targetDir = createMockDirectoryHandle();
       const chapterFolder = await targetDir.getDirectoryHandle('Chapter 1', { create: true });
-      const existingFile = await chapterFolder.getFileHandle('Chapter 1.mp3', { create: true });
+      const existingFile = await chapterFolder.getFileHandle('Chapter 1.opus', { create: true });
       const w = await existingFile.createWritable();
       await w.write(new Uint8Array(2000)); // > 1KB
       await w.close();
@@ -518,7 +466,7 @@ describe('AudioMergeStep', () => {
       const skipMockMerger: IAudioMerger = {
         calculateMergeGroups: vi.fn(async () => [{ fromIndex: 0, toIndex: 2, filename: 'Chapter 1', mergeNumber: 1, durationMs: 1000 }]),
         mergeAndSave: vi.fn(async (_audioMap, _totalSentences, _fileNames, _tempDirHandle, saveDirectoryHandle, onProgress) => {
-          const filename = 'Chapter 1.mp3';
+          const filename = 'Chapter 1.opus';
           const folderName = 'Chapter 1';
           try {
             const folderHandle = await saveDirectoryHandle.getDirectoryHandle(folderName);
@@ -552,7 +500,7 @@ describe('AudioMergeStep', () => {
 
       const targetDir = createMockDirectoryHandle();
       const chapterFolder = await targetDir.getDirectoryHandle('Chapter 1', { create: true });
-      const existingFile = await chapterFolder.getFileHandle('Chapter 1.mp3', { create: true });
+      const existingFile = await chapterFolder.getFileHandle('Chapter 1.opus', { create: true });
       const w = await existingFile.createWritable();
       await w.write(new Uint8Array(2000));
       await w.close();
@@ -570,7 +518,7 @@ describe('AudioMergeStep', () => {
       const skipMockMerger: IAudioMerger = {
         calculateMergeGroups: vi.fn(async () => [{ fromIndex: 0, toIndex: 2, filename: 'Chapter 1', mergeNumber: 1, durationMs: 1000 }]),
         mergeAndSave: vi.fn(async (_audioMap, _totalSentences, fileNames, _tempDirHandle, saveDirectoryHandle, onProgress) => {
-          const filename = 'Chapter 1.mp3';
+          const filename = 'Chapter 1.opus';
           const folderName = 'Chapter 1';
           try {
             const folderHandle = await saveDirectoryHandle.getDirectoryHandle(folderName);
@@ -604,7 +552,7 @@ describe('AudioMergeStep', () => {
 
       const targetDir = createMockDirectoryHandle();
       const chapterFolder = await targetDir.getDirectoryHandle('Chapter 1', { create: true });
-      const existingFile = await chapterFolder.getFileHandle('Chapter 1.mp3', { create: true });
+      const existingFile = await chapterFolder.getFileHandle('Chapter 1.opus', { create: true });
       const w = await existingFile.createWritable();
       await w.write(new Uint8Array(500)); // < 1KB - likely partial/corrupt
       await w.close();
