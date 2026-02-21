@@ -46,7 +46,7 @@ describe('Zod Schemas', () => {
       expect(result.success).toBe(true);
     });
 
-    it('accepts null reasoning (transformed to undefined)', () => {
+    it('accepts null reasoning (stays null)', () => {
       const result = ExtractSchema.safeParse({
         reasoning: null,
         characters: [
@@ -55,7 +55,7 @@ describe('Zod Schemas', () => {
       });
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.reasoning).toBeUndefined();
+        expect(result.data.reasoning).toBeNull();
       }
     });
 
@@ -136,16 +136,10 @@ describe('Zod Schemas', () => {
 
     it('AssignResponse matches inferred type', () => {
       const data: AssignResponse = {
-        reasoning: undefined,
+        reasoning: null,
         assignments: { '0': 'A' }
       };
-      // To parse into the inferred type, we must pass null (which transforms to undefined)
-      const parseResult = AssignSchema.safeParse({ reasoning: null, assignments: { '0': 'A' } });
-      expect(parseResult.success).toBe(true);
-      if (parseResult.success) {
-        // After transform, reasoning is undefined
-        expect(parseResult.data.reasoning).toBe(undefined);
-      }
+      expect(AssignSchema.safeParse(data).success).toBe(true);
     });
   });
 });

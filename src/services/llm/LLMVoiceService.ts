@@ -15,15 +15,14 @@ import {
   buildExtractPrompt,
   buildMergePrompt,
   buildAssignPrompt,
-  parseExtractResponse,
   parseMergeResponse,
   parseAssignResponse,
   type ExtractContext,
   type MergeContext,
   type AssignContext,
 } from './PromptStrategy';
+import { ExtractSchema, MergeSchema, AssignSchema } from './schemas';
 import {
-  validateExtractResponse,
   validateMergeResponse,
   validateAssignResponse,
 } from './ResponseValidators';
@@ -175,7 +174,7 @@ export class LLMVoiceService {
   }
 
   /**
-   * Extract: Extract characters from text blocks (sequential)
+   * Extract: Extract characters from text blocks using structured outputs
    */
   async extractCharacters(
     blocks: TextBlock[],
@@ -195,34 +194,26 @@ export class LLMVoiceService {
 
       const block = blocks[i];
       const blockText = block.sentences.join('\n');
-      const context: ExtractContext = { textBlock: blockText };
 
-      const response = await this.apiClient.callWithRetry(
-        buildExtractPrompt(context.textBlock),
-        validateExtractResponse,
-        this.abortController.signal,
-        [],
-        'extract'
-      );
+      const response = await this.apiClient.callStructured({
+        prompt: buildExtractPrompt(blockText),
+        schema: ExtractSchema,
+        schemaName: 'ExtractSchema',
+        signal: this.abortController.signal,
+      });
 
-      // With infinite retries, this should never be null
-      if (response === null) {
-        throw new Error('Extract failed unexpectedly');
-      }
+      allCharacters.push(...response.characters);
 
-      const parsed = parseExtractResponse(response);
-      allCharacters.push(...parsed.characters);
-
-      // Small delay between requests to avoid overwhelming LLM server
+      // Small delay between requests
       if (i < blocks.length - 1) {
         await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
       }
     }
 
-    // Simple merge by canonicalName first
+    // Simple merge by canonicalName
     let merged = mergeCharacters(allCharacters);
 
-    // LLM merge only if multiple blocks were processed and multiple characters exist
+    // LLM merge if multiple blocks and characters
     if (blocks.length > 1 && merged.length > 1) {
       onProgress?.(blocks.length, blocks.length, `Merging ${merged.length} characters...`);
       merged = await this.mergeCharactersWithLLM(merged, onProgress);
