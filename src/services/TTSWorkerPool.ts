@@ -6,7 +6,7 @@ import { createPool, Pool } from 'generic-pool';
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 import { LadderController } from './LadderController';
-import { withRetry, AbortError } from '@/utils/asyncUtils';
+import { withRetry, AbortError } from '@/utils/retry';
 import { isAppError } from '@/errors';
 import type { Logger } from './Logger';
 
