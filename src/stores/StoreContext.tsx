@@ -5,6 +5,7 @@ import { createContext, ComponentChildren } from 'preact';
 import { useContext } from 'preact/hooks';
 
 import type { LoggerStore } from '@/services/Logger';
+import { createLoggerStore } from '@/services/Logger';
 import { DataStore } from './DataStore';
 import { LanguageStore } from './LanguageStore';
 
@@ -12,7 +13,6 @@ import { LanguageStore } from './LanguageStore';
 import * as SettingsStore from './SettingsStore';
 import * as ConversionStore from './ConversionStore';
 import * as LLMStore from './LLMStore';
-import { createLoggerStore } from './LoggerStore';
 import { createDataStore } from './DataStore';
 import { createLanguageStore } from './LanguageStore';
 
@@ -21,24 +21,27 @@ import { settings as settingsSignal, resetSettingsStore } from './SettingsStore'
 import { conversion as conversionSignal } from './ConversionStore';
 import { llm as llmSignal, loadSettings as llmLoadSettings } from './LLMStore';
 
+// Import state types
+import type { AppSettings } from '@/state/types';
+
 // ============================================================================
 // Store Types
 // ============================================================================
 
 // Re-export the store modules as types for convenient access
 export type SettingsStoreType = typeof SettingsStore & {
-  value: ReturnType<typeof settingsSignal>;
+  value: typeof settingsSignal;
   save: () => void;
-  toObject: () => import('@/state/types').AppSettings;
+  toObject: () => AppSettings;
   reset: () => void;
 };
 
 export type ConversionStoreType = typeof ConversionStore & {
-  value: ReturnType<typeof conversionSignal>;
+  value: typeof conversionSignal;
 };
 
 export type LLMStoreType = typeof LLMStore & {
-  value: ReturnType<typeof llmSignal>;
+  value: typeof llmSignal;
   saveSettings: () => Promise<void>;
 };
 

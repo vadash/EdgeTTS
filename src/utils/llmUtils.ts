@@ -1,7 +1,8 @@
 // LLM Response Utilities
 // Shared utilities for parsing LLM responses (handles thinking tags, markdown, JSON repair)
+// DEPRECATED: This file will be removed as part of structured outputs refactor
 
-import { jsonrepair } from 'jsonrepair';
+// TODO: Remove this file after structured outputs migration
 
 /**
  * Strip thinking tags from LLM response
@@ -22,7 +23,7 @@ export function stripThinkingTags(content: string): string {
  * - Raw JSON objects
  * - Common LLM JSON issues (trailing commas, missing quotes, unclosed brackets)
  *
- * Uses jsonrepair to fix malformed JSON.
+ * NOTE: jsonrepair removed - this will be replaced by structured outputs
  */
 export function extractJSON(content: string): string {
   const cleaned = stripThinkingTags(content);
@@ -43,6 +44,6 @@ export function extractJSON(content: string): string {
     }
   }
 
-  // Repair common JSON issues (trailing commas, missing quotes, unclosed brackets)
-  return jsonrepair(jsonCandidate);
+  // Return JSON as-is (structured outputs will validate)
+  return jsonCandidate;
 }

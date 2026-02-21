@@ -23,7 +23,7 @@ export function AudioTab() {
           {AUDIO_PRESETS.map(preset => (
             <button
               key={preset.name}
-              onClick={() => settings.setOpusPreset(preset.name)}
+              onClick={() => settings.applyOpusPreset(preset.name)}
               className={`text-xs p-2 rounded ${
                 settings.opusPreset.value === preset.name
                   ? 'bg-accent text-white'
