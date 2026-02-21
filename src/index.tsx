@@ -4,7 +4,7 @@ import { App } from './App';
 import { StoreProvider, createStores, initializeStores } from './stores';
 import { getLogger } from './services';
 import type { SupportedLocale } from './stores/LanguageStore';
-import type { LoggerService } from './services/LoggerService';
+import type { Logger } from './services/Logger';
 import en from './i18n/en.json';
 import ru from './i18n/ru.json';
 import './styles/tailwind.css';
@@ -14,7 +14,7 @@ const definitions: Record<SupportedLocale, Record<string, unknown>> = { en, ru }
 
 // Create stores and initialize logger
 const stores = createStores();
-const logger: LoggerService = getLogger(stores.logs);
+const logger: Logger = getLogger(stores.logs);
 
 // Initialize app
 async function init() {

@@ -8,7 +8,7 @@ import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 import { LadderController } from './LadderController';
 import { withRetry, AbortError } from '@/utils/asyncUtils';
 import { isAppError } from '@/errors';
-import type { LoggerService } from './LoggerService';
+import type { Logger } from './Logger';
 
 export interface PoolTask {
   partIndex: number;
@@ -32,7 +32,7 @@ export interface WorkerPoolOptions {
   onTaskComplete?: (partIndex: number, filename: string) => void;
   onTaskError?: (partIndex: number, error: Error) => void;
   onAllComplete?: () => void;
-  logger?: LoggerService;
+  logger?: Logger;
 }
 
 const TEMP_DIR_NAME = '_temp_work';
@@ -67,7 +67,7 @@ export class TTSWorkerPool {
   private onTaskComplete?: (partIndex: number, filename: string) => void;
   private onTaskError?: (partIndex: number, error: Error) => void;
   private onAllComplete?: () => void;
-  private logger?: LoggerService;
+  private logger?: Logger;
 
   constructor(options: WorkerPoolOptions) {
     this.voiceConfig = options.config;

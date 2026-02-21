@@ -1,4 +1,4 @@
-import type { LoggerService } from './LoggerService';
+import type { Logger } from './Logger';
 
 export interface TaskResult {
   success: boolean;
@@ -22,7 +22,7 @@ export class LadderController {
   constructor(
     private config: LadderConfig,
     private readonly maxWorkers: number,
-    private readonly logger?: LoggerService
+    private readonly logger?: Logger
   ) {
     this.currentWorkers = this.minWorkers;
   }

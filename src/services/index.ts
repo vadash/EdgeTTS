@@ -1,11 +1,11 @@
 // Service Singletons and Factories
 // ES Modules handle singletons naturally - no DI container needed
 
-import type { LogStore } from '@/stores/LogStore';
+import type { LoggerStore } from '@/services/Logger';
 import type { LLMServiceFactoryOptions } from './llm/LLMVoiceService';
 import type { WorkerPoolOptions } from './TTSWorkerPool';
 import type { MergerConfig } from './AudioMerger';
-import { LoggerService } from './LoggerService';
+import { Logger, createLogger } from './Logger';
 import { FFmpegService } from './FFmpegService';
 import { TextBlockSplitter } from './TextBlockSplitter';
 import { VoicePoolBuilder } from './VoicePoolBuilder';
@@ -18,7 +18,7 @@ import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 // Core Singletons (initialized once)
 // ============================================================================
 
-let loggerInstance: LoggerService | null = null;
+let loggerInstance: Logger | null = null;
 let ffmpegInstance: FFmpegService | null = null;
 let textBlockSplitterInstance: TextBlockSplitter | null = null;
 let voicePoolBuilderInstance: VoicePoolBuilder | null = null;
@@ -27,11 +27,9 @@ let ttsPreviewServiceInstance: ReusableEdgeTTSService | null = null;
 /**
  * Get or create the logger singleton
  */
-export function getLogger(logStore?: LogStore): LoggerService {
+export function getLogger(logStore?: LoggerStore): Logger {
   if (!loggerInstance) {
-    loggerInstance = logStore
-      ? new LoggerService(logStore)
-      : new LoggerService(undefined); // Uses console fallback
+    loggerInstance = createLogger(logStore);
   }
   return loggerInstance;
 }
@@ -141,7 +139,7 @@ export function getOrchestratorServices(): ConversionOrchestratorServices {
 // Re-exports for convenience
 // ============================================================================
 
-export { LoggerService } from './LoggerService';
+export { Logger, createLogger, createLoggerStore } from './Logger';
 export { FFmpegService } from './FFmpegService';
 export { TextBlockSplitter } from './TextBlockSplitter';
 export { VoicePoolBuilder } from './VoicePoolBuilder';

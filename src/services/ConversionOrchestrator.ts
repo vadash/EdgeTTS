@@ -18,7 +18,7 @@ import { checkResumeState, loadPipelineState } from './ResumeCheck';
 import { AppError, noContentError, insufficientVoicesError, getErrorMessage } from '@/errors';
 
 // Import concrete service classes
-import type { LoggerService } from './LoggerService';
+import type { Logger } from './Logger';
 import type { TextBlockSplitter } from './TextBlockSplitter';
 import type { VoicePoolBuilder } from './VoicePoolBuilder';
 import type { LLMVoiceService } from './llm/LLMVoiceService';
@@ -99,7 +99,7 @@ export interface OrchestratorInput {
 // ============================================================================
 
 export interface ConversionOrchestratorServices {
-  logger: LoggerService;
+  logger: Logger;
   textBlockSplitter: TextBlockSplitter;
   llmServiceFactory: {
     create(options: LLMServiceFactoryOptions): LLMVoiceService;
@@ -269,7 +269,7 @@ function checkCancelled(signal: AbortSignal): void {
 
 async function cleanupTemp(
   directoryHandle: FileSystemDirectoryHandle,
-  logger: LoggerService
+  logger: Logger
 ): Promise<void> {
   try {
     await directoryHandle.removeEntry('_temp_work', { recursive: true });
@@ -287,7 +287,7 @@ function logVoiceSummary(
   uniqueCount: number,
   pool: VoicePool,
   narratorVoice: string,
-  logger: LoggerService
+  logger: Logger
 ): void {
   const frequency = new Map<string, number>();
   for (const a of assignments) {
@@ -350,7 +350,7 @@ async function saveVoiceProfile(
   assignments: SpeakerAssignment[],
   narratorVoice: string,
   existingProfile: VoiceProfileFile | null,
-  logger: LoggerService
+  logger: Logger
 ): Promise<void> {
   try {
     const bookName = extractBookName(fileNames);

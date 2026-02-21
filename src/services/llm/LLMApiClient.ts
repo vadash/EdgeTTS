@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import pRetry, { AbortError } from 'p-retry';
 import type { LLMValidationResult } from '@/state/types';
 import { getRetryDelay, defaultConfig } from '@/config';
-import type { LoggerService } from '../LoggerService';
+import type { Logger } from '../Logger';
 import { stripThinkingTags, extractJSON } from '@/utils/llmUtils';
 import { DebugLogger } from './DebugLogger';
 
@@ -15,7 +15,7 @@ export interface LLMApiClientOptions {
   temperature?: number;
   topP?: number;
   debugLogger?: DebugLogger;
-  logger?: LoggerService;
+  logger?: Logger;
 }
 
 export type PassType = 'extract' | 'merge' | 'assign';
@@ -51,7 +51,7 @@ function applyProviderFixes(requestBody: Record<string, unknown>, provider: stri
  */
 export class LLMApiClient {
   private options: LLMApiClientOptions;
-  private logger?: LoggerService;
+  private logger?: Logger;
   private client: OpenAI;
   private debugLogger?: DebugLogger;
   private provider: string;

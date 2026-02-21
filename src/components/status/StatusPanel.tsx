@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect } from 'preact/hooks';
 import { useLogs, useConversion } from '@/stores';
 import { getLogger } from '@/services';
-import type { LogLevel } from '@/services/LoggerService';
+import type { LogLevel } from '@/services/Logger';
 import { ProgressBar } from './ProgressBar';
 
 /**

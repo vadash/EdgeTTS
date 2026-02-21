@@ -1,4 +1,4 @@
-import type { LoggerService } from '../LoggerService';
+import type { Logger } from '../Logger';
 
 /**
  * Majority vote helper for 3-way voting.
@@ -28,7 +28,7 @@ export function majorityVote(
  * Pairs appearing in ≥2 of 5 votes get merged.
  * Returns 0-based index groups.
  */
-export function buildMergeConsensus(votes: number[][][], logger?: LoggerService): number[][] {
+export function buildMergeConsensus(votes: number[][][], logger?: Logger): number[][] {
   // Count how many votes have each pair in same group
   const pairCounts = new Map<string, number>();
   // Track which index was "keep" (first in group) for each pair

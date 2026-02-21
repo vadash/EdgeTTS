@@ -2,7 +2,7 @@
 // Used for testing components that depend on logging
 
 import { vi } from 'vitest';
-import type { LoggerService } from '@/services/LoggerService';
+import type { Logger } from '@/services/Logger';
 
 export interface LogCall {
   level: 'info' | 'warn' | 'error' | 'debug';
@@ -10,7 +10,7 @@ export interface LogCall {
   data?: Record<string, unknown>;
 }
 
-export class MockLogger implements LoggerService {
+export class MockLogger implements Logger {
   public calls: LogCall[] = [];
 
   info = vi.fn((message: string, data?: Record<string, unknown>) => {

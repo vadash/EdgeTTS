@@ -6,7 +6,7 @@
  * - Browser-instance specific (won't work if copied elsewhere)
  */
 
-import type { ILogger } from './LoggerService';
+import type { ILogger } from './Logger';
 import { IndexedDBNames } from '@/config/storage';
 
 const KEY_ID = 'master';
