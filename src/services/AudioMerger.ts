@@ -5,7 +5,7 @@
 import { defaultConfig } from '@/config';
 import { sanitizeFilename } from '@/utils/fileUtils';
 import { parseMP3Duration } from './MP3Parser';
-import { withPermissionRetry } from './FileSystemRetry';
+import { withPermissionRetry } from '@/utils/retry';
 import type { FFmpegService } from './FFmpegService';
 
 export type MergeProgressCallback = (current: number, total: number, message: string) => void;

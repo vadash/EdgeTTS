@@ -13,7 +13,7 @@ import type {
 import type { Stores } from '@/stores';
 import { allocateByGender, allocateByFrequency, remapAssignments, shortVoiceId } from './VoiceAllocator';
 import { exportToProfile } from './llm/VoiceProfile';
-import { withPermissionRetry } from './FileSystemRetry';
+import { withPermissionRetry } from '@/utils/retry';
 import { checkResumeState, loadPipelineState } from './ResumeCheck';
 import { AppError, noContentError, insufficientVoicesError, getErrorMessage } from '@/errors';
 
