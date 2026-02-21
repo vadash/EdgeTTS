@@ -5,7 +5,7 @@ import { StoreProvider, createStores, initializeStores } from './stores';
 import { ServiceProvider, createProductionContainer } from './di';
 import { ServiceTypes } from './di';
 import type { SupportedLocale } from './stores/LanguageStore';
-import type { ILogger } from './services/interfaces';
+import type { ILogger } from './services/LoggerService';
 import en from './i18n/en.json';
 import ru from './i18n/ru.json';
 import './styles/tailwind.css';

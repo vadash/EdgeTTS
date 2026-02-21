@@ -6,7 +6,7 @@ import { generateConnectionId } from '../utils/uuid';
 import { defaultConfig } from '@/config';
 import { RetriableError } from '@/errors';
 import type { TTSConfig } from '../state/types';
-import type { ILogger } from './interfaces';
+import type { ILogger } from './LoggerService';
 
 // Windows epoch for Sec-MS-GEC generation
 const WIN_EPOCH = 11644473600;

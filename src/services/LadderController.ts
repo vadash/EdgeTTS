@@ -1,4 +1,4 @@
-import type { ILogger } from './interfaces';
+import type { ILogger } from './LoggerService';
 
 export interface TaskResult {
   success: boolean;

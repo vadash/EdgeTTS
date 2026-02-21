@@ -1,8 +1,25 @@
 // Logger Service
-// Implements ILogger interface with LogStore integration
+// Logger with LogStore integration
 
-import type { ILogger, LogLevel } from '@/services/interfaces';
 import type { LogStore } from '@/stores/LogStore';
+
+export type LogLevel = 'info' | 'warn' | 'error';
+
+export interface LogEntry {
+  id: string;
+  timestamp: Date;
+  elapsed: string;
+  level: LogLevel;
+  message: string;
+  data?: Record<string, unknown>;
+}
+
+export interface ILogger {
+  debug(message: string, data?: Record<string, unknown>): void;
+  info(message: string, data?: Record<string, unknown>): void;
+  warn(message: string, data?: Record<string, unknown>): void;
+  error(message: string, error?: Error, data?: Record<string, unknown>): void;
+}
 
 /**
  * Logger Service - logs to console and LogStore

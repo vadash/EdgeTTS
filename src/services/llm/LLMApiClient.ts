@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import pRetry, { AbortError } from 'p-retry';
 import type { LLMValidationResult } from '@/state/types';
 import { getRetryDelay, defaultConfig } from '@/config';
-import type { ILogger } from '../interfaces';
+import type { ILogger } from '../LoggerService';
 import { stripThinkingTags, extractJSON } from '@/utils/llmUtils';
 import { DebugLogger } from './DebugLogger';
 

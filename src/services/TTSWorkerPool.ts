@@ -8,7 +8,21 @@ import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 import { LadderController } from './LadderController';
 import { withRetry, AbortError } from '@/utils/asyncUtils';
 import { isAppError } from '@/errors';
-import type { IWorkerPool, PoolTask, WorkerPoolProgress, ILogger } from './interfaces';
+import type { ILogger } from './LoggerService';
+
+export interface PoolTask {
+  partIndex: number;
+  text: string;
+  filename: string;
+  filenum: string;
+  voice?: string;
+}
+
+export interface WorkerPoolProgress {
+  completed: number;
+  total: number;
+  failed: number;
+}
 
 export interface WorkerPoolOptions {
   maxWorkers: number;
@@ -33,7 +47,7 @@ const TEMP_DIR_NAME = '_temp_work';
  * - Handles sleep mode recovery via reconnection
  * - Writes audio chunks to disk immediately to prevent OOM
  */
-export class TTSWorkerPool implements IWorkerPool {
+export class TTSWorkerPool {
   private queue: PQueue;
   private connectionPool: Pool<ReusableEdgeTTSService>;
   private ladder: LadderController;

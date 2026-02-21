@@ -2,7 +2,11 @@
 // Used for testing components that depend on TTS functionality
 
 import { vi } from 'vitest';
-import type { ITTSService } from '@/services/interfaces';
+
+export interface ITTSService {
+  start(): void;
+  clear(): void;
+}
 
 export class MockTTSService implements ITTSService {
   start = vi.fn();

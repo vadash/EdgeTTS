@@ -6,7 +6,9 @@ import { defaultConfig } from '@/config';
 import { sanitizeFilename } from '@/utils/fileUtils';
 import { parseMP3Duration } from './MP3Parser';
 import { withPermissionRetry } from './FileSystemRetry';
-import type { IFFmpegService, IAudioMerger, MergeProgressCallback } from './interfaces';
+import type { FFmpegService } from './FFmpegService';
+
+export type MergeProgressCallback = (current: number, total: number, message: string) => void;
 
 export interface MergedFile {
   filename: string;
@@ -44,14 +46,14 @@ export interface MergerConfig {
  * Reads audio chunks from disk to minimize RAM usage
  * Receives IFFmpegService via constructor for testability
  */
-export class AudioMerger implements IAudioMerger {
-  private ffmpegService: IFFmpegService;
+export class AudioMerger {
+  private ffmpegService: FFmpegService;
   private config: MergerConfig;
   private targetDurationMs: number;
   private minDurationMs: number;
   private maxDurationMs: number;
 
-  constructor(ffmpegService: IFFmpegService, config: MergerConfig) {
+  constructor(ffmpegService: FFmpegService, config: MergerConfig) {
     this.ffmpegService = ffmpegService;
     this.config = config;
 

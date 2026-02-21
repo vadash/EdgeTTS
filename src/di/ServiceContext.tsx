@@ -13,30 +13,42 @@ import { StorageKeys } from '@/config/storage';
 // not pre-registered in the container.
 import { FFmpegService } from '@/services/FFmpegService';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
-import { LoggerService } from '@/services/LoggerService';
+import { LoggerService, type ILogger } from '@/services/LoggerService';
 import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import { VoicePoolBuilder } from '@/services/VoicePoolBuilder';
 import { LLMVoiceService } from '@/services/llm';
-import { TTSWorkerPool } from '@/services/TTSWorkerPool';
-import { AudioMerger } from '@/services/AudioMerger';
+import { TTSWorkerPool, type WorkerPoolOptions } from '@/services/TTSWorkerPool';
+import { AudioMerger, type MergerConfig } from '@/services/AudioMerger';
 import { ReusableEdgeTTSService } from '@/services/ReusableEdgeTTSService';
 import type { LogStore } from '@/stores/LogStore';
-
-import type {
-  ILogger,
-  ISecureStorage,
-  IFFmpegService,
-  ITextBlockSplitter,
-  IVoicePoolBuilder,
-  ILLMServiceFactory,
-  IWorkerPoolFactory,
-  IAudioMergerFactory,
-  IReusableTTSService,
-  LLMServiceFactoryOptions,
-  MergerConfig,
-} from '@/services/interfaces';
-import type { WorkerPoolOptions } from '@/services/TTSWorkerPool';
+import type { LLMServiceFactoryOptions } from '@/services/llm/LLMVoiceService';
 import type { ConversionOrchestratorServices } from '@/services/ConversionOrchestrator';
+
+// ============================================================================
+// Factory Types
+// ============================================================================
+
+export interface ISecureStorage {
+  saveApiKey(key: string): Promise<void>;
+  loadApiKey(): Promise<string>;
+  clearApiKey(): Promise<void>;
+}
+
+export interface ILLMServiceFactory {
+  create(options: LLMServiceFactoryOptions): LLMVoiceService;
+}
+
+export interface IWorkerPoolFactory {
+  create(options: WorkerPoolOptions): TTSWorkerPool;
+}
+
+export interface IAudioMergerFactory {
+  create(config: MergerConfig): AudioMerger;
+}
+
+export interface IReusableTTSServiceFactory {
+  create(): ReusableEdgeTTSService;
+}
 
 // ============================================================================
 // Context Definition
@@ -95,8 +107,8 @@ export function useConfig(): AppConfig {
 /**
  * Hook to get the logger service
  */
-export function useLogger(): ILogger {
-  return useService<ILogger>(ServiceTypes.Logger);
+export function useLogger(): LoggerService {
+  return useService<LoggerService>(ServiceTypes.Logger);
 }
 
 // ============================================================================
@@ -189,29 +201,29 @@ export function createProductionContainer(
   });
 
   // Register FFmpeg service (singleton)
-  container.registerSingleton<IFFmpegService>(ServiceTypes.FFmpegService, () => {
-    const logger = container.get<ILogger>(ServiceTypes.Logger);
+  container.registerSingleton<FFmpegService>(ServiceTypes.FFmpegService, () => {
+    const logger = container.get<LoggerService>(ServiceTypes.Logger);
     return new FFmpegService(logger);
   });
 
   // Register TextBlockSplitter (singleton)
-  container.registerSingleton<ITextBlockSplitter>(
+  container.registerSingleton<TextBlockSplitter>(
     ServiceTypes.TextBlockSplitter,
     () => new TextBlockSplitter()
   );
 
   // Register VoicePoolBuilder (singleton)
-  container.registerSingleton<IVoicePoolBuilder>(
+  container.registerSingleton<VoicePoolBuilder>(
     ServiceTypes.VoicePoolBuilder,
     () => new VoicePoolBuilder()
   );
 
   // Register TTS Preview Service (singleton for UI voice samples)
   // Uses ReusableEdgeTTSService to avoid rate limiting from repeated sample plays
-  container.registerSingleton<IReusableTTSService>(
+  container.registerSingleton<ReusableEdgeTTSService>(
     ServiceTypes.TTSPreviewService,
     () => {
-      const logger = container.get<ILogger>(ServiceTypes.Logger);
+      const logger = container.get<LoggerService>(ServiceTypes.Logger);
       return new ReusableEdgeTTSService(logger);
     }
   );
@@ -220,7 +232,7 @@ export function createProductionContainer(
   container.registerSingleton<ILLMServiceFactory>(
     ServiceTypes.LLMServiceFactory,
     () => {
-      const logger = container.get<ILogger>(ServiceTypes.Logger);
+      const logger = container.get<LoggerService>(ServiceTypes.Logger);
       return {
         create: (options: LLMServiceFactoryOptions) => new LLMVoiceService({ ...options, logger }),
       };
@@ -239,7 +251,7 @@ export function createProductionContainer(
   container.registerSingleton<IAudioMergerFactory>(
     ServiceTypes.AudioMergerFactory,
     () => {
-      const ffmpeg = container.get<IFFmpegService>(ServiceTypes.FFmpegService);
+      const ffmpeg = container.get<FFmpegService>(ServiceTypes.FFmpegService);
       return {
         create: (cfg: MergerConfig) => new AudioMerger(ffmpeg, cfg),
       };
@@ -250,13 +262,13 @@ export function createProductionContainer(
   container.registerSingleton<ConversionOrchestratorServices>(
     ServiceTypes.ConversionOrchestratorServices,
     () => ({
-      logger: container.get<ILogger>(ServiceTypes.Logger),
-      textBlockSplitter: container.get<ITextBlockSplitter>(ServiceTypes.TextBlockSplitter),
+      logger: container.get<LoggerService>(ServiceTypes.Logger),
+      textBlockSplitter: container.get<TextBlockSplitter>(ServiceTypes.TextBlockSplitter),
       llmServiceFactory: container.get<ILLMServiceFactory>(ServiceTypes.LLMServiceFactory),
       workerPoolFactory: container.get<IWorkerPoolFactory>(ServiceTypes.WorkerPoolFactory),
       audioMergerFactory: container.get<IAudioMergerFactory>(ServiceTypes.AudioMergerFactory),
-      voicePoolBuilder: container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder),
-      ffmpegService: container.get<IFFmpegService>(ServiceTypes.FFmpegService),
+      voicePoolBuilder: container.get<VoicePoolBuilder>(ServiceTypes.VoicePoolBuilder),
+      ffmpegService: container.get<FFmpegService>(ServiceTypes.FFmpegService),
     })
   );
 
@@ -268,10 +280,10 @@ export function createProductionContainer(
  */
 export interface ServiceOverrides {
   config?: AppConfig;
-  logger?: ILogger;
+  logger?: LoggerService;
   secureStorage?: ISecureStorage;
-  ffmpegService?: IFFmpegService;
-  voicePoolBuilder?: IVoicePoolBuilder;
+  ffmpegService?: FFmpegService;
+  voicePoolBuilder?: VoicePoolBuilder;
 }
 
 /**
@@ -307,8 +319,8 @@ export function createTestContainer(overrides: ServiceOverrides = {}): ServiceCo
   if (overrides.ffmpegService) {
     container.registerInstance(ServiceTypes.FFmpegService, overrides.ffmpegService);
   } else {
-    container.registerSingleton<IFFmpegService>(ServiceTypes.FFmpegService, () => {
-      const logger = container.get<ILogger>(ServiceTypes.Logger);
+    container.registerSingleton<FFmpegService>(ServiceTypes.FFmpegService, () => {
+      const logger = container.get<LoggerService>(ServiceTypes.Logger);
       return new FFmpegService(logger);
     });
   }
@@ -317,7 +329,7 @@ export function createTestContainer(overrides: ServiceOverrides = {}): ServiceCo
   if (overrides.voicePoolBuilder) {
     container.registerInstance(ServiceTypes.VoicePoolBuilder, overrides.voicePoolBuilder);
   } else {
-    container.registerSingleton<IVoicePoolBuilder>(
+    container.registerSingleton<VoicePoolBuilder>(
       ServiceTypes.VoicePoolBuilder,
       () => new VoicePoolBuilder()
     );

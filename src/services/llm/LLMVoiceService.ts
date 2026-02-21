@@ -3,7 +3,9 @@ import type {
   LLMCharacter,
   SpeakerAssignment,
 } from '@/state/types';
-import type { ILogger, ProgressCallback } from '../interfaces';
+import type { ILogger } from '../LoggerService';
+
+export type ProgressCallback = (current: number, total: number, message?: string) => void;
 import { defaultConfig } from '@/config';
 import { LLMApiClient } from './LLMApiClient';
 import { DebugLogger } from './DebugLogger';
@@ -87,6 +89,10 @@ const VOTING_TEMPERATURES = [0.1, 0.4, 0.7] as const;
  */
 const LLM_DELAY_MS = 1000;
 
+/**
+ * Options for creating LLM service instances
+ * Aliased as LLMServiceFactoryOptions for DI compatibility
+ */
 export interface LLMVoiceServiceOptions {
   apiKey: string;
   apiUrl: string;
@@ -531,3 +537,6 @@ export class LLMVoiceService {
     return this.apiClient.testConnectionStreaming();
   }
 }
+
+// Type alias for DI factory compatibility
+export type LLMServiceFactoryOptions = LLMVoiceServiceOptions;

@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'preact/hooks';
 import { useService, ServiceTypes } from '@/di';
-import type { IReusableTTSService } from '@/services/interfaces';
+import { ReusableEdgeTTSService } from '@/services/ReusableEdgeTTSService';
 
 export function useVoicePreview() {
-  const ttsService = useService<IReusableTTSService>(ServiceTypes.TTSPreviewService);
+  const ttsService = useService<ReusableEdgeTTSService>(ServiceTypes.TTSPreviewService);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentVoiceId, setCurrentVoiceId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

@@ -1,7 +1,6 @@
 import { voices } from '../components/VoiceSelector/voices';
 import type { VoicePool } from '../state/types';
 import type { DetectedLanguage } from '../utils/languageDetection';
-import type { IVoicePoolBuilder } from './interfaces';
 
 /**
  * Build options for voice pool
@@ -74,10 +73,10 @@ export function getRandomVoice(
 }
 
 /**
- * VoicePoolBuilder class implementing IVoicePoolBuilder interface for DI
+ * VoicePoolBuilder class for DI
  * Delegates to buildVoicePool with includeMultilingual=true for LLM
  */
-export class VoicePoolBuilder implements IVoicePoolBuilder {
+export class VoicePoolBuilder {
   buildPool(locale: string, enabledVoices?: string[]): VoicePool {
     return buildVoicePool({ language: locale, includeMultilingual: true, enabledVoices });
   }

@@ -2,7 +2,7 @@
 // Used for testing components that depend on logging
 
 import { vi } from 'vitest';
-import type { ILogger } from '@/services/interfaces';
+import type { ILogger } from '@/services/LoggerService';
 
 export interface LogCall {
   level: 'info' | 'warn' | 'error' | 'debug';

@@ -2,20 +2,15 @@
 // Used for testing components that depend on LLM voice assignment
 
 import { vi } from 'vitest';
-import type {
-  ILLMService,
-  TextBlock,
-  LLMCharacter,
-  SpeakerAssignment,
-  LLMProgressCallback,
-} from '@/services/interfaces';
+import type { TextBlock, LLMCharacter, SpeakerAssignment } from '@/state/types';
+import type { ProgressCallback } from '@/services/llm/LLMVoiceService';
 
-export class MockLLMService implements ILLMService {
+export class MockLLMService {
   private cancelled = false;
 
   extractCharacters = vi.fn(async (
     blocks: TextBlock[],
-    onProgress?: LLMProgressCallback
+    onProgress?: ProgressCallback
   ): Promise<LLMCharacter[]> => {
     if (this.cancelled) throw new Error('Cancelled');
     onProgress?.(blocks.length, blocks.length);
@@ -30,7 +25,7 @@ export class MockLLMService implements ILLMService {
     blocks: TextBlock[],
     characterVoiceMap: Map<string, string>,
     characters: LLMCharacter[],
-    onProgress?: LLMProgressCallback
+    onProgress?: ProgressCallback
   ): Promise<SpeakerAssignment[]> => {
     if (this.cancelled) throw new Error('Cancelled');
     onProgress?.(blocks.length, blocks.length);

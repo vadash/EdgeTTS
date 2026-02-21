@@ -12,13 +12,12 @@ import { defaultConfig } from '@/config';
 import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import { VoicePoolBuilder } from '@/services/VoicePoolBuilder';
 import type { ConversionOrchestratorServices } from '@/services/ConversionOrchestrator';
-import type {
-  ILLMServiceFactory,
-  IWorkerPoolFactory,
-  IAudioMergerFactory,
-  ITextBlockSplitter,
-  IVoicePoolBuilder,
-} from '@/services/interfaces';
+import { LLMVoiceService } from '@/services/llm/LLMVoiceService';
+import { TTSWorkerPool } from '@/services/TTSWorkerPool';
+import { AudioMerger } from '@/services/AudioMerger';
+import type { WorkerPoolOptions } from '@/services/TTSWorkerPool';
+import type { MergerConfig } from '@/services/AudioMerger';
+import type { LLMServiceFactoryOptions } from '@/services/llm/LLMVoiceService';
 
 export interface MockServices {
   tts: MockTTSService;
@@ -63,37 +62,36 @@ export function createTestContainer(options: TestContainerOptions = {}): {
   container.registerInstance(ServiceTypes.FFmpegService, mocks.ffmpeg);
 
   // Utility services
-  container.registerSingleton<ITextBlockSplitter>(
+  container.registerSingleton<TextBlockSplitter>(
     ServiceTypes.TextBlockSplitter,
     () => new TextBlockSplitter()
   );
-  container.registerSingleton<IVoicePoolBuilder>(
+  container.registerSingleton<VoicePoolBuilder>(
     ServiceTypes.VoicePoolBuilder,
     () => new VoicePoolBuilder()
   );
 
   // Factories - return mock services
-  container.registerSingleton<ILLMServiceFactory>(
+  container.registerSingleton<{ create: (options: LLMServiceFactoryOptions) => LLMVoiceService }>(
     ServiceTypes.LLMServiceFactory,
     () => ({
       create: () => mocks.llm,
     })
   );
 
-  container.registerSingleton<IWorkerPoolFactory>(
+  container.registerSingleton<{ create: (options: WorkerPoolOptions) => TTSWorkerPool }>(
     ServiceTypes.WorkerPoolFactory,
     () => ({
       create: () => mocks.workerPool,
     })
   );
 
-  container.registerSingleton<IAudioMergerFactory>(
+  container.registerSingleton<{ create: (config: MergerConfig) => AudioMerger }>(
     ServiceTypes.AudioMergerFactory,
     () => ({
       create: () => ({
         calculateMergeGroups: () => [],
-        merge: async () => [],
-        saveMergedFiles: async () => {},
+        mergeAndSave: async () => 0,
       }),
     })
   );
@@ -113,8 +111,7 @@ export function createTestContainer(options: TestContainerOptions = {}): {
       audioMergerFactory: {
         create: () => ({
           calculateMergeGroups: () => [],
-          merge: async () => [],
-          saveMergedFiles: async () => {},
+          mergeAndSave: async () => 0,
         }),
       },
       voicePoolBuilder: new VoicePoolBuilder(),

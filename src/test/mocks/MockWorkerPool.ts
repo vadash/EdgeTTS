@@ -2,9 +2,9 @@
 // Used for testing components that depend on worker pool functionality
 
 import { vi } from 'vitest';
-import type { IWorkerPool, PoolTask, WorkerPoolProgress } from '@/services/interfaces';
+import type { PoolTask, WorkerPoolProgress } from '@/services/TTSWorkerPool';
 
-export class MockWorkerPool implements IWorkerPool {
+export class MockWorkerPool {
   private tasks: PoolTask[] = [];
   private completedAudio = new Map<number, Uint8Array>();
   private failedTasks = new Set<number>();

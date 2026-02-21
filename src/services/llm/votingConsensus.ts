@@ -1,4 +1,4 @@
-import type { ILogger } from '../interfaces';
+import type { ILogger } from '../LoggerService';
 
 /**
  * Majority vote helper for 3-way voting.

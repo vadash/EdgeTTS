@@ -1,7 +1,7 @@
 // Test Factories - Audio Data
 // Factory functions for creating test audio data
 
-import type { MergedFile } from '@/services/interfaces';
+import type { MergedFile } from '@/services/AudioMerger';
 
 /**
  * Create fake audio data (empty MP3 header + silence)

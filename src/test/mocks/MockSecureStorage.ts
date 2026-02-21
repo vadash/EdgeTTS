@@ -2,7 +2,12 @@
 // Used for testing components that depend on encrypted storage
 
 import { vi } from 'vitest';
-import type { ISecureStorage } from '@/services/interfaces';
+
+export interface ISecureStorage {
+  saveApiKey(key: string): Promise<void>;
+  loadApiKey(): Promise<string>;
+  clearApiKey(): Promise<void>;
+}
 
 export class MockSecureStorage implements ISecureStorage {
   private storage = new Map<string, string>();

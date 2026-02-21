@@ -2,7 +2,7 @@
 // Manages application logs with structured entries
 
 import { signal, computed } from '@preact/signals';
-import type { LogLevel, LogEntry, ILogger } from '@/services/interfaces';
+import type { LogLevel, LogEntry, ILogger } from '@/services/LoggerService';
 
 /**
  * Generate unique ID for log entries

@@ -1,16 +1,7 @@
 // Conversion Orchestrator - Simplified without pipeline architecture
 // Runs the TTS conversion workflow as a single async function
 
-import type {
-  ILogger,
-  ITextBlockSplitter,
-  ILLMServiceFactory,
-  IWorkerPoolFactory,
-  IAudioMergerFactory,
-  IVoicePoolBuilder,
-  IFFmpegService,
-  LLMServiceFactoryOptions,
-} from '@/services/interfaces';
+import type { LLMServiceFactoryOptions } from './llm/LLMVoiceService';
 import type {
   TTSConfig,
   LLMCharacter,
@@ -26,8 +17,37 @@ import { withPermissionRetry } from './FileSystemRetry';
 import { checkResumeState, loadPipelineState } from './ResumeCheck';
 import { AppError, noContentError, insufficientVoicesError, getErrorMessage } from '@/errors';
 
+// Import concrete service classes
+import type { ILogger } from './LoggerService';
+import type { TextBlockSplitter } from './TextBlockSplitter';
+import type { VoicePoolBuilder } from './VoicePoolBuilder';
+import type { LLMVoiceService } from './llm/LLMVoiceService';
+import type { TTSWorkerPool } from './TTSWorkerPool';
+import type { AudioMerger } from './AudioMerger';
+import type { FFmpegService } from './FFmpegService';
+
 // Re-export types from OrchestratorCallbacks for convenience
 export type { WorkflowProgress, OrchestratorInput } from './OrchestratorCallbacks';
+
+// ============================================================================
+// Orchestrator Services Bundle
+// ============================================================================
+
+export interface ConversionOrchestratorServices {
+  logger: ILogger;
+  textBlockSplitter: TextBlockSplitter;
+  llmServiceFactory: {
+    create(options: LLMServiceFactoryOptions): LLMVoiceService;
+  };
+  workerPoolFactory: {
+    create(options: import('./TTSWorkerPool').WorkerPoolOptions): TTSWorkerPool;
+  };
+  audioMergerFactory: {
+    create(config: import('./AudioMerger').MergerConfig): AudioMerger;
+  };
+  voicePoolBuilder: VoicePoolBuilder;
+  ffmpegService: FFmpegService;
+}
 
 // ============================================================================
 // Orchestrator
@@ -39,18 +59,10 @@ export type { WorkflowProgress, OrchestratorInput } from './OrchestratorCallback
  */
 export class ConversionOrchestrator {
   private abortController: AbortController | null = null;
-  private llmService: ReturnType<ILLMServiceFactory['create']> | null = null;
+  private llmService: LLMVoiceService | null = null;
 
   constructor(
-    private services: {
-      logger: ILogger;
-      textBlockSplitter: ITextBlockSplitter;
-      llmServiceFactory: ILLMServiceFactory;
-      workerPoolFactory: IWorkerPoolFactory;
-      audioMergerFactory: IAudioMergerFactory;
-      voicePoolBuilder: IVoicePoolBuilder;
-      ffmpegService: IFFmpegService;
-    },
+    private services: ConversionOrchestratorServices,
     private callbacks: OrchestratorCallbacks
   ) {}
 
@@ -858,16 +870,6 @@ export class ConversionOrchestrator {
 // ============================================================================
 // Factory
 // ============================================================================
-
-export interface ConversionOrchestratorServices {
-  logger: ILogger;
-  textBlockSplitter: ITextBlockSplitter;
-  llmServiceFactory: ILLMServiceFactory;
-  workerPoolFactory: IWorkerPoolFactory;
-  audioMergerFactory: IAudioMergerFactory;
-  voicePoolBuilder: IVoicePoolBuilder;
-  ffmpegService: IFFmpegService;
-}
 
 export function createConversionOrchestrator(
   services: ConversionOrchestratorServices,

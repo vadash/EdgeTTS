@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { TTSWorkerPool, type WorkerPoolOptions } from './TTSWorkerPool';
-import type { PoolTask } from './interfaces';
+import { TTSWorkerPool, type WorkerPoolOptions, type PoolTask } from './TTSWorkerPool';
 import type { TTSConfig as VoiceConfig } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 

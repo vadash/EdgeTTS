@@ -4,8 +4,24 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 import { defaultConfig } from '@/config';
-import type { ILogger, IFFmpegService, AudioProcessingOptions } from './interfaces';
+import type { ILogger } from './LoggerService';
 import { buildFilterChain } from './audio/buildFilterChain';
+
+export type FFmpegProgressCallback = (message: string) => void;
+
+export interface AudioProcessingOptions {
+  silenceRemoval: boolean;
+  normalization: boolean;
+  deEss: boolean;
+  silenceGapMs: number;
+  eq: boolean;
+  compressor: boolean;
+  fadeIn: boolean;
+  stereoWidth: boolean;
+  opusMinBitrate?: number;
+  opusMaxBitrate?: number;
+  opusCompressionLevel?: number;
+}
 
 export interface AudioProcessingConfig {
   silenceRemoval: boolean;
@@ -25,10 +41,10 @@ export interface AudioProcessingConfig {
 const CDN_MIRRORS = defaultConfig.ffmpeg.cdnMirrors;
 
 /**
- * FFmpegService - Implements IFFmpegService interface
+ * FFmpegService
  * Container-managed singleton (no static getInstance)
  */
-export class FFmpegService implements IFFmpegService {
+export class FFmpegService {
   private ffmpeg: FFmpeg | null = null;
   private loadPromise: Promise<boolean> | null = null;
   private loaded = false;

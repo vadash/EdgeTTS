@@ -2,13 +2,9 @@
 // Used for testing components that depend on FFmpeg functionality
 
 import { vi } from 'vitest';
-import type {
-  IFFmpegService,
-  AudioProcessingOptions,
-  FFmpegProgressCallback,
-} from '@/services/interfaces';
+import type { AudioProcessingOptions, FFmpegProgressCallback } from '@/services/FFmpegService';
 
-export class MockFFmpegService implements IFFmpegService {
+export class MockFFmpegService {
   private loaded = false;
   private shouldFail = false;
   private loadError: string | null = null;

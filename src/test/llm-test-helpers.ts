@@ -3,7 +3,7 @@ import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import { testConfig } from '../../test.config.local';
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 import type { TestFixture, ExpectedDialogue } from './fixtures';
-import type { ILogger } from '@/services/interfaces';
+import type { ILogger } from '@/services/LoggerService';
 import { speakerMatchesCharacter } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
