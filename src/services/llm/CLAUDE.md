@@ -1,18 +1,13 @@
-# LLM Service Guidelines
+# LLM Service & Prompts
 
-## Strategy Pattern
-We use a **Prompt Strategy** pattern (`PromptStrategy.ts`) to decouple:
-1. Prompt Building (`PromptBuilders.ts`)
-2. Response Validation (`ResponseValidators.ts`)
-3. Response Parsing (`utils/llmUtils.ts`)
+**WHAT**: Orchestrates API calls to OpenAI/Mistral/DeepSeek, handles prompt building, and parses messy LLM outputs.
 
-## Three-Pass Architecture
-1. **Extract:** Identifies characters.
-2. **Merge:** Deduplicates characters (using heuristics or LLM).
-3. **Assign:** Assigns speaker codes to text blocks.
+## Architecture
+- **Prompts**: Located in `src/config/prompts/`. We use strict XML tags (`<instructions>`, `<rules>`, etc.) to guide the LLM. 
+- **Clients**: `LLMApiClient.ts` manages the raw fetch calls. It strips standard SDK headers to bypass certain proxies.
+- **Consensus**: We use a multi-vote system to improve accuracy. Merge uses a 5-way Union-Find consensus. Assign uses a 3-way majority vote.
 
-## Constraints & Gotchas
-- **JSON Repair:** Models often output malformed JSON. Always use `extractJSON` and `jsonrepair` utilities.
-- **Token Limits:** Text is split into blocks (`TextBlockSplitter`). Extract blocks are larger (16k) than Assign blocks (8k).
-- **Reasoning Models:** DeepSeek/Qwen models output `<think>` tags. Use `stripThinkingTags` before parsing.
-- **Consistency:** Never translate names. Code mapping (A, B, C...) is used to save tokens during assignment.
+## Parsing Gotchas (CRITICAL)
+- **Thinking Models**: Models like DeepSeek-R1 output `<think>` or `<scratchpad>` blocks. ALWAYS use `stripThinkingTags()` before parsing.
+- **JSON Repair**: LLMs often output malformed JSON or wrap it in markdown (` ```json `). ALWAYS parse responses using the `extractJSON()` utility, which utilizes the `jsonrepair` library.
+- **Resilience**: Use `ResponseValidators.ts` to attempt auto-repair on flawed data (e.g., missing genders, duplicate indices) before triggering an API retry.

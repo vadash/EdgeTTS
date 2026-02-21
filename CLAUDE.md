@@ -1,32 +1,22 @@
-# EdgeTTS Project Context
+# Edge TTS Web
 
-## Overview
-A local-first Text-to-Speech app using Edge TTS, FFmpeg (WASM), and LLMs for character voice assignment.
-**Stack:** TypeScript, Preact (via Vite/Webpack), Tailwind CSS, IndexedDB, @preact/signals.
+**WHAT**: A local-first Text-to-Speech web app that converts books (EPUB/FB2/TXT) to audiobooks using Edge TTS and LLMs for character voice assignment.
+**WHY**: To provide a free, high-quality audiobook generation pipeline optimized for LitRPG, Web Novels, and multi-character stories.
+**HOW**: Built with TypeScript, Preact, Tailwind CSS, `@preact/signals`, and Webpack. Runs entirely in the browser (uses FFmpeg.wasm for audio processing and File System Access API for local file management).
 
-## Core Architecture
-1. **Input:** File/Text -> `TextBlockSplitter`
-2. **Analysis:** LLM Service -> Extract Chars -> Assign Speakers
-3. **Pipeline:** `ConversionOrchestrator` -> Runs steps (Extract, Assign, TTS, Merge)
-4. **TTS:** `TTSWorkerPool` -> Edge TTS WebSocket -> Audio Chunks (fs: `_temp_work`)
-5. **Merge:** `AudioMerger` -> FFmpeg (Opus/MP3) -> Final File
-
-## Key Commands
-- `npm run dev`: Start dev server (Webpack)
+## Core Commands
+- `npm run dev`: Start Webpack dev server
 - `npm run build`: Production build
 - `npm test`: Run unit tests (Vitest)
 - `npm run test:real`: Run integration tests against real LLM APIs
-- `npm run typecheck`: TypeScript validation
 
-## Code Standards
-- **Async:** Use `async/await`. Handle known errors with `AppError` class.
-- **Imports:** Use `@/` alias for `src/`.
-- **Formatting:** Prettier/ESLint defaults apply.
-- **Filesystem:** Browser File System Access API is used heavily. Always handle permission errors via `withPermissionRetry`.
+## Architecture Map (Progressive Disclosure)
+Claude, if you are working in specific domains, rely on the local `CLAUDE.md` files in those directories:
+- `src/services/` - Core processing pipeline (Orchestrator, TTS Workers, FFmpeg).
+- `src/services/llm/` - LLM interaction, prompting, and parsing logic.
+- `src/stores/` - Global state management with `@preact/signals`.
+- `src/test/` - Testing conventions (mocked vs real API tests).
 
-## Directory Map
-- `src/di`: Dependency Injection container (`ServiceContainer`).
-- `src/services/pipeline`: Core conversion logic using Step pattern.
-- `src/services/llm`: Prompt engineering and API interaction.
-- `src/stores`: Global state (`@preact/signals`).
-- `src/components`: UI components.
+## Global Gotchas
+- **File System**: The app writes directly to the user's hard drive to prevent OOM errors. All file operations MUST use `withPermissionRetry` to handle browser security drops.
+- **Async Resilience**: Network and WebSocket calls must use the internal `withRetry` utility (which wraps `p-retry`) to survive sleep modes and rate limits.
