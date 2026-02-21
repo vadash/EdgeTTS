@@ -1,20 +1,35 @@
 // Settings Store
 // Manages user preferences and application settings
 
-import { signal, computed } from '@preact/signals';
-import type { AppSettings } from '@/state/types';
-import { AudioPreset, AUDIO_PRESETS } from '@/state/types';
+import { signal, computed, effect } from '@preact/signals';
+import type { AppSettings, AudioPreset } from '@/state/types';
+import { AUDIO_PRESETS } from '@/state/types';
 import type { LogStore } from './LogStore';
 import { StorageKeys } from '@/config/storage';
 
+// ============================================================================
+// Types
+// ============================================================================
+
 /**
- * Default settings values
+ * Settings state structure
  */
-const defaultSettings: AppSettings = {
+export interface SettingsState extends AppSettings {}
+
+/**
+ * Partial update helper type
+ */
+export type SettingsPatch = Partial<AppSettings>;
+
+// ============================================================================
+// Defaults
+// ============================================================================
+
+const defaultSettings: SettingsState = {
   voice: 'ru-RU, DmitryNeural',
   narratorVoice: 'ru-RU, DmitryNeural',
   voicePoolLocale: 'ru-RU',
-  enabledVoices: [], // Empty means all voices enabled
+  enabledVoices: [],
   rate: 0,
   pitch: 0,
   ttsThreads: 15,
@@ -25,412 +40,288 @@ const defaultSettings: AppSettings = {
   statusAreaWidth: 450,
   outputFormat: 'opus',
   silenceRemovalEnabled: true,
-  normalizationEnabled: true,   // was false
-  deEssEnabled: true,           // was false
+  normalizationEnabled: true,
+  deEssEnabled: true,
   silenceGapMs: 100,
-  // Broadcast voice audio enhancement
   eqEnabled: true,
   compressorEnabled: true,
   fadeInEnabled: true,
   stereoWidthEnabled: true,
-  // Opus encoding settings
-  opusPreset: AudioPreset.BALANCED,
+  opusPreset: 'balanced' as AudioPreset,
   opusMinBitrate: 64,
   opusMaxBitrate: 96,
   opusCompressionLevel: 10,
 };
 
 /**
- * Settings Store - manages user preferences
+ * Parse settings from localStorage with fallback to defaults
+ */
+function loadFromStorage(): SettingsState {
+  try {
+    const saved = localStorage.getItem(StorageKeys.settings);
+    if (saved) {
+      const parsed: Partial<AppSettings> = JSON.parse(saved);
+      return { ...defaultSettings, ...parsed };
+    }
+  } catch {
+    // Fall through to defaults
+  }
+  return { ...defaultSettings };
+}
+
+// ============================================================================
+// Store Definition
+// ============================================================================
+
+/**
+ * Root settings signal
+ */
+const rootSignal = signal<SettingsState>(loadFromStorage());
+
+/**
+ * Computed display values
+ */
+const rateDisplayComputed = computed(() =>
+  rootSignal.value.rate >= 0 ? `+${rootSignal.value.rate}%` : `${rootSignal.value.rate}%`
+);
+
+const pitchDisplayComputed = computed(() =>
+  rootSignal.value.pitch >= 0 ? `+${rootSignal.value.pitch}Hz` : `${rootSignal.value.pitch}Hz`
+);
+
+// ============================================================================
+// Persistence Effect
+// ============================================================================
+
+/**
+ * Auto-save to localStorage on any change
+ */
+effect(() => {
+  localStorage.setItem(StorageKeys.settings, JSON.stringify(rootSignal.value));
+});
+
+// ============================================================================
+// Public API
+// ============================================================================
+
+/**
+ * Update settings with partial patch
+ */
+function patchSettings(patch: SettingsPatch): void {
+  rootSignal.value = { ...rootSignal.value, ...patch };
+}
+
+/**
+ * Apply an Opus preset (updates multiple fields atomically)
+ */
+function applyOpusPreset(preset: AudioPreset): void {
+  const config = AUDIO_PRESETS.find(p => p.name === preset);
+  if (!config) return;
+
+  rootSignal.value = {
+    ...rootSignal.value,
+    opusPreset: preset,
+    opusMinBitrate: config.minBitrate,
+    opusMaxBitrate: config.maxBitrate,
+    opusCompressionLevel: config.compressionLevel,
+  };
+}
+
+/**
+ * Modify Opus bitrate and switch to CUSTOM preset
+ */
+function setOpusMinBitrate(value: number): void {
+  rootSignal.value = {
+    ...rootSignal.value,
+    opusPreset: 'custom' as AudioPreset,
+    opusMinBitrate: value,
+  };
+}
+
+function setOpusMaxBitrate(value: number): void {
+  rootSignal.value = {
+    ...rootSignal.value,
+    opusPreset: 'custom' as AudioPreset,
+    opusMaxBitrate: value,
+  };
+}
+
+function setOpusCompressionLevel(value: number): void {
+  rootSignal.value = {
+    ...rootSignal.value,
+    opusPreset: 'custom' as AudioPreset,
+    opusCompressionLevel: value,
+  };
+}
+
+/**
+ * Reset to defaults
+ */
+function resetSettings(): void {
+  rootSignal.value = { ...defaultSettings };
+}
+
+/**
+ * Get current settings as plain object (for export)
+ */
+function settingsToObject(): AppSettings {
+  return { ...rootSignal.value };
+}
+
+// ============================================================================
+// Legacy Class Wrapper (for test compatibility)
+// ============================================================================
+
+/**
+ * Computed signal wrappers for individual properties
+ * Maintains the API: store.rate.value, store.pitch.value, etc.
+ */
+class PropertySignal<T> {
+  constructor(private fn: (s: SettingsState) => T) {}
+
+  get value(): T {
+    return this.fn(rootSignal.value);
+  }
+  set value(_v: T) {
+    // No-op - mutations go through methods
+  }
+}
+
+/**
+ * Legacy wrapper for backward compatibility with tests
+ * Tests call methods like setRate(), setPitch(), and access properties like store.rate.value
  */
 export class SettingsStore {
   private readonly logStore: LogStore;
 
-  // Voice settings
-  readonly voice = signal<string>(defaultSettings.voice);
-  readonly narratorVoice = signal<string>(defaultSettings.narratorVoice);
-  readonly voicePoolLocale = signal<string>(defaultSettings.voicePoolLocale);
-  readonly enabledVoices = signal<string[]>(defaultSettings.enabledVoices);
+  // Voice properties - computed wrappers
+  readonly voice = new PropertySignal(s => s.voice);
+  readonly narratorVoice = new PropertySignal(s => s.narratorVoice);
+  readonly voicePoolLocale = new PropertySignal(s => s.voicePoolLocale);
+  readonly enabledVoices = new PropertySignal(s => s.enabledVoices);
 
-  // Speech settings
-  readonly rate = signal<number>(defaultSettings.rate);
-  readonly pitch = signal<number>(defaultSettings.pitch);
+  // Speech properties
+  readonly rate = new PropertySignal(s => s.rate);
+  readonly pitch = new PropertySignal(s => s.pitch);
 
-  // Processing settings
-  readonly ttsThreads = signal<number>(defaultSettings.ttsThreads);
-  readonly llmThreads = signal<number>(defaultSettings.llmThreads);
-  readonly outputFormat = signal<'opus'>(defaultSettings.outputFormat);
-  readonly silenceRemovalEnabled = signal<boolean>(defaultSettings.silenceRemovalEnabled);
-  readonly normalizationEnabled = signal<boolean>(defaultSettings.normalizationEnabled);
-  readonly deEssEnabled = signal<boolean>(defaultSettings.deEssEnabled);
-  readonly silenceGapMs = signal<number>(defaultSettings.silenceGapMs);
-  readonly eqEnabled = signal<boolean>(defaultSettings.eqEnabled);
-  readonly compressorEnabled = signal<boolean>(defaultSettings.compressorEnabled);
-  readonly fadeInEnabled = signal<boolean>(defaultSettings.fadeInEnabled);
-  readonly stereoWidthEnabled = signal<boolean>(defaultSettings.stereoWidthEnabled);
+  // Processing properties
+  readonly ttsThreads = new PropertySignal(s => s.ttsThreads);
+  readonly llmThreads = new PropertySignal(s => s.llmThreads);
+  readonly outputFormat = new PropertySignal(s => s.outputFormat);
+  readonly silenceRemovalEnabled = new PropertySignal(s => s.silenceRemovalEnabled);
+  readonly normalizationEnabled = new PropertySignal(s => s.normalizationEnabled);
+  readonly deEssEnabled = new PropertySignal(s => s.deEssEnabled);
+  readonly silenceGapMs = new PropertySignal(s => s.silenceGapMs);
+  readonly eqEnabled = new PropertySignal(s => s.eqEnabled);
+  readonly compressorEnabled = new PropertySignal(s => s.compressorEnabled);
+  readonly fadeInEnabled = new PropertySignal(s => s.fadeInEnabled);
+  readonly stereoWidthEnabled = new PropertySignal(s => s.stereoWidthEnabled);
 
-  // Opus encoding settings
-  readonly opusPreset = signal<AudioPreset>(defaultSettings.opusPreset);
-  readonly opusMinBitrate = signal<number>(defaultSettings.opusMinBitrate);
-  readonly opusMaxBitrate = signal<number>(defaultSettings.opusMaxBitrate);
-  readonly opusCompressionLevel = signal<number>(defaultSettings.opusCompressionLevel);
+  // Opus properties
+  readonly opusPreset = new PropertySignal(s => s.opusPreset);
+  readonly opusMinBitrate = new PropertySignal(s => s.opusMinBitrate);
+  readonly opusMaxBitrate = new PropertySignal(s => s.opusMaxBitrate);
+  readonly opusCompressionLevel = new PropertySignal(s => s.opusCompressionLevel);
 
-  // Text processing settings
-  readonly lexxRegister = signal<boolean>(defaultSettings.lexxRegister);
+  // Text processing properties
+  readonly lexxRegister = new PropertySignal(s => s.lexxRegister);
 
-  // UI settings
-  readonly showDopSettings = signal<boolean>(defaultSettings.showDopSettings);
-  readonly isLiteMode = signal<boolean>(defaultSettings.isLiteMode);
-  readonly statusAreaWidth = signal<number>(defaultSettings.statusAreaWidth);
+  // UI properties
+  readonly showDopSettings = new PropertySignal(s => s.showDopSettings);
+  readonly isLiteMode = new PropertySignal(s => s.isLiteMode);
+  readonly statusAreaWidth = new PropertySignal(s => s.statusAreaWidth);
+
+  // Computed
+  readonly rateDisplay = rateDisplayComputed;
+  readonly pitchDisplay = pitchDisplayComputed;
 
   constructor(logStore: LogStore) {
     this.logStore = logStore;
   }
 
-  // Computed display values
-  readonly rateDisplay = computed(() =>
-    this.rate.value >= 0 ? `+${this.rate.value}%` : `${this.rate.value}%`
-  );
-
-  readonly pitchDisplay = computed(() =>
-    this.pitch.value >= 0 ? `+${this.pitch.value}Hz` : `${this.pitch.value}Hz`
-  );
-
   // ========== Voice Setters ==========
-
-  setVoice(value: string): void {
-    this.voice.value = value;
-    this.save();
-  }
-
-  setNarratorVoice(value: string): void {
-    this.narratorVoice.value = value;
-    this.save();
-  }
-
-  setVoicePoolLocale(value: string): void {
-    this.voicePoolLocale.value = value;
-    this.save();
-  }
-
-  setEnabledVoices(value: string[]): void {
-    this.enabledVoices.value = value;
-    this.save();
-  }
+  setVoice(value: string): void { patchSettings({ voice: value }); }
+  setNarratorVoice(value: string): void { patchSettings({ narratorVoice: value }); }
+  setVoicePoolLocale(value: string): void { patchSettings({ voicePoolLocale: value }); }
+  setEnabledVoices(value: string[]): void { patchSettings({ enabledVoices: value }); }
 
   // ========== Speech Setters ==========
-
-  setRate(value: number): void {
-    this.rate.value = value;
-    this.save();
-  }
-
-  setPitch(value: number): void {
-    this.pitch.value = value;
-    this.save();
-  }
+  setRate(value: number): void { patchSettings({ rate: value }); }
+  setPitch(value: number): void { patchSettings({ pitch: value }); }
 
   // ========== Processing Setters ==========
+  setTtsThreads(value: number): void { patchSettings({ ttsThreads: value }); }
+  setLlmThreads(value: number): void { patchSettings({ llmThreads: value }); }
 
-  setTtsThreads(value: number): void {
-    this.ttsThreads.value = value;
-    this.save();
-  }
+  toggleSilenceRemoval(): void { patchSettings({ silenceRemovalEnabled: !rootSignal.value.silenceRemovalEnabled }); }
+  setSilenceRemovalEnabled(value: boolean): void { patchSettings({ silenceRemovalEnabled: value }); }
 
-  setLlmThreads(value: number): void {
-    this.llmThreads.value = value;
-    this.save();
-  }
+  toggleNormalization(): void { patchSettings({ normalizationEnabled: !rootSignal.value.normalizationEnabled }); }
+  setNormalizationEnabled(value: boolean): void { patchSettings({ normalizationEnabled: value }); }
 
-  toggleSilenceRemoval(): void {
-    this.silenceRemovalEnabled.value = !this.silenceRemovalEnabled.value;
-    this.save();
-  }
+  toggleDeEss(): void { patchSettings({ deEssEnabled: !rootSignal.value.deEssEnabled }); }
+  setDeEssEnabled(value: boolean): void { patchSettings({ deEssEnabled: value }); }
 
-  setSilenceRemovalEnabled(value: boolean): void {
-    this.silenceRemovalEnabled.value = value;
-    this.save();
-  }
+  setSilenceGapMs(value: number): void { patchSettings({ silenceGapMs: value }); }
 
-  toggleNormalization(): void {
-    this.normalizationEnabled.value = !this.normalizationEnabled.value;
-    this.save();
-  }
+  toggleEq(): void { patchSettings({ eqEnabled: !rootSignal.value.eqEnabled }); }
+  setEqEnabled(value: boolean): void { patchSettings({ eqEnabled: value }); }
 
-  setNormalizationEnabled(value: boolean): void {
-    this.normalizationEnabled.value = value;
-    this.save();
-  }
+  toggleCompressor(): void { patchSettings({ compressorEnabled: !rootSignal.value.compressorEnabled }); }
+  setCompressorEnabled(value: boolean): void { patchSettings({ compressorEnabled: value }); }
 
-  toggleDeEss(): void {
-    this.deEssEnabled.value = !this.deEssEnabled.value;
-    this.save();
-  }
+  toggleFadeIn(): void { patchSettings({ fadeInEnabled: !rootSignal.value.fadeInEnabled }); }
+  setFadeInEnabled(value: boolean): void { patchSettings({ fadeInEnabled: value }); }
 
-  setDeEssEnabled(value: boolean): void {
-    this.deEssEnabled.value = value;
-    this.save();
-  }
-
-  setSilenceGapMs(value: number): void {
-    this.silenceGapMs.value = value;
-    this.save();
-  }
-
-  toggleEq(): void {
-    this.eqEnabled.value = !this.eqEnabled.value;
-    this.save();
-  }
-
-  setEqEnabled(value: boolean): void {
-    this.eqEnabled.value = value;
-    this.save();
-  }
-
-  toggleCompressor(): void {
-    this.compressorEnabled.value = !this.compressorEnabled.value;
-    this.save();
-  }
-
-  setCompressorEnabled(value: boolean): void {
-    this.compressorEnabled.value = value;
-    this.save();
-  }
-
-  toggleFadeIn(): void {
-    this.fadeInEnabled.value = !this.fadeInEnabled.value;
-    this.save();
-  }
-
-  setFadeInEnabled(value: boolean): void {
-    this.fadeInEnabled.value = value;
-    this.save();
-  }
-
-  toggleStereoWidth(): void {
-    this.stereoWidthEnabled.value = !this.stereoWidthEnabled.value;
-    this.save();
-  }
-
-  setStereoWidthEnabled(value: boolean): void {
-    this.stereoWidthEnabled.value = value;
-    this.save();
-  }
+  toggleStereoWidth(): void { patchSettings({ stereoWidthEnabled: !rootSignal.value.stereoWidthEnabled }); }
+  setStereoWidthEnabled(value: boolean): void { patchSettings({ stereoWidthEnabled: value }); }
 
   // ========== Opus Encoding Setters ==========
-
-  setOpusPreset(value: AudioPreset): void {
-    const config = AUDIO_PRESETS.find(p => p.name === value);
-    if (!config) return;
-
-    this.opusPreset.value = value;
-    this.opusMinBitrate.value = config.minBitrate;
-    this.opusMaxBitrate.value = config.maxBitrate;
-    this.opusCompressionLevel.value = config.compressionLevel;
-    this.save();
-  }
-
-  setOpusMinBitrate(value: number): void {
-    this.opusMinBitrate.value = value;
-    this.opusPreset.value = AudioPreset.CUSTOM;
-    this.save();
-  }
-
-  setOpusMaxBitrate(value: number): void {
-    this.opusMaxBitrate.value = value;
-    this.opusPreset.value = AudioPreset.CUSTOM;
-    this.save();
-  }
-
-  setOpusCompressionLevel(value: number): void {
-    this.opusCompressionLevel.value = value;
-    this.opusPreset.value = AudioPreset.CUSTOM;
-    this.save();
-  }
+  setOpusPreset(value: AudioPreset): void { applyOpusPreset(value); }
+  setOpusMinBitrate(value: number): void { setOpusMinBitrate(value); }
+  setOpusMaxBitrate(value: number): void { setOpusMaxBitrate(value); }
+  setOpusCompressionLevel(value: number): void { setOpusCompressionLevel(value); }
 
   // ========== Text Processing Setters ==========
-
-  setLexxRegister(value: boolean): void {
-    this.lexxRegister.value = value;
-    this.save();
-  }
+  setLexxRegister(value: boolean): void { patchSettings({ lexxRegister: value }); }
 
   // ========== UI Setters ==========
-
-  setShowDopSettings(value: boolean): void {
-    this.showDopSettings.value = value;
-    this.save();
-  }
-
-  toggleDopSettings(): void {
-    this.showDopSettings.value = !this.showDopSettings.value;
-    this.save();
-  }
-
-  setIsLiteMode(value: boolean): void {
-    this.isLiteMode.value = value;
-    this.save();
-  }
-
-  toggleLiteMode(): void {
-    this.isLiteMode.value = !this.isLiteMode.value;
-    this.save();
-  }
-
-  setStatusAreaWidth(value: number): void {
-    this.statusAreaWidth.value = value;
-    this.save();
-  }
+  setShowDopSettings(value: boolean): void { patchSettings({ showDopSettings: value }); }
+  toggleDopSettings(): void { patchSettings({ showDopSettings: !rootSignal.value.showDopSettings }); }
+  setIsLiteMode(value: boolean): void { patchSettings({ isLiteMode: value }); }
+  toggleLiteMode(): void { patchSettings({ isLiteMode: !rootSignal.value.isLiteMode }); }
+  setStatusAreaWidth(value: number): void { patchSettings({ statusAreaWidth: value }); }
 
   // ========== Persistence ==========
-
-  /**
-   * Save settings to localStorage
-   */
   save(): void {
-    const settings: AppSettings = {
-      voice: this.voice.value,
-      narratorVoice: this.narratorVoice.value,
-      voicePoolLocale: this.voicePoolLocale.value,
-      enabledVoices: this.enabledVoices.value,
-      rate: this.rate.value,
-      pitch: this.pitch.value,
-      ttsThreads: this.ttsThreads.value,
-      llmThreads: this.llmThreads.value,
-      lexxRegister: this.lexxRegister.value,
-      showDopSettings: this.showDopSettings.value,
-      isLiteMode: this.isLiteMode.value,
-      statusAreaWidth: this.statusAreaWidth.value,
-      outputFormat: this.outputFormat.value,
-      silenceRemovalEnabled: this.silenceRemovalEnabled.value,
-      normalizationEnabled: this.normalizationEnabled.value,
-      deEssEnabled: this.deEssEnabled.value,
-      silenceGapMs: this.silenceGapMs.value,
-      eqEnabled: this.eqEnabled.value,
-      compressorEnabled: this.compressorEnabled.value,
-      fadeInEnabled: this.fadeInEnabled.value,
-      stereoWidthEnabled: this.stereoWidthEnabled.value,
-      opusPreset: this.opusPreset.value,
-      opusMinBitrate: this.opusMinBitrate.value,
-      opusMaxBitrate: this.opusMaxBitrate.value,
-      opusCompressionLevel: this.opusCompressionLevel.value,
-    };
-    localStorage.setItem(StorageKeys.settings, JSON.stringify(settings));
+    // Auto-saved via effect, but explicit save for tests
+    localStorage.setItem(StorageKeys.settings, JSON.stringify(rootSignal.value));
   }
 
-  /**
-   * Load settings from localStorage
-   */
   load(): void {
-    try {
-      const saved = localStorage.getItem(StorageKeys.settings);
-      if (saved) {
-        const settings: Partial<AppSettings> = JSON.parse(saved);
-
-        this.voice.value = settings.voice ?? defaultSettings.voice;
-        this.narratorVoice.value = settings.narratorVoice ?? defaultSettings.narratorVoice;
-        this.voicePoolLocale.value = settings.voicePoolLocale ?? defaultSettings.voicePoolLocale;
-        this.enabledVoices.value = settings.enabledVoices ?? defaultSettings.enabledVoices;
-        this.rate.value = settings.rate ?? defaultSettings.rate;
-        this.pitch.value = settings.pitch ?? defaultSettings.pitch;
-        this.ttsThreads.value = settings.ttsThreads ?? defaultSettings.ttsThreads;
-        this.llmThreads.value = settings.llmThreads ?? defaultSettings.llmThreads;
-        this.lexxRegister.value = settings.lexxRegister ?? defaultSettings.lexxRegister;
-        this.showDopSettings.value = settings.showDopSettings ?? defaultSettings.showDopSettings;
-        this.isLiteMode.value = settings.isLiteMode ?? defaultSettings.isLiteMode;
-        this.statusAreaWidth.value = settings.statusAreaWidth ?? defaultSettings.statusAreaWidth;
-        this.outputFormat.value = settings.outputFormat ?? defaultSettings.outputFormat;
-        this.silenceRemovalEnabled.value = settings.silenceRemovalEnabled ?? defaultSettings.silenceRemovalEnabled;
-        this.normalizationEnabled.value = settings.normalizationEnabled ?? defaultSettings.normalizationEnabled;
-        this.deEssEnabled.value = settings.deEssEnabled ?? defaultSettings.deEssEnabled;
-        this.silenceGapMs.value = settings.silenceGapMs ?? defaultSettings.silenceGapMs;
-        this.eqEnabled.value = settings.eqEnabled ?? defaultSettings.eqEnabled;
-        this.compressorEnabled.value = settings.compressorEnabled ?? defaultSettings.compressorEnabled;
-        this.fadeInEnabled.value = settings.fadeInEnabled ?? defaultSettings.fadeInEnabled;
-        this.stereoWidthEnabled.value = settings.stereoWidthEnabled ?? defaultSettings.stereoWidthEnabled;
-        this.opusPreset.value = settings.opusPreset ?? defaultSettings.opusPreset;
-        this.opusMinBitrate.value = settings.opusMinBitrate ?? defaultSettings.opusMinBitrate;
-        this.opusMaxBitrate.value = settings.opusMaxBitrate ?? defaultSettings.opusMaxBitrate;
-        this.opusCompressionLevel.value = settings.opusCompressionLevel ?? defaultSettings.opusCompressionLevel;
-      }
-    } catch (e) {
-      this.logStore.error(
-        'Failed to load settings',
-        e instanceof Error ? e : undefined,
-        e instanceof Error ? undefined : { error: String(e) }
-      );
-    }
+    const loaded = loadFromStorage();
+    rootSignal.value = loaded;
   }
 
-  /**
-   * Reset to default settings
-   */
-  reset(): void {
-    this.voice.value = defaultSettings.voice;
-    this.narratorVoice.value = defaultSettings.narratorVoice;
-    this.voicePoolLocale.value = defaultSettings.voicePoolLocale;
-    this.enabledVoices.value = defaultSettings.enabledVoices;
-    this.rate.value = defaultSettings.rate;
-    this.pitch.value = defaultSettings.pitch;
-    this.ttsThreads.value = defaultSettings.ttsThreads;
-    this.llmThreads.value = defaultSettings.llmThreads;
-    this.lexxRegister.value = defaultSettings.lexxRegister;
-    this.showDopSettings.value = defaultSettings.showDopSettings;
-    this.isLiteMode.value = defaultSettings.isLiteMode;
-    this.statusAreaWidth.value = defaultSettings.statusAreaWidth;
-    this.outputFormat.value = defaultSettings.outputFormat;
-    this.silenceRemovalEnabled.value = defaultSettings.silenceRemovalEnabled;
-    this.normalizationEnabled.value = defaultSettings.normalizationEnabled;
-    this.deEssEnabled.value = defaultSettings.deEssEnabled;
-    this.silenceGapMs.value = defaultSettings.silenceGapMs;
-    this.eqEnabled.value = defaultSettings.eqEnabled;
-    this.compressorEnabled.value = defaultSettings.compressorEnabled;
-    this.fadeInEnabled.value = defaultSettings.fadeInEnabled;
-    this.stereoWidthEnabled.value = defaultSettings.stereoWidthEnabled;
-    this.opusPreset.value = defaultSettings.opusPreset;
-    this.opusMinBitrate.value = defaultSettings.opusMinBitrate;
-    this.opusMaxBitrate.value = defaultSettings.opusMaxBitrate;
-    this.opusCompressionLevel.value = defaultSettings.opusCompressionLevel;
-    this.save();
-  }
-
-  /**
-   * Get current settings as an object
-   */
-  toObject(): AppSettings {
-    return {
-      voice: this.voice.value,
-      narratorVoice: this.narratorVoice.value,
-      voicePoolLocale: this.voicePoolLocale.value,
-      enabledVoices: this.enabledVoices.value,
-      rate: this.rate.value,
-      pitch: this.pitch.value,
-      ttsThreads: this.ttsThreads.value,
-      llmThreads: this.llmThreads.value,
-      lexxRegister: this.lexxRegister.value,
-      showDopSettings: this.showDopSettings.value,
-      isLiteMode: this.isLiteMode.value,
-      statusAreaWidth: this.statusAreaWidth.value,
-      outputFormat: this.outputFormat.value,
-      silenceRemovalEnabled: this.silenceRemovalEnabled.value,
-      normalizationEnabled: this.normalizationEnabled.value,
-      deEssEnabled: this.deEssEnabled.value,
-      silenceGapMs: this.silenceGapMs.value,
-      eqEnabled: this.eqEnabled.value,
-      compressorEnabled: this.compressorEnabled.value,
-      fadeInEnabled: this.fadeInEnabled.value,
-      stereoWidthEnabled: this.stereoWidthEnabled.value,
-      opusPreset: this.opusPreset.value,
-      opusMinBitrate: this.opusMinBitrate.value,
-      opusMaxBitrate: this.opusMaxBitrate.value,
-      opusCompressionLevel: this.opusCompressionLevel.value,
-    };
-  }
+  reset(): void { resetSettings(); }
+  toObject(): AppSettings { return settingsToObject(); }
 }
 
 /**
- * Create a new SettingsStore instance
+ * Reset to defaults (for tests)
+ */
+export function resetSettingsStore(): void {
+  rootSignal.value = { ...defaultSettings };
+}
+
+/**
+ * Factory function for creating SettingsStore
  */
 export function createSettingsStore(logStore: LogStore): SettingsStore {
   return new SettingsStore(logStore);
 }
+
+// Export for direct access (optional, for future use)
+export const settings = rootSignal;
+export const rateDisplay = rateDisplayComputed;
+export const pitchDisplay = pitchDisplayComputed;

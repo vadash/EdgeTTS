@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ConversionStore, createConversionStore } from './ConversionStore';
+import { ConversionStore, createConversionStore, resetConversionStore } from './ConversionStore';
 
 describe('ConversionStore', () => {
   let store: ConversionStore;
 
   beforeEach(() => {
+    resetConversionStore();
     store = createConversionStore();
   });
 
