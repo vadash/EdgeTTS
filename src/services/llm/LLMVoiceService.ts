@@ -464,8 +464,7 @@ export class LLMVoiceService {
   }
 
   /**
-   * Single merge operation with specified temperature
-   * Returns merge groups (0-based indices) or null if max retries exceeded
+   * Single merge operation with specified temperature using structured outputs
    */
   private async singleMerge(
     characters: LLMCharacter[],
@@ -474,15 +473,12 @@ export class LLMVoiceService {
   ): Promise<number[][] | null> {
     this.logger?.info(`[Merge] Single merge: ${characters.length} characters (temp=${temperature.toFixed(2)})`);
 
-    // Build context
-    const context: MergeContext = { characters };
-
     // Create a client with the specified temperature
     const client = new LLMApiClient({
       apiKey: this.options.mergeConfig?.apiKey ?? this.options.apiKey,
       apiUrl: this.options.mergeConfig?.apiUrl ?? this.options.apiUrl,
       model: this.options.mergeConfig?.model ?? this.options.model,
-      streaming: this.options.mergeConfig?.streaming ?? this.options.streaming,
+      streaming: false,  // Always non-streaming for structured outputs
       reasoning: this.options.mergeConfig?.reasoning ?? this.options.reasoning,
       temperature: temperature,
       topP: this.options.mergeConfig?.topP ?? this.options.topP,
@@ -490,28 +486,18 @@ export class LLMVoiceService {
       logger: this.logger,
     });
 
-    const response = await client.callWithRetry(
-      buildMergePrompt(context.characters),
-      (result) => validateMergeResponse(result, context.characters),
-      this.abortController?.signal,
-      [],
-      'merge',
-      (attempt, delay, errors) => {
-        const errorCount = errors?.length || 0;
-        const reason = errorCount ? ` (${errorCount} errors): ${errors![errors!.length - 1]}` : '';
-        onProgress?.(0, 0, `Merge validation failed${reason}, retry ${attempt} in ${Math.round(delay / 1000)}s...`);
-      },
-      defaultConfig.llm.maxMergeRetries
-    );
-
-    // Return null if max retries exceeded
-    if (response === null) {
-      this.logger?.warn(`[Merge] Vote failed after ${defaultConfig.llm.maxMergeRetries} retries (temp=${temperature.toFixed(2)})`);
+    try {
+      const response = await client.callStructured({
+        prompt: buildMergePrompt(characters),
+        schema: MergeSchema,
+        schemaName: 'MergeSchema',
+        signal: this.abortController?.signal,
+      });
+      return response.merges;
+    } catch (error) {
+      this.logger?.warn(`[Merge] Vote failed (temp=${temperature.toFixed(2)}): ${(error as Error).message}`);
       return null;
     }
-
-    // Parse response to get merge groups (0-based indices)
-    return parseMergeResponse(response, context);
   }
 
   /**
