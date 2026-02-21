@@ -51,6 +51,7 @@ export interface StageLLMConfig {
   reasoning?: 'auto' | 'high' | 'medium' | 'low';
   temperature?: number;
   topP?: number;
+  repeatPrompt?: boolean;
 }
 
 /**

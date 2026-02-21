@@ -96,6 +96,7 @@ export interface LLMVoiceServiceOptions {
   temperature?: number;
   topP?: number;
   useVoting?: boolean;
+  repeatPrompt?: boolean;
   maxConcurrentRequests?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: Logger; // Required - prevents silent failures
@@ -108,6 +109,7 @@ export interface LLMVoiceServiceOptions {
     reasoning?: 'auto' | 'high' | 'medium' | 'low';
     temperature?: number;
     topP?: number;
+    repeatPrompt?: boolean;
   };
 }
 
