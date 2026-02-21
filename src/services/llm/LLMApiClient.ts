@@ -42,6 +42,12 @@ function applyProviderFixes(requestBody: Record<string, unknown>, provider: stri
     // Mistral requires top_p=1 when temperature=0 (greedy sampling)
     // Safest to just not send top_p at all
     delete requestBody.top_p;
+
+    // Mistral doesn't support OpenAI's json_schema format.
+    // Use json_object mode instead (instructs model to return valid JSON).
+    if (requestBody.response_format && (requestBody.response_format as any).type === 'json_schema') {
+      requestBody.response_format = { type: 'json_object' };
+    }
   }
 }
 
@@ -291,7 +297,12 @@ export class LLMApiClient {
     }
 
     // Parse JSON and validate with Zod
-    const parsed = JSON.parse(content);
+    // Strip markdown fences if model wraps JSON in ```json ... ```
+    let jsonContent = content.trim();
+    const fenceMatch = jsonContent.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    if (fenceMatch) jsonContent = fenceMatch[1].trim();
+
+    const parsed = JSON.parse(jsonContent);
     return schema.parse(parsed); // Zod runtime validation
   }
 }
