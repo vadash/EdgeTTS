@@ -5,14 +5,11 @@ import { render, RenderResult } from '@testing-library/preact';
 import { IntlProvider } from 'preact-i18n';
 import { ComponentChildren, VNode } from 'preact';
 import { StoreProvider, createStores, Stores } from '@/stores';
-import { ServiceProvider } from '@/di';
-import { ServiceContainer } from '@/di/ServiceContainer';
-import { createTestContainer, MockServices, TestContainerOptions } from './TestServiceContainer';
+import { resetLogger, resetFFmpeg } from '@/services';
 import en from '@/i18n/en.json';
 
 export interface TestRenderOptions {
   stores?: Partial<TestStoresState>;
-  services?: TestContainerOptions;
   locale?: 'en' | 'ru';
 }
 
@@ -45,8 +42,6 @@ export interface TestStoresState {
 
 export interface TestRenderResult extends RenderResult {
   stores: Stores;
-  mocks: MockServices;
-  serviceContainer: ServiceContainer;
 }
 
 /**
@@ -56,6 +51,10 @@ export function renderWithProviders(
   ui: VNode,
   options: TestRenderOptions = {}
 ): TestRenderResult {
+  // Reset singletons before each test
+  resetLogger();
+  resetFFmpeg();
+
   const stores = createStores();
 
   // Apply initial settings state
@@ -102,16 +101,12 @@ export function renderWithProviders(
     }
   }
 
-  const { container: serviceContainer, mocks } = createTestContainer(options.services);
-
   const Wrapper = ({ children }: { children: ComponentChildren }) => (
-    <ServiceProvider container={serviceContainer}>
-      <StoreProvider stores={stores}>
-        <IntlProvider definition={en}>
-          {children}
-        </IntlProvider>
-      </StoreProvider>
-    </ServiceProvider>
+    <StoreProvider stores={stores}>
+      <IntlProvider definition={en}>
+        {children}
+      </IntlProvider>
+    </StoreProvider>
   );
 
   const result = render(ui, { wrapper: Wrapper });
@@ -119,8 +114,6 @@ export function renderWithProviders(
   return {
     ...result,
     stores,
-    mocks,
-    serviceContainer,
   };
 }
 

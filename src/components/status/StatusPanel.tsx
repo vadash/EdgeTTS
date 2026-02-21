@@ -1,6 +1,6 @@
 import { useRef, useCallback, useEffect } from 'preact/hooks';
 import { useLogs, useConversion } from '@/stores';
-import { useLogger } from '@/di';
+import { getLogger } from '@/services';
 import type { LogLevel } from '@/services/LoggerService';
 import { ProgressBar } from './ProgressBar';
 
@@ -22,7 +22,7 @@ function getLevelColor(level: LogLevel): string {
 export function StatusPanel() {
   const logs = useLogs();
   const conversion = useConversion();
-  const logger = useLogger();
+  const logger = getLogger();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { current, total } = conversion.progress.value;

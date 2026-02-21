@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { useLLM } from '@/stores';
-import { useLogger } from '@/di/ServiceContext';
+import { getLogger } from '@/services';
 import { LLMVoiceService } from '@/services/llm';
 import { Tabs, TabPanel, Button } from '@/components/common';
 import { LLMHelp } from './LLMHelp';
@@ -27,7 +27,7 @@ const initialTestState: TestState = {
 
 export function LLMTab() {
   const llm = useLLM();
-  const logger = useLogger();
+  const logger = getLogger();
   const [testState, setTestState] = useState<TestState>(initialTestState);
 
   const handleTestConnection = async (stage: LLMStage, useStreaming: boolean) => {

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ConversionOrchestrator, type OrchestratorInput } from '../ConversionOrchestrator';
+import { ConversionOrchestrator, type ConversionOrchestratorServices, type OrchestratorInput } from '../ConversionOrchestrator';
 import type { Stores } from '@/stores';
-import { ServiceContainer, ServiceTypes } from '@/di/ServiceContainer';
 
 function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorInput {
   return {
@@ -107,41 +106,57 @@ function createMockStores(): Stores {
   };
 }
 
-function createMockContainer(): ServiceContainer {
-  const container = new ServiceContainer();
-  container.registerInstance(ServiceTypes.Logger, {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  });
-  container.registerInstance(ServiceTypes.PipelineBuilder, {
-    build: vi.fn(),
-  });
-  container.registerInstance(ServiceTypes.VoicePoolBuilder, {
-    buildPool: vi.fn().mockReturnValue({ male: ['m1', 'm2'], female: ['f1', 'f2', 'f3'] }),
-  });
-  return container;
+function createMockServices(): ConversionOrchestratorServices {
+  return {
+    logger: {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    },
+    textBlockSplitter: {
+      createExtractBlocks: vi.fn(),
+      createAssignBlocks: vi.fn(),
+    },
+    llmServiceFactory: {
+      create: vi.fn(),
+    },
+    workerPoolFactory: {
+      create: vi.fn(),
+    },
+    audioMergerFactory: {
+      create: vi.fn(),
+    },
+    voicePoolBuilder: {
+      buildPool: vi.fn().mockReturnValue({ male: ['m1', 'm2'], female: ['f1', 'f2', 'f3'] }),
+    },
+    ffmpegService: {
+      load: vi.fn().mockResolvedValue(true),
+    },
+  };
 }
 
 describe('ConversionOrchestrator', () => {
   it('throws when text is empty', async () => {
     const stores = createMockStores();
-    const orch = new ConversionOrchestrator(createMockContainer(), stores);
+    const services = createMockServices();
+    const orch = new ConversionOrchestrator(services, stores);
     const input = createMockInput({ textContent: '' });
     await expect(orch.run(input)).rejects.toThrow();
   });
 
   it('throws when LLM not configured', async () => {
     const stores = createMockStores();
-    const orch = new ConversionOrchestrator(createMockContainer(), stores);
+    const services = createMockServices();
+    const orch = new ConversionOrchestrator(services, stores);
     const input = createMockInput({ isLLMConfigured: false });
     await expect(orch.run(input)).rejects.toThrow('LLM API key not configured');
   });
 
   it('throws when no directory handle', async () => {
     const stores = createMockStores();
-    const orch = new ConversionOrchestrator(createMockContainer(), stores);
+    const services = createMockServices();
+    const orch = new ConversionOrchestrator(services, stores);
     const input = createMockInput({ directoryHandle: null });
     await expect(orch.run(input)).rejects.toThrow('Please select an output directory');
   });
@@ -149,7 +164,8 @@ describe('ConversionOrchestrator', () => {
   it('calls conversion.cancel when resume declined', async () => {
     const stores = createMockStores();
     stores.conversion.awaitResumeConfirmation = vi.fn().mockResolvedValue(false);
-    const orch = new ConversionOrchestrator(createMockContainer(), stores);
+    const services = createMockServices();
+    const orch = new ConversionOrchestrator(services, stores);
     const input = createMockInput();
 
     // The orchestrator checks for resume state via directoryHandle

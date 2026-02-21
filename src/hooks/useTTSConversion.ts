@@ -2,10 +2,10 @@
 // Directly passes stores to the orchestrator instead of using callback middleware
 
 import { useCallback, useRef } from 'preact/hooks';
-import { useServices, ServiceTypes } from '@/di';
 import { useStores } from '@/stores';
 import type { Stores } from '@/stores';
-import { createConversionOrchestrator, type ConversionOrchestratorServices, type OrchestratorInput } from '@/services/ConversionOrchestrator';
+import { createConversionOrchestrator, type OrchestratorInput } from '@/services/ConversionOrchestrator';
+import { getOrchestratorServices } from '@/services';
 import { getKeepAwake } from '@/services/KeepAwake';
 import type { ProcessedBook } from '@/state/types';
 
@@ -96,7 +96,6 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
  * Uses ConversionOrchestrator for the actual conversion workflow
  */
 export function useTTSConversion(): UseTTSConversionResult {
-  const container = useServices();
   const stores = useStores();
   const orchestratorRef = useRef<{ run: (input: OrchestratorInput, existingBook?: ProcessedBook | null) => Promise<void>; cancel: () => void } | null>(null);
 
@@ -117,7 +116,7 @@ export function useTTSConversion(): UseTTSConversionResult {
     const input = buildInput(stores, text);
 
     // Get orchestrator services bundle and create new orchestrator
-    const orchestratorServices = container.get<ConversionOrchestratorServices>(ServiceTypes.ConversionOrchestratorServices);
+    const orchestratorServices = getOrchestratorServices();
     orchestratorRef.current = createConversionOrchestrator(orchestratorServices, stores);
 
     // Start keep-awake to prevent background throttling
@@ -136,7 +135,7 @@ export function useTTSConversion(): UseTTSConversionResult {
       // Stop keep-awake when conversion ends
       keepAwake.stop();
     }
-  }, [container, stores]);
+  }, [stores]);
 
   /**
    * Cancel conversion
