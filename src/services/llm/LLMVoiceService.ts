@@ -15,17 +15,11 @@ import {
   buildExtractPrompt,
   buildMergePrompt,
   buildAssignPrompt,
-  parseMergeResponse,
-  parseAssignResponse,
   type ExtractContext,
   type MergeContext,
   type AssignContext,
 } from './PromptStrategy';
 import { ExtractSchema, MergeSchema, AssignSchema } from './schemas';
-import {
-  validateMergeResponse,
-  validateAssignResponse,
-} from './ResponseValidators';
 
 /**
  * Unambiguous speech/dialogue symbols (no contraction risk):
@@ -284,7 +278,8 @@ export class LLMVoiceService {
   }
 
   /**
-   * Process a single block for Assign
+   * Process a single block for Assign using structured outputs
+   * New format: sparse JSON object {"0": "A", "5": "B"}
    */
   private async processAssignBlock(
     block: TextBlock,
@@ -313,35 +308,39 @@ export class LLMVoiceService {
     };
 
     const prompt = buildAssignPrompt(context.characters, context.nameToCode, context.numberedParagraphs);
-    const validator = (result: string) => validateAssignResponse(result, context.sentenceCount, context.codeToName);
 
     let relativeMap: Map<number, string>;
 
     if (this.options.useVoting) {
       // 3-way voting with different temperatures (sequential with delays)
-      const responses: (string | null)[] = [];
+      const responses: (object | null)[] = [];
       for (let i = 0; i < VOTING_TEMPERATURES.length; i++) {
         const client = new LLMApiClient({
           ...this.options,
           temperature: VOTING_TEMPERATURES[i],
+          logger: this.logger,
         });
-        const response = await client.callWithRetry(
-          prompt,
-          validator,
-          this.abortController?.signal,
-          [],
-          'assign',
-          undefined,
-          defaultConfig.llm.maxAssignRetries
-        );
-        responses.push(response);
+
+        try {
+          const response = await client.callStructured({
+            prompt,
+            schema: AssignSchema,
+            schemaName: 'AssignSchema',
+            signal: this.abortController?.signal,
+          });
+          responses.push(response);
+        } catch (e) {
+          this.logger?.warn(`[assign] Vote ${i + 1} failed: ${(e as Error).message}`);
+          responses.push(null);
+        }
+
         if (i < VOTING_TEMPERATURES.length - 1) {
           await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
         }
       }
 
       // Check if all voting attempts failed - fall back to narrator
-      const validResponses = responses.filter((r): r is string => r !== null);
+      const validResponses = responses.filter((r): r is object => r !== null);
       if (validResponses.length === 0) {
         this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed after max retries (all voting attempts), using default voice for ${block.sentences.length} sentences`);
         return block.sentences.map((text, i) => ({
@@ -352,8 +351,17 @@ export class LLMVoiceService {
         }));
       }
 
-      // Parse valid responses only
-      const parsedMaps = validResponses.map(r => parseAssignResponse(r, context).speakerMap);
+      // Parse valid responses: convert sparse assignments to Map<number, string>
+      const parsedMaps = validResponses.map((r: any) => {
+        const map = new Map<number, string>();
+        for (const [key, code] of Object.entries(r.assignments)) {
+          const idx = parseInt(key, 10);
+          if (codeToName.has(code as string)) {
+            map.set(idx, code as string);
+          }
+        }
+        return map;
+      });
 
       // Majority vote for each paragraph (use available responses)
       relativeMap = new Map();
@@ -364,18 +372,23 @@ export class LLMVoiceService {
       }
     } else {
       // Single call (original behavior)
-      const response = await this.apiClient.callWithRetry(
-        prompt,
-        validator,
-        this.abortController?.signal,
-        [],
-        'assign',
-        undefined,
-        defaultConfig.llm.maxAssignRetries
-      );
+      try {
+        const response = await this.apiClient.callStructured({
+          prompt,
+          schema: AssignSchema,
+          schemaName: 'AssignSchema',
+          signal: this.abortController?.signal,
+        });
 
-      // Handle max retries exceeded - fall back to narrator
-      if (response === null) {
+        // Convert sparse object to Map
+        relativeMap = new Map();
+        for (const [key, code] of Object.entries(response.assignments)) {
+          const index = parseInt(key, 10);
+          if (context.codeToName.has(code)) {
+            relativeMap.set(index, code);
+          }
+        }
+      } catch (e) {
         this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed after max retries, using default voice for ${block.sentences.length} sentences`);
         return block.sentences.map((text, i) => ({
           sentenceIndex: block.sentenceStartIndex + i,
@@ -384,15 +397,15 @@ export class LLMVoiceService {
           voiceId: this.options.narratorVoice,
         }));
       }
-
-      relativeMap = parseAssignResponse(response, context).speakerMap;
     }
 
     return block.sentences.map((text, i) => {
       const absoluteIndex = block.sentenceStartIndex + i;
       const relativeIndex = i; // 0-based
       // Trust the LLM's assignment regardless of speech symbols
-      const speaker = relativeMap.get(relativeIndex) || 'narrator';
+      const speakerCode = relativeMap.get(relativeIndex);
+      // Convert code back to canonical name
+      const speaker = speakerCode ? codeToName.get(speakerCode) ?? 'narrator' : 'narrator';
       return {
         sentenceIndex: absoluteIndex,
         text,
