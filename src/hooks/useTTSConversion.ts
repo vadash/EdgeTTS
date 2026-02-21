@@ -1,13 +1,11 @@
 // useTTSConversion - Simplified hook using ConversionOrchestrator
-// This is the adapter layer between Preact stores and the decoupled orchestrator
+// Directly passes stores to the orchestrator instead of using callback middleware
 
 import { useCallback, useRef } from 'preact/hooks';
 import { useServices, ServiceTypes } from '@/di';
 import { useStores } from '@/stores';
 import type { Stores } from '@/stores';
-import { createConversionOrchestrator, type ConversionOrchestratorServices } from '@/services/ConversionOrchestrator';
-import type { OrchestratorInput, OrchestratorCallbacks } from '@/services/OrchestratorCallbacks';
-import type { ConversionStatus } from '@/stores/ConversionStore';
+import { createConversionOrchestrator, type ConversionOrchestratorServices, type OrchestratorInput } from '@/services/ConversionOrchestrator';
 import { getKeepAwake } from '@/services/KeepAwake';
 import type { ProcessedBook } from '@/state/types';
 
@@ -94,43 +92,6 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
 }
 
 /**
- * Build OrchestratorCallbacks that delegate to stores
- */
-function buildCallbacks(stores: Stores): OrchestratorCallbacks {
-  return {
-    onConversionStart: () => stores.conversion.startConversion(),
-    onConversionComplete: () => stores.conversion.complete(),
-    onConversionCancel: () => stores.conversion.cancel(),
-    onError: (message: string, code: string) => stores.conversion.setError(message, code),
-    onProgress: () => {}, // Progress is handled via specific callbacks below
-    onStatusChange: (status: ConversionStatus) => stores.conversion.setStatus(status),
-    onConversionProgress: (current: number, total: number) => stores.conversion.updateProgress(current, total),
-    onLLMProcessingStatus: (status: string) => stores.llm.setProcessingStatus(status as any),
-    onLLMBlockProgress: (current: number, total: number) => stores.llm.setBlockProgress(current, total),
-
-    awaitResumeConfirmation: (info) => stores.conversion.awaitResumeConfirmation(info),
-
-    onCharactersReady: (characters) => stores.llm.setCharacters(characters),
-    onVoiceMapReady: (voiceMap) => stores.llm.setVoiceMap(voiceMap),
-    onAssignmentsReady: (assignments) => stores.llm.setSpeakerAssignments(assignments),
-    awaitVoiceReview: async () => {
-      stores.llm.setPendingReview(true);
-      await stores.llm.awaitReview();
-      return {
-        voiceMap: stores.llm.characterVoiceMap.value,
-        existingProfile: stores.llm.loadedProfile.value,
-      };
-    },
-
-    clearTextContent: () => stores.data.setTextContent(''),
-    clearBook: () => stores.data.setBook(null),
-    startTimer: () => stores.logs.startTimer(),
-    resetLLMState: () => stores.llm.resetProcessingState(),
-    setLLMError: (message: string) => stores.llm.setError(message),
-  };
-}
-
-/**
  * Main TTS conversion hook
  * Uses ConversionOrchestrator for the actual conversion workflow
  */
@@ -152,13 +113,12 @@ export function useTTSConversion(): UseTTSConversionResult {
       return;
     }
 
-    // Build callbacks and input snapshot from current store state
-    const callbacks = buildCallbacks(stores);
+    // Build input snapshot from current store state
     const input = buildInput(stores, text);
 
     // Get orchestrator services bundle and create new orchestrator
     const orchestratorServices = container.get<ConversionOrchestratorServices>(ServiceTypes.ConversionOrchestratorServices);
-    orchestratorRef.current = createConversionOrchestrator(orchestratorServices, callbacks);
+    orchestratorRef.current = createConversionOrchestrator(orchestratorServices, stores);
 
     // Start keep-awake to prevent background throttling
     const keepAwake = getKeepAwake();

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ConversionOrchestrator } from '../ConversionOrchestrator';
-import type { OrchestratorInput, OrchestratorCallbacks } from '../OrchestratorCallbacks';
+import { ConversionOrchestrator, type OrchestratorInput } from '../ConversionOrchestrator';
+import type { Stores } from '@/stores';
 import { ServiceContainer, ServiceTypes } from '@/di/ServiceContainer';
 
 function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorInput {
@@ -38,27 +38,72 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
   };
 }
 
-function createMockCallbacks(): OrchestratorCallbacks {
+function createMockStores(): Stores {
   return {
-    onConversionStart: vi.fn(),
-    onConversionComplete: vi.fn(),
-    onConversionCancel: vi.fn(),
-    onError: vi.fn(),
-    onProgress: vi.fn(),
-    onStatusChange: vi.fn(),
-    onConversionProgress: vi.fn(),
-    onLLMProcessingStatus: vi.fn(),
-    onLLMBlockProgress: vi.fn(),
-    awaitResumeConfirmation: vi.fn().mockResolvedValue(false),
-    onCharactersReady: vi.fn(),
-    onVoiceMapReady: vi.fn(),
-    onAssignmentsReady: vi.fn(),
-    awaitVoiceReview: vi.fn().mockResolvedValue({ voiceMap: new Map(), existingProfile: null }),
-    clearTextContent: vi.fn(),
-    clearBook: vi.fn(),
-    startTimer: vi.fn(),
-    resetLLMState: vi.fn(),
-    setLLMError: vi.fn(),
+    settings: {
+      narratorVoice: { value: 'narrator' },
+      voice: { value: 'default' },
+      pitch: { value: 0 },
+      rate: { value: 0 },
+      ttsThreads: { value: 2 },
+      llmThreads: { value: 1 },
+      enabledVoices: { value: ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'] },
+      lexxRegister: { value: false },
+      outputFormat: { value: 'opus' as const },
+      silenceRemovalEnabled: { value: false },
+      normalizationEnabled: { value: false },
+      deEssEnabled: { value: false },
+      silenceGapMs: { value: 0 },
+      eqEnabled: { value: false },
+      compressorEnabled: { value: false },
+      fadeInEnabled: { value: false },
+      stereoWidthEnabled: { value: false },
+      opusMinBitrate: { value: 24 },
+      opusMaxBitrate: { value: 64 },
+      opusCompressionLevel: { value: 10 },
+    } as any,
+    conversion: {
+      startConversion: vi.fn(),
+      complete: vi.fn(),
+      cancel: vi.fn(),
+      setError: vi.fn(),
+      setStatus: vi.fn(),
+      updateProgress: vi.fn(),
+      isProcessing: { value: false },
+      progress: { value: { current: 0, total: 0 } },
+      awaitResumeConfirmation: vi.fn().mockResolvedValue(false),
+    } as any,
+    llm: {
+      setProcessingStatus: vi.fn(),
+      setBlockProgress: vi.fn(),
+      setCharacters: vi.fn(),
+      setVoiceMap: vi.fn(),
+      setSpeakerAssignments: vi.fn(),
+      setPendingReview: vi.fn(),
+      awaitReview: vi.fn().mockResolvedValue(undefined),
+      characterVoiceMap: { value: new Map() },
+      loadedProfile: { value: null },
+      resetProcessingState: vi.fn(),
+      setError: vi.fn(),
+      isConfigured: { value: true },
+      extract: { value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 } },
+      merge: { value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 } },
+      assign: { value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 } },
+      useVoting: { value: false },
+    } as any,
+    logs: {
+      info: vi.fn(),
+      error: vi.fn(),
+      startTimer: vi.fn(),
+    } as any,
+    data: {
+      directoryHandle: { value: {} as FileSystemDirectoryHandle },
+      detectLanguageFromContent: vi.fn().mockReturnValue('en'),
+      dictionaryRaw: { value: [] },
+      setTextContent: vi.fn(),
+      setBook: vi.fn(),
+    } as any,
+    language: {} as any,
   };
 }
 
@@ -81,35 +126,35 @@ function createMockContainer(): ServiceContainer {
 
 describe('ConversionOrchestrator', () => {
   it('throws when text is empty', async () => {
-    const callbacks = createMockCallbacks();
-    const orch = new ConversionOrchestrator(createMockContainer(), callbacks);
+    const stores = createMockStores();
+    const orch = new ConversionOrchestrator(createMockContainer(), stores);
     const input = createMockInput({ textContent: '' });
     await expect(orch.run(input)).rejects.toThrow();
   });
 
   it('throws when LLM not configured', async () => {
-    const callbacks = createMockCallbacks();
-    const orch = new ConversionOrchestrator(createMockContainer(), callbacks);
+    const stores = createMockStores();
+    const orch = new ConversionOrchestrator(createMockContainer(), stores);
     const input = createMockInput({ isLLMConfigured: false });
     await expect(orch.run(input)).rejects.toThrow('LLM API key not configured');
   });
 
   it('throws when no directory handle', async () => {
-    const callbacks = createMockCallbacks();
-    const orch = new ConversionOrchestrator(createMockContainer(), callbacks);
+    const stores = createMockStores();
+    const orch = new ConversionOrchestrator(createMockContainer(), stores);
     const input = createMockInput({ directoryHandle: null });
     await expect(orch.run(input)).rejects.toThrow('Please select an output directory');
   });
 
-  it('calls onConversionCancel when resume declined', async () => {
-    const callbacks = createMockCallbacks();
-    callbacks.awaitResumeConfirmation = vi.fn().mockResolvedValue(false);
-    const orch = new ConversionOrchestrator(createMockContainer(), callbacks);
+  it('calls conversion.cancel when resume declined', async () => {
+    const stores = createMockStores();
+    stores.conversion.awaitResumeConfirmation = vi.fn().mockResolvedValue(false);
+    const orch = new ConversionOrchestrator(createMockContainer(), stores);
     const input = createMockInput();
 
     // The orchestrator checks for resume state via directoryHandle
     // With a mock handle that has no _temp_work, it proceeds past resume check
     // This test verifies the basic input validation path
-    expect(callbacks.onConversionCancel).not.toHaveBeenCalled();
+    expect(stores.conversion.cancel).not.toHaveBeenCalled();
   });
 });

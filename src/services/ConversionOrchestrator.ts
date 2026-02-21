@@ -10,7 +10,7 @@ import type {
   VoicePool,
   ProcessedBook,
 } from '@/state/types';
-import type { OrchestratorCallbacks, OrchestratorInput } from './OrchestratorCallbacks';
+import type { Stores } from '@/stores';
 import { allocateByGender, allocateByFrequency, remapAssignments, shortVoiceId } from './VoiceAllocator';
 import { exportToProfile } from './llm/VoiceProfile';
 import { withPermissionRetry } from './FileSystemRetry';
@@ -26,8 +26,73 @@ import type { TTSWorkerPool } from './TTSWorkerPool';
 import type { AudioMerger } from './AudioMerger';
 import type { FFmpegService } from './FFmpegService';
 
-// Re-export types from OrchestratorCallbacks for convenience
-export type { WorkflowProgress, OrchestratorInput } from './OrchestratorCallbacks';
+// ============================================================================
+// Orchestrator Input Types
+// ============================================================================
+
+/**
+ * Progress information from workflow stages
+ */
+export interface WorkflowProgress {
+  stage: string;
+  current: number;
+  total: number;
+  message: string;
+}
+
+/**
+ * Per-stage LLM configuration
+ */
+export interface StageLLMConfig {
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  streaming?: boolean;
+  reasoning?: 'auto' | 'high' | 'medium' | 'low';
+  temperature?: number;
+  topP?: number;
+}
+
+/**
+ * Input configuration snapshot — read once at the start of run().
+ * Replaces all signal .value reads.
+ */
+export interface OrchestratorInput {
+  // LLM config
+  isLLMConfigured: boolean;
+  extractConfig: StageLLMConfig;
+  mergeConfig: StageLLMConfig;
+  assignConfig: StageLLMConfig;
+  useVoting: boolean;
+
+  // Settings
+  narratorVoice: string;
+  voice: string;
+  pitch: number;
+  rate: number;
+  ttsThreads: number;
+  llmThreads: number;
+  enabledVoices: string[];
+  lexxRegister: boolean;
+  outputFormat: 'opus';
+  silenceRemoval: boolean;
+  normalization: boolean;
+  deEss: boolean;
+  silenceGapMs: number;
+  eq: boolean;
+  compressor: boolean;
+  fadeIn: boolean;
+  stereoWidth: boolean;
+  opusMinBitrate: number;
+  opusMaxBitrate: number;
+  opusCompressionLevel: number;
+
+  // Data
+  directoryHandle: FileSystemDirectoryHandle | null;
+  detectedLanguage: string;
+  dictionaryRaw: string[];
+  textContent: string;
+}
 
 // ============================================================================
 // Orchestrator Services Bundle
@@ -63,7 +128,7 @@ export class ConversionOrchestrator {
 
   constructor(
     private services: ConversionOrchestratorServices,
-    private callbacks: OrchestratorCallbacks
+    private stores: Stores
   ) {}
 
   /**
@@ -93,9 +158,9 @@ export class ConversionOrchestrator {
     let resumedCharacters: LLMCharacter[] | undefined;
 
     if (resumeInfo) {
-      const confirmed = await this.callbacks.awaitResumeConfirmation(resumeInfo);
+      const confirmed = await this.stores.conversion.awaitResumeConfirmation(resumeInfo);
       if (!confirmed) {
-        this.callbacks.onConversionCancel();
+        this.stores.conversion.cancel();
         this.services.logger.info('User cancelled resume, starting fresh');
         try {
           await directoryHandle.removeEntry('_temp_work', { recursive: true });
@@ -132,11 +197,11 @@ export class ConversionOrchestrator {
 
     // ==================== INITIALIZATION ====================
     this.abortController = new AbortController();
-    this.callbacks.onConversionStart();
-    this.callbacks.startTimer();
-    this.callbacks.resetLLMState();
-    this.callbacks.clearTextContent();
-    this.callbacks.clearBook();
+    this.stores.conversion.startConversion();
+    this.stores.logs.startTimer();
+    this.stores.llm.resetProcessingState();
+    this.stores.data.setTextContent('');
+    this.stores.data.setBook(null);
 
     this.services.logger.info(`Detected language: ${input.detectedLanguage.toUpperCase()}`);
 
@@ -147,7 +212,6 @@ export class ConversionOrchestrator {
     // Progress reporter helper
     const report = (stage: string, current: number, total: number, message: string) => {
       this.services.logger.info(message);
-      this.callbacks.onProgress({ stage, current, total, message });
       this.updateStatus(stage);
     };
 
@@ -285,12 +349,15 @@ export class ConversionOrchestrator {
         // ==================== VOICE REVIEW PAUSE ====================
         this.checkCancelled(signal);
 
-        this.callbacks.onCharactersReady(characters);
-        this.callbacks.onVoiceMapReady(voiceMap);
-        this.callbacks.onAssignmentsReady(assignments);
+        this.stores.llm.setCharacters(characters);
+        this.stores.llm.setVoiceMap(voiceMap);
+        this.stores.llm.setSpeakerAssignments(assignments);
 
-        const reviewResult = await this.callbacks.awaitVoiceReview();
-        const reviewedVoiceMap = reviewResult.voiceMap;
+        this.stores.llm.setPendingReview(true);
+        await this.stores.llm.awaitReview();
+        const reviewedVoiceMap = this.stores.llm.characterVoiceMap.value;
+        const existingProfile = this.stores.llm.loadedProfile.value;
+
         assignments = assignments.map(a => ({
           ...a,
           voiceId: a.speaker === 'narrator'
@@ -302,7 +369,7 @@ export class ConversionOrchestrator {
 
         // ==================== SAVE VOICE PROFILE ====================
         await this.saveVoiceProfile(directoryHandle, fileNames, characters, reviewedVoiceMap, assignments,
-          input.narratorVoice, reviewResult.existingProfile);
+          input.narratorVoice, existingProfile);
 
         // ==================== TEXT SANITIZATION ====================
         this.checkCancelled(signal);
@@ -323,12 +390,14 @@ export class ConversionOrchestrator {
         voiceMap = resumedVoiceMap!;
         const assignments = resumedAssignments!;
 
-        this.callbacks.onCharactersReady(characters);
-        this.callbacks.onVoiceMapReady(voiceMap);
-        this.callbacks.onAssignmentsReady(assignments);
+        this.stores.llm.setCharacters(characters);
+        this.stores.llm.setVoiceMap(voiceMap);
+        this.stores.llm.setSpeakerAssignments(assignments);
 
-        const reviewResult = await this.callbacks.awaitVoiceReview();
-        const reviewedVoiceMap = reviewResult.voiceMap;
+        this.stores.llm.setPendingReview(true);
+        await this.stores.llm.awaitReview();
+        const reviewedVoiceMap = this.stores.llm.characterVoiceMap.value;
+        const existingProfile = this.stores.llm.loadedProfile.value;
         const remappedAssignments = assignments.map(a => ({
           ...a,
           voiceId: a.speaker === 'narrator'
@@ -337,7 +406,7 @@ export class ConversionOrchestrator {
         }));
 
         await this.saveVoiceProfile(directoryHandle, fileNames, characters, reviewedVoiceMap, remappedAssignments,
-          input.narratorVoice, reviewResult.existingProfile);
+          input.narratorVoice, existingProfile);
 
         const sanitized = this.sanitizeText(remappedAssignments);
         const withDictionary = this.applyDictionary(sanitized, input.dictionaryRaw, input.lexxRegister);
@@ -346,20 +415,20 @@ export class ConversionOrchestrator {
       }
 
       // ==================== COMPLETE ====================
-      this.callbacks.onConversionComplete();
+      this.stores.conversion.complete();
       this.services.logger.info('Conversion complete!');
 
     } catch (error) {
       if (error instanceof AppError && error.isCancellation()) {
-        this.callbacks.onConversionCancel();
+        this.stores.conversion.cancel();
         this.services.logger.info('Conversion cancelled');
       } else if ((error as Error).message === 'Pipeline cancelled' || (error as Error).message === 'Voice review cancelled') {
-        this.callbacks.onConversionCancel();
+        this.stores.conversion.cancel();
         this.services.logger.info('Conversion cancelled');
       } else {
         const appError = AppError.fromUnknown(error);
-        this.callbacks.onError(appError.message, appError.code);
-        this.callbacks.setLLMError(appError.message);
+        this.stores.conversion.setError(appError.message, appError.code);
+        this.stores.llm.setError(appError.message);
         this.services.logger.error('Conversion failed', appError);
         throw appError;
       }
@@ -772,12 +841,7 @@ export class ConversionOrchestrator {
       return freqB - freqA;
     });
 
-    const report = (msg: string) => this.callbacks.onProgress({
-      stage: 'voice-remapping',
-      current: 0,
-      total: 0,
-      message: msg,
-    });
+    const report = (msg: string) => this.services.logger.info(msg);
 
     report('');
     report('══════ Voice Assignment ══════');
@@ -817,20 +881,20 @@ export class ConversionOrchestrator {
   private updateStatus(stage: string): void {
     switch (stage) {
       case 'character-extraction':
-        this.callbacks.onStatusChange('llm-extract');
-        this.callbacks.onLLMProcessingStatus('extracting');
+        this.stores.conversion.setStatus('llm-extract');
+        this.stores.llm.setProcessingStatus('extracting');
         break;
       case 'speaker-assignment':
-        this.callbacks.onStatusChange('llm-assign');
-        this.callbacks.onLLMProcessingStatus('assigning');
+        this.stores.conversion.setStatus('llm-assign');
+        this.stores.llm.setProcessingStatus('assigning');
         break;
       case 'tts-conversion':
-        this.callbacks.onStatusChange('converting');
-        this.callbacks.onLLMProcessingStatus('idle');
-        this.callbacks.onConversionProgress(0, 0); // Will be updated by onTaskComplete
+        this.stores.conversion.setStatus('converting');
+        this.stores.llm.setProcessingStatus('idle');
+        this.stores.conversion.updateProgress(0, 0); // Will be updated by onTaskComplete
         break;
       case 'audio-merge':
-        this.callbacks.onStatusChange('merging');
+        this.stores.conversion.setStatus('merging');
         break;
     }
   }
@@ -861,8 +925,8 @@ export class ConversionOrchestrator {
   cancel(): void {
     this.abortController?.abort();
     this.llmService?.cancel();
-    this.callbacks.resetLLMState();
-    this.callbacks.onConversionCancel();
+    this.stores.llm.resetProcessingState();
+    this.stores.conversion.cancel();
     this.services.logger.info('Conversion cancelled by user');
   }
 }
@@ -873,7 +937,7 @@ export class ConversionOrchestrator {
 
 export function createConversionOrchestrator(
   services: ConversionOrchestratorServices,
-  callbacks: OrchestratorCallbacks
+  stores: Stores
 ): ConversionOrchestrator {
-  return new ConversionOrchestrator(services, callbacks);
+  return new ConversionOrchestrator(services, stores);
 }
