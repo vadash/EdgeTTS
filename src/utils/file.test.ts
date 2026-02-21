@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeFilename } from './fileUtils';
+import { sanitizeFilename } from './file';
 
 describe('sanitizeFilename', () => {
   it('should replace invalid characters with underscores', () => {

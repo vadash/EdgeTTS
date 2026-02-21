@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { withPermissionRetry } from './FileSystemRetry';
+import { withPermissionRetry } from './filesystem';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 
 describe('withPermissionRetry', () => {
