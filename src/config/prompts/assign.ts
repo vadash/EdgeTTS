@@ -119,6 +119,23 @@ For each numbered paragraph, analyze content and context to determine which char
   Output exactly one line for every paragraph. Do not skip any paragraph index.
   Do not stop mid-output or leave incomplete lines.
   </rule>
+
+  <rule name="pronoun_resolution">
+  Speech tags using pronouns must be resolved to their referent within the paragraph.
+    - "Quote," he said → Find who "he" refers to (male character mentioned or active)
+    - "Quote," she asked → Find who "she" refers to (female character mentioned or active)
+    - "Quote," they replied → Find who "they" refers to in context
+
+  Resolution strategy:
+    1. Check if only one character of that gender is present in the paragraph
+    2. Look for the character whose name appears closest to the speech tag
+    3. In third-person limited narration, he/she often refers to the POV character
+    4. The subject of the action beat nearest the dialogue is often the speaker
+
+  When a character name appears alongside a pronoun speech tag, the pronoun refers to that character:
+    "Nicolus leaned over. 'Damn,' he said." → "he" = Nicolus → Speaker = Nicolus
+    "Mirian cleared her throat. 'Sorry,' she muttered." → "she" = Mirian → Speaker = Mirian
+  </rule>
 </rules>
 
 <speaker_list>
@@ -265,6 +282,7 @@ Assign a speaker to each paragraph above using the speaker codes listed.
 Key reminders:
   - [Brackets] → use the System code from the speaker list
   - Names inside quotes are vocatives (listeners, not speakers) → assign to the other person
+  - Pronoun speech tags ("he said", "she asked") → resolve to the character being described in the paragraph
   - Closest action to dialogue determines the speaker
   - "I" narrator → use the Protagonist code
   - Use codes only (A, B, C), not character names

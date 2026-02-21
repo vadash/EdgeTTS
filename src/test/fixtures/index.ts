@@ -151,7 +151,7 @@ export const fixtures: TestFixture[] = [
       { textContains: "Damn", speaker: "Nicolus", strict: false },
       { textContains: "Hey. Want to study together", speaker: "Nicolus", strict: false },
       { textContains: "Sure", speaker: "Mirian", strict: false },
-      { textContains: "Great", speaker: "Nicolus", strict: false },
+      { textContains: "I'll meet you after that", speaker: "Nicolus", strict: false },
 
       // Professor Viridian's class
       { textContains: "Regal cordyline, ruby variety", speaker: "Professor Viridian", strict: false },
