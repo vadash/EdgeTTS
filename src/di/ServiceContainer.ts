@@ -12,9 +12,10 @@ export const ServiceTypes = {
   FileConverter: Symbol.for('IFileConverter'),
   TextBlockSplitter: Symbol.for('ITextBlockSplitter'),
   VoicePoolBuilder: Symbol.for('IVoicePoolBuilder'),
-  PipelineRunner: Symbol.for('IPipelineRunner'),
-  PipelineBuilder: Symbol.for('IPipelineBuilder'),
   TTSPreviewService: Symbol.for('ITTSPreviewService'),
+
+  // Orchestrator services bundle
+  ConversionOrchestratorServices: Symbol.for('ConversionOrchestratorServices'),
 
   // Factories (for creating per-conversion instances)
   LLMServiceFactory: Symbol.for('ILLMServiceFactory'),

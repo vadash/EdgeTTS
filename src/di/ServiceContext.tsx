@@ -19,8 +19,6 @@ import { VoicePoolBuilder } from '@/services/VoicePoolBuilder';
 import { LLMVoiceService } from '@/services/llm';
 import { TTSWorkerPool } from '@/services/TTSWorkerPool';
 import { AudioMerger } from '@/services/AudioMerger';
-import { PipelineRunner } from '@/services/pipeline/PipelineRunner';
-import { PipelineBuilder } from '@/services/pipeline';
 import { ReusableEdgeTTSService } from '@/services/ReusableEdgeTTSService';
 import type { LogStore } from '@/stores/LogStore';
 
@@ -38,8 +36,7 @@ import type {
   MergerConfig,
 } from '@/services/interfaces';
 import type { WorkerPoolOptions } from '@/services/TTSWorkerPool';
-import type { IPipelineRunner } from '@/services/pipeline/types';
-import type { IPipelineBuilder } from '@/services/pipeline';
+import type { ConversionOrchestratorServices } from '@/services/ConversionOrchestrator';
 
 // ============================================================================
 // Context Definition
@@ -219,18 +216,6 @@ export function createProductionContainer(
     }
   );
 
-  // Register PipelineRunner (transient - new instance per conversion)
-  container.registerTransient<IPipelineRunner>(
-    ServiceTypes.PipelineRunner,
-    () => new PipelineRunner(container.get<ILogger>(ServiceTypes.Logger))
-  );
-
-  // Register PipelineBuilder (singleton)
-  container.registerSingleton<IPipelineBuilder>(
-    ServiceTypes.PipelineBuilder,
-    () => new PipelineBuilder(container)
-  );
-
   // Register factories for per-conversion services
   container.registerSingleton<ILLMServiceFactory>(
     ServiceTypes.LLMServiceFactory,
@@ -259,6 +244,20 @@ export function createProductionContainer(
         create: (cfg: MergerConfig) => new AudioMerger(ffmpeg, cfg),
       };
     }
+  );
+
+  // Register ConversionOrchestrator services bundle (for easy injection)
+  container.registerSingleton<ConversionOrchestratorServices>(
+    ServiceTypes.ConversionOrchestratorServices,
+    () => ({
+      logger: container.get<ILogger>(ServiceTypes.Logger),
+      textBlockSplitter: container.get<ITextBlockSplitter>(ServiceTypes.TextBlockSplitter),
+      llmServiceFactory: container.get<ILLMServiceFactory>(ServiceTypes.LLMServiceFactory),
+      workerPoolFactory: container.get<IWorkerPoolFactory>(ServiceTypes.WorkerPoolFactory),
+      audioMergerFactory: container.get<IAudioMergerFactory>(ServiceTypes.AudioMergerFactory),
+      voicePoolBuilder: container.get<IVoicePoolBuilder>(ServiceTypes.VoicePoolBuilder),
+      ffmpegService: container.get<IFFmpegService>(ServiceTypes.FFmpegService),
+    })
   );
 
   return container;

@@ -11,7 +11,7 @@ import { MockSecureStorage, createMockSecureStorage } from './mocks/MockSecureSt
 import { defaultConfig } from '@/config';
 import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import { VoicePoolBuilder } from '@/services/VoicePoolBuilder';
-import { PipelineRunner } from '@/services/pipeline/PipelineRunner';
+import type { ConversionOrchestratorServices } from '@/services/ConversionOrchestrator';
 import type {
   ILLMServiceFactory,
   IWorkerPoolFactory,
@@ -19,7 +19,6 @@ import type {
   ITextBlockSplitter,
   IVoicePoolBuilder,
 } from '@/services/interfaces';
-import type { IPipelineRunner } from '@/services/pipeline/types';
 
 export interface MockServices {
   tts: MockTTSService;
@@ -73,12 +72,6 @@ export function createTestContainer(options: TestContainerOptions = {}): {
     () => new VoicePoolBuilder()
   );
 
-  // Pipeline runner
-  container.registerTransient<IPipelineRunner>(
-    ServiceTypes.PipelineRunner,
-    () => new PipelineRunner(mocks.logger)
-  );
-
   // Factories - return mock services
   container.registerSingleton<ILLMServiceFactory>(
     ServiceTypes.LLMServiceFactory,
@@ -102,6 +95,30 @@ export function createTestContainer(options: TestContainerOptions = {}): {
         merge: async () => [],
         saveMergedFiles: async () => {},
       }),
+    })
+  );
+
+  // Orchestrator services bundle
+  container.registerSingleton<ConversionOrchestratorServices>(
+    ServiceTypes.ConversionOrchestratorServices,
+    () => ({
+      logger: mocks.logger,
+      textBlockSplitter: new TextBlockSplitter(),
+      llmServiceFactory: {
+        create: () => mocks.llm,
+      },
+      workerPoolFactory: {
+        create: () => mocks.workerPool,
+      },
+      audioMergerFactory: {
+        create: () => ({
+          calculateMergeGroups: () => [],
+          merge: async () => [],
+          saveMergedFiles: async () => {},
+        }),
+      },
+      voicePoolBuilder: new VoicePoolBuilder(),
+      ffmpegService: mocks.ffmpeg,
     })
   );
 

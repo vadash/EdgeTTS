@@ -1,3 +1,6 @@
+// Resume state checking for TTS conversion
+// Checks for cached work to resume after interruption
+
 import type { SpeakerAssignment, LLMCharacter } from '@/state/types';
 
 export interface ResumeInfo {

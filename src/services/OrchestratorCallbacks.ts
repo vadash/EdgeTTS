@@ -1,8 +1,35 @@
-import type { PipelineProgress } from './pipeline/types';
+// Orchestrator Callbacks - Type definitions for orchestrator-to-UI communication
+
 import type { LLMCharacter, SpeakerAssignment, VoiceProfileFile } from '@/state/types';
-import type { StageLLMConfig } from './pipeline/PipelineBuilder';
 import type { ConversionStatus } from '@/stores/ConversionStore';
-import type { ResumeInfo } from './pipeline/resumeCheck';
+import type { ResumeInfo } from './ResumeCheck';
+
+/**
+ * Progress information from workflow stages
+ */
+export interface WorkflowProgress {
+  /** Current stage name */
+  stage: string;
+  /** Current item being processed */
+  current: number;
+  /** Total items to process */
+  total: number;
+  /** Human-readable message */
+  message: string;
+}
+
+/**
+ * Per-stage LLM configuration
+ */
+export interface StageLLMConfig {
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  streaming?: boolean;
+  reasoning?: 'auto' | 'high' | 'medium' | 'low';
+  temperature?: number;
+  topP?: number;
+}
 
 /**
  * Input configuration snapshot — read once at the start of run().
@@ -54,7 +81,7 @@ export interface OrchestratorCallbacks {
   onConversionComplete: () => void;
   onConversionCancel: () => void;
   onError: (message: string, code: string) => void;
-  onProgress: (progress: PipelineProgress) => void;
+  onProgress: (progress: WorkflowProgress) => void;
   onStatusChange: (status: ConversionStatus) => void;
   onConversionProgress: (current: number, total: number) => void;
   onLLMProcessingStatus: (status: string) => void;

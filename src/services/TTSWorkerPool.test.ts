@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { TTSWorkerPool, type WorkerPoolOptions } from './TTSWorkerPool';
 import type { PoolTask } from './interfaces';
 import type { TTSConfig as VoiceConfig, StatusUpdate } from '@/state/types';
-import { createMockDirectoryHandle } from '@/test/pipeline/helpers';
+import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 
 // Mock the ReusableEdgeTTSService
 vi.mock('./ReusableEdgeTTSService', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createMockDirectoryHandle } from '@/test/pipeline/helpers';
-import { checkResumeState, type ResumeCheckResult } from '@/services/pipeline/resumeCheck';
+import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
+import { checkResumeState, type ResumeCheckResult } from '@/services/ResumeCheck';
 
 describe('checkResumeState', () => {
   it('returns null when _temp_work does not exist', async () => {

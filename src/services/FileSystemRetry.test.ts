@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { withPermissionRetry } from './FileSystemRetry';
-import { createMockDirectoryHandle } from '@/test/pipeline/helpers';
+import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 
 describe('withPermissionRetry', () => {
   it('returns result on success without retry', async () => {

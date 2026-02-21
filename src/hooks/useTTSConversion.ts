@@ -2,10 +2,10 @@
 // This is the adapter layer between Preact stores and the decoupled orchestrator
 
 import { useCallback, useRef } from 'preact/hooks';
-import { useServices } from '@/di';
+import { useServices, ServiceTypes } from '@/di';
 import { useStores } from '@/stores';
 import type { Stores } from '@/stores';
-import { ConversionOrchestrator } from '@/services/ConversionOrchestrator';
+import { createConversionOrchestrator, type ConversionOrchestratorServices } from '@/services/ConversionOrchestrator';
 import type { OrchestratorInput, OrchestratorCallbacks } from '@/services/OrchestratorCallbacks';
 import type { ConversionStatus } from '@/stores/ConversionStore';
 import { getKeepAwake } from '@/services/KeepAwake';
@@ -137,7 +137,7 @@ function buildCallbacks(stores: Stores): OrchestratorCallbacks {
 export function useTTSConversion(): UseTTSConversionResult {
   const container = useServices();
   const stores = useStores();
-  const orchestratorRef = useRef<ConversionOrchestrator | null>(null);
+  const orchestratorRef = useRef<{ run: (input: OrchestratorInput, existingBook?: ProcessedBook | null) => Promise<void>; cancel: () => void } | null>(null);
 
   /**
    * Start conversion
@@ -156,8 +156,9 @@ export function useTTSConversion(): UseTTSConversionResult {
     const callbacks = buildCallbacks(stores);
     const input = buildInput(stores, text);
 
-    // Create new orchestrator
-    orchestratorRef.current = new ConversionOrchestrator(container, callbacks);
+    // Get orchestrator services bundle and create new orchestrator
+    const orchestratorServices = container.get<ConversionOrchestratorServices>(ServiceTypes.ConversionOrchestratorServices);
+    orchestratorRef.current = createConversionOrchestrator(orchestratorServices, callbacks);
 
     // Start keep-awake to prevent background throttling
     const keepAwake = getKeepAwake();
