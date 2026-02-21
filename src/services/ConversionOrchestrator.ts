@@ -496,6 +496,7 @@ export async function runConversion(
         reasoning: input.extractConfig.reasoning,
         temperature: input.extractConfig.temperature,
         topP: input.extractConfig.topP,
+        repeatPrompt: input.extractConfig.repeatPrompt,
         maxConcurrentRequests: input.llmThreads,
         directoryHandle: input.directoryHandle,
         logger,
@@ -507,6 +508,7 @@ export async function runConversion(
           reasoning: input.mergeConfig.reasoning,
           temperature: input.mergeConfig.temperature,
           topP: input.mergeConfig.topP,
+          repeatPrompt: input.mergeConfig.repeatPrompt,
         },
       };
 
@@ -549,6 +551,7 @@ export async function runConversion(
         reasoning: input.assignConfig.reasoning,
         temperature: input.assignConfig.temperature,
         topP: input.assignConfig.topP,
+        repeatPrompt: input.assignConfig.repeatPrompt,
         useVoting: input.useVoting,
         maxConcurrentRequests: input.llmThreads,
         directoryHandle: input.directoryHandle,
