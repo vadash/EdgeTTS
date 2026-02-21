@@ -5,6 +5,8 @@ import { getRetryDelay, defaultConfig } from '@/config';
 import type { Logger } from '../Logger';
 import { stripThinkingTags, extractJSON } from '@/utils/llmUtils';
 import { DebugLogger } from './DebugLogger';
+import { zodToJsonSchema, type StructuredCallOptions } from './schemaUtils';
+import { z } from 'zod';
 
 export interface LLMApiClientOptions {
   apiKey: string;
@@ -18,7 +20,7 @@ export interface LLMApiClientOptions {
   logger?: Logger;
 }
 
-export type PassType = 'extract' | 'merge' | 'assign';
+export type PassType = 'extract' | 'merge' | 'assign' | 'structured';
 
 export interface LLMPrompt {
   system: string;
@@ -406,5 +408,73 @@ export class LLMApiClient {
       return e;
     }
     return 'Unknown error';
+  }
+
+  /**
+   * Call LLM with structured output enforcement.
+   * Returns validated, typed result directly.
+   *
+   * @param options - Structured call options including prompt, schema, schema name
+   * @returns Parsed and validated result matching the schema
+   * @throws Error if LLM refuses or returns empty response
+   */
+  async callStructured<T>({
+    prompt,
+    schema,
+    schemaName,
+    signal,
+  }: StructuredCallOptions<T>): Promise<T> {
+    const requestBody: any = {
+      model: this.options.model,
+      messages: [
+        { role: 'system', content: prompt.system },
+        { role: 'user', content: prompt.user },
+      ],
+      stream: false, // Structured outputs require non-streaming
+      response_format: zodToJsonSchema(schema, schemaName),
+    };
+
+    // Apply provider-specific fixes
+    applyProviderFixes(requestBody, this.provider);
+
+    // Save request log
+    if (this.debugLogger?.shouldLog('structured')) {
+      this.debugLogger.saveLog('structured_request.json', requestBody);
+    }
+
+    this.logger?.info(`[structured] API call starting...`);
+
+    // Make API call (non-streaming only for structured outputs)
+    const response = await this.client.chat.completions.create(
+      requestBody as any,
+      { signal }
+    );
+
+    const message = response.choices[0]?.message;
+
+    // Check for refusal (content policy triggers)
+    if (message?.refusal) {
+      throw new Error(`LLM refused: ${message.refusal}`);
+    }
+
+    const content = message?.content;
+    if (!content) {
+      throw new Error('Empty response from LLM');
+    }
+
+    this.logger?.info(`[structured] API call completed (${content.length} chars)`);
+
+    // Save response log
+    if (this.debugLogger?.shouldLog('structured')) {
+      this.debugLogger.saveLog('structured_response.json', {
+        choices: [{ message: { content } }],
+        model: this.options.model,
+      });
+      this.debugLogger.markLogged('structured');
+    }
+
+    // Parse JSON and validate with Zod
+    const parsed = JSON.parse(content);
+    return schema.parse(parsed); // Zod runtime validation
   }
 }
