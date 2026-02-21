@@ -50,6 +50,7 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
       reasoning: l.extract.reasoning ?? undefined,
       temperature: l.extract.temperature,
       topP: l.extract.topP,
+      repeatPrompt: l.extract.repeatPrompt,
     },
     mergeConfig: {
       apiKey: l.merge.apiKey,
@@ -59,6 +60,7 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
       reasoning: l.merge.reasoning ?? undefined,
       temperature: l.merge.temperature,
       topP: l.merge.topP,
+      repeatPrompt: l.merge.repeatPrompt,
     },
     assignConfig: {
       apiKey: l.assign.apiKey,
@@ -68,6 +70,7 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
       reasoning: l.assign.reasoning ?? undefined,
       temperature: l.assign.temperature,
       topP: l.assign.topP,
+      repeatPrompt: l.assign.repeatPrompt,
     },
     useVoting: l.useVoting,
 
