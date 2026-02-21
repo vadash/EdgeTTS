@@ -1,14 +1,13 @@
 import { z } from 'zod';
 
 /**
- * CRITICAL: .nullable() not .optional() for OpenAI strict: true compatibility
- * .optional() omits from required array, breaking strict mode
+ * CRITICAL: OpenAI Structured Outputs may omit nullable fields entirely
+ * Use .default(null) to provide a default when the field is missing
  *
- * Note: .transform() cannot be used with toJSONSchema(), so we keep null in the schema
- * and handle null → undefined conversion in the domain types if needed
+ * The field is nullable (accepts null | string), and defaults to null when omitted.
  */
 const baseSchema = z.object({
-  reasoning: z.string().nullable(),
+  reasoning: z.string().nullable().default(null),
 });
 
 // Extract stage schemas
