@@ -82,11 +82,14 @@ Extract every unique entity that speaks in the provided text. Output JSON with c
 
   <step name="determine_gender">
   Assign gender based on textual evidence only:
-    - Male indicators: he/him/his, Mr./Sir/Lord/King, son/husband/boyfriend, "the man"/"the boy"
-    - Female indicators: she/her/hers, Mrs./Ms./Lady/Queen, daughter/wife/girlfriend, "the woman"/"the girl"
+    - Male indicators: he/him/his, Mr./Sir/Lord/King, son/husband/boyfriend, "the man"/"the boy", он/его/ему (Russian), er/ihm/sein (German)
+    - Female indicators: she/her/hers, Mrs./Ms./Lady/Queen, daughter/wife/girlfriend, "the woman"/"the girl", она/её/ей (Russian), sie/ihr (German)
     - Default for System/Interface/AI → female (LitRPG convention)
     - Default for monsters/dragons → male (unless pronouns indicate otherwise)
     - No evidence → unknown
+
+    CRITICAL: The gender value must ALWAYS be in English: "male", "female", or "unknown"
+    Never translate: use "male" not "мужской", "female" not "женский", "unknown" not "неизвестно"
   </step>
 </instructions>
 
@@ -143,7 +146,7 @@ Field requirements:
   - characters: array of character objects (must contain at least one character)
   - canonicalName: the primary name chosen by the priority in step choose_canonical_name, must be non-empty
   - variations: all names and titles used for this character, including canonicalName itself
-  - gender: exactly "male", "female", or "unknown" — required for every character
+  - gender: EXACTLY "male", "female", or "unknown" (English only, never translate)
   - Return null for reasoning if no additional explanation needed
 </output_format>
 

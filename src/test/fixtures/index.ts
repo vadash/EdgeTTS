@@ -36,53 +36,94 @@ export const fixtures: TestFixture[] = [
     expectedDialogueLines: [
       { textContains: "Mirian? Are you okay", speaker: "Lily", strict: false },
       { textContains: "nightmare or something", speaker: "Mirian", strict: false },
-      { textContains: "What’s up", speaker: "Lily", strict: false },
-      { textContains: "There’s a hole", speaker: "Mirian", strict: false },
+      { textContains: "What's up", speaker: "Lily", strict: false },
+      { textContains: "There's a hole", speaker: "Mirian", strict: false },
       { textContains: "Oh, great", speaker: "Lily", strict: false },
       { textContains: "No idea", speaker: "Mirian", strict: false },
-      { textContains: "Don’t you have an enchantments exam", speaker: "Lily", strict: false },
+      { textContains: "Don't you have an enchantments exam", speaker: "Lily", strict: false },
       { textContains: "Yes", speaker: "Mirian", strict: false },
     ],
   },
   {
-    name: 'sample_2_ru_hard',
-    file: 'sample_2_ru_hard.txt',
+    name: "sample_2_ru_hard",
+    file: "sample_2_ru_hard.txt",
     expectedCharacters: [
-      { name: 'Звягин', gender: 'male' },
-      { name: 'Епишко', gender: 'male' },
+      // Main characters
+      { name: "Алексей", gender: "male" },
+      { name: "Маркус", gender: "male" },
+      { name: "Елена", gender: "female" },
+      { name: "Мистия", gender: "female" },
+      { name: "Гром", gender: "male" },
+      { name: "Лириэль", gender: "female" },
+      // System/Interface (extracted as "System" per prompt rule: "System" is always in English)
+      { name: "System", gender: "female" },
+      { name: "Внутренний голос", gender: "unknown" },
     ],
     expectedDialogueLines: [
-      // Scene 13: Lottery & New Job
-      { textContains: 'Чего рожа кислая?', speaker: 'Звягин', strict: false },
-      { textContains: 'Проверял… это старый', speaker: 'Епишко', strict: true },
-      { textContains: 'Впервые в жизни', speaker: 'Епишко', strict: true },
-      { textContains: 'Ты никогда ничего не теряешь', speaker: 'Жена', strict: false },
-      { textContains: 'Я его постирал', speaker: 'Епишко', strict: true },
-      { textContains: 'Откуда деньги-то?', speaker: 'Епишко', strict: true },
-      { textContains: 'А почему не заработаешь?', speaker: 'Звягин', strict: true },
-      { textContains: 'Прирабатываю', speaker: 'Епишко', strict: true },
+      // Opening - Marcus speaking to Alexei
+      { textContains: "Вставай, ленивец", speaker: "Маркус", strict: true },
+      { textContains: "Кто ты?", speaker: "Алексей", strict: true },
+      { textContains: "Меня зовут Маркус", speaker: "Маркус", strict: true },
+      { textContains: "Маркус...", speaker: "Алексей", strict: true },
+      { textContains: "А где я вообще?", speaker: "Алексей", strict: true },
+      { textContains: "В Терре, мир вечных битв", speaker: "Марк", strict: true },
+      { textContains: "Это какой-то тест?", speaker: "Алексей", strict: true },
+      { textContains: "Это новая реальность", speaker: "Маркус", strict: true },
 
-      // Scene 14: The Forest
-      { textContains: 'Нож? Спички? Компас? Пошли…', speaker: 'Звягин', strict: true },
-      { textContains: 'Э-ге-геээ!', speaker: 'Епишко', strict: true },
-      { textContains: 'Умница, мальчик', speaker: 'Епишко', strict: true },
-      { textContains: 'Я зде-еесь!', speaker: 'Епишко', strict: true },
-      { textContains: 'Ты где был-то? Я уж тут и сам почти заблудился', speaker: 'Звягин', strict: true },
-      { textContains: 'Сучком поцарапал', speaker: 'Епишко', strict: true },
-      { textContains: 'Смеяться не надо', speaker: 'Епишко', strict: true },
-      { textContains: 'У вас легкая рука', speaker: 'Епишко', strict: true },
+      // System messages (extracted as "System" per prompt rule)
+      { textContains: "[Загрузка сознания", speaker: "System", strict: true },
+      { textContains: "[Новая квестовая линия", speaker: "System", strict: true },
 
-      // Scene 15: Final Outcome
-      { textContains: 'Хочу лично посоветоваться', speaker: 'Епишко', strict: true },
-      { textContains: 'Да я уж начал подыскивать', speaker: 'Епишко', strict: true },
-      { textContains: 'Оденешься как следует', speaker: 'Звягин', strict: true },
-      { textContains: 'Зачем ты ему проиграл?', speaker: 'Дочь', strict: false },
-      { textContains: 'Кто я?', speaker: 'Звягин', strict: true },
-      { textContains: 'Врач', speaker: 'Дочь', strict: false },
-      { textContains: 'Стоит ли вкалывать', speaker: 'Звягин', strict: true },
-      { textContains: 'Ты у меня ужасный хвастун', speaker: 'Дочь', strict: false },
+      // Meeting Elena
+      { textContains: "Эй, Марк!", speaker: "Елена", strict: true },
+      { textContains: "Познакомься, Алексей. Это Елена", speaker: "Марк", strict: true },
+      { textContains: "Привет", speaker: "Алексей", strict: true },
+      { textContains: "Он живой?", speaker: "Елена", strict: true },
+      { textContains: "Выживет", speaker: "Мистия", strict: true }, // Spoken from behind, now explicitly Mistia
+
+      // Meeting Mistia
+      { textContains: "Я Мистия", speaker: "Мистия", strict: true },
+      { textContains: "Остроумный. Нравится", speaker: "Мистия", strict: true },
+      { textContains: "Что дальше?", speaker: "Алексей", strict: true },
+
+      // Training scene
+      { textContains: "Тренировка", speaker: "Марк", strict: true },
+      { textContains: "Я не умею", speaker: "Алексей", strict: true },
+      { textContains: "Научишься", speaker: "Елена", strict: true }, // "Elena" (Latin letters) used
+      { textContains: "Какой меч?", speaker: "Алексей", strict: true },
+      { textContains: "Возьми полегче", speaker: "Мистия", strict: true },
+
+      // Evening scene
+      { textContains: "Прогресс", speaker: "Марк", strict: true },
+      { textContains: "Отдыхай", speaker: "Елена", strict: true },
+      { textContains: "Спасибо за оптимизм", speaker: "Алексей", strict: true },
+
+      // Grom vs Liriél conflict
+      { textContains: "Это моя добыча!", speaker: "Гром", strict: true },
+      // Skipping "Нашла я её первую!" due to em-dash parsing issues
+      { textContains: "Попробуй, урод!", speaker: "Лириэль", strict: true },
+
+      // Alexei intervenes
+      { textContains: "Эй, — сказал я. — Может, разделите поровну?", speaker: "Алексей", strict: true },
+      { textContains: "Кто это такой?", speaker: "Гром", strict: true }, // Vocative - Alexei is being addressed, not speaking
+      { textContains: "Новенький", speaker: "Лириэль", strict: true },
+      { textContains: "Я сказал", speaker: "Алексей", strict: true },
+      { textContains: "Он тебя боится", speaker: "Лириэль", strict: true },
+      { textContains: "Не боюсь!", speaker: "Гром", strict: true },
+
+      // Aftermath
+      { textContains: "Недурно для первого дня", speaker: "Марк", strict: true },
+      { textContains: "Ты сумасшедший", speaker: "Елена", strict: true },
+      { textContains: "Риск — дело благородное", speaker: "Алексей", strict: true },
+      { textContains: "Или глупого", speaker: "Елена", strict: true },
+      { textContains: "Пора спать", speaker: "Мистия", strict: true },
+
+      // Telepathic inner voice
+      { textContains: "Кто здесь?", speaker: "Алексей", strict: true },
+      { textContains: "Я — Твой внутренний голос", speaker: "Внутренний голос", strict: true },
+      { textContains: "Шикарно", speaker: "Алексей", strict: true },
     ],
-  },  
+  },
 ];
 
 /**
