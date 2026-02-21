@@ -124,6 +124,50 @@ export const fixtures: TestFixture[] = [
       { textContains: "Шикарно", speaker: "Алексей", strict: true },
     ],
   },
+  {
+    name: "sample_3_en_royalroad",
+    file: "sample_3_en_royalroad.txt",
+    expectedCharacters: [
+      { name: "Mirian", gender: "female" },
+      { name: "Nicolus", gender: "male" },
+      { name: "Professor Seneca", gender: "female" },
+      { name: "Professor Viridian", gender: "male" },
+      { name: "Valen", gender: "female" },
+    ],
+    expectedDialogueLines: [
+      // Mirian to guard (guard responses skipped)
+      { textContains: "Hi, sorry to bother you", speaker: "Mirian", strict: false },
+      { textContains: "It's just", speaker: "Mirian", strict: false },
+      { textContains: "I just thought you might want to know", speaker: "Mirian", strict: false },
+
+      // Professor Seneca's class
+      { textContains: "Alright, class", speaker: "Professor Seneca", strict: false },
+      { textContains: "Remember, we started our class", speaker: "Professor Seneca", strict: false },
+      { textContains: "It will be now", speaker: "Professor Seneca", strict: false },
+      { textContains: "Alchemical mana is classified in three ways", speaker: "Professor Seneca", strict: false },
+      { textContains: "Next, mana is classified", speaker: "Professor Seneca", strict: false },
+
+      // Nicolus interactions
+      { textContains: "Damn", speaker: "Nicolus", strict: false },
+      { textContains: "Hey. Want to study together", speaker: "Nicolus", strict: false },
+      { textContains: "Sure", speaker: "Mirian", strict: false },
+      { textContains: "Great", speaker: "Nicolus", strict: false },
+
+      // Professor Viridian's class
+      { textContains: "Regal cordyline, ruby variety", speaker: "Professor Viridian", strict: false },
+      { textContains: "Glycomyriate", speaker: "Valen", strict: false },
+      { textContains: "Very volatile when their mana flow is destabilized", speaker: "Valen", strict: false },
+      { textContains: "Observe", speaker: "Professor Viridian", strict: false },
+      { textContains: "Observe, the golden crown", speaker: "Professor Viridian", strict: false },
+
+      // Mirian and Valen interaction at the end
+      { textContains: "Did you see that", speaker: "Mirian", strict: false },
+      { textContains: "Sorry", speaker: "Mirian", strict: false },
+      { textContains: "Yeah", speaker: "Valen", strict: false },
+      { textContains: "Isn't that corridor forbidden", speaker: "Valen", strict: false },
+      { textContains: "We should tell Professor Viridian", speaker: "Mirian", strict: false },
+    ],
+  },
 ];
 
 /**
