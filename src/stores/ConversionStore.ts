@@ -65,22 +65,32 @@ const defaultState: ConversionState = {
 // Store Definition
 // ============================================================================
 
-const rootSignal = signal<ConversionState>({ ...defaultState });
+export const conversion = signal<ConversionState>({ ...defaultState });
 
-// Resume promise resolver (not persisted)
 let resumeResolve: ((confirmed: boolean) => void) | null = null;
 
 // ============================================================================
 // Computed Properties
 // ============================================================================
 
-const isProcessingComputed = computed(() => {
-  const s = rootSignal.value.status;
+export const isProcessing = computed(() => {
+  const s = conversion.value.status;
   return s === 'llm-extract' || s === 'llm-assign' || s === 'converting' || s === 'merging';
 });
 
-const progressPercentComputed = computed(() => {
-  const { current, total } = rootSignal.value.progress;
+export const progress = computed(() => conversion.value.progress);
+
+// Export computed for nested state access
+export const status = computed(() => conversion.value.status);
+export const startTime = computed(() => conversion.value.startTime);
+export const error = computed(() => conversion.value.error);
+export const resumeInfo = computed(() => conversion.value.resumeInfo);
+export const ffmpegLoaded = computed(() => conversion.value.ffmpegLoaded);
+export const ffmpegLoading = computed(() => conversion.value.ffmpegLoading);
+export const ffmpegError = computed(() => conversion.value.ffmpegError);
+
+export const progressPercent = computed(() => {
+  const { current, total } = conversion.value.progress;
   if (total === 0) return 0;
   return Math.round((current / total) * 100);
 });
@@ -93,21 +103,21 @@ const formatDuration = (ms: number): string => {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
-const elapsedTimeComputed = computed(() => {
-  const start = rootSignal.value.startTime;
+export const elapsedTime = computed(() => {
+  const start = conversion.value.startTime;
   if (!start) return '00:00:00';
   return formatDuration(Date.now() - start);
 });
 
-const estimatedTimeRemainingComputed = computed(() => {
-  const { current, total } = rootSignal.value.progress;
-  const status = rootSignal.value.status;
+export const estimatedTimeRemaining = computed(() => {
+  const { current, total } = conversion.value.progress;
+  const status = conversion.value.status;
 
   if (status !== 'llm-extract' && status !== 'llm-assign' && status !== 'converting' && status !== 'merging') {
     return null;
   }
 
-  const start = rootSignal.value.phaseStartTime;
+  const start = conversion.value.phaseStartTime;
   if (!start || total === 0 || current === 0) return null;
 
   const elapsed = Date.now() - start;
@@ -121,7 +131,7 @@ const estimatedTimeRemainingComputed = computed(() => {
 // ============================================================================
 
 const beforeUnloadHandler = (e: BeforeUnloadEvent): string | void => {
-  if (isProcessingComputed.value) {
+  if (isProcessing.value) {
     e.preventDefault();
     e.returnValue = '';
     return '';
@@ -129,7 +139,7 @@ const beforeUnloadHandler = (e: BeforeUnloadEvent): string | void => {
 };
 
 effect(() => {
-  if (isProcessingComputed.value) {
+  if (isProcessing.value) {
     window.addEventListener('beforeunload', beforeUnloadHandler);
   } else {
     window.removeEventListener('beforeunload', beforeUnloadHandler);
@@ -141,67 +151,71 @@ effect(() => {
 // ============================================================================
 
 function patchState(partial: Partial<ConversionState>): void {
-  rootSignal.value = { ...rootSignal.value, ...partial };
+  conversion.value = { ...conversion.value, ...partial };
 }
 
 // ============================================================================
 // Public API - State Actions
 // ============================================================================
 
-function startConversion(): void {
-  rootSignal.value = {
+export function startConversion(): void {
+  conversion.value = {
     ...defaultState,
     startTime: Date.now(),
     status: 'idle',
   };
 }
 
-function setStatus(status: ConversionStatus): void {
-  const newState = { ...rootSignal.value, status };
+export function setStatus(status: ConversionStatus): void {
+  const newState = { ...conversion.value, status };
   if (status === 'llm-extract' || status === 'llm-assign' || status === 'converting' || status === 'merging') {
     newState.phaseStartTime = Date.now();
-    newState.progress = { current: 0, total: rootSignal.value.progress.total };
+    newState.progress = { current: 0, total: conversion.value.progress.total };
   }
-  rootSignal.value = newState;
+  conversion.value = newState;
 }
 
-function updateProgress(current: number, total: number): void {
+export function updateProgress(current: number, total: number): void {
   patchState({ progress: { current, total } });
 }
 
-function incrementProgress(): void {
-  const { current, total } = rootSignal.value.progress;
+export function incrementProgress(): void {
+  const { current, total } = conversion.value.progress;
   patchState({ progress: { current: current + 1, total } });
 }
 
-function setTotal(total: number): void {
-  patchState({ progress: { current: rootSignal.value.progress.current, total } });
+export function setTotal(total: number): void {
+  patchState({ progress: { current: conversion.value.progress.current, total } });
 }
 
-function setError(message: string, code?: string): void {
+export function setError(message: string, code?: string): void {
   patchState({
     status: 'error',
     error: { code, message, timestamp: new Date() },
   });
 }
 
-function complete(): void {
+export function complete(): void {
   patchState({ status: 'complete' });
 }
 
-function cancel(): void {
+export function cancel(): void {
   patchState({ status: 'cancelled' });
 }
 
-function reset(): void {
-  rootSignal.value = { ...defaultState };
+export function resetConversionStore(): void {
+  conversion.value = { ...defaultState };
+}
+
+export function reset(): void {
+  resetConversionStore();
 }
 
 // ============================================================================
 // Public API - FFmpeg State
 // ============================================================================
 
-function setFFmpegLoaded(loaded: boolean): void {
+export function setFFmpegLoaded(loaded: boolean): void {
   if (loaded) {
     patchState({ ffmpegLoaded: true, ffmpegLoading: false, ffmpegError: null });
   } else {
@@ -209,11 +223,11 @@ function setFFmpegLoaded(loaded: boolean): void {
   }
 }
 
-function setFFmpegLoading(loading: boolean): void {
+export function setFFmpegLoading(loading: boolean): void {
   patchState({ ffmpegLoading: loading });
 }
 
-function setFFmpegError(error: string | null): void {
+export function setFFmpegError(error: string | null): void {
   patchState({ ffmpegError: error, ffmpegLoading: false });
 }
 
@@ -221,92 +235,21 @@ function setFFmpegError(error: string | null): void {
 // Public API - Resume State
 // ============================================================================
 
-function awaitResumeConfirmation(info: ResumeInfo): Promise<boolean> {
+export function awaitResumeConfirmation(info: ResumeInfo): Promise<boolean> {
   patchState({ resumeInfo: info });
   return new Promise<boolean>((resolve) => {
     resumeResolve = resolve;
   });
 }
 
-function confirmResume(): void {
+export function confirmResume(): void {
   resumeResolve?.(true);
   patchState({ resumeInfo: null });
   resumeResolve = null;
 }
 
-function cancelResume(): void {
+export function cancelResume(): void {
   resumeResolve?.(false);
   patchState({ resumeInfo: null });
   resumeResolve = null;
 }
-
-// ============================================================================
-// Legacy Class Wrapper
-// ============================================================================
-
-class PropertySignal<T> {
-  constructor(private fn: (s: ConversionState) => T) {}
-
-  get value(): T {
-    return this.fn(rootSignal.value);
-  }
-  set value(_v: T) {}
-}
-
-export class ConversionStore {
-  // Status properties
-  readonly status = new PropertySignal(s => s.status);
-  readonly progress = new PropertySignal(s => s.progress);
-  readonly startTime = new PropertySignal(s => s.startTime);
-  readonly phaseStartTime = new PropertySignal(s => s.phaseStartTime);
-  readonly error = new PropertySignal(s => s.error);
-
-  // FFmpeg properties
-  readonly ffmpegLoaded = new PropertySignal(s => s.ffmpegLoaded);
-  readonly ffmpegLoading = new PropertySignal(s => s.ffmpegLoading);
-  readonly ffmpegError = new PropertySignal(s => s.ffmpegError);
-
-  // Resume properties
-  readonly resumeInfo = new PropertySignal(s => s.resumeInfo);
-
-  // Computed
-  readonly isProcessing = isProcessingComputed;
-  readonly progressPercent = progressPercentComputed;
-  readonly elapsedTime = elapsedTimeComputed;
-  readonly estimatedTimeRemaining = estimatedTimeRemainingComputed;
-
-  // Actions
-  startConversion = startConversion;
-  setStatus = setStatus;
-  updateProgress = updateProgress;
-  incrementProgress = incrementProgress;
-  setTotal = setTotal;
-  setError = setError;
-  complete = complete;
-  cancel = cancel;
-  reset = reset;
-
-  setFFmpegLoaded = setFFmpegLoaded;
-  setFFmpegLoading = setFFmpegLoading;
-  setFFmpegError = setFFmpegError;
-
-  awaitResumeConfirmation = awaitResumeConfirmation;
-  confirmResume = confirmResume;
-  cancelResume = cancelResume;
-}
-
-/**
- * Reset to defaults (for tests)
- */
-export function resetConversionStore(): void {
-  rootSignal.value = { ...defaultState };
-}
-
-export function createConversionStore(): ConversionStore {
-  return new ConversionStore();
-}
-
-// Export for direct access
-export const conversion = rootSignal;
-export const isProcessing = isProcessingComputed;
-export const progress = rootSignal;

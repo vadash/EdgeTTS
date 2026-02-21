@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ConversionOrchestrator, type ConversionOrchestratorServices, type OrchestratorInput } from '../ConversionOrchestrator';
+import { runConversion, type ConversionOrchestratorServices, type OrchestratorInput } from '../ConversionOrchestrator';
 import type { Stores } from '@/stores';
 
 function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorInput {
@@ -136,36 +136,36 @@ function createMockServices(): ConversionOrchestratorServices {
   };
 }
 
-describe('ConversionOrchestrator', () => {
+describe('runConversion', () => {
   it('throws when text is empty', async () => {
     const stores = createMockStores();
     const services = createMockServices();
-    const orch = new ConversionOrchestrator(services, stores);
+    const signal = new AbortController().signal;
     const input = createMockInput({ textContent: '' });
-    await expect(orch.run(input)).rejects.toThrow();
+    await expect(runConversion(services, stores, signal, input)).rejects.toThrow();
   });
 
   it('throws when LLM not configured', async () => {
     const stores = createMockStores();
     const services = createMockServices();
-    const orch = new ConversionOrchestrator(services, stores);
+    const signal = new AbortController().signal;
     const input = createMockInput({ isLLMConfigured: false });
-    await expect(orch.run(input)).rejects.toThrow('LLM API key not configured');
+    await expect(runConversion(services, stores, signal, input)).rejects.toThrow('LLM API key not configured');
   });
 
   it('throws when no directory handle', async () => {
     const stores = createMockStores();
     const services = createMockServices();
-    const orch = new ConversionOrchestrator(services, stores);
+    const signal = new AbortController().signal;
     const input = createMockInput({ directoryHandle: null });
-    await expect(orch.run(input)).rejects.toThrow('Please select an output directory');
+    await expect(runConversion(services, stores, signal, input)).rejects.toThrow('Please select an output directory');
   });
 
   it('calls conversion.cancel when resume declined', async () => {
     const stores = createMockStores();
     stores.conversion.awaitResumeConfirmation = vi.fn().mockResolvedValue(false);
     const services = createMockServices();
-    const orch = new ConversionOrchestrator(services, stores);
+    const signal = new AbortController().signal;
     const input = createMockInput();
 
     // The orchestrator checks for resume state via directoryHandle

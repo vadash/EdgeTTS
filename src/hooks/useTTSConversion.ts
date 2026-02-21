@@ -1,13 +1,19 @@
-// useTTSConversion - Simplified hook using ConversionOrchestrator
-// Directly passes stores to the orchestrator instead of using callback middleware
+// useTTSConversion - Simplified hook using runConversion function
+// Orchestrator is now a plain function with external AbortSignal
 
 import { useCallback, useRef } from 'preact/hooks';
 import { useStores } from '@/stores';
 import type { Stores } from '@/stores';
-import { createConversionOrchestrator, type OrchestratorInput } from '@/services/ConversionOrchestrator';
+import { runConversion, type OrchestratorInput } from '@/services/ConversionOrchestrator';
 import { getOrchestratorServices } from '@/services';
 import { getKeepAwake } from '@/services/KeepAwake';
 import type { ProcessedBook } from '@/state/types';
+
+// Import signal-based stores directly for snapshot access
+import { settings } from '@/stores/SettingsStore';
+import { llm } from '@/stores/LLMStore';
+import { isConfigured } from '@/stores/LLMStore';
+import { isProcessing, progress, setError } from '@/stores/ConversionStore';
 
 /**
  * Hook return type
@@ -29,60 +35,62 @@ export interface UseTTSConversionResult {
 }
 
 /**
- * Build OrchestratorInput snapshot from stores
+ * Build OrchestratorInput snapshot from signal-based stores
  */
 function buildInput(stores: Stores, text: string): OrchestratorInput {
+  const s = settings.value;
+  const l = llm.value;
   return {
-    isLLMConfigured: stores.llm.isConfigured.value,
+    isLLMConfigured: isConfigured.value,
     extractConfig: {
-      apiKey: stores.llm.extract.value.apiKey,
-      apiUrl: stores.llm.extract.value.apiUrl,
-      model: stores.llm.extract.value.model,
-      streaming: stores.llm.extract.value.streaming,
-      reasoning: stores.llm.extract.value.reasoning ?? undefined,
-      temperature: stores.llm.extract.value.temperature,
-      topP: stores.llm.extract.value.topP,
+      apiKey: l.extract.apiKey,
+      apiUrl: l.extract.apiUrl,
+      model: l.extract.model,
+      streaming: l.extract.streaming,
+      reasoning: l.extract.reasoning ?? undefined,
+      temperature: l.extract.temperature,
+      topP: l.extract.topP,
     },
     mergeConfig: {
-      apiKey: stores.llm.merge.value.apiKey,
-      apiUrl: stores.llm.merge.value.apiUrl,
-      model: stores.llm.merge.value.model,
-      streaming: stores.llm.merge.value.streaming,
-      reasoning: stores.llm.merge.value.reasoning ?? undefined,
-      temperature: stores.llm.merge.value.temperature,
-      topP: stores.llm.merge.value.topP,
+      apiKey: l.merge.apiKey,
+      apiUrl: l.merge.apiUrl,
+      model: l.merge.model,
+      streaming: l.merge.streaming,
+      reasoning: l.merge.reasoning ?? undefined,
+      temperature: l.merge.temperature,
+      topP: l.merge.topP,
     },
     assignConfig: {
-      apiKey: stores.llm.assign.value.apiKey,
-      apiUrl: stores.llm.assign.value.apiUrl,
-      model: stores.llm.assign.value.model,
-      streaming: stores.llm.assign.value.streaming,
-      reasoning: stores.llm.assign.value.reasoning ?? undefined,
-      temperature: stores.llm.assign.value.temperature,
-      topP: stores.llm.assign.value.topP,
+      apiKey: l.assign.apiKey,
+      apiUrl: l.assign.apiUrl,
+      model: l.assign.model,
+      streaming: l.assign.streaming,
+      reasoning: l.assign.reasoning ?? undefined,
+      temperature: l.assign.temperature,
+      topP: l.assign.topP,
     },
-    useVoting: stores.llm.useVoting.value,
+    useVoting: l.useVoting,
 
-    narratorVoice: stores.settings.narratorVoice.value,
-    voice: stores.settings.voice.value,
-    pitch: stores.settings.pitch.value,
-    rate: stores.settings.rate.value,
-    ttsThreads: stores.settings.ttsThreads.value,
-    llmThreads: stores.settings.llmThreads.value,
-    enabledVoices: stores.settings.enabledVoices.value,
-    lexxRegister: stores.settings.lexxRegister.value,
-    outputFormat: stores.settings.outputFormat.value,
-    silenceRemoval: stores.settings.silenceRemovalEnabled.value,
-    normalization: stores.settings.normalizationEnabled.value,
-    deEss: stores.settings.deEssEnabled.value,
-    silenceGapMs: stores.settings.silenceGapMs.value,
-    eq: stores.settings.eqEnabled.value,
-    compressor: stores.settings.compressorEnabled.value,
-    fadeIn: stores.settings.fadeInEnabled.value,
-    stereoWidth: stores.settings.stereoWidthEnabled.value,
-    opusMinBitrate: stores.settings.opusMinBitrate.value,
-    opusMaxBitrate: stores.settings.opusMaxBitrate.value,
-    opusCompressionLevel: stores.settings.opusCompressionLevel.value,
+    narratorVoice: s.narratorVoice,
+    voice: s.voice,
+    pitch: s.pitch,
+    rate: s.rate,
+    ttsThreads: s.ttsThreads,
+    llmThreads: s.llmThreads,
+    enabledVoices: s.enabledVoices,
+    lexxRegister: s.lexxRegister,
+    outputFormat: s.outputFormat,
+    silenceRemoval: s.silenceRemovalEnabled,
+    normalization: s.normalizationEnabled,
+    deEss: s.deEssEnabled,
+    silenceGapMs: s.silenceGapMs,
+    eq: s.eqEnabled,
+    compressor: s.compressorEnabled,
+    fadeIn: s.fadeInEnabled,
+    stereoWidth: s.stereoWidthEnabled,
+    opusMinBitrate: s.opusMinBitrate,
+    opusMaxBitrate: s.opusMaxBitrate,
+    opusCompressionLevel: s.opusCompressionLevel,
 
     directoryHandle: stores.data.directoryHandle.value,
     detectedLanguage: stores.data.detectLanguageFromContent(),
@@ -97,7 +105,7 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
  */
 export function useTTSConversion(): UseTTSConversionResult {
   const stores = useStores();
-  const orchestratorRef = useRef<{ run: (input: OrchestratorInput, existingBook?: ProcessedBook | null) => Promise<void>; cancel: () => void } | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
    * Start conversion
@@ -107,7 +115,7 @@ export function useTTSConversion(): UseTTSConversionResult {
     existingBook?: ProcessedBook | null
   ) => {
     // Check if already processing
-    if (stores.conversion.isProcessing.value) {
+    if (isProcessing.value) {
       stores.logs.info('Conversion already in progress');
       return;
     }
@@ -115,25 +123,28 @@ export function useTTSConversion(): UseTTSConversionResult {
     // Build input snapshot from current store state
     const input = buildInput(stores, text);
 
-    // Get orchestrator services bundle and create new orchestrator
+    // Create abort controller for this conversion
+    abortControllerRef.current = new AbortController();
+
+    // Get orchestrator services bundle
     const orchestratorServices = getOrchestratorServices();
-    orchestratorRef.current = createConversionOrchestrator(orchestratorServices, stores);
 
     // Start keep-awake to prevent background throttling
     const keepAwake = getKeepAwake();
     await keepAwake.start();
 
     try {
-      await orchestratorRef.current.run(input, existingBook);
+      await runConversion(orchestratorServices, stores, abortControllerRef.current.signal, input, existingBook);
     } catch (error) {
       // Error is already logged by orchestrator
       // Just ensure we're not in processing state
-      if (stores.conversion.isProcessing.value) {
-        stores.conversion.setError((error as Error).message);
+      if (isProcessing.value) {
+        setError((error as Error).message);
       }
     } finally {
       // Stop keep-awake when conversion ends
       keepAwake.stop();
+      abortControllerRef.current = null;
     }
   }, [stores]);
 
@@ -141,9 +152,9 @@ export function useTTSConversion(): UseTTSConversionResult {
    * Cancel conversion
    */
   const cancel = useCallback(() => {
-    orchestratorRef.current?.cancel();
+    abortControllerRef.current?.abort();
     stores.logs.info('Conversion cancelled');
-  }, [stores]);
+  }, [stores.logs]);
 
   /**
    * Select directory for saving files
@@ -183,16 +194,16 @@ export function useTTSConversion(): UseTTSConversionResult {
       }
       return false;
     }
-  }, [stores]);
+  }, [stores.data, stores.logs]);
 
   return {
     startConversion,
     cancel,
     selectDirectory,
-    isProcessing: stores.conversion.isProcessing.value,
+    isProcessing: isProcessing.value,
     progress: {
-      current: stores.conversion.progress.value.current,
-      total: stores.conversion.progress.value.total,
+      current: progress.value.current,
+      total: progress.value.total,
     },
   };
 }

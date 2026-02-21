@@ -4,7 +4,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 import { defaultConfig } from '@/config';
-import type { ILogger } from './LoggerService';
+import type { LoggerService } from './LoggerService';
 import { buildFilterChain } from './audio/buildFilterChain';
 
 export type FFmpegProgressCallback = (message: string) => void;
@@ -49,7 +49,7 @@ export class FFmpegService {
   private loadPromise: Promise<boolean> | null = null;
   private loaded = false;
   private loadError: string | null = null;
-  private logger?: ILogger;
+  private logger?: LoggerService;
   private operationCount = 0;
   private readonly MAX_OPERATIONS_BEFORE_REFRESH = 10;
 
@@ -57,11 +57,11 @@ export class FFmpegService {
   private cachedCoreURL: string | null = null;
   private cachedWasmURL: string | null = null;
 
-  constructor(logger?: ILogger) {
+  constructor(logger?: LoggerService) {
     this.logger = logger;
   }
 
-  setLogger(logger: ILogger): void {
+  setLogger(logger: LoggerService): void {
     this.logger = logger;
   }
 

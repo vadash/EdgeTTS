@@ -146,4 +146,7 @@ export { FFmpegService } from './FFmpegService';
 export { TextBlockSplitter } from './TextBlockSplitter';
 export { VoicePoolBuilder } from './VoicePoolBuilder';
 export { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
-export type { ILogger } from './LoggerService';
+
+// Export orchestrator types and function
+export type { OrchestratorInput, ConversionOrchestratorServices, WorkflowProgress, StageLLMConfig } from './ConversionOrchestrator';
+export { runConversion } from './ConversionOrchestrator';

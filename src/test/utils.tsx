@@ -8,6 +8,11 @@ import { StoreProvider, createStores, Stores } from '@/stores';
 import { resetLogger, resetFFmpeg } from '@/services';
 import en from '@/i18n/en.json';
 
+// Import signal-based store actions for test setup
+import { patchSettings } from '@/stores/SettingsStore';
+import { updateProgress } from '@/stores/ConversionStore';
+import { setStageField } from '@/stores/LLMStore';
+
 export interface TestRenderOptions {
   stores?: Partial<TestStoresState>;
   locale?: 'en' | 'ru';
@@ -60,22 +65,26 @@ export function renderWithProviders(
   // Apply initial settings state
   if (options.stores?.settings) {
     const s = options.stores.settings;
-    if (s.voice !== undefined) stores.settings.voice.value = s.voice;
-    if (s.narratorVoice !== undefined) stores.settings.setNarratorVoice(s.narratorVoice);
-    if (s.rate !== undefined) stores.settings.setRate(s.rate);
-    if (s.pitch !== undefined) stores.settings.setPitch(s.pitch);
-    if (s.maxThreads !== undefined) stores.settings.setMaxThreads(s.maxThreads);
-    if (s.outputFormat !== undefined) stores.settings.setOutputFormat(s.outputFormat);
-    if (s.silenceRemovalEnabled !== undefined) stores.settings.setSilenceRemovalEnabled(s.silenceRemovalEnabled);
-    if (s.normalizationEnabled !== undefined) stores.settings.setNormalizationEnabled(s.normalizationEnabled);
-    if (s.lexxRegister !== undefined) stores.settings.lexxRegister.value = s.lexxRegister;
+    const settingsPatch: Record<string, unknown> = {};
+    if (s.voice !== undefined) settingsPatch.voice = s.voice;
+    if (s.narratorVoice !== undefined) settingsPatch.narratorVoice = s.narratorVoice;
+    if (s.rate !== undefined) settingsPatch.rate = s.rate;
+    if (s.pitch !== undefined) settingsPatch.pitch = s.pitch;
+    if (s.maxThreads !== undefined) settingsPatch.ttsThreads = s.maxThreads;
+    if (s.outputFormat !== undefined) settingsPatch.outputFormat = s.outputFormat;
+    if (s.silenceRemovalEnabled !== undefined) settingsPatch.silenceRemovalEnabled = s.silenceRemovalEnabled;
+    if (s.normalizationEnabled !== undefined) settingsPatch.normalizationEnabled = s.normalizationEnabled;
+    if (s.lexxRegister !== undefined) settingsPatch.lexxRegister = s.lexxRegister;
+    if (Object.keys(settingsPatch).length > 0) {
+      patchSettings(settingsPatch);
+    }
   }
 
   // Apply initial conversion state
   if (options.stores?.conversion) {
     const c = options.stores.conversion;
     if (c.progress) {
-      stores.conversion.updateProgress(c.progress.current, c.progress.total);
+      updateProgress(c.progress.current, c.progress.total);
     }
   }
 
@@ -90,14 +99,14 @@ export function renderWithProviders(
   if (options.stores?.llm) {
     const l = options.stores.llm;
     if (l.apiUrl !== undefined) {
-      stores.llm.extract.value = { ...stores.llm.extract.value, apiUrl: l.apiUrl };
-      stores.llm.merge.value = { ...stores.llm.merge.value, apiUrl: l.apiUrl };
-      stores.llm.assign.value = { ...stores.llm.assign.value, apiUrl: l.apiUrl };
+      setStageField('extract', 'apiUrl', l.apiUrl);
+      setStageField('merge', 'apiUrl', l.apiUrl);
+      setStageField('assign', 'apiUrl', l.apiUrl);
     }
     if (l.model !== undefined) {
-      stores.llm.extract.value = { ...stores.llm.extract.value, model: l.model };
-      stores.llm.merge.value = { ...stores.llm.merge.value, model: l.model };
-      stores.llm.assign.value = { ...stores.llm.assign.value, model: l.model };
+      setStageField('extract', 'model', l.model);
+      setStageField('merge', 'model', l.model);
+      setStageField('assign', 'model', l.model);
     }
   }
 

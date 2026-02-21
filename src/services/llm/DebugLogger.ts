@@ -1,4 +1,4 @@
-import type { ILogger } from '../LoggerService';
+import type { LoggerService } from '../LoggerService';
 import type { PassType } from './LLMApiClient';
 
 /**
@@ -10,7 +10,7 @@ export class DebugLogger {
 
   constructor(
     private directoryHandle: FileSystemDirectoryHandle | null | undefined,
-    private logger?: ILogger
+    private logger?: LoggerService
   ) {}
 
   /** Save a JSON object to the logs/ subfolder */

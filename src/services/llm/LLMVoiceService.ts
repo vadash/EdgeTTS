@@ -3,7 +3,7 @@ import type {
   LLMCharacter,
   SpeakerAssignment,
 } from '@/state/types';
-import type { ILogger } from '../LoggerService';
+import type { LoggerService } from '../LoggerService';
 
 export type ProgressCallback = (current: number, total: number, message?: string) => void;
 import { defaultConfig } from '@/config';
@@ -105,7 +105,7 @@ export interface LLMVoiceServiceOptions {
   useVoting?: boolean;
   maxConcurrentRequests?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
-  logger: ILogger; // Required - prevents silent failures
+  logger: LoggerService; // Required - prevents silent failures
   // Optional separate config for merge stage
   mergeConfig?: {
     apiKey: string;
@@ -126,7 +126,7 @@ export class LLMVoiceService {
   private apiClient: LLMApiClient;
   private mergeApiClient: LLMApiClient;
   private abortController: AbortController | null = null;
-  private logger: ILogger;
+  private logger: LoggerService;
 
   constructor(options: LLMVoiceServiceOptions) {
     if (!options.logger) {

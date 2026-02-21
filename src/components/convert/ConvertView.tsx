@@ -5,12 +5,10 @@ import { TextEditor } from './TextEditor';
 import { VoiceReviewModal } from './VoiceReviewModal';
 import { ResumeModal } from './ResumeModal';
 import { StatusPanel } from '@/components/status';
-import { useLLM, useConversion } from '@/stores';
+import { pendingReview, confirmReview, cancelReview } from '@/stores';
+import { resumeInfo, confirmResume, cancelResume } from '@/stores';
 
 export function ConvertView() {
-  const llm = useLLM();
-  const conversion = useConversion();
-
   return (
     <div className="flex-1 flex flex-col md:flex-row gap-4 p-4 min-h-0">
       {/* Left Panel - Controls & Editor */}
@@ -41,19 +39,19 @@ export function ConvertView() {
       </div>
 
       {/* Voice Review Modal */}
-      {llm.pendingReview.value && (
+      {pendingReview.value && (
         <VoiceReviewModal
-          onConfirm={() => llm.confirmReview()}
-          onCancel={() => llm.cancelReview()}
+          onConfirm={() => confirmReview()}
+          onCancel={() => cancelReview()}
         />
       )}
 
       {/* Resume Modal */}
-      {conversion.resumeInfo.value && (
+      {resumeInfo.value && (
         <ResumeModal
-          info={conversion.resumeInfo.value}
-          onContinue={() => conversion.confirmResume()}
-          onCancel={() => conversion.cancelResume()}
+          info={resumeInfo.value}
+          onContinue={() => confirmResume()}
+          onCancel={() => cancelResume()}
         />
       )}
     </div>

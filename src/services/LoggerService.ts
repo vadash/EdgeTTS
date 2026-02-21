@@ -14,11 +14,15 @@ export interface LogEntry {
   data?: Record<string, unknown>;
 }
 
+/**
+ * Minimal logger interface for dependency injection
+ * Both LoggerService and LogStore implement this
+ */
 export interface ILogger {
-  debug(message: string, data?: Record<string, unknown>): void;
   info(message: string, data?: Record<string, unknown>): void;
   warn(message: string, data?: Record<string, unknown>): void;
   error(message: string, error?: Error, data?: Record<string, unknown>): void;
+  debug?(message: string, data?: Record<string, unknown>): void;
 }
 
 /**

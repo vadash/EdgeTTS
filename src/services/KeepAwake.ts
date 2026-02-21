@@ -4,19 +4,13 @@
 // 2. Web Locks API - prevents tab from being discarded
 // 3. Screen Wake Lock - prevents screen dimming (mobile)
 
-export interface IKeepAwake {
-  start(): Promise<void>;
-  stop(): void;
-  isActive(): boolean;
-}
-
 /**
  * KeepAwake uses multiple strategies to keep the browser active:
  * - AudioContext: Tricks browser into treating tab as "playing audio"
  * - Web Locks: Prevents tab from being discarded by browser
  * - Screen Wake Lock: Prevents screen from dimming (useful on mobile)
  */
-export class KeepAwake implements IKeepAwake {
+export class KeepAwake {
   private audioContext: AudioContext | null = null;
   private oscillator: OscillatorNode | null = null;
   private gainNode: GainNode | null = null;
@@ -157,7 +151,7 @@ export class KeepAwake implements IKeepAwake {
 // Singleton instance
 let keepAwakeInstance: KeepAwake | null = null;
 
-export function getKeepAwake(): IKeepAwake {
+export function getKeepAwake(): KeepAwake {
   if (!keepAwakeInstance) {
     keepAwakeInstance = new KeepAwake();
   }

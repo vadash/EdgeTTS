@@ -3,7 +3,7 @@ import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import { testConfig } from '../../test.config.local';
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 import type { TestFixture, ExpectedDialogue } from './fixtures';
-import type { ILogger } from '@/services/LoggerService';
+import type { LoggerService } from '@/services/LoggerService';
 import { speakerMatchesCharacter } from './fixtures';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -11,7 +11,7 @@ import * as path from 'path';
 /**
  * Console logger for tests
  */
-const testLogger: ILogger = {
+const testLogger: LoggerService = {
   debug: (message: string, data?: Record<string, unknown>) => console.log(`[DEBUG] ${message}`, data || ''),
   info: (message: string, data?: Record<string, unknown>) => console.log(`[INFO] ${message}`, data || ''),
   warn: (message: string, data?: Record<string, unknown>) => console.warn(`[WARN] ${message}`, data || ''),

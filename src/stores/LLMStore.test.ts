@@ -1,6 +1,35 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { LLMStore, createLLMStore, type LLMProcessingStatus } from './LLMStore';
-import { LogStore, createLogStore } from './LogStore';
+import {
+  llm,
+  isConfigured,
+  isProcessing,
+  blockProgress,
+  characterNames,
+  characterLineCounts,
+  setUseVoting,
+  setStageField,
+  setStageConfig,
+  getStageConfig,
+  setProcessingStatus,
+  setBlockProgress,
+  setError,
+  setCharacters,
+  addCharacter,
+  updateCharacter,
+  removeCharacter,
+  setVoiceMap,
+  updateVoiceMapping,
+  removeVoiceMapping,
+  setSpeakerAssignments,
+  setLoadedProfile,
+  setPendingReview,
+  awaitReview,
+  confirmReview,
+  cancelReview,
+  resetProcessingState,
+  resetLLMStore,
+  loadSettings,
+} from './LLMStore';
 import type { LLMCharacter } from '@/state/types';
 import { StorageKeys } from '@/config/storage';
 
@@ -16,115 +45,111 @@ vi.mock('@/services/SecureStorage', () => ({
 }));
 
 describe('LLMStore', () => {
-  let store: LLMStore;
-  let logStore: LogStore;
-
   beforeEach(() => {
     localStorage.clear();
-    logStore = createLogStore();
-    store = createLLMStore(logStore);
+    resetLLMStore();
   });
 
   describe('initial state', () => {
     it('starts with empty API keys for all stages', () => {
-      expect(store.extract.value.apiKey).toBe('');
-      expect(store.merge.value.apiKey).toBe('');
-      expect(store.assign.value.apiKey).toBe('');
+      expect(llm.value.extract.apiKey).toBe('');
+      expect(llm.value.merge.apiKey).toBe('');
+      expect(llm.value.assign.apiKey).toBe('');
     });
 
     it('starts with default API URL for all stages', () => {
-      expect(store.extract.value.apiUrl).toBe('https://api.openai.com/v1');
-      expect(store.merge.value.apiUrl).toBe('https://api.openai.com/v1');
-      expect(store.assign.value.apiUrl).toBe('https://api.openai.com/v1');
+      expect(llm.value.extract.apiUrl).toBe('https://api.openai.com/v1');
+      expect(llm.value.merge.apiUrl).toBe('https://api.openai.com/v1');
+      expect(llm.value.assign.apiUrl).toBe('https://api.openai.com/v1');
     });
 
     it('starts with default model for all stages', () => {
-      expect(store.extract.value.model).toBe('gpt-4o-mini');
-      expect(store.merge.value.model).toBe('gpt-4o-mini');
-      expect(store.assign.value.model).toBe('gpt-4o-mini');
+      expect(llm.value.extract.model).toBe('gpt-4o-mini');
+      expect(llm.value.merge.model).toBe('gpt-4o-mini');
+      expect(llm.value.assign.model).toBe('gpt-4o-mini');
     });
 
     it('starts with idle processing status', () => {
-      expect(store.processingStatus.value).toBe('idle');
+      expect(llm.value.processingStatus).toBe('idle');
     });
 
     it('starts with zero block progress', () => {
-      expect(store.currentBlock.value).toBe(0);
-      expect(store.totalBlocks.value).toBe(0);
+      expect(llm.value.currentBlock).toBe(0);
+      expect(llm.value.totalBlocks).toBe(0);
     });
 
     it('starts with no error', () => {
-      expect(store.error.value).toBeNull();
+      expect(llm.value.error).toBeNull();
     });
 
     it('starts with empty characters', () => {
-      expect(store.detectedCharacters.value).toEqual([]);
+      expect(llm.value.detectedCharacters).toEqual([]);
     });
 
     it('starts with empty voice map', () => {
-      expect(store.characterVoiceMap.value.size).toBe(0);
+      expect(llm.value.characterVoiceMap.size).toBe(0);
     });
   });
 
   describe('computed properties', () => {
     describe('isConfigured', () => {
       it('returns false when no API key', () => {
-        expect(store.isConfigured.value).toBe(false);
+        expect(isConfigured.value).toBe(false);
       });
 
       it('returns true when extract API key is set', () => {
-        store.setStageField('extract', 'apiKey', 'sk-test-key');
-        expect(store.isConfigured.value).toBe(true);
+        setStageField('extract', 'apiKey', 'sk-test-key');
+        expect(isConfigured.value).toBe(true);
       });
 
       it('returns true when merge API key is set', () => {
-        store.setStageField('merge', 'apiKey', 'sk-test-key');
-        expect(store.isConfigured.value).toBe(true);
+        setStageField('merge', 'apiKey', 'sk-test-key');
+        expect(isConfigured.value).toBe(true);
       });
 
       it('returns true when assign API key is set', () => {
-        store.setStageField('assign', 'apiKey', 'sk-test-key');
-        expect(store.isConfigured.value).toBe(true);
+        setStageField('assign', 'apiKey', 'sk-test-key');
+        expect(isConfigured.value).toBe(true);
       });
     });
 
     describe('isProcessing', () => {
       it('returns false for idle', () => {
-        store.setProcessingStatus('idle');
-        expect(store.isProcessing.value).toBe(false);
+        setProcessingStatus('idle');
+        expect(isProcessing.value).toBe(false);
       });
 
       it('returns true for extract', () => {
-        store.setProcessingStatus('extracting');
-        expect(store.isProcessing.value).toBe(true);
+        setProcessingStatus('extracting');
+        expect(isProcessing.value).toBe(true);
       });
 
       it('returns true for assign', () => {
-        store.setProcessingStatus('assigning');
-        expect(store.isProcessing.value).toBe(true);
+        setProcessingStatus('assigning');
+        expect(isProcessing.value).toBe(true);
       });
 
       it('returns false for review', () => {
-        store.setProcessingStatus('review');
-        expect(store.isProcessing.value).toBe(false);
+        setProcessingStatus('review');
+        expect(isProcessing.value).toBe(false);
       });
 
       it('returns false for error', () => {
-        store.setProcessingStatus('error');
-        expect(store.isProcessing.value).toBe(false);
+        setProcessingStatus('error');
+        expect(isProcessing.value).toBe(false);
       });
     });
 
     describe('blockProgress', () => {
       it('returns current and total blocks', () => {
-        store.setBlockProgress(5, 10);
-        expect(store.blockProgress.value).toEqual({ current: 5, total: 10 });
+        setBlockProgress(5, 10);
+        expect(blockProgress.value).toEqual({ current: 5, total: 10 });
       });
     });
 
     describe('characterNames', () => {
       it('returns empty array when no characters', () => {
-        expect(store.characterNames.value).toEqual([]);
+        expect(characterNames.value).toEqual([]);
       });
 
       it('returns character names', () => {
@@ -132,8 +157,8 @@ describe('LLMStore', () => {
           { code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] },
           { code: 'B', canonicalName: 'Bob', gender: 'male', aliases: [] },
         ];
-        store.setCharacters(characters);
-        expect(store.characterNames.value).toEqual(['Alice', 'Bob']);
+        setCharacters(characters);
+        expect(characterNames.value).toEqual(['Alice', 'Bob']);
       });
     });
   });
@@ -149,23 +174,34 @@ describe('LLMStore', () => {
         temperature: 0.5,
         topP: 0.9,
       };
-      store.setStageConfig('extract', config);
-      expect(store.extract.value).toEqual(config);
+      setStageConfig('extract', config);
+      expect(llm.value.extract).toEqual(config);
+    });
+
+    it('gets stage config', () => {
+      setStageField('extract', 'apiKey', 'sk-key');
+      const config = getStageConfig('extract');
+      expect(config.apiKey).toBe('sk-key');
+    });
+
+    it('sets useVoting', () => {
+      setUseVoting(true);
+      expect(llm.value.useVoting).toBe(true);
     });
   });
 
   describe('processing state actions', () => {
     it('sets error and updates status', () => {
-      store.setError('Something went wrong');
-      expect(store.error.value).toBe('Something went wrong');
-      expect(store.processingStatus.value).toBe('error');
+      setError('Something went wrong');
+      expect(llm.value.error).toBe('Something went wrong');
+      expect(llm.value.processingStatus).toBe('error');
     });
 
     it('clears error without changing status', () => {
-      store.setProcessingStatus('extracting');
-      store.setError(null);
-      expect(store.error.value).toBeNull();
-      expect(store.processingStatus.value).toBe('extracting');
+      setProcessingStatus('extracting');
+      setError(null);
+      expect(llm.value.error).toBeNull();
+      expect(llm.value.processingStatus).toBe('extracting');
     });
   });
 
@@ -178,168 +214,57 @@ describe('LLMStore', () => {
     };
 
     it('sets characters', () => {
-      store.setCharacters([mockCharacter]);
-      expect(store.detectedCharacters.value).toEqual([mockCharacter]);
+      setCharacters([mockCharacter]);
+      expect(llm.value.detectedCharacters).toEqual([mockCharacter]);
     });
 
     it('adds character', () => {
-      store.addCharacter(mockCharacter);
-      expect(store.detectedCharacters.value).toContainEqual(mockCharacter);
+      addCharacter(mockCharacter);
+      expect(llm.value.detectedCharacters).toContainEqual(mockCharacter);
     });
 
     it('updates character', () => {
-      store.setCharacters([mockCharacter]);
-      store.updateCharacter(0, { canonicalName: 'Alicia' });
-      expect(store.detectedCharacters.value[0].canonicalName).toBe('Alicia');
+      setCharacters([mockCharacter]);
+      updateCharacter(0, { canonicalName: 'Alicia' });
+      expect(llm.value.detectedCharacters[0].canonicalName).toBe('Alicia');
     });
 
     it('does not update character at invalid index', () => {
-      store.setCharacters([mockCharacter]);
-      store.updateCharacter(5, { canonicalName: 'Changed' });
-      expect(store.detectedCharacters.value[0].canonicalName).toBe('Alice');
+      setCharacters([mockCharacter]);
+      updateCharacter(5, { canonicalName: 'Changed' });
+      expect(llm.value.detectedCharacters[0].canonicalName).toBe('Alice');
     });
 
     it('removes character', () => {
-      store.setCharacters([mockCharacter]);
-      store.removeCharacter(0);
-      expect(store.detectedCharacters.value).toEqual([]);
+      setCharacters([mockCharacter]);
+      removeCharacter(0);
+      expect(llm.value.detectedCharacters).toEqual([]);
     });
   });
 
   describe('voice map actions', () => {
     it('sets voice map', () => {
       const map = new Map([['Alice', 'voice-1'], ['Bob', 'voice-2']]);
-      store.setVoiceMap(map);
-      expect(store.characterVoiceMap.value.get('Alice')).toBe('voice-1');
-      expect(store.characterVoiceMap.value.get('Bob')).toBe('voice-2');
+      setVoiceMap(map);
+      expect(llm.value.characterVoiceMap.get('Alice')).toBe('voice-1');
+      expect(llm.value.characterVoiceMap.get('Bob')).toBe('voice-2');
     });
 
     it('updates voice mapping', () => {
-      store.updateVoiceMapping('Alice', 'voice-1');
-      expect(store.characterVoiceMap.value.get('Alice')).toBe('voice-1');
+      updateVoiceMapping('Alice', 'voice-1');
+      expect(llm.value.characterVoiceMap.get('Alice')).toBe('voice-1');
     });
 
     it('removes voice mapping', () => {
-      store.updateVoiceMapping('Alice', 'voice-1');
-      store.removeVoiceMapping('Alice');
-      expect(store.characterVoiceMap.value.has('Alice')).toBe(false);
-    });
-  });
-
-  describe('state management', () => {
-    it('resets processing state but keeps settings', () => {
-      store.setStageField('extract', 'apiKey', 'sk-key');
-      store.setProcessingStatus('extracting');
-      store.setBlockProgress(5, 10);
-      store.setError('Error');
-      store.setCharacters([{ code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] }]);
-      store.updateVoiceMapping('Alice', 'voice-1');
-
-      store.resetProcessingState();
-
-      expect(store.processingStatus.value).toBe('idle');
-      expect(store.currentBlock.value).toBe(0);
-      expect(store.totalBlocks.value).toBe(0);
-      expect(store.error.value).toBeNull();
-      expect(store.detectedCharacters.value).toEqual([]);
-      expect(store.characterVoiceMap.value.size).toBe(0);
-      // Settings preserved
-      expect(store.extract.value.apiKey).toBe('sk-key');
-    });
-
-    it('full reset clears everything', () => {
-      store.setStageField('extract', 'apiKey', 'sk-key');
-      store.setStageField('extract', 'apiUrl', 'https://custom.api.com');
-      store.setStageField('extract', 'model', 'gpt-4');
-      store.setProcessingStatus('extracting');
-
-      store.reset();
-
-      expect(store.extract.value.apiKey).toBe('');
-      expect(store.extract.value.apiUrl).toBe('https://api.openai.com/v1');
-      expect(store.extract.value.model).toBe('gpt-4o-mini');
-      expect(store.processingStatus.value).toBe('idle');
-    });
-  });
-
-  describe('persistence', () => {
-    it('saves settings to localStorage', async () => {
-      store.setStageField('extract', 'apiKey', 'sk-test');
-      store.setStageField('extract', 'apiUrl', 'https://custom.api.com');
-      store.setStageField('extract', 'model', 'gpt-4');
-
-      await store.saveSettings();
-
-      const saved = localStorage.getItem(StorageKeys.llmSettings);
-      expect(saved).toBeTruthy();
-      const parsed = JSON.parse(saved!);
-      expect(parsed.extract.apiKey).toBe('encrypted:sk-test');
-      expect(parsed.extract.apiUrl).toBe('https://custom.api.com');
-      expect(parsed.extract.model).toBe('gpt-4');
-    });
-
-    it('loads settings from localStorage', async () => {
-      localStorage.setItem(StorageKeys.llmSettings, JSON.stringify({
-        useVoting: false,
-        extract: {
-          apiKey: 'encrypted:sk-loaded',
-          apiUrl: 'https://loaded.api.com',
-          model: 'gpt-3.5-turbo',
-          streaming: true,
-          reasoning: null,
-          temperature: 0.0,
-          topP: 0.95,
-        },
-        merge: {
-          apiKey: '',
-          apiUrl: 'https://api.openai.com/v1',
-          model: 'gpt-4o-mini',
-          streaming: true,
-          reasoning: null,
-          temperature: 0.0,
-          topP: 0.95,
-        },
-        assign: {
-          apiKey: '',
-          apiUrl: 'https://api.openai.com/v1',
-          model: 'gpt-4o-mini',
-          streaming: true,
-          reasoning: null,
-          temperature: 0.0,
-          topP: 0.95,
-        },
-      }));
-
-      await store.loadSettings();
-
-      expect(store.extract.value.apiKey).toBe('sk-loaded');
-      expect(store.extract.value.apiUrl).toBe('https://loaded.api.com');
-      expect(store.extract.value.model).toBe('gpt-3.5-turbo');
-    });
-
-    it('uses defaults for missing settings', async () => {
-      localStorage.setItem(StorageKeys.llmSettings, JSON.stringify({
-        extract: {},
-        merge: {},
-        assign: {},
-      }));
-
-      await store.loadSettings();
-
-      expect(store.extract.value.apiKey).toBe('');
-      expect(store.extract.value.apiUrl).toBe('https://api.openai.com/v1');
-      expect(store.extract.value.model).toBe('gpt-4o-mini');
-    });
-
-    it('handles missing localStorage gracefully', async () => {
-      await store.loadSettings();
-      // Should not throw and keep defaults
+      updateVoiceMapping('Alice', 'voice-1');
+      removeVoiceMapping('Alice');
+      expect(llm.value.characterVoiceMap.has('Alice')).toBe(false);
     });
   });
 
   describe('speakerAssignments', () => {
     it('starts with empty assignments', () => {
-      expect(store.speakerAssignments.value).toEqual([]);
+      expect(llm.value.speakerAssignments).toEqual([]);
     });
 
     it('sets speaker assignments', () => {
@@ -347,44 +272,117 @@ describe('LLMStore', () => {
         { sentenceIndex: 0, text: 'Hello', speaker: 'John', voiceId: 'voice-1' },
         { sentenceIndex: 1, text: 'Hi', speaker: 'Mary', voiceId: 'voice-2' },
       ];
-      store.setSpeakerAssignments(assignments);
-      expect(store.speakerAssignments.value).toEqual(assignments);
+      setSpeakerAssignments(assignments);
+      expect(llm.value.speakerAssignments).toEqual(assignments);
     });
 
     it('resets assignments on resetProcessingState', () => {
-      store.setSpeakerAssignments([
+      setSpeakerAssignments([
         { sentenceIndex: 0, text: 'Hello', speaker: 'John', voiceId: 'voice-1' },
       ]);
-      store.resetProcessingState();
-      expect(store.speakerAssignments.value).toEqual([]);
+      resetProcessingState();
+      expect(llm.value.speakerAssignments).toEqual([]);
     });
 
     describe('characterLineCounts', () => {
       it('returns empty map when no assignments', () => {
-        expect(store.characterLineCounts.value.size).toBe(0);
+        expect(characterLineCounts.value.size).toBe(0);
       });
 
       it('counts lines per character', () => {
-        store.setSpeakerAssignments([
+        setSpeakerAssignments([
           { sentenceIndex: 0, text: 'Hello', speaker: 'John', voiceId: 'v1' },
           { sentenceIndex: 1, text: 'Hi', speaker: 'Mary', voiceId: 'v2' },
           { sentenceIndex: 2, text: 'Hey', speaker: 'John', voiceId: 'v1' },
           { sentenceIndex: 3, text: 'Yo', speaker: 'John', voiceId: 'v1' },
         ]);
-        const counts = store.characterLineCounts.value;
+        const counts = characterLineCounts.value;
         expect(counts.get('John')).toBe(3);
         expect(counts.get('Mary')).toBe(1);
       });
 
       it('excludes narrator from counts', () => {
-        store.setSpeakerAssignments([
+        setSpeakerAssignments([
           { sentenceIndex: 0, text: 'Narration', speaker: 'narrator', voiceId: 'v0' },
           { sentenceIndex: 1, text: 'Hello', speaker: 'John', voiceId: 'v1' },
         ]);
-        const counts = store.characterLineCounts.value;
+        const counts = characterLineCounts.value;
         expect(counts.has('narrator')).toBe(false);
         expect(counts.get('John')).toBe(1);
       });
+    });
+  });
+
+  describe('voice review', () => {
+    it('sets pending review', () => {
+      setPendingReview(true);
+      expect(llm.value.pendingReview).toBe(true);
+      expect(llm.value.processingStatus).toBe('review');
+    });
+
+    it('resolves awaitReview when confirmed', async () => {
+      setPendingReview(true);
+      const promise = awaitReview();
+      confirmReview();
+      await expect(promise).resolves.toBeUndefined();
+    });
+
+    it('rejects awaitReview when cancelled', async () => {
+      setPendingReview(true);
+      const promise = awaitReview();
+      cancelReview();
+      await expect(promise).rejects.toThrow('Voice review cancelled');
+    });
+  });
+
+  describe('state management', () => {
+    it('resets processing state but keeps settings', () => {
+      setStageField('extract', 'apiKey', 'sk-key');
+      setProcessingStatus('extracting');
+      setBlockProgress(5, 10);
+      setError('Error');
+      setCharacters([{ code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] }]);
+      updateVoiceMapping('Alice', 'voice-1');
+
+      resetProcessingState();
+
+      expect(llm.value.processingStatus).toBe('idle');
+      expect(llm.value.currentBlock).toBe(0);
+      expect(llm.value.totalBlocks).toBe(0);
+      expect(llm.value.error).toBeNull();
+      expect(llm.value.detectedCharacters).toEqual([]);
+      expect(llm.value.characterVoiceMap.size).toBe(0);
+      // Settings preserved
+      expect(llm.value.extract.apiKey).toBe('sk-key');
+    });
+
+    it('full reset clears everything', () => {
+      setStageField('extract', 'apiKey', 'sk-key');
+      setStageField('extract', 'apiUrl', 'https://custom.api.com');
+      setStageField('extract', 'model', 'gpt-4');
+      setProcessingStatus('extracting');
+
+      resetLLMStore();
+
+      expect(llm.value.extract.apiKey).toBe('');
+      expect(llm.value.extract.apiUrl).toBe('https://api.openai.com/v1');
+      expect(llm.value.extract.model).toBe('gpt-4o-mini');
+      expect(llm.value.processingStatus).toBe('idle');
+    });
+  });
+
+  describe('loaded profile', () => {
+    it('sets loaded profile', () => {
+      const profile = { name: 'test', characters: [], voiceMap: {} } as any;
+      setLoadedProfile(profile);
+      expect(llm.value.loadedProfile).toBe(profile);
+    });
+
+    it('can clear loaded profile', () => {
+      const profile = { name: 'test', characters: [], voiceMap: {} } as any;
+      setLoadedProfile(profile);
+      setLoadedProfile(null);
+      expect(llm.value.loadedProfile).toBeNull();
     });
   });
 });

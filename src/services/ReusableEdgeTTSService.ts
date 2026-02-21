@@ -6,7 +6,7 @@ import { generateConnectionId } from '../utils/uuid';
 import { defaultConfig } from '@/config';
 import { RetriableError } from '@/errors';
 import type { TTSConfig } from '../state/types';
-import type { ILogger } from './LoggerService';
+import type { LoggerService } from './LoggerService';
 
 // Windows epoch for Sec-MS-GEC generation
 const WIN_EPOCH = 11644473600;
@@ -44,7 +44,7 @@ export class ReusableEdgeTTSService {
   private socket: WebSocket | null = null;
   private state: ConnectionState = 'DISCONNECTED';
   private bytesDataSeparator: Uint8Array;
-  private logger?: ILogger;
+  private logger?: LoggerService;
 
   // Connection management
   private connectPromise: Promise<void> | null = null;
@@ -58,7 +58,7 @@ export class ReusableEdgeTTSService {
   private requestReject: ((error: Error) => void) | null = null;
   private requestTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(logger?: ILogger) {
+  constructor(logger?: LoggerService) {
     this.bytesDataSeparator = new TextEncoder().encode('Path:audio\r\n');
     this.logger = logger;
   }

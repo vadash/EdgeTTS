@@ -1,7 +1,7 @@
 // LLM Store
 // Manages LLM settings and character detection state
 
-import { signal, computed, effect } from '@preact/signals';
+import { signal, computed } from '@preact/signals';
 import type { LLMCharacter, SpeakerAssignment, VoiceProfileFile } from '@/state/types';
 import { encryptValue, decryptValue } from '@/services/SecureStorage';
 import type { LogStore } from './LogStore';
@@ -90,11 +90,27 @@ const defaultTransientState = {
 // Store Definition
 // ============================================================================
 
-// Root signal with default state
-const rootSignal = signal<LLMState>({
+export const llm = signal<LLMState>({
   ...defaultPersistedState,
   ...defaultTransientState,
 });
+
+// Export direct signal references for the orchestrator
+export const characterVoiceMap = computed(() => llm.value.characterVoiceMap);
+export const loadedProfile = computed(() => llm.value.loadedProfile);
+
+// Export computed for nested state access
+export const pendingReview = computed(() => llm.value.pendingReview);
+export const detectedCharacters = computed(() => llm.value.detectedCharacters);
+export const speakerAssignments = computed(() => llm.value.speakerAssignments);
+export const processingStatus = computed(() => llm.value.processingStatus);
+export const error = computed(() => llm.value.error);
+
+// Export computed for stage config access
+export const extract = computed(() => llm.value.extract);
+export const merge = computed(() => llm.value.merge);
+export const assign = computed(() => llm.value.assign);
+export const useVoting = computed(() => llm.value.useVoting);
 
 // Review promise resolvers (not persisted)
 let reviewResolver: (() => void) | null = null;
@@ -104,28 +120,28 @@ let reviewRejecter: ((reason: Error) => void) | null = null;
 // Computed Properties
 // ============================================================================
 
-const isConfiguredComputed = computed(() =>
-  rootSignal.value.extract.apiKey.length > 0 ||
-  rootSignal.value.merge.apiKey.length > 0 ||
-  rootSignal.value.assign.apiKey.length > 0
+export const isConfigured = computed(() =>
+  llm.value.extract.apiKey.length > 0 ||
+  llm.value.merge.apiKey.length > 0 ||
+  llm.value.assign.apiKey.length > 0
 );
 
-const isProcessingComputed = computed(() => {
-  const status = rootSignal.value.processingStatus;
+export const isProcessing = computed(() => {
+  const status = llm.value.processingStatus;
   return status === 'extracting' || status === 'assigning';
 });
 
-const blockProgressComputed = computed(() => ({
-  current: rootSignal.value.currentBlock,
-  total: rootSignal.value.totalBlocks,
+export const blockProgress = computed(() => ({
+  current: llm.value.currentBlock,
+  total: llm.value.totalBlocks,
 }));
 
-const characterNamesComputed = computed(() =>
-  rootSignal.value.detectedCharacters.map(c => c.canonicalName)
+export const characterNames = computed(() =>
+  llm.value.detectedCharacters.map(c => c.canonicalName)
 );
 
-const characterLineCountsComputed = computed(() => {
-  const assignments = rootSignal.value.speakerAssignments;
+export const characterLineCounts = computed(() => {
+  const assignments = llm.value.speakerAssignments;
   const counts = new Map<string, number>();
   for (const a of assignments) {
     if (a.speaker !== 'narrator') {
@@ -142,11 +158,7 @@ const characterLineCountsComputed = computed(() => {
 let savePending = false;
 let saveTimer: number | null = null;
 
-/**
- * Async save with encryption - debounced to batch rapid changes
- */
 async function saveSettings(): Promise<void> {
-  // Clear any pending save timer
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
@@ -155,18 +167,17 @@ async function saveSettings(): Promise<void> {
   savePending = true;
 
   try {
-    // Encrypt all API keys in parallel
     const [extractKey, mergeKey, assignKey] = await Promise.all([
-      encryptValue(rootSignal.value.extract.apiKey),
-      encryptValue(rootSignal.value.merge.apiKey),
-      encryptValue(rootSignal.value.assign.apiKey),
+      encryptValue(llm.value.extract.apiKey),
+      encryptValue(llm.value.merge.apiKey),
+      encryptValue(llm.value.assign.apiKey),
     ]);
 
     const settings: LLMSettings = {
-      useVoting: rootSignal.value.useVoting,
-      extract: { ...rootSignal.value.extract, apiKey: extractKey },
-      merge: { ...rootSignal.value.merge, apiKey: mergeKey },
-      assign: { ...rootSignal.value.assign, apiKey: assignKey },
+      useVoting: llm.value.useVoting,
+      extract: { ...llm.value.extract, apiKey: extractKey },
+      merge: { ...llm.value.merge, apiKey: mergeKey },
+      assign: { ...llm.value.assign, apiKey: assignKey },
     };
     localStorage.setItem(StorageKeys.llmSettings, JSON.stringify(settings));
   } finally {
@@ -174,9 +185,6 @@ async function saveSettings(): Promise<void> {
   }
 }
 
-/**
- * Debounced save - schedules a save if none pending
- */
 function scheduleSave(): void {
   if (!saveTimer) {
     saveTimer = window.setTimeout(() => {
@@ -186,26 +194,23 @@ function scheduleSave(): void {
   }
 }
 
-/**
- * Load settings from localStorage with decryption
- */
-async function loadSettings(logStore: LogStore): Promise<void> {
+export async function loadSettings(logStore: LogStore): Promise<void> {
   try {
     const saved = localStorage.getItem(StorageKeys.llmSettings);
     if (!saved) return;
 
     const settings: LLMSettings = JSON.parse(saved);
 
-    rootSignal.value = {
-      ...rootSignal.value,
+    llm.value = {
+      ...llm.value,
       useVoting: settings.useVoting ?? defaultPersistedState.useVoting,
     };
 
     for (const stage of ['extract', 'merge', 'assign'] as const) {
       if (settings[stage]) {
         const decryptedKey = await decryptValue(settings[stage].apiKey ?? '', logStore);
-        rootSignal.value = {
-          ...rootSignal.value,
+        llm.value = {
+          ...llm.value,
           [stage]: {
             apiKey: decryptedKey,
             apiUrl: settings[stage].apiUrl ?? defaultStageConfig.apiUrl,
@@ -229,103 +234,103 @@ async function loadSettings(logStore: LogStore): Promise<void> {
 
 // ============================================================================
 // Internal State Updates
-// ============================================================================>
+// ============================================================================
 
 function patchState(partial: Partial<LLMState>): void {
-  rootSignal.value = { ...rootSignal.value, ...partial };
+  llm.value = { ...llm.value, ...partial };
 }
 
 // ============================================================================
 // Public API - Settings Actions
 // ============================================================================
 
-function setUseVoting(value: boolean): void {
+export function setUseVoting(value: boolean): void {
   patchState({ useVoting: value });
   scheduleSave();
 }
 
-function setStageField<K extends keyof StageConfig>(
+export function setStageField<K extends keyof StageConfig>(
   stage: LLMStage,
   field: K,
   value: StageConfig[K]
 ): void {
-  const current = rootSignal.value[stage];
+  const current = llm.value[stage];
   patchState({ [stage]: { ...current, [field]: value } });
   scheduleSave();
 }
 
-function setStageConfig(stage: LLMStage, config: StageConfig): void {
+export function setStageConfig(stage: LLMStage, config: StageConfig): void {
   patchState({ [stage]: { ...config } });
   scheduleSave();
 }
 
-function getStageConfig(stage: LLMStage): StageConfig {
-  return rootSignal.value[stage];
+export function getStageConfig(stage: LLMStage): StageConfig {
+  return llm.value[stage];
 }
 
 // ============================================================================
 // Public API - Processing State Actions
 // ============================================================================
 
-function setProcessingStatus(status: LLMProcessingStatus): void {
+export function setProcessingStatus(status: LLMProcessingStatus): void {
   patchState({ processingStatus: status });
 }
 
-function setBlockProgress(current: number, total: number): void {
+export function setBlockProgress(current: number, total: number): void {
   patchState({ currentBlock: current, totalBlocks: total });
 }
 
-function setError(error: string | null): void {
-  patchState({ error, processingStatus: error ? 'error' : rootSignal.value.processingStatus });
+export function setError(error: string | null): void {
+  patchState({ error, processingStatus: error ? 'error' : llm.value.processingStatus });
 }
 
 // ============================================================================
 // Public API - Character Data Actions
 // ============================================================================
 
-function setCharacters(characters: LLMCharacter[]): void {
+export function setCharacters(characters: LLMCharacter[]): void {
   patchState({ detectedCharacters: characters });
 }
 
-function addCharacter(character: LLMCharacter): void {
-  patchState({ detectedCharacters: [...rootSignal.value.detectedCharacters, character] });
+export function addCharacter(character: LLMCharacter): void {
+  patchState({ detectedCharacters: [...llm.value.detectedCharacters, character] });
 }
 
-function updateCharacter(index: number, updates: Partial<LLMCharacter>): void {
-  const characters = [...rootSignal.value.detectedCharacters];
+export function updateCharacter(index: number, updates: Partial<LLMCharacter>): void {
+  const characters = [...llm.value.detectedCharacters];
   if (index >= 0 && index < characters.length) {
     characters[index] = { ...characters[index], ...updates };
     patchState({ detectedCharacters: characters });
   }
 }
 
-function removeCharacter(index: number): void {
-  const characters = [...rootSignal.value.detectedCharacters];
+export function removeCharacter(index: number): void {
+  const characters = [...llm.value.detectedCharacters];
   characters.splice(index, 1);
   patchState({ detectedCharacters: characters });
 }
 
-function setVoiceMap(map: Map<string, string>): void {
+export function setVoiceMap(map: Map<string, string>): void {
   patchState({ characterVoiceMap: new Map(map) });
 }
 
-function updateVoiceMapping(characterName: string, voiceId: string): void {
-  const map = new Map(rootSignal.value.characterVoiceMap);
+export function updateVoiceMapping(characterName: string, voiceId: string): void {
+  const map = new Map(llm.value.characterVoiceMap);
   map.set(characterName, voiceId);
   patchState({ characterVoiceMap: map });
 }
 
-function removeVoiceMapping(characterName: string): void {
-  const map = new Map(rootSignal.value.characterVoiceMap);
+export function removeVoiceMapping(characterName: string): void {
+  const map = new Map(llm.value.characterVoiceMap);
   map.delete(characterName);
   patchState({ characterVoiceMap: map });
 }
 
-function setSpeakerAssignments(assignments: SpeakerAssignment[]): void {
+export function setSpeakerAssignments(assignments: SpeakerAssignment[]): void {
   patchState({ speakerAssignments: assignments });
 }
 
-function setLoadedProfile(profile: VoiceProfileFile | null): void {
+export function setLoadedProfile(profile: VoiceProfileFile | null): void {
   patchState({ loadedProfile: profile });
 }
 
@@ -333,28 +338,28 @@ function setLoadedProfile(profile: VoiceProfileFile | null): void {
 // Public API - Voice Review Actions
 // ============================================================================
 
-function setPendingReview(value: boolean): void {
+export function setPendingReview(value: boolean): void {
   patchState({
     pendingReview: value,
-    processingStatus: value ? 'review' : rootSignal.value.processingStatus,
+    processingStatus: value ? 'review' : llm.value.processingStatus,
   });
 }
 
-function awaitReview(): Promise<void> {
+export function awaitReview(): Promise<void> {
   return new Promise((resolve, reject) => {
     reviewResolver = resolve;
     reviewRejecter = reject;
   });
 }
 
-function confirmReview(): void {
+export function confirmReview(): void {
   patchState({ pendingReview: false });
   reviewResolver?.();
   reviewResolver = null;
   reviewRejecter = null;
 }
 
-function cancelReview(): void {
+export function cancelReview(): void {
   patchState({ pendingReview: false });
   reviewRejecter?.(new Error('Voice review cancelled'));
   reviewResolver = null;
@@ -365,140 +370,23 @@ function cancelReview(): void {
 // Public API - State Management
 // ============================================================================
 
-function resetProcessingState(): void {
+export function resetProcessingState(): void {
   patchState({
     ...defaultTransientState,
-    // Preserve settings
-    useVoting: rootSignal.value.useVoting,
-    extract: rootSignal.value.extract,
-    merge: rootSignal.value.merge,
-    assign: rootSignal.value.assign,
+    useVoting: llm.value.useVoting,
+    extract: llm.value.extract,
+    merge: llm.value.merge,
+    assign: llm.value.assign,
   });
 }
 
-function reset(): void {
-  patchState({
-    ...defaultPersistedState,
-    ...defaultTransientState,
-  });
-}
-
-// ============================================================================
-// Legacy Class Wrapper
-// ============================================================================
-
-class PropertySignal<T> {
-  constructor(private fn: (s: LLMState) => T) {}
-
-  get value(): T {
-    return this.fn(rootSignal.value);
-  }
-  set value(_v: T) {}
-}
-
-class StagePropertySignal {
-  constructor(private stage: LLMStage) {}
-
-  get value(): StageConfig {
-    return rootSignal.value[this.stage];
-  }
-  set value(v: StageConfig) {
-    setStageConfig(this.stage, v);
-  }
-}
-
-export class LLMStore {
-  private readonly logStore: LogStore;
-
-  // Settings properties
-  readonly useVoting = new PropertySignal(s => s.useVoting);
-  readonly extract = new StagePropertySignal('extract');
-  readonly merge = new StagePropertySignal('merge');
-  readonly assign = new StagePropertySignal('assign');
-
-  // Processing state properties
-  readonly processingStatus = new PropertySignal(s => s.processingStatus);
-  readonly currentBlock = new PropertySignal(s => s.currentBlock);
-  readonly totalBlocks = new PropertySignal(s => s.totalBlocks);
-  readonly error = new PropertySignal(s => s.error);
-
-  // Character data properties
-  readonly detectedCharacters = new PropertySignal(s => s.detectedCharacters);
-  readonly characterVoiceMap = new PropertySignal(s => s.characterVoiceMap);
-  readonly speakerAssignments = new PropertySignal(s => s.speakerAssignments);
-  readonly loadedProfile = new PropertySignal(s => s.loadedProfile);
-
-  // Voice review state
-  readonly pendingReview = new PropertySignal(s => s.pendingReview);
-
-  // Computed
-  readonly isConfigured = isConfiguredComputed;
-  readonly isProcessing = isProcessingComputed;
-  readonly blockProgress = blockProgressComputed;
-  readonly characterNames = characterNamesComputed;
-  readonly characterLineCounts = characterLineCountsComputed;
-
-  constructor(logStore: LogStore) {
-    this.logStore = logStore;
-  }
-
-  // Settings Actions
-  setUseVoting = setUseVoting;
-  setStageField = setStageField;
-  setStageConfig = setStageConfig;
-  getStageConfig = getStageConfig;
-
-  // Processing State Actions
-  setProcessingStatus = setProcessingStatus;
-  setBlockProgress = setBlockProgress;
-  setError = setError;
-
-  // Character Data Actions
-  setCharacters = setCharacters;
-  addCharacter = addCharacter;
-  updateCharacter = updateCharacter;
-  removeCharacter = removeCharacter;
-  setVoiceMap = setVoiceMap;
-  updateVoiceMapping = updateVoiceMapping;
-  removeVoiceMapping = removeVoiceMapping;
-  setSpeakerAssignments = setSpeakerAssignments;
-  setLoadedProfile = setLoadedProfile;
-
-  // Voice Review Actions
-  setPendingReview = setPendingReview;
-  awaitReview = awaitReview;
-  confirmReview = confirmReview;
-  cancelReview = cancelReview;
-
-  // State Management
-  resetProcessingState = resetProcessingState;
-  reset = reset;
-
-  // Persistence
-  async saveSettings(): Promise<void> {
-    await saveSettings();
-  }
-
-  async loadSettings(): Promise<void> {
-    await loadSettings(this.logStore);
-  }
-}
-
-/**
- * Reset to defaults (for tests)
- */
 export function resetLLMStore(): void {
-  rootSignal.value = {
+  llm.value = {
     ...defaultPersistedState,
     ...defaultTransientState,
   };
 }
 
-export function createLLMStore(logStore: LogStore): LLMStore {
-  return new LLMStore(logStore);
+export function reset(): void {
+  resetLLMStore();
 }
-
-// Export for direct access
-export const llm = rootSignal;
-export const isConfigured = isConfiguredComputed;
-export const isProcessing = isProcessingComputed;

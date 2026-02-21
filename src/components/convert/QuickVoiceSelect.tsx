@@ -1,6 +1,7 @@
 import { signal, computed } from '@preact/signals';
 import { Text } from 'preact-i18n';
-import { useSettings, useData } from '@/stores';
+import { useData } from '@/stores';
+import { settings, patchSettings } from '@/stores';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
 import voices from '@/components/VoiceSelector/voices';
 
@@ -15,7 +16,6 @@ const SAMPLE_PHRASES = [
 const samplePhrase = signal<string>(SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)]);
 
 export function QuickVoiceSelect() {
-  const settings = useSettings();
   const data = useData();
   const preview = useVoicePreview();
 
@@ -34,8 +34,8 @@ export function QuickVoiceSelect() {
   const playVoiceSample = () => {
     preview.play(
       samplePhrase.value,
-      settings.narratorVoice.value,
-      { rate: settings.rate.value, pitch: settings.pitch.value }
+      settings.value.narratorVoice,
+      { rate: settings.value.rate, pitch: settings.value.pitch }
     );
   };
 
@@ -47,8 +47,8 @@ export function QuickVoiceSelect() {
       <div className="flex gap-2">
         <select
           className="select-field flex-1"
-          value={settings.narratorVoice.value}
-          onChange={(e) => settings.setNarratorVoice((e.target as HTMLSelectElement).value)}
+          value={settings.value.narratorVoice}
+          onChange={(e) => patchSettings({ narratorVoice: (e.target as HTMLSelectElement).value })}
         >
           {filteredVoices.value.map((v) => (
             v.isSeparator ? (
