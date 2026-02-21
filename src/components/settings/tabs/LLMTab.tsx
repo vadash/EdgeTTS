@@ -128,6 +128,67 @@ export function LLMTab() {
         <p><strong>Assign:</strong> <Text id="llm.assignDesc">Assigns speakers to sentences</Text></p>
       </div>
 
+      {/* Prompt Repetition Section */}
+      <div className="space-y-3 pt-4 border-t border-gray-700">
+        <div>
+          <h4 className="text-sm font-medium text-gray-300 flex items-center gap-2">
+            <span>🔄</span>
+            <Text id="llm.promptRepetition">Prompt Repetition</Text>
+          </h4>
+          <p className="text-xs text-gray-400 mt-1">
+            <Text id="llm.promptRepetitionDesc">
+              Duplicates user prompt for improved LLM accuracy. Adds ~20-30% processing time.
+            </Text>
+          </p>
+        </div>
+
+        {/* Per-stage toggles */}
+        <div className="grid grid-cols-3 gap-3">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={llm.extract.value.repeatPrompt}
+              onClick={() => handleStageFieldChange('extract', 'repeatPrompt', !llm.extract.value.repeatPrompt)}
+              className={`toggle ${llm.extract.value.repeatPrompt ? 'toggle-checked' : ''}`}
+            >
+              <span className={`toggle-thumb ${llm.extract.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`} />
+            </button>
+            <span className="text-sm text-gray-300">
+              <Text id="llm.extract">Extract</Text>
+            </span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={llm.merge.value.repeatPrompt}
+              onClick={() => handleStageFieldChange('merge', 'repeatPrompt', !llm.merge.value.repeatPrompt)}
+              className={`toggle ${llm.merge.value.repeatPrompt ? 'toggle-checked' : ''}`}
+            >
+              <span className={`toggle-thumb ${llm.merge.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`} />
+            </button>
+            <span className="text-sm text-gray-300">
+              <Text id="llm.merge">Merge</Text>
+            </span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={llm.assign.value.repeatPrompt}
+              onClick={() => handleStageFieldChange('assign', 'repeatPrompt', !llm.assign.value.repeatPrompt)}
+              className={`toggle ${llm.assign.value.repeatPrompt ? 'toggle-checked' : ''}`}
+            >
+              <span className={`toggle-thumb ${llm.assign.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`} />
+            </button>
+            <span className="text-sm text-gray-300">
+              <Text id="llm.assign">Assign</Text>
+            </span>
+          </label>
+        </div>
+      </div>
+
       {/* Stage Tabs */}
       <Tabs tabs={stageTabs} defaultTab="extract">
         {(activeTab) => (
