@@ -1,32 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { ExtractPromptStrategy, AssignPromptStrategy } from './PromptStrategy';
+import { parseExtractResponse, parseAssignResponse } from './PromptStrategy';
 
-describe('ExtractPromptStrategy.parseResponse', () => {
-  const strategy = new ExtractPromptStrategy();
-  const dummyContext = { textBlock: 'dummy' };
-
+describe('parseExtractResponse', () => {
   it('returns repaired characters when gender is missing', () => {
     const response = '{"characters":[{"canonicalName":"Erick","variations":["Erick"]}]}';
-    const result = strategy.parseResponse(response, dummyContext);
+    const result = parseExtractResponse(response);
     expect(result.characters[0].gender).toBe('unknown');
   });
 
   it('returns repaired characters when variations is null', () => {
     const response = '{"characters":[{"canonicalName":"Jane","variations":null}]}';
-    const result = strategy.parseResponse(response, dummyContext);
+    const result = parseExtractResponse(response);
     expect(result.characters[0].variations).toEqual(['Jane']);
   });
 
   it('drops characters with empty canonicalName', () => {
     const response = '{"characters":[{"canonicalName":""},{"canonicalName":"Erick","variations":["Erick"],"gender":"male"}]}';
-    const result = strategy.parseResponse(response, dummyContext);
+    const result = parseExtractResponse(response);
     expect(result.characters).toHaveLength(1);
     expect(result.characters[0].canonicalName).toBe('Erick');
   });
 
   it('passes through already-valid responses unchanged', () => {
     const response = '{"characters":[{"canonicalName":"Erick","variations":["Erick"],"gender":"male"}]}';
-    const result = strategy.parseResponse(response, dummyContext);
+    const result = parseExtractResponse(response);
     expect(result.characters[0]).toEqual({
       canonicalName: 'Erick',
       variations: ['Erick'],
@@ -35,8 +32,7 @@ describe('ExtractPromptStrategy.parseResponse', () => {
   });
 });
 
-describe('AssignPromptStrategy.parseResponse', () => {
-  const strategy = new AssignPromptStrategy();
+describe('parseAssignResponse', () => {
   const codeToName = new Map([
     ['A', 'Erick'],
     ['B', 'Jane'],
@@ -52,7 +48,7 @@ describe('AssignPromptStrategy.parseResponse', () => {
 
   it('parses valid assign response', () => {
     const response = '0:A\n1:B\n2:A\n3:C';
-    const result = strategy.parseResponse(response, context);
+    const result = parseAssignResponse(response, context);
     expect(result.speakerMap.get(0)).toBe('Erick');
     expect(result.speakerMap.get(1)).toBe('Jane');
     expect(result.speakerMap.get(2)).toBe('Erick');
@@ -61,7 +57,7 @@ describe('AssignPromptStrategy.parseResponse', () => {
 
   it('filters out incomplete lines like "7"', () => {
     const response = '0:A\n1:B\n2:A\n7';
-    const result = strategy.parseResponse(response, context);
+    const result = parseAssignResponse(response, context);
     expect(result.speakerMap.get(0)).toBe('Erick');
     expect(result.speakerMap.get(1)).toBe('Jane');
     expect(result.speakerMap.get(2)).toBe('Erick');
@@ -70,7 +66,7 @@ describe('AssignPromptStrategy.parseResponse', () => {
 
   it('filters out incomplete lines like "15:"', () => {
     const response = '0:A\n1:B\n15:';
-    const result = strategy.parseResponse(response, context);
+    const result = parseAssignResponse(response, context);
     expect(result.speakerMap.get(0)).toBe('Erick');
     expect(result.speakerMap.get(1)).toBe('Jane');
     expect(result.speakerMap.get(15)).toBeUndefined(); // Incomplete line filtered
@@ -78,7 +74,7 @@ describe('AssignPromptStrategy.parseResponse', () => {
 
   it('handles lines with brackets', () => {
     const response = '[0]:A\n[1]:B\n[2]:C';
-    const result = strategy.parseResponse(response, context);
+    const result = parseAssignResponse(response, context);
     expect(result.speakerMap.get(0)).toBe('Erick');
     expect(result.speakerMap.get(1)).toBe('Jane');
     expect(result.speakerMap.get(2)).toBe('System');
@@ -86,7 +82,7 @@ describe('AssignPromptStrategy.parseResponse', () => {
 
   it('strips thinking tags', () => {
     const response = '<thinking>\nReasoning here\n</thinking>\n0:A\n1:B';
-    const result = strategy.parseResponse(response, context);
+    const result = parseAssignResponse(response, context);
     expect(result.speakerMap.get(0)).toBe('Erick');
     expect(result.speakerMap.get(1)).toBe('Jane');
   });

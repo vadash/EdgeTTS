@@ -1,13 +1,13 @@
 // PromptStrategy.ts - LLM Prompt building, validation, and parsing
-// Functions for character extraction, merging, and speaker assignment
+// Pure functions for character extraction, merging, and speaker assignment
 
 import type { LLMPrompt } from './LLMApiClient';
 import type { LLMCharacter, LLMValidationResult, ExtractResponse } from '@/state/types';
 import { LLM_PROMPTS } from '@/config/prompts';
 import {
-  validateExtractResponse,
-  validateMergeResponse,
-  validateAssignResponse,
+  validateExtractResponse as validateExtractResp,
+  validateMergeResponse as validateMergeResp,
+  validateAssignResponse as validateAssignResp,
   parseAssignResponse as parseAssignResponseInternal,
   parseMergeResponse as parseMergeResponseInternal,
   repairExtractCharacters,
@@ -37,16 +37,6 @@ export interface AssignContext {
 
 export interface AssignResult {
   speakerMap: Map<number, string>;
-}
-
-// ============================================================================
-// Strategy Interface (for testability)
-// ============================================================================
-
-export interface IPromptStrategy<TContext, TResult> {
-  buildPrompt(context: TContext): LLMPrompt;
-  validateResponse(response: string, context: TContext): LLMValidationResult;
-  parseResponse(response: string, context: TContext): TResult;
 }
 
 // ============================================================================
@@ -118,7 +108,7 @@ export function parseExtractResponse(response: string): ExtractResponse {
 }
 
 export function parseMergeResponse(response: string, context: MergeContext): number[][] {
-  const validation = validateMergeResponse(response, context.characters);
+  const validation = validateMergeResp(response, context.characters);
   const finalResponse = validation.repairedResponse || response;
   return parseMergeResponseInternal(finalResponse);
 }
@@ -126,58 +116,9 @@ export function parseMergeResponse(response: string, context: MergeContext): num
 export function parseAssignResponse(response: string, context: AssignContext): AssignResult {
   const validCodes = new Set(context.codeToName.keys());
   const repaired = repairAssignResponse(response, validCodes);
-  const validation = validateAssignResponse(response, context.sentenceCount, context.codeToName);
+  const validation = validateAssignResp(response, context.sentenceCount, context.codeToName);
   const finalResponse = validation.repairedResponse || repaired;
   return {
     speakerMap: parseAssignResponseInternal(finalResponse, context.codeToName),
   };
 }
-
-// ============================================================================
-// Default Strategy Implementations (function objects for testability)
-// ============================================================================
-
-export const extractStrategy: IPromptStrategy<ExtractContext, ExtractResponse> = {
-  buildPrompt: (ctx) => buildExtractPrompt(ctx.textBlock),
-  validateResponse: (res) => validateExtractResponse(res),
-  parseResponse: (res) => parseExtractResponse(res),
-};
-
-export const mergeStrategy: IPromptStrategy<MergeContext, number[][]> = {
-  buildPrompt: (ctx) => buildMergePrompt(ctx.characters),
-  validateResponse: (res, ctx) => validateMergeResponse(res, ctx.characters),
-  parseResponse: (res, ctx) => parseMergeResponse(res, ctx),
-};
-
-export const assignStrategy: IPromptStrategy<AssignContext, AssignResult> = {
-  buildPrompt: (ctx) => buildAssignPrompt(ctx.characters, ctx.nameToCode, ctx.numberedParagraphs),
-  validateResponse: (res, ctx) => validateAssignResponse(res, ctx.sentenceCount, ctx.codeToName),
-  parseResponse: (res, ctx) => parseAssignResponse(res, ctx),
-};
-
-export function createDefaultStrategies() {
-  return {
-    extract: extractStrategy,
-    merge: mergeStrategy,
-    assign: assignStrategy,
-  };
-}
-
-// Backward compatibility exports (classes were removed)
-export const ExtractPromptStrategy = class implements IPromptStrategy<ExtractContext, ExtractResponse> {
-  buildPrompt = extractStrategy.buildPrompt;
-  validateResponse = extractStrategy.validateResponse;
-  parseResponse = extractStrategy.parseResponse;
-};
-
-export const MergePromptStrategy = class implements IPromptStrategy<MergeContext, number[][]> {
-  buildPrompt = mergeStrategy.buildPrompt;
-  validateResponse = mergeStrategy.validateResponse;
-  parseResponse = mergeStrategy.parseResponse;
-};
-
-export const AssignPromptStrategy = class implements IPromptStrategy<AssignContext, AssignResult> {
-  buildPrompt = assignStrategy.buildPrompt;
-  validateResponse = assignStrategy.validateResponse;
-  parseResponse = assignStrategy.parseResponse;
-};
