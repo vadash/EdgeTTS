@@ -3,7 +3,7 @@
 // Supports Opus encoding with silence removal and normalization
 
 import { defaultConfig } from '@/config';
-import { sanitizeFilename } from '@/utils/fileUtils';
+import { sanitizeFilename } from '@/utils/file';
 import { parseMP3Duration } from './MP3Parser';
 import { withPermissionRetry } from '@/utils/retry';
 import type { FFmpegService } from './FFmpegService';
