@@ -23,6 +23,7 @@ export interface StageConfig {
   reasoning: ReasoningLevel | null;
   temperature: number;
   topP: number;
+  repeatPrompt: boolean;
 }
 
 interface LLMSettings {
@@ -65,6 +66,7 @@ const defaultStageConfig: StageConfig = {
   reasoning: null,
   temperature: 0.0,
   topP: 0.95,
+  repeatPrompt: false,
 };
 
 const defaultPersistedState: LLMSettings = {
@@ -219,6 +221,7 @@ export async function loadSettings(logStore: LoggerStore): Promise<void> {
             reasoning: settings[stage].reasoning ?? defaultStageConfig.reasoning,
             temperature: settings[stage].temperature ?? defaultStageConfig.temperature,
             topP: settings[stage].topP ?? defaultStageConfig.topP,
+            repeatPrompt: settings[stage].repeatPrompt ?? defaultStageConfig.repeatPrompt,
           },
         };
       }
