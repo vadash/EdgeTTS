@@ -86,15 +86,18 @@ Note: Keys are strings (JSON object limitation), cast to numbers during parsing.
 
 ## 4. Data Models / Schema
 
-### Zod Schemas
+### Zod Schemas (Zod v4)
 
 ```typescript
 // src/services/llm/schemas.ts
 import { z } from 'zod';
 
-// Base schema with optional reasoning field
+// Base schema with nullable reasoning field
+// CRITICAL: .nullable() not .optional() for OpenAI strict: true compatibility
+// .optional() omits from required array, breaking strict mode
+// Use .transform() to convert null → undefined for clean domain types
 const baseSchema = z.object({
-  reasoning: z.string().optional(),
+  reasoning: z.string().nullable().transform(v => v ?? undefined),
 });
 
 // Extract stage
@@ -116,8 +119,9 @@ export const MergeSchema = baseSchema.extend({
 });
 
 // Assign stage
+// NOTE: z.record() requires 2 args in Zod 4 (single-arg form removed)
 export const AssignSchema = baseSchema.extend({
-  assignments: z.record(z.string()), // Sparse: {"0": "A", "5": "B"}
+  assignments: z.record(z.string(), z.string()), // Sparse: {"0": "A", "5": "B"}
 });
 
 // Type exports
@@ -126,13 +130,16 @@ export type MergeResponse = z.infer<typeof MergeSchema>;
 export type AssignResponse = z.infer<typeof AssignSchema>;
 ```
 
-### Zod to JSON Schema Conversion
+### Zod to JSON Schema Conversion (Zod v4 Native)
 
 ```typescript
 // src/services/llm/schemaUtils.ts
 import { z } from 'zod';
 
-export function zodToJsonSchema(schema: z.ZodType, schemaName: string): {
+export function zodToJsonSchema<T>(
+  schema: z.ZodType<T>,
+  schemaName: string
+): {
   type: 'json_schema';
   json_schema: {
     name: string;
@@ -145,18 +152,19 @@ export function zodToJsonSchema(schema: z.ZodType, schemaName: string): {
     json_schema: {
       name: schemaName,
       strict: true,
-      schema: schemaToOpenAISchema(schema),
+      // Zod 4 has native toJSONSchema() - no external package needed
+      // target: 'draft-7' ensures compatibility with OpenAI's expectations
+      // (default Draft 2020-12 may use keywords OpenAI doesn't recognize)
+      schema: z.toJSONSchema(schema, { target: 'draft-7' }),
     },
   };
 }
-
-// Use zod-to-json-schema library or manual conversion
-function schemaToOpenAISchema(schema: z.ZodType): Record<string, unknown> {
-  // Zod's .toJSON() or use zod-to-json-schema package
-  const zodJsonSchema = z.ZodSchema.prototype.toJSON.call(schema);
-  return zodJsonSchema as Record<string, unknown>;
-}
 ```
+
+**Key Zod v4 changes:**
+- Native `z.toJSONSchema()` eliminates `zod-to-json-schema` dependency
+- `target: 'draft-7'` option for OpenAI compatibility
+- Sets `additionalProperties: false` on all objects by default (required for `strict: true`)
 
 ### Request Body Structure
 
@@ -231,12 +239,25 @@ export class LLMApiClient {
 
     // ... API call ...
 
-    const content = response.choices[0]?.message?.content || '';
+    const message = response.choices[0]?.message;
+
+    // Check for refusal (content policy triggers)
+    if (message?.refusal) {
+      throw new Error(`LLM refused: ${message.refusal}`);
+    }
+
+    const content = message?.content;
+    if (!content) {
+      throw new Error('Empty response from LLM');
+    }
+
     const parsed = JSON.parse(content);
     return schema.parse(parsed); // Zod runtime validation
   }
 }
 ```
+
+**Refusal handling:** OpenAI structured outputs can return a `refusal` field instead of `content` when content policy is triggered. This is checked before parsing content.
 
 ### Simplified PromptStrategy
 
@@ -339,38 +360,56 @@ async assignSpeakers(...): Promise<Map<number, string>> {
 ### Dependencies
 
 ```bash
-npm install zod
-npm install zod-to-json-schema  # or manual conversion
-npm uninstall jsonrepair  # No longer needed
+# Install Zod v4
+npm install zod@^4
+
+# Remove - no longer needed
+npm uninstall jsonrepair
 ```
+
+**Note:** `zod-to-json-schema` is NOT needed - Zod 4 has native `toJSONSchema()`.
 
 ## 7. Risks & Edge Cases
 
 | Risk | Mitigation |
 |---|---|
-| Provider doesn't support `json_schema` | Design choice: require provider support. Add API capability check and fail fast with clear error. |
-| Structured outputs degrade reasoning quality | Added `reasoning` field to schema - LLM can think before outputting structured answer. |
-| `strict: true` causes failures on some providers | Test with target providers; may need `strict: false` fallback for some (Mistral, etc.). |
-| Streaming disabled (structured outputs require non-streaming) | Accept tradeoff: structured outputs > streaming for reliability. |
+| Provider doesn't support `json_schema` | **Fail hard:** Design requires provider support. Throw clear error on structured output failure. |
+| Content policy refusal | Check `message.refusal` and throw immediately with refusal message. |
+| `strict: true` schema rejection | Ensure `.nullable()` not `.optional()` for reasoning field. Use `target: 'draft-7'` in `toJSONSchema()`. |
+| Structured outputs degrade reasoning quality | LLM can still think - prompt to use `reasoning` field (or `null` if not needed). |
+| `z.record()` single-arg form | Zod 4 removed single-arg form - must use `z.record(keySchema, valueSchema)`. |
+| `ZodError` format changed | Use `z.treeifyError(err)` instead of deprecated `.format()` or `.flatten()`. |
+| `z.number().int()` safe integer limit | Zod 4 enforces `MAX_SAFE_INTEGER` - non-issue for audio sentence indices. |
+| Streaming disabled | Accept tradeoff: structured outputs > streaming for reliability. |
 | Zod runtime validation fails despite schema | Should never happen with `strict: true`, but Zod catches it - fail with clear error. |
 | Assign stage sparse object has string keys | Parse keys as integers; validate range against sentenceCount. |
 | Large outputs (500+ sentences) hit token limits | Already handled by current implementation; structured output doesn't change this. |
 
 ## 8. Migration Steps
 
-1. Add `zod` and `zod-to-json-schema` dependencies
-2. Create `schemas.ts` with all three schemas
-3. Create `schemaUtils.ts` for conversion
-4. Add `callStructured` method to `LLMApiClient`
-5. Migrate Extract stage first (easiest, already JSON)
-6. Migrate Merge stage
-7. Migrate Assign stage (format change)
-8. Delete `llmUtils.ts` and `ResponseValidators.ts`
-9. Update prompts to reference new schema structure
-10. Remove `jsonrepair` dependency
+1. Install Zod v4: `npm install zod@^4`
+2. Remove `jsonrepair`: `npm uninstall jsonrepair`
+3. Create `schemas.ts` with Zod v4 schemas (use `.nullable()` not `.optional()`)
+4. Create `schemaUtils.ts` using native `z.toJSONSchema()` with `target: 'draft-7'`
+5. Add `callStructured` method to `LLMApiClient` with refusal handling
+6. Migrate Extract stage first (easiest, already JSON)
+7. Migrate Merge stage
+8. Migrate Assign stage (format change)
+9. Delete `llmUtils.ts` and `ResponseValidators.ts`
+10. Update prompts to mention `null` for reasoning when not needed
 11. Test with real providers
 
-## 9. Code Reduction Estimate
+## 9. Zod v4 Migration Checklist
+
+- [ ] Change `reasoning: z.string().optional()` → `z.string().nullable().transform(v => v ?? undefined)`
+- [ ] Verify all `z.record()` calls use 2-arg form: `z.record(keySchema, valueSchema)`
+- [ ] Use `z.toJSONSchema(schema, { target: 'draft-7' })` in schemaUtils
+- [ ] Add refusal check: `if (message?.refusal) throw new Error(...)`
+- [ ] Update error handling to use `z.treeifyError(err)` if needed
+- [ ] Remove `zod-to-json-schema` dependency (if present)
+- [ ] Confirm `z.ZodType<T>` usage (no `z.ZodTypeAny`)
+
+## 10. Code Reduction Estimate
 
 | Component | Before | After | Savings |
 |-----------|--------|-------|---------|
@@ -378,5 +417,21 @@ npm uninstall jsonrepair  # No longer needed
 | `ResponseValidators.ts` | 350 lines | 0 lines (deleted) | -350 |
 | `PromptStrategy.ts` parsers | ~80 lines | ~30 lines | -50 |
 | `LLMApiClient.ts` | ~200 lines | ~180 lines | -20 |
-| New files (schemas, utils) | 0 lines | ~100 lines | +100 |
-| **Net** | **~670 lines** | **~310 lines** | **-360 lines (54% reduction)** |
+| New files (schemas, utils) | 0 lines | ~60 lines (no zod-to-json-schema) | +60 |
+| **Net** | **~670 lines** | **~270 lines** | **-400 lines (60% reduction)** |
+
+## 11. References
+
+- [Zod v4 JSON Schema](https://zod.dev/json-schema)
+- [Zod v4 Migration Guide](https://zod.dev/v4/changelog)
+- [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs/)
+- [Zod + OpenAI Strict Mode Guide](https://hooshmand.net/zod-zodresponseformat-structured-outputs-openai/)
+
+## 12. Implementation Plan
+
+See `docs/plans/2026-02-21-structured-outputs-plan.md` for the step-by-step TDD implementation plan.
+
+- [Zod v4 JSON Schema](https://zod.dev/json-schema)
+- [Zod v4 Migration Guide](https://zod.dev/v4/changelog)
+- [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs/)
+- [Zod + OpenAI Strict Mode Guide](https://hooshmand.net/zod-zodresponseformat-structured-outputs-openai/)
