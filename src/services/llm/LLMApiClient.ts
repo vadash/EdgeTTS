@@ -4,6 +4,7 @@ import type { Logger } from '../Logger';
 import { DebugLogger } from './DebugLogger';
 import { zodToJsonSchema, type StructuredCallOptions } from './schemaUtils';
 import { z } from 'zod';
+import { RetriableError } from '@/errors';
 
 export interface LLMApiClientOptions {
   apiKey: string;
@@ -303,6 +304,16 @@ export class LLMApiClient {
     if (fenceMatch) jsonContent = fenceMatch[1].trim();
 
     const parsed = JSON.parse(jsonContent);
-    return schema.parse(parsed); // Zod runtime validation
+
+    // Zod runtime validation - wrap errors as retriable since they may be transient LLM outputs
+    try {
+      return schema.parse(parsed);
+    } catch (error) {
+      // Convert Zod validation errors to RetriableError so they get retried
+      throw new RetriableError(
+        `Zod validation failed: ${(error as Error).message}`,
+        error as Error
+      );
+    }
   }
 }

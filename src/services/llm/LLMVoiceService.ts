@@ -20,6 +20,7 @@ import {
   type AssignContext,
 } from './PromptStrategy';
 import { ExtractSchema, MergeSchema, AssignSchema } from './schemas';
+import { withRetry } from '@/utils/retry';
 
 /**
  * Unambiguous speech/dialogue symbols (no contraction risk):
@@ -178,11 +179,12 @@ export class LLMVoiceService {
   ): Promise<LLMCharacter[]> {
     this.logger?.info(`[Extract] Starting (${blocks.length} blocks)`);
     const allCharacters: LLMCharacter[] = [];
-    this.abortController = new AbortController();
+    const controller = new AbortController();
+    this.abortController = controller;
     this.apiClient.resetLogging();
 
     for (let i = 0; i < blocks.length; i++) {
-      if (this.abortController.signal.aborted) {
+      if (controller.signal.aborted) {
         throw new Error('Operation cancelled');
       }
 
@@ -191,12 +193,21 @@ export class LLMVoiceService {
       const block = blocks[i];
       const blockText = block.sentences.join('\n');
 
-      const response = await this.apiClient.callStructured({
-        prompt: buildExtractPrompt(blockText),
-        schema: ExtractSchema,
-        schemaName: 'ExtractSchema',
-        signal: this.abortController.signal,
-      });
+      const response = await withRetry(
+        () => this.apiClient.callStructured({
+          prompt: buildExtractPrompt(blockText),
+          schema: ExtractSchema,
+          schemaName: 'ExtractSchema',
+          signal: controller.signal,
+        }),
+        {
+          maxRetries: Infinity, // Keep retrying until valid
+          signal: controller.signal,
+          onRetry: (attempt, error) => {
+            this.logger?.warn(`[Extract] Block ${i + 1}/${blocks.length} retry ${attempt}: ${(error as Error).message}`);
+          },
+        }
+      );
 
       allCharacters.push(...response.characters);
 
