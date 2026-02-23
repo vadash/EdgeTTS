@@ -85,6 +85,15 @@ const VOTING_TEMPERATURES = [0.1, 0.4, 0.7] as const;
 const LLM_DELAY_MS = 1000;
 
 /**
+ * Default retry counts for each operation
+ */
+const RETRY_CONFIG = {
+  extract: Infinity,  // Extract: keep retrying until valid
+  merge: 3,           // Merge: 3 retries per vote attempt
+  assign: 3,          // Assign: 3 retries per block attempt
+} as const;
+
+/**
  * Options for creating LLM service instances
  * Aliased as LLMServiceFactoryOptions for DI compatibility
  */
@@ -202,7 +211,7 @@ export class LLMVoiceService {
           signal: controller.signal,
         }),
         {
-          maxRetries: Infinity, // Keep retrying until valid
+          maxRetries: RETRY_CONFIG.extract, // Keep retrying until valid
           signal: controller.signal,
           onRetry: (attempt, error) => {
             this.logger?.warn(`[Extract] Block ${i + 1}/${blocks.length} retry ${attempt}: ${getErrorMessage(error)}`);
@@ -336,15 +345,24 @@ export class LLMVoiceService {
         });
 
         try {
-          const response = await client.callStructured({
-            prompt,
-            schema: AssignSchema,
-            schemaName: 'AssignSchema',
-            signal: this.abortController?.signal,
-          });
+          const response = await withRetry(
+            () => client.callStructured({
+              prompt,
+              schema: AssignSchema,
+              schemaName: 'AssignSchema',
+              signal: this.abortController?.signal,
+            }),
+            {
+              maxRetries: RETRY_CONFIG.assign,
+              signal: this.abortController?.signal,
+              onRetry: (attempt, error) => {
+                this.logger?.warn(`[assign] Vote ${i + 1} at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`);
+              },
+            }
+          );
           responses.push(response);
         } catch (e) {
-          this.logger?.warn(`[assign] Vote ${i + 1} failed: ${getErrorMessage(e)}`);
+          this.logger?.warn(`[assign] Vote ${i + 1} at ${block.sentenceStartIndex} failed after ${RETRY_CONFIG.assign} retries: ${getErrorMessage(e)}`);
           responses.push(null);
         }
 
@@ -385,14 +403,23 @@ export class LLMVoiceService {
         if (winner) relativeMap.set(i, winner);
       }
     } else {
-      // Single call (original behavior)
+      // Single call with retry (original behavior)
       try {
-        const response = await this.apiClient.callStructured({
-          prompt,
-          schema: AssignSchema,
-          schemaName: 'AssignSchema',
-          signal: this.abortController?.signal,
-        });
+        const response = await withRetry(
+          () => this.apiClient.callStructured({
+            prompt,
+            schema: AssignSchema,
+            schemaName: 'AssignSchema',
+            signal: this.abortController?.signal,
+          }),
+          {
+            maxRetries: RETRY_CONFIG.assign,
+            signal: this.abortController?.signal,
+            onRetry: (attempt, error) => {
+              this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`);
+            },
+          }
+        );
 
         // Convert sparse object to Map
         relativeMap = new Map();
@@ -403,7 +430,7 @@ export class LLMVoiceService {
           }
         }
       } catch (e) {
-        this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed, using default voice for ${block.sentences.length} sentences`);
+        this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed after ${RETRY_CONFIG.assign} retries, using default voice for ${block.sentences.length} sentences`);
         return block.sentences.map((text, i) => ({
           sentenceIndex: block.sentenceStartIndex + i,
           text,
@@ -514,15 +541,24 @@ export class LLMVoiceService {
     });
 
     try {
-      const response = await client.callStructured({
-        prompt: buildMergePrompt(characters),
-        schema: MergeSchema,
-        schemaName: 'MergeSchema',
-        signal: this.abortController?.signal,
-      });
+      const response = await withRetry(
+        () => client.callStructured({
+          prompt: buildMergePrompt(characters),
+          schema: MergeSchema,
+          schemaName: 'MergeSchema',
+          signal: this.abortController?.signal,
+        }),
+        {
+          maxRetries: RETRY_CONFIG.merge,
+          signal: this.abortController?.signal,
+          onRetry: (attempt, error) => {
+            this.logger?.warn(`[Merge] Retry ${attempt}/${RETRY_CONFIG.merge} (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`);
+          },
+        }
+      );
       return response.merges;
     } catch (error) {
-      this.logger?.warn(`[Merge] Vote failed (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`);
+      this.logger?.warn(`[Merge] Vote failed after ${RETRY_CONFIG.merge} retries (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`);
       return null;
     }
   }
