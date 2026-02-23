@@ -249,47 +249,79 @@ export class LLMApiClient {
     schemaName,
     signal,
   }: StructuredCallOptions<T>): Promise<T> {
+    const useStreaming = this.options.streaming ?? false;
+
     const requestBody: any = {
       model: this.options.model,
       messages: [
         { role: 'system', content: prompt.system },
         { role: 'user', content: prompt.user },
       ],
-      stream: false, // Structured outputs require non-streaming
+      stream: useStreaming,
       response_format: zodToJsonSchema(schema, schemaName),
     };
 
-    // Apply provider-specific fixes
     applyProviderFixes(requestBody, this.provider);
 
-    // Save request log
     if (this.debugLogger?.shouldLog('structured')) {
       this.debugLogger.saveLog('structured_request.json', requestBody);
     }
 
-    this.logger?.info(`[structured] API call starting...`);
+    this.logger?.info(`[structured] API call starting (streaming: ${useStreaming})...`);
 
-    // Make API call (non-streaming only for structured outputs)
-    const response = await this.client.chat.completions.create(
-      requestBody as any,
-      { signal }
-    );
+    let content: string;
 
-    const message = response.choices[0]?.message;
+    if (useStreaming) {
+      // Streaming path: accumulate SSE chunks
+      const stream = await this.client.chat.completions.create(
+        requestBody as any,
+        { signal }
+      );
 
-    // Check for refusal (content policy triggers)
-    if (message?.refusal) {
-      throw new Error(`LLM refused: ${message.refusal}`);
-    }
+      let accumulated = '';
+      let finishReason: string | null = null;
 
-    const content = message?.content;
-    if (!content) {
-      throw new Error('Empty response from LLM');
+      for await (const chunk of stream as any) {
+        const delta = chunk.choices[0]?.delta;
+        if (delta?.content) {
+          accumulated += delta.content;
+        }
+        if (chunk.choices[0]?.finish_reason) {
+          finishReason = chunk.choices[0].finish_reason;
+        }
+      }
+
+      if (finishReason === 'content_filter') {
+        throw new Error('Response refused by content filter');
+      }
+
+      if (!accumulated) {
+        throw new Error('Empty response from LLM');
+      }
+
+      content = accumulated;
+    } else {
+      // Non-streaming path (existing behavior)
+      const response = await this.client.chat.completions.create(
+        requestBody as any,
+        { signal }
+      );
+
+      const message = (response as any).choices[0]?.message;
+
+      if (message?.refusal) {
+        throw new Error(`LLM refused: ${message.refusal}`);
+      }
+
+      if (!message?.content) {
+        throw new Error('Empty response from LLM');
+      }
+
+      content = message.content;
     }
 
     this.logger?.info(`[structured] API call completed (${content.length} chars)`);
 
-    // Save response log
     if (this.debugLogger?.shouldLog('structured')) {
       this.debugLogger.saveLog('structured_response.json', {
         choices: [{ message: { content } }],

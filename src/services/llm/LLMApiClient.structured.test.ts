@@ -181,4 +181,50 @@ describe('LLMApiClient.callStructured', () => {
 
     expect(result).toEqual({ value: 'fenced' });
   });
+
+  it('streams structured response when streaming enabled', async () => {
+    const TestSchema = z.object({ value: z.string() });
+
+    // Mock async iterable stream
+    const chunks = [
+      { choices: [{ delta: { content: '{"val' }, finish_reason: null }], model: 'gpt-4o-mini' },
+      { choices: [{ delta: { content: 'ue":"str' }, finish_reason: null }], model: 'gpt-4o-mini' },
+      { choices: [{ delta: { content: 'eamed"}' }, finish_reason: 'stop' }], model: 'gpt-4o-mini' },
+    ];
+
+    const asyncIterable = {
+      [Symbol.asyncIterator]: () => {
+        let i = 0;
+        return {
+          next: async () => i < chunks.length
+            ? { value: chunks[i++], done: false }
+            : { value: undefined, done: true }
+        };
+      }
+    };
+
+    mockCreate.mockResolvedValue(asyncIterable);
+
+    const client = new LLMApiClient({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      streaming: true,
+      logger: mockLogger
+    });
+
+    const result = await (client as any).callStructured({
+      prompt: { system: 'test', user: 'test' },
+      schema: TestSchema,
+      schemaName: 'TestSchema'
+    });
+
+    expect(result).toEqual({ value: 'streamed' });
+
+    // Verify stream: true was passed
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ stream: true }),
+      expect.any(Object)
+    );
+  });
 });
