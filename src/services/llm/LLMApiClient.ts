@@ -273,48 +273,71 @@ export class LLMApiClient {
 
     if (useStreaming) {
       // Streaming path: accumulate SSE chunks
-      const stream = await this.client.chat.completions.create(
-        requestBody as any,
-        { signal }
-      );
+      let stream;
+      try {
+        stream = await this.client.chat.completions.create(
+          requestBody as any,
+          { signal }
+        );
+      } catch (error) {
+        throw new RetriableError(
+          `LLM API call failed: ${(error as Error).message}`,
+          error as Error
+        );
+      }
 
       let accumulated = '';
       let finishReason: string | null = null;
 
-      for await (const chunk of stream as any) {
-        const delta = chunk.choices[0]?.delta;
-        if (delta?.content) {
-          accumulated += delta.content;
+      try {
+        for await (const chunk of stream as any) {
+          const delta = chunk.choices[0]?.delta;
+          if (delta?.content) {
+            accumulated += delta.content;
+          }
+          if (chunk.choices[0]?.finish_reason) {
+            finishReason = chunk.choices[0].finish_reason;
+          }
         }
-        if (chunk.choices[0]?.finish_reason) {
-          finishReason = chunk.choices[0].finish_reason;
-        }
+      } catch (error) {
+        throw new RetriableError(
+          `Streaming failed: ${(error as Error).message}`,
+          error as Error
+        );
       }
 
       if (finishReason === 'content_filter') {
-        throw new Error('Response refused by content filter');
+        throw new RetriableError('Response refused by content filter');
       }
 
       if (!accumulated) {
-        throw new Error('Empty response from LLM');
+        throw new RetriableError('Empty response from LLM');
       }
 
       content = accumulated;
     } else {
-      // Non-streaming path (existing behavior)
-      const response = await this.client.chat.completions.create(
-        requestBody as any,
-        { signal }
-      );
+      // Non-streaming path
+      let response;
+      try {
+        response = await this.client.chat.completions.create(
+          requestBody as any,
+          { signal }
+        );
+      } catch (error) {
+        throw new RetriableError(
+          `LLM API call failed: ${(error as Error).message}`,
+          error as Error
+        );
+      }
 
       const message = (response as any).choices[0]?.message;
 
       if (message?.refusal) {
-        throw new Error(`LLM refused: ${message.refusal}`);
+        throw new RetriableError(`LLM refused: ${message.refusal}`);
       }
 
       if (!message?.content) {
-        throw new Error('Empty response from LLM');
+        throw new RetriableError('Empty response from LLM');
       }
 
       content = message.content;

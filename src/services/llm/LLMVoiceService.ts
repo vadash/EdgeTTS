@@ -21,6 +21,7 @@ import {
 } from './PromptStrategy';
 import { ExtractSchema, MergeSchema, AssignSchema } from './schemas';
 import { withRetry } from '@/utils/retry';
+import { getErrorMessage } from '@/errors';
 
 /**
  * Unambiguous speech/dialogue symbols (no contraction risk):
@@ -204,7 +205,7 @@ export class LLMVoiceService {
           maxRetries: Infinity, // Keep retrying until valid
           signal: controller.signal,
           onRetry: (attempt, error) => {
-            this.logger?.warn(`[Extract] Block ${i + 1}/${blocks.length} retry ${attempt}: ${(error as Error).message}`);
+            this.logger?.warn(`[Extract] Block ${i + 1}/${blocks.length} retry ${attempt}: ${getErrorMessage(error)}`);
           },
         }
       );
@@ -343,7 +344,7 @@ export class LLMVoiceService {
           });
           responses.push(response);
         } catch (e) {
-          this.logger?.warn(`[assign] Vote ${i + 1} failed: ${(e as Error).message}`);
+          this.logger?.warn(`[assign] Vote ${i + 1} failed: ${getErrorMessage(e)}`);
           responses.push(null);
         }
 
@@ -355,7 +356,7 @@ export class LLMVoiceService {
       // Check if all voting attempts failed - fall back to narrator
       const validResponses = responses.filter((r): r is object => r !== null);
       if (validResponses.length === 0) {
-        this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed after max retries (all voting attempts), using default voice for ${block.sentences.length} sentences`);
+        this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed (all voting attempts), using default voice for ${block.sentences.length} sentences`);
         return block.sentences.map((text, i) => ({
           sentenceIndex: block.sentenceStartIndex + i,
           text,
@@ -402,7 +403,7 @@ export class LLMVoiceService {
           }
         }
       } catch (e) {
-        this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed after max retries, using default voice for ${block.sentences.length} sentences`);
+        this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed, using default voice for ${block.sentences.length} sentences`);
         return block.sentences.map((text, i) => ({
           sentenceIndex: block.sentenceStartIndex + i,
           text,
@@ -521,7 +522,7 @@ export class LLMVoiceService {
       });
       return response.merges;
     } catch (error) {
-      this.logger?.warn(`[Merge] Vote failed (temp=${temperature.toFixed(2)}): ${(error as Error).message}`);
+      this.logger?.warn(`[Merge] Vote failed (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`);
       return null;
     }
   }
