@@ -29,6 +29,8 @@ We use a multi-vote system to improve accuracy:
 We use p-retry 7.1.1. Callbacks (`onFailedAttempt`, `shouldRetry`) receive a **context object** `{error, attemptNumber, retriesLeft, ...}`, NOT the error directly. Always use `context.error` to get the actual error. Throwing the context object itself produces `[object Object]` in error messages.
 
 ## Gotchas & Rules
+- **RetriableError REQUIRED**: ALL errors in `LLMApiClient` MUST be `RetriableError` (from `@/errors`). Plain `Error` breaks `withRetry()` — it checks `instanceof RetriableError` to decide retry. API calls, streaming, JSON parse, validation, empty responses — all `RetriableError`.
+- **Safe error logging**: Use `getErrorMessage(e)` from `@/errors` in catch blocks, never `(e as Error).message`
 - **Streaming**: Structured outputs support streaming when enabled via `streaming: true` in client options
 - **Sparse Assign Format**: Assign uses `{"0": "A", "5": "B"}` not line-by-line format
 - **Record Syntax**: Zod 4 requires 2-arg `z.record(keySchema, valueSchema)`
