@@ -148,7 +148,8 @@ export class LLMApiClient {
         stream: false,
       });
 
-      const content = response.choices[0]?.message?.content;
+      const message = response.choices[0]?.message as any;
+      const content = message?.content || message?.reasoning;
       if (!content) {
         return { success: false, error: 'Empty response from model' };
       }
