@@ -227,4 +227,103 @@ describe('LLMApiClient.callStructured', () => {
       expect.any(Object)
     );
   });
+
+  it('throws on content_filter finish_reason during streaming', async () => {
+    const TestSchema = z.object({ value: z.string() });
+
+    const chunks = [
+      { choices: [{ delta: { content: '{"val' }, finish_reason: null }] },
+      { choices: [{ delta: { content: '' }, finish_reason: 'content_filter' }] },
+    ];
+
+    const asyncIterable = {
+      [Symbol.asyncIterator]: () => {
+        let i = 0;
+        return {
+          next: async () => i < chunks.length
+            ? { value: chunks[i++], done: false }
+            : { value: undefined, done: true }
+        };
+      }
+    };
+
+    mockCreate.mockResolvedValue(asyncIterable);
+
+    const client = new LLMApiClient({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      streaming: true,
+      logger: mockLogger
+    });
+
+    await expect((client as any).callStructured({
+      prompt: { system: 'test', user: 'test' },
+      schema: TestSchema,
+      schemaName: 'TestSchema'
+    })).rejects.toThrow('Response refused by content filter');
+  });
+
+  it('throws on empty streaming response', async () => {
+    const TestSchema = z.object({ value: z.string() });
+
+    const chunks = [
+      { choices: [{ delta: {}, finish_reason: 'stop' }] },
+    ];
+
+    const asyncIterable = {
+      [Symbol.asyncIterator]: () => {
+        let i = 0;
+        return {
+          next: async () => i < chunks.length
+            ? { value: chunks[i++], done: false }
+            : { value: undefined, done: true }
+        };
+      }
+    };
+
+    mockCreate.mockResolvedValue(asyncIterable);
+
+    const client = new LLMApiClient({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      streaming: true,
+      logger: mockLogger
+    });
+
+    await expect((client as any).callStructured({
+      prompt: { system: 'test', user: 'test' },
+      schema: TestSchema,
+      schemaName: 'TestSchema'
+    })).rejects.toThrow('Empty response from LLM');
+  });
+
+  it('uses non-streaming when streaming option is false', async () => {
+    const TestSchema = z.object({ value: z.string() });
+
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: '{"value":"ok"}', refusal: null } }]
+    });
+
+    const client = new LLMApiClient({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      streaming: false,
+      logger: mockLogger
+    });
+
+    const result = await (client as any).callStructured({
+      prompt: { system: 'test', user: 'test' },
+      schema: TestSchema,
+      schemaName: 'TestSchema'
+    });
+
+    expect(result).toEqual({ value: 'ok' });
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ stream: false }),
+      expect.any(Object)
+    );
+  });
 });
