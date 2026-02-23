@@ -50,17 +50,20 @@ export async function withRetry<T>(
       factor: 2, // Exponential backoff factor
       randomize: true, // Adds jitter to prevent thundering herd
       signal,
-      onFailedAttempt: (error) => {
+      onFailedAttempt: (context) => {
+        // p-retry 7.x passes a context object {error, attemptNumber, retriesLeft, ...}
+        const actualError = context.error;
+
         // Check if error should be retried
-        if (shouldRetry && !shouldRetry(error)) {
-          throw error; // Don't retry - rethrow to stop
+        if (shouldRetry && !shouldRetry(actualError)) {
+          throw actualError; // Don't retry - rethrow to stop
         }
 
         // Calculate delay for callback (p-retry handles actual delay)
         const jitter = Math.random() * 1000;
-        const nextDelay = Math.min(baseDelay * Math.pow(2, error.attemptNumber - 1) + jitter, maxDelay);
+        const nextDelay = Math.min(baseDelay * Math.pow(2, context.attemptNumber - 1) + jitter, maxDelay);
 
-        onRetry?.(error.attemptNumber, error, nextDelay);
+        onRetry?.(context.attemptNumber, actualError, nextDelay);
       },
     }
   );

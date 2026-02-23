@@ -342,7 +342,15 @@ export class LLMApiClient {
     const fenceMatch = jsonContent.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
     if (fenceMatch) jsonContent = fenceMatch[1].trim();
 
-    const parsed = JSON.parse(jsonContent);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonContent);
+    } catch (error) {
+      throw new RetriableError(
+        `JSON parse failed: ${(error as Error).message}`,
+        error as Error
+      );
+    }
 
     try {
       return schema.parse(parsed);

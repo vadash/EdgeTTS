@@ -132,6 +132,18 @@ export class AppError extends Error {
       return new AppError('UNKNOWN_ERROR', error.message, error, context);
     }
 
+    // Handle plain objects with message or error properties (e.g., p-retry context objects)
+    if (error && typeof error === 'object') {
+      const obj = error as Record<string, unknown>;
+      if (obj.error instanceof Error) {
+        return new AppError('UNKNOWN_ERROR', obj.error.message, obj.error, context);
+      }
+      if (typeof obj.message === 'string') {
+        return new AppError('UNKNOWN_ERROR', obj.message, undefined, context);
+      }
+      return new AppError('UNKNOWN_ERROR', JSON.stringify(error), undefined, context);
+    }
+
     return new AppError('UNKNOWN_ERROR', String(error), undefined, context);
   }
 

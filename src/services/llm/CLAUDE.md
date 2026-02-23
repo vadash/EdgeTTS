@@ -25,6 +25,9 @@ We use a multi-vote system to improve accuracy:
 - **Merge**: 5-way Union-Find consensus with random temperatures
 - **Assign**: 3-way majority vote with fixed temperatures [0.3, 0.7, 1.0]
 
+## p-retry 7.x
+We use p-retry 7.1.1. Callbacks (`onFailedAttempt`, `shouldRetry`) receive a **context object** `{error, attemptNumber, retriesLeft, ...}`, NOT the error directly. Always use `context.error` to get the actual error. Throwing the context object itself produces `[object Object]` in error messages.
+
 ## Gotchas & Rules
 - **Streaming**: Structured outputs support streaming when enabled via `streaming: true` in client options
 - **Sparse Assign Format**: Assign uses `{"0": "A", "5": "B"}` not line-by-line format
