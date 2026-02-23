@@ -154,4 +154,31 @@ describe('LLMApiClient.callStructured', () => {
       expect.any(Object)
     );
   });
+
+  it('strips markdown fences from response', async () => {
+    const TestSchema = z.object({ value: z.string() });
+
+    const mockResponse = {
+      choices: [{
+        message: { content: '```json\n{"value":"fenced"}\n```', refusal: null }
+      }]
+    };
+
+    mockCreate.mockResolvedValue(mockResponse);
+
+    const client = new LLMApiClient({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      logger: mockLogger
+    });
+
+    const result = await (client as any).callStructured({
+      prompt: { system: 'test', user: 'test' },
+      schema: TestSchema,
+      schemaName: 'TestSchema'
+    });
+
+    expect(result).toEqual({ value: 'fenced' });
+  });
 });

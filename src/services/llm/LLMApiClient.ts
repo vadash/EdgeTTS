@@ -298,19 +298,23 @@ export class LLMApiClient {
       this.debugLogger.markLogged('structured');
     }
 
-    // Parse JSON and validate with Zod
-    // Strip markdown fences if model wraps JSON in ```json ... ```
+    return this.parseStructuredResponse(content, schema);
+  }
+
+  /**
+   * Parse JSON content and validate with Zod schema.
+   * Shared by both streaming and non-streaming paths.
+   */
+  private parseStructuredResponse<T>(content: string, schema: z.ZodType<T>): T {
     let jsonContent = content.trim();
     const fenceMatch = jsonContent.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
     if (fenceMatch) jsonContent = fenceMatch[1].trim();
 
     const parsed = JSON.parse(jsonContent);
 
-    // Zod runtime validation - wrap errors as retriable since they may be transient LLM outputs
     try {
       return schema.parse(parsed);
     } catch (error) {
-      // Convert Zod validation errors to RetriableError so they get retried
       throw new RetriableError(
         `Zod validation failed: ${(error as Error).message}`,
         error as Error
