@@ -176,8 +176,9 @@ export class LLMApiClient {
 
       for await (const chunk of stream) {
         model = chunk.model || model;
-        content += chunk.choices[0]?.delta?.content || '';
-      }
+        const delta = chunk.choices[0]?.delta as any;
+        content += delta?.content || delta?.reasoning || '';
+      };
 
       if (!content) {
         return { success: false, error: 'Empty response from streaming endpoint' };
