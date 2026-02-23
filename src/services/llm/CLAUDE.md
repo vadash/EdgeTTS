@@ -26,7 +26,7 @@ We use a multi-vote system to improve accuracy:
 - **Assign**: 3-way majority vote with fixed temperatures [0.3, 0.7, 1.0]
 
 ## Gotchas & Rules
-- **Non-Streaming**: Structured outputs require `stream: false`
+- **Streaming**: Structured outputs support streaming when enabled via `streaming: true` in client options
 - **Sparse Assign Format**: Assign uses `{"0": "A", "5": "B"}` not line-by-line format
 - **Record Syntax**: Zod 4 requires 2-arg `z.record(keySchema, valueSchema)`
 - **No JSON Repair**: Structured outputs guarantee valid JSON - no repair logic needed
