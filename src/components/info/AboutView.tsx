@@ -3,7 +3,7 @@ import type { ComponentChildren } from 'preact';
 
 export function AboutView() {
   return (
-    <div class="about-view max-w-3xl mx-auto p-6 prose prose-slate dark:prose-invert">
+    <div class="about-view max-w-3xl mx-auto p-6 prose prose-slate dark:prose-invert overflow-y-auto scrollbar-hide">
       <header class="mb-8">
         <h1 class="text-3xl font-bold mb-2">
           <Text id="about.headline">Edge TTS Web</Text>
