@@ -1,4 +1,5 @@
 import { Text } from 'preact-i18n';
+import type { ComponentChildren } from 'preact';
 
 export function AboutView() {
   return (
@@ -172,8 +173,8 @@ export function AboutView() {
 }
 
 interface FeatureRowProps {
-  label: JSX.Element | string;
-  value: JSX.Element | string;
+  label: ComponentChildren;
+  value: ComponentChildren;
 }
 
 function FeatureRow({ label, value }: FeatureRowProps) {
@@ -186,8 +187,8 @@ function FeatureRow({ label, value }: FeatureRowProps) {
 }
 
 interface StepItemProps {
-  title: JSX.Element | string;
-  desc: JSX.Element | string;
+  title: ComponentChildren;
+  desc: ComponentChildren;
 }
 
 function StepItem({ title, desc }: StepItemProps) {
