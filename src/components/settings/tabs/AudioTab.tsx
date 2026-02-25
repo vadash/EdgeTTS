@@ -19,7 +19,7 @@ export function AudioTab() {
         </p>
 
         {/* Preset Buttons */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {AUDIO_PRESETS.map(preset => (
             <button
               key={preset.name}

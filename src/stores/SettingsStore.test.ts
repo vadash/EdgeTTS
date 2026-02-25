@@ -38,13 +38,13 @@ describe('SettingsStore', () => {
       expect(settings.value.eqEnabled).toBe(true);
       expect(settings.value.compressorEnabled).toBe(true);
       expect(settings.value.fadeInEnabled).toBe(true);
-      expect(settings.value.stereoWidthEnabled).toBe(true);
+      expect(settings.value.stereoWidthEnabled).toBe(false);
     });
 
     it('should have Opus encoding defaults', () => {
-      expect(settings.value.opusPreset).toBe('balanced');
-      expect(settings.value.opusMinBitrate).toBe(64);
-      expect(settings.value.opusMaxBitrate).toBe(96);
+      expect(settings.value.opusPreset).toBe('pc');
+      expect(settings.value.opusMinBitrate).toBe(32);
+      expect(settings.value.opusMaxBitrate).toBe(64);
       expect(settings.value.opusCompressionLevel).toBe(10);
     });
   });
@@ -56,56 +56,40 @@ describe('SettingsStore', () => {
     });
 
     it('applyOpusPreset should update all values to preset config', () => {
-      applyOpusPreset('max_quality');
-      expect(settings.value.opusPreset).toBe('max_quality');
-      expect(settings.value.opusMinBitrate).toBe(128);
-      expect(settings.value.opusMaxBitrate).toBe(128);
-      expect(settings.value.opusCompressionLevel).toBe(10);
-    });
-
-    it('applyOpusPreset(BALANCED) should use balanced config', () => {
-      applyOpusPreset('balanced');
-      expect(settings.value.opusPreset).toBe('balanced');
-      expect(settings.value.opusMinBitrate).toBe(64);
-      expect(settings.value.opusMaxBitrate).toBe(96);
-      expect(settings.value.opusCompressionLevel).toBe(10);
-    });
-
-    it('applyOpusPreset(FAST) should use fast config', () => {
-      applyOpusPreset('fast');
-      expect(settings.value.opusPreset).toBe('fast');
-      expect(settings.value.opusMinBitrate).toBe(48);
+      applyOpusPreset('pc');
+      expect(settings.value.opusPreset).toBe('pc');
+      expect(settings.value.opusMinBitrate).toBe(32);
       expect(settings.value.opusMaxBitrate).toBe(64);
-      expect(settings.value.opusCompressionLevel).toBe(5);
+      expect(settings.value.opusCompressionLevel).toBe(10);
     });
 
     it('applyOpusPreset(MOBILE) should use mobile config', () => {
       applyOpusPreset('mobile');
       expect(settings.value.opusPreset).toBe('mobile');
       expect(settings.value.opusMinBitrate).toBe(32);
-      expect(settings.value.opusMaxBitrate).toBe(48);
+      expect(settings.value.opusMaxBitrate).toBe(96);
       expect(settings.value.opusCompressionLevel).toBe(3);
     });
 
     it('setOpusMinBitrate should switch preset to CUSTOM', () => {
-      applyOpusPreset('balanced');
-      setOpusMinBitrate(72);
+      applyOpusPreset('pc');
+      setOpusMinBitrate(48);
       expect(settings.value.opusPreset).toBe('custom');
-      expect(settings.value.opusMinBitrate).toBe(72);
+      expect(settings.value.opusMinBitrate).toBe(48);
     });
 
     it('setOpusMaxBitrate should switch preset to CUSTOM', () => {
-      applyOpusPreset('balanced');
+      applyOpusPreset('mobile');
       setOpusMaxBitrate(128);
       expect(settings.value.opusPreset).toBe('custom');
       expect(settings.value.opusMaxBitrate).toBe(128);
     });
 
     it('setOpusCompressionLevel should switch preset to CUSTOM', () => {
-      applyOpusPreset('balanced');
-      setOpusCompressionLevel(7);
+      applyOpusPreset('mobile');
+      setOpusCompressionLevel(5);
       expect(settings.value.opusPreset).toBe('custom');
-      expect(settings.value.opusCompressionLevel).toBe(7);
+      expect(settings.value.opusCompressionLevel).toBe(5);
     });
   });
 
@@ -154,8 +138,8 @@ describe('SettingsStore', () => {
       setOpusMinBitrate(100);
       resetSettings();
 
-      expect(settings.value.opusPreset).toBe('balanced');
-      expect(settings.value.opusMinBitrate).toBe(64);
+      expect(settings.value.opusPreset).toBe('pc');
+      expect(settings.value.opusMinBitrate).toBe(32);
     });
   });
 

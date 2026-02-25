@@ -7,9 +7,7 @@ describe('Russian i18n - Opus settings', () => {
   });
 
   it('should have all preset labels', () => {
-    expect(ru.settings['preset.maxQuality']).toBeDefined();
-    expect(ru.settings['preset.balanced']).toBeDefined();
-    expect(ru.settings['preset.fast']).toBeDefined();
+    expect(ru.settings['preset.pc']).toBeDefined();
     expect(ru.settings['preset.mobile']).toBeDefined();
   });
 

@@ -4,32 +4,20 @@ import type { AppSettings } from '@/state/types';
 
 describe('AudioPreset', () => {
   it('should have all preset values', () => {
-    expect(AudioPreset.MAX_QUALITY).toBe('max_quality');
-    expect(AudioPreset.BALANCED).toBe('balanced');
-    expect(AudioPreset.FAST).toBe('fast');
+    expect(AudioPreset.PC).toBe('pc');
     expect(AudioPreset.MOBILE).toBe('mobile');
     expect(AudioPreset.CUSTOM).toBe('custom');
   });
 
   it('AUDIO_PRESETS should have correct configuration', () => {
-    const maxQuality = AUDIO_PRESETS.find(p => p.name === AudioPreset.MAX_QUALITY);
-    expect(maxQuality?.minBitrate).toBe(128);
-    expect(maxQuality?.maxBitrate).toBe(128);
-    expect(maxQuality?.compressionLevel).toBe(10);
-
-    const balanced = AUDIO_PRESETS.find(p => p.name === AudioPreset.BALANCED);
-    expect(balanced?.minBitrate).toBe(64);
-    expect(balanced?.maxBitrate).toBe(96);
-    expect(balanced?.compressionLevel).toBe(10);
-
-    const fast = AUDIO_PRESETS.find(p => p.name === AudioPreset.FAST);
-    expect(fast?.minBitrate).toBe(48);
-    expect(fast?.maxBitrate).toBe(64);
-    expect(fast?.compressionLevel).toBe(5);
+    const pc = AUDIO_PRESETS.find(p => p.name === AudioPreset.PC);
+    expect(pc?.minBitrate).toBe(32);
+    expect(pc?.maxBitrate).toBe(64);
+    expect(pc?.compressionLevel).toBe(10);
 
     const mobile = AUDIO_PRESETS.find(p => p.name === AudioPreset.MOBILE);
     expect(mobile?.minBitrate).toBe(32);
-    expect(mobile?.maxBitrate).toBe(48);
+    expect(mobile?.maxBitrate).toBe(96);
     expect(mobile?.compressionLevel).toBe(3);
   });
 });
@@ -58,16 +46,16 @@ describe('AppSettings interface', () => {
       eqEnabled: true,
       compressorEnabled: true,
       fadeInEnabled: true,
-      stereoWidthEnabled: true,
+      stereoWidthEnabled: false,
       // New Opus settings
-      opusPreset: AudioPreset.BALANCED,
-      opusMinBitrate: 64,
-      opusMaxBitrate: 96,
+      opusPreset: AudioPreset.PC,
+      opusMinBitrate: 32,
+      opusMaxBitrate: 64,
       opusCompressionLevel: 10,
     } as AppSettings;
-    expect(settings.opusPreset).toBe(AudioPreset.BALANCED);
-    expect(settings.opusMinBitrate).toBe(64);
-    expect(settings.opusMaxBitrate).toBe(96);
+    expect(settings.opusPreset).toBe(AudioPreset.PC);
+    expect(settings.opusMinBitrate).toBe(32);
+    expect(settings.opusMaxBitrate).toBe(64);
     expect(settings.opusCompressionLevel).toBe(10);
   });
 
@@ -76,9 +64,9 @@ describe('AppSettings interface', () => {
     const settings: Partial<AppSettings> = {};
     // If this compiles, the interface accepts these properties
     expect(() => {
-      settings.opusPreset = AudioPreset.BALANCED;
-      settings.opusMinBitrate = 64;
-      settings.opusMaxBitrate = 96;
+      settings.opusPreset = AudioPreset.PC;
+      settings.opusMinBitrate = 32;
+      settings.opusMaxBitrate = 64;
       settings.opusCompressionLevel = 10;
     }).not.toThrow();
   });

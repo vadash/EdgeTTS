@@ -38,10 +38,10 @@ const defaultSettings: AppSettings = {
   eqEnabled: true,
   compressorEnabled: true,
   fadeInEnabled: true,
-  stereoWidthEnabled: true,
-  opusPreset: 'balanced' as AudioPreset,
-  opusMinBitrate: 64,
-  opusMaxBitrate: 96,
+  stereoWidthEnabled: false,
+  opusPreset: 'pc' as AudioPreset,
+  opusMinBitrate: 32,
+  opusMaxBitrate: 64,
   opusCompressionLevel: 10,
 };
 

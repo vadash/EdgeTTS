@@ -7,9 +7,7 @@ describe('English i18n - Opus settings', () => {
   });
 
   it('should have all preset labels', () => {
-    expect(en.settings['preset.maxQuality']).toBe('Max Quality');
-    expect(en.settings['preset.balanced']).toBe('Balanced');
-    expect(en.settings['preset.fast']).toBe('Fast');
+    expect(en.settings['preset.pc']).toBe('PC');
     expect(en.settings['preset.mobile']).toBe('Mobile');
     expect(en.settings['preset.custom']).toBe('Custom');
   });
