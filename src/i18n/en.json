@@ -144,5 +144,120 @@
   "language": {
     "en": "EN",
     "ru": "RU"
+  },
+  "about": {
+    "title": "About Edge TTS",
+    "headline": "Edge TTS Web",
+    "subtitle": "Convert text files to high-quality audiobooks using Microsoft Edge's TTS engine — entirely in your browser.",
+    "whatItDoes": {
+      "title": "What It Does",
+      "description": "Upload a book (TXT, FB2, EPUB, or ZIP) and get back an MP3 or Opus audio file. For fiction, an LLM detects characters and assigns each one a unique voice — producing multi-voice audiobooks automatically.",
+      "sampleLink": "Example output:"
+    },
+    "features": {
+      "title": "Features",
+      "multiFormat": {
+        "label": "Multi-Format Input",
+        "value": "TXT, FB2, EPUB, ZIP archives"
+      },
+      "audioOutput": {
+        "label": "Audio Output",
+        "value": "MP3 or Opus with configurable bitrate"
+      },
+      "multiVoice": {
+        "label": "Multi-Voice",
+        "value": "LLM-powered character detection and voice assignment"
+      },
+      "genderAware": {
+        "label": "Gender-Aware",
+        "value": "Male/female voices matched to detected characters"
+      },
+      "parallel": {
+        "label": "Parallel Processing",
+        "value": "Multi-threaded TTS conversion"
+      },
+      "audioProcessing": {
+        "label": "Audio Processing",
+        "value": "Silence removal & normalization via FFmpeg"
+      },
+      "dictionary": {
+        "label": "Dictionary Support",
+        "value": "Custom pronunciation rules (.lexx files)"
+      },
+      "dragDrop": {
+        "label": "Drag & Drop",
+        "value": "Simple file upload or paste text directly"
+      },
+      "progress": {
+        "label": "Progress Tracking",
+        "value": "Real-time status with ETA"
+      },
+      "backup": {
+        "label": "Settings Backup",
+        "value": "Export/import your configuration"
+      }
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "step1": {
+        "title": "Text Splitting",
+        "desc": "Input is split into paragraphs, then sentences, then grouped into blocks for efficient LLM processing"
+      },
+      "step2": {
+        "title": "Character Extraction",
+        "desc": "LLM identifies characters and their genders from the text"
+      },
+      "step3": {
+        "title": "Speaker Assignment",
+        "desc": "Each sentence gets assigned to a character (dialogue) or narrator (non-dialogue)"
+      },
+      "step4": {
+        "title": "Voice Mapping",
+        "desc": "Top characters get unique voices; rare speakers share generic voices by gender"
+      },
+      "step5": {
+        "title": "TTS Conversion",
+        "desc": "Sentences are sent to Edge TTS via WebSocket in parallel"
+      },
+      "step6": {
+        "title": "Audio Merge",
+        "desc": "FFmpeg combines chunks into a single MP3/Opus file"
+      }
+    },
+    "quickStart": {
+      "title": "Quick Start",
+      "step1": "Upload — Drop a file or paste text",
+      "step2": "Configure — Pick voice, speed, pitch in Settings",
+      "step3": "Enable LLM (optional) — For multi-voice books, add an API key in Settings → LLM",
+      "step4": "Convert — Click \"Save to MP3\" and pick an output folder"
+    },
+    "llmSetup": {
+      "title": "LLM Setup",
+      "description": "For multi-voice audiobooks, you need an OpenAI-compatible API:",
+      "gemini": "Google Gemini — free tier available",
+      "openRouter": "OpenRouter — many free models",
+      "anyProvider": "Any OpenAI-compatible provider",
+      "instructions": {
+        "before": "Go to ",
+        "link": "Settings → LLM",
+        "after": " → enable \"LLM Voice Assignment\" → enter API URL and key."
+      },
+      "help": {
+        "before": "See the ",
+        "icon": "?",
+        "after": " button in LLM settings for detailed provider options."
+      }
+    },
+    "techStack": {
+      "title": "Tech Stack",
+      "ui": "UI: Preact + TypeScript + Tailwind CSS",
+      "tts": "TTS: Microsoft Edge WebSocket API",
+      "audio": "Audio: FFmpeg WASM",
+      "llm": "LLM: OpenAI-compatible API",
+      "storage": "Storage: IndexedDB + File System Access API",
+      "state": "State: @preact/signals",
+      "build": "Build: Vite"
+    },
+    "footer": "Everything runs locally in your browser. No server, no uploads, no tracking."
   }
 }
