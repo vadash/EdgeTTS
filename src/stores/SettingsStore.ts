@@ -55,7 +55,7 @@ export type SettingsPatch = Partial<AppSettings>;
 
 const defaultSettings: AppSettings = {
   narratorVoice: 'ru-RU, DmitryNeural',
-  enabledVoices: DEFAULT_ENABLED_VOICES,
+  enabledVoices: [...DEFAULT_ENABLED_VOICES],
   rate: 0,
   pitch: 0,
   ttsThreads: 15,
@@ -86,7 +86,7 @@ function loadFromStorage(): AppSettings {
       const parsed: Partial<AppSettings> = JSON.parse(saved);
       // Migration: [] used to mean "default enabled" — convert to explicit list
       if (parsed.enabledVoices && parsed.enabledVoices.length === 0) {
-        parsed.enabledVoices = DEFAULT_ENABLED_VOICES;
+        parsed.enabledVoices = [...DEFAULT_ENABLED_VOICES];
       }
       return { ...defaultSettings, ...parsed };
     }
