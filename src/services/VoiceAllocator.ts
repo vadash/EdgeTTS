@@ -6,6 +6,7 @@
 import type { LLMCharacter, SpeakerAssignment, VoiceOption, VoicePool } from '@/state/types';
 import type { DetectedLanguage } from '@/utils/languageDetection';
 import { countSpeakingFrequency } from './llm/CharacterUtils';
+import { deduplicateVariants } from './VoicePoolBuilder';
 
 /**
  * Voice allocation result
@@ -29,6 +30,26 @@ export interface VoiceAllocationOptions {
   pool: VoicePool;
   /** Pre-reserved voices (e.g., from user selection) */
   reservedVoices?: Set<string>;
+}
+
+/**
+ * Build a priority-ordered, deduplicated voice pool.
+ * Used by all voice assignment paths (initial, randomize, JSON import).
+ *
+ * Order: native non-Multilingual → native Multilingual → foreign Multilingual
+ * Dedup: variant pairs resolved (only one of Andrew/AndrewMultilingual survives)
+ */
+export function buildPriorityPool(
+  voices: VoiceOption[],
+  bookLanguage: string,
+  reserved: Set<string>,
+): { male: VoiceOption[]; female: VoiceOption[] } {
+  const available = voices.filter((v) => !reserved.has(v.fullValue));
+  const deduped = deduplicateVariants(available, bookLanguage);
+  return {
+    male: deduped.filter((v) => v.gender === 'male'),
+    female: deduped.filter((v) => v.gender === 'female'),
+  };
 }
 
 /**
