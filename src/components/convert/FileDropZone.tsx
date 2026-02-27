@@ -26,7 +26,6 @@ function LanguageBadge() {
         {fileName}
       </span>
       <select
-        role="language-badge"
         value={lang}
         onChange={(e) => {
           e.stopPropagation();
