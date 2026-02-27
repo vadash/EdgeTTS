@@ -1,0 +1,69 @@
+/**
+ * Top 20 stopwords per language (lowercase).
+ * Only for scripts shared by multiple languages.
+ * Used for disambiguation when Unicode script alone is insufficient.
+ */
+export const STOPWORDS: Record<string, Set<string>> = {
+  // Latin-script languages
+  en: new Set(['the', 'and', 'to', 'of', 'a', 'in', 'is', 'it', 'that', 'was', 'for', 'on', 'with', 'he', 'she', 'his', 'her', 'they', 'this', 'have']),
+  de: new Set(['der', 'die', 'und', 'den', 'das', 'ist', 'ein', 'eine', 'nicht', 'sich', 'mit', 'auf', 'des', 'dem', 'ich', 'auch', 'als', 'wie', 'von', 'aber']),
+  fr: new Set(['le', 'la', 'les', 'de', 'des', 'un', 'une', 'et', 'est', 'que', 'pas', 'pour', 'qui', 'dans', 'sur', 'avec', 'son', 'mais', 'nous', 'vous']),
+  es: new Set(['el', 'la', 'los', 'las', 'de', 'en', 'un', 'una', 'que', 'es', 'por', 'con', 'para', 'del', 'al', 'como', 'pero', 'fue', 'más', 'su']),
+  it: new Set(['il', 'la', 'di', 'che', 'un', 'una', 'del', 'dei', 'nel', 'con', 'non', 'per', 'sono', 'suo', 'sua', 'era', 'gli', 'anche', 'più', 'come']),
+  pt: new Set(['o', 'a', 'os', 'as', 'de', 'do', 'da', 'em', 'um', 'uma', 'que', 'com', 'para', 'por', 'não', 'seu', 'sua', 'mais', 'como', 'foi']),
+  nl: new Set(['de', 'het', 'een', 'van', 'en', 'in', 'is', 'dat', 'op', 'voor', 'met', 'niet', 'zijn', 'aan', 'hij', 'maar', 'ook', 'nog', 'als', 'naar']),
+  pl: new Set(['nie', 'się', 'na', 'jest', 'to', 'że', 'do', 'jak', 'ale', 'co', 'tak', 'za', 'od', 'już', 'był', 'jej', 'jego', 'tylko', 'czy', 'po']),
+  cs: new Set(['je', 'že', 'na', 'se', 'to', 'jak', 'ale', 'jsem', 'byl', 'pro', 'tak', 'jako', 'jeho', 'její', 'nebo', 'aby', 'jsou', 'jen', 'které', 'než', 'v', 's', 'k', 'z', 'do', 'si', 'ho', 'mu', 'jej', 'bylo', 'byla', 'byli', 'jsme', 'být', 'mít', 'má', 'můj', 'moje', 'této', 'tomu', 'tím', 'tento', 'tato', 'toho']),
+  sk: new Set(['je', 'na', 'sa', 'že', 'som', 'ako', 'ale', 'pri', 'bol', 'aby', 'tak', 'jeho', 'jej', 'len', 'alebo', 'sú', 'bolo', 'ešte', 'podľa', 'veľmi']),
+  ro: new Set(['de', 'la', 'în', 'pe', 'un', 'și', 'cu', 'care', 'din', 'mai', 'nu', 'sau', 'dar', 'este', 'sunt', 'fost', 'pentru', 'prin', 'acest', 'avea']),
+  hu: new Set(['egy', 'az', 'hogy', 'nem', 'is', 'volt', 'már', 'csak', 'meg', 'még', 'mint', 'van', 'fel', 'lett', 'majd', 'igen', 'után', 'ahol', 'nagy', 'vagy']),
+  sv: new Set(['och', 'att', 'det', 'som', 'den', 'för', 'med', 'var', 'har', 'inte', 'till', 'ett', 'kan', 'han', 'hon', 'hade', 'sig', 'från', 'men', 'alla']),
+  nb: new Set(['og', 'det', 'som', 'til', 'med', 'den', 'har', 'han', 'var', 'hun', 'seg', 'fra', 'men', 'eller', 'kan', 'skal', 'ble', 'alle', 'noe', 'sin']),
+  da: new Set(['og', 'det', 'som', 'til', 'med', 'den', 'har', 'han', 'var', 'hun', 'sig', 'fra', 'men', 'eller', 'kan', 'skal', 'blev', 'alle', 'noget', 'sin']),
+  fi: new Set(['ja', 'on', 'oli', 'hän', 'ei', 'se', 'että', 'kun', 'niin', 'mutta', 'kuin', 'olla', 'sen', 'voi', 'sitä', 'siitä', 'mitä', 'ovat', 'kanssa', 'tämä']),
+  et: new Set(['ja', 'on', 'oli', 'ei', 'ka', 'kui', 'see', 'mis', 'aga', 'nii', 'oma', 'siis', 'seda', 'veel', 'tema', 'kuid', 'olid', 'olla', 'mida', 'ning']),
+  lt: new Set(['ir', 'kad', 'tai', 'yra', 'buvo', 'bet', 'jis', 'jos', 'kaip', 'nuo', 'tik', 'dar', 'jau', 'apie', 'arba', 'labai', 'savo', 'nes', 'gali', 'nors']),
+  lv: new Set(['un', 'ir', 'ka', 'tas', 'ar', 'bet', 'kā', 'par', 'lai', 'gan', 'nav', 'bija', 'jau', 'tā', 'tad', 'vēl', 'vai', 'arī', 'viņš', 'viņa']),
+  hr: new Set(['je', 'da', 'na', 'se', 'su', 'za', 'ali', 'bio', 'kao', 'ili', 'sam', 'sve', 'još', 'samo', 'biti', 'nije', 'već', 'ima', 'koji', 'ovo']),
+  bs: new Set(['je', 'da', 'na', 'se', 'su', 'za', 'ali', 'bio', 'kao', 'ili', 'sam', 'sve', 'još', 'samo', 'biti', 'nije', 'već', 'ima', 'koji', 'ovo']),
+  sl: new Set(['je', 'da', 'na', 'se', 'za', 'ali', 'bil', 'kot', 'ali', 'sem', 'vse', 'še', 'samo', 'biti', 'ni', 'že', 'ima', 'ki', 'tudi', 'tako']),
+  sq: new Set(['dhe', 'në', 'një', 'për', 'që', 'nga', 'me', 'por', 'ishte', 'kanë', 'ka', 'pas', 'nuk', 'kjo', 'ky', 'janë', 'ose', 'duke', 'do', 'edhe']),
+  tr: new Set(['bir', 've', 'bu', 'için', 'ile', 'olan', 'gibi', 'ama', 'daha', 'çok', 'var', 'kadar', 'ancak', 'sonra', 'olarak', 'bunu', 'hem', 'ise', 'nasıl', 'değil']),
+  az: new Set(['bir', 'və', 'bu', 'üçün', 'ilə', 'olan', 'kimi', 'amma', 'daha', 'çox', 'var', 'sonra', 'olaraq', 'bunu', 'həm', 'isə', 'necə', 'yox', 'belə', 'edir']),
+  id: new Set(['dan', 'yang', 'di', 'ini', 'itu', 'dengan', 'untuk', 'dari', 'tidak', 'ada', 'pada', 'juga', 'akan', 'sudah', 'bisa', 'oleh', 'tetapi', 'atau', 'saya', 'mereka']),
+  ms: new Set(['dan', 'yang', 'di', 'ini', 'itu', 'dengan', 'untuk', 'dari', 'tidak', 'ada', 'pada', 'juga', 'akan', 'sudah', 'boleh', 'oleh', 'tetapi', 'atau', 'saya', 'mereka']),
+  vi: new Set(['của', 'và', 'là', 'có', 'trong', 'được', 'một', 'cho', 'không', 'này', 'với', 'các', 'đã', 'người', 'cũng', 'như', 'từ', 'đến', 'khi', 'những']),
+  ca: new Set(['de', 'la', 'el', 'les', 'dels', 'un', 'una', 'amb', 'que', 'per', 'com', 'però', 'més', 'són', 'tot', 'era', 'han', 'seva', 'seu', 'això']),
+  gl: new Set(['de', 'do', 'da', 'os', 'as', 'un', 'unha', 'que', 'con', 'para', 'por', 'non', 'máis', 'como', 'pero', 'seu', 'súa', 'foi', 'hai', 'ten']),
+  cy: new Set(['yn', 'ac', 'ar', 'yr', 'mae', 'ei', 'eu', 'gan', 'ond', 'bod', 'wedi', 'oedd', 'nid', 'roedd', 'hyn', 'fod', 'fel', 'dim', 'yw', 'hefyd']),
+  ga: new Set(['agus', 'ar', 'an', 'na', 'go', 'le', 'bhí', 'sé', 'sí', 'iad', 'atá', 'sin', 'ach', 'ann', 'nach', 'mar', 'ní', 'leis', 'tá', 'aon']),
+  is: new Set(['og', 'að', 'sem', 'um', 'var', 'með', 'til', 'hans', 'hennar', 'hún', 'hann', 'það', 'þetta', 'ekki', 'frá', 'eða', 'eru', 'hefur', 'sín', 'allt']),
+  mt: new Set(['li', 'ta', 'il', 'fil', 'għal', 'ma', 'dan', 'minn', 'kienu', 'kien', 'fuq', 'jew', 'imma', 'biss', 'kellu', 'wara', 'meta', 'għandu', 'jista', 'qatt']),
+  sw: new Set(['na', 'ya', 'kwa', 'ni', 'wa', 'ili', 'katika', 'hii', 'kama', 'lakini', 'hata', 'hiyo', 'kuwa', 'yake', 'wake', 'baada', 'sana', 'zaidi', 'pia', 'kwamba']),
+  so: new Set(['waa', 'iyo', 'oo', 'ka', 'ku', 'in', 'ay', 'ee', 'laga', 'ugu', 'lakin', 'sida', 'waxaa', 'ama', 'kale', 'dheer', 'jiray', 'leh', 'aad', 'waxa']),
+  af: new Set(['die', 'en', 'van', 'het', 'dat', 'vir', 'met', 'nie', 'ook', 'maar', 'was', 'kan', 'sal', 'aan', 'nog', 'wat', 'hulle', 'haar', 'ons', 'hom']),
+  zu: new Set(['uma', 'futhi', 'ukuthi', 'ngoba', 'kodwa', 'kwa', 'noma', 'yena', 'bona', 'naye', 'nabo', 'kanje', 'lapho', 'okwa', 'ngale', 'bonke', 'kuyo', 'kube', 'wathi', 'eya']),
+  fil: new Set(['ang', 'ng', 'mga', 'sa', 'na', 'ay', 'niya', 'siya', 'ako', 'ito', 'para', 'kung', 'nang', 'din', 'lang', 'hindi', 'pag', 'dahil', 'pero', 'sila']),
+  jv: new Set(['lan', 'ing', 'kang', 'sing', 'ora', 'ana', 'iku', 'iki', 'wis', 'arep', 'nanging', 'bisa', 'amarga', 'kanggo', 'uwong', 'kabeh', 'isih', 'saka', 'maneh', 'saiki']),
+  su: new Set(['jeung', 'teh', 'kana', 'anu', 'henteu', 'pikeun', 'dina', 'mah', 'téh', 'bisa', 'jadi', 'naon', 'ogé', 'boga', 'anjeun', 'urang', 'maneh', 'kitu', 'atuh', 'lamun']),
+  uz: new Set(['va', 'bir', 'bu', 'uchun', 'bilan', 'emas', 'ham', 'lekin', 'yoki', 'keyin', 'bor', 'har', 'edi', 'shu', 'hech', 'yana', 'kabi', 'shunday', 'juda', 'qanday']),
+
+  // Cyrillic-script languages
+  ru: new Set(['что', 'это', 'как', 'так', 'его', 'она', 'они', 'было', 'уже', 'все', 'для', 'был', 'она', 'ещё', 'или', 'при', 'тоже', 'мне', 'даже', 'вот']),
+  uk: new Set(['що', 'це', 'як', 'його', 'вона', 'вони', 'було', 'вже', 'всі', 'для', 'був', 'ще', 'або', 'при', 'також', 'мені', 'навіть', 'ось', 'тому', 'коли']),
+  bg: new Set(['на', 'от', 'за', 'се', 'да', 'са', 'като', 'също', 'има', 'бил', 'само', 'все', 'още', 'след', 'без', 'при', 'много', 'така', 'тези', 'тя']),
+  sr: new Set(['је', 'да', 'на', 'се', 'су', 'за', 'али', 'био', 'као', 'или', 'сам', 'све', 'још', 'само', 'бити', 'није', 'већ', 'има', 'који', 'ово']),
+  mk: new Set(['на', 'од', 'за', 'се', 'да', 'како', 'исто', 'има', 'бил', 'само', 'сè', 'уште', 'после', 'без', 'при', 'многу', 'така', 'овие', 'тие', 'таа']),
+  kk: new Set(['бір', 'және', 'бұл', 'үшін', 'мен', 'жоқ', 'бар', 'деп', 'сол', 'осы', 'оның', 'біз', 'оны', 'кейін', 'ғана', 'яғни', 'бойынша', 'бірақ', 'неге', 'қалай']),
+
+  // Arabic-script languages
+  ar: new Set(['في', 'من', 'على', 'إلى', 'أن', 'هذا', 'هذه', 'التي', 'الذي', 'عن', 'كان', 'لم', 'ما', 'مع', 'بعد', 'قد', 'أو', 'بين', 'ذلك', 'حتى']),
+  fa: new Set(['از', 'که', 'در', 'این', 'با', 'است', 'آن', 'برای', 'هم', 'یا', 'بود', 'نه', 'ما', 'تا', 'اما', 'شد', 'خود', 'بر', 'هر', 'پس']),
+  ur: new Set(['کے', 'کا', 'کی', 'میں', 'سے', 'نے', 'پر', 'ہے', 'اور', 'یہ', 'کو', 'بھی', 'وہ', 'تھا', 'ایک', 'لیے', 'ہو', 'جو', 'مگر', 'اس']),
+  ps: new Set(['د', 'په', 'چې', 'دا', 'هم', 'او', 'یو', 'لره', 'نه', 'تر', 'سره', 'ته', 'وه', 'کې', 'دې', 'هغه', 'خو', 'پورې', 'بل', 'ډېر']),
+
+  // Devanagari-script languages
+  hi: new Set(['का', 'के', 'की', 'में', 'से', 'है', 'और', 'यह', 'को', 'पर', 'ने', 'भी', 'वह', 'था', 'एक', 'लिए', 'हो', 'जो', 'मगर', 'इस']),
+  mr: new Set(['आणि', 'हा', 'ही', 'हे', 'या', 'ला', 'ने', 'च्या', 'केले', 'होता', 'होती', 'असे', 'त्या', 'पण', 'एक', 'काही', 'म्हणून', 'नाही', 'आहे', 'तो']),
+  ne: new Set(['र', 'को', 'मा', 'ले', 'छ', 'यो', 'त्यो', 'गर्न', 'भएको', 'गरेको', 'हो', 'थियो', 'पनि', 'एक', 'तर', 'कुनै', 'यस', 'भने', 'सबै', 'गर्दा']),
+};

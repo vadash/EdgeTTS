@@ -1,6 +1,8 @@
 /**
- * Multi-language detection using Unicode script analysis
+ * Multi-language detection using Unicode script analysis and stopword disambiguation
  */
+
+import { STOPWORDS } from './stopwords';
 
 export type DetectedLanguage = string;
 
@@ -81,8 +83,39 @@ function detectDominantScript(text: string): ScriptDef | null {
   return maxScript ? SCRIPTS.find(s => s.name === maxScript) ?? null : null;
 }
 
+function disambiguateByStopwords(
+  text: string,
+  candidateLanguages: string[],
+  fallbackLanguage: string
+): DetectionResult {
+  // Tokenize: split on non-letter characters, lowercase
+  // Supports Latin, Cyrillic, Arabic, and Devanagari scripts
+  const words = text.toLowerCase().split(/[^a-zA-Z\u00C0-\u024F\u0400-\u04FF\u0600-\u06FF\u0900-\u097F]+/).filter(w => w.length > 0);
+
+  let bestLang = fallbackLanguage;
+  let bestCount = 0;
+
+  for (const lang of candidateLanguages) {
+    const stopwords = STOPWORDS[lang];
+    if (!stopwords) continue;
+    let count = 0;
+    for (const word of words) {
+      if (stopwords.has(word)) count++;
+    }
+    if (count > bestCount) {
+      bestCount = count;
+      bestLang = lang;
+    }
+  }
+
+  if (bestCount === 0) {
+    return { language: fallbackLanguage, confidence: 'low', method: 'fallback' };
+  }
+  return { language: bestLang, confidence: 'medium', method: 'stopwords' };
+}
+
 /**
- * Detects language from text using Unicode script analysis
+ * Detects language from text using Unicode script analysis and stopword disambiguation
  * @param text The text to analyze
  * @param maxLength Maximum characters to analyze (default 5000)
  * @returns DetectionResult with language code, confidence, and method
@@ -99,7 +132,10 @@ export function detectLanguage(text: string, maxLength: number = DEFAULT_MAX_LEN
   if (script.directLanguage) {
     return { language: script.directLanguage, confidence: 'high', method: 'script' };
   }
-  // TODO: stopword disambiguation — Task 3
-  // Temporary: use fallback
+  // Use stopword disambiguation for shared scripts
+  if (script.candidateLanguages && script.fallbackLanguage) {
+    return disambiguateByStopwords(sample, script.candidateLanguages, script.fallbackLanguage);
+  }
+  // Fallback if no candidates defined
   return { language: script.fallbackLanguage ?? 'en', confidence: 'low', method: 'fallback' };
 }
