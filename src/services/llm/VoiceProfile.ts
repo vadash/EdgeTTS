@@ -7,7 +7,7 @@ import type {
 } from '@/state/types';
 import { IMPORTANCE_THRESHOLD } from '@/state/types';
 import type { DetectedLanguage } from '@/utils/languageDetection';
-import { allocateTiered, randomizeBelow, sortVoicesByPriority } from '../VoiceAllocator';
+import { allocateTiered, randomizeBelow } from '../VoiceAllocator';
 import { countSpeakingFrequency } from './CharacterUtils';
 import { matchCharacter } from './NameMatcher';
 
@@ -202,12 +202,6 @@ export function randomizeBelowVoices(params: RandomizeBelowParams): Map<string, 
     params.bookLanguage,
   );
 }
-
-/**
- * Sorts voices by priority for randomization
- * Re-exports from VoiceAllocator for backward compatibility
- */
-export { sortVoicesByPriority };
 
 /**
  * Download JSON as a file

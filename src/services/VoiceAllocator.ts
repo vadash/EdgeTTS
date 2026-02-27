@@ -321,34 +321,6 @@ export function randomizeBelow(
 }
 
 /**
- * Sort voices by priority: book language voices first, then alphabetically
- */
-export function sortVoicesByPriority(
-  voices: VoiceOption[],
-  bookLanguage: DetectedLanguage,
-  narratorVoice: string,
-): VoiceOption[] {
-  const filtered = voices.filter((v) => v.fullValue !== narratorVoice);
-  const langPrefix = bookLanguage === 'ru' ? 'ru' : 'en';
-
-  const bookLang: VoiceOption[] = [];
-  const other: VoiceOption[] = [];
-
-  for (const v of filtered) {
-    if (v.locale.startsWith(langPrefix)) {
-      bookLang.push(v);
-    } else {
-      other.push(v);
-    }
-  }
-
-  bookLang.sort((a, b) => a.fullValue.localeCompare(b.fullValue));
-  other.sort((a, b) => a.fullValue.localeCompare(b.fullValue));
-
-  return [...bookLang, ...other];
-}
-
-/**
  * Assign voices to unmatched characters from priority pool.
  * Used after JSON import to fill gaps.
  *
