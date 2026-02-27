@@ -284,21 +284,14 @@ export function FileDropZone() {
   return (
     <div className="space-y-3">
       {/* File Drop Zone */}
-      <div
-        role="button"
-        tabIndex={0}
-        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
+      <button
+        type="button"
+        className={`w-full border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
           ${isDragging ? 'border-accent bg-accent/10' : 'border-border hover:border-gray-500'}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
       >
         <input
           ref={inputRef}
@@ -313,7 +306,7 @@ export function FileDropZone() {
           <Text id="files.dropzone">Drop files here or click to upload</Text>
         </p>
         <p className="text-xs text-gray-500 mt-1">TXT, FB2, EPUB, ZIP</p>
-      </div>
+      </button>
 
       {/* Language Badge - shown after book loaded */}
       <LanguageBadge />

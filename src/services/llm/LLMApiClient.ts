@@ -273,12 +273,7 @@ export class LLMApiClient {
    * @returns Parsed and validated result matching the schema
    * @throws Error if LLM refuses or returns empty response
    */
-  async callStructured<T>({
-    prompt,
-    schema,
-    schemaName,
-    signal,
-  }: StructuredCallOptions<T>): Promise<T> {
+  async callStructured<T>({ prompt, schema, schemaName }: StructuredCallOptions<T>): Promise<T> {
     const useStreaming = this.options.streaming ?? false;
 
     const requestBody: Record<string, unknown> = {
@@ -304,7 +299,6 @@ export class LLMApiClient {
     if (useStreaming) {
       // Streaming path: accumulate SSE chunks
       try {
-        // biome-ignore lint/suspicious/noExplicitAny: OpenAI SDK types don't support conditional streaming well
         const streamResult = await this.client.chat.completions.create({
           ...requestBody,
           stream: true,
@@ -348,7 +342,6 @@ export class LLMApiClient {
       // Non-streaming path
       let response: ChatCompletion;
       try {
-        // biome-ignore lint/suspicious/noExplicitAny: OpenAI SDK types don't support conditional streaming well
         response = await this.client.chat.completions.create({
           ...requestBody,
           stream: false,
