@@ -3,8 +3,12 @@
 
 import { computed, effect, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
+import voices from '@/components/VoiceSelector/voices';
 import type { AppSettings, AudioPreset } from '@/state/types';
 import { AUDIO_PRESETS } from '@/state/types';
+
+/** All voice IDs — used as the default for enabledVoices */
+const ALL_VOICE_IDS = voices.map((v) => v.fullValue);
 
 // ============================================================================
 // Types
@@ -20,7 +24,7 @@ const defaultSettings: AppSettings = {
   voice: 'ru-RU, DmitryNeural',
   narratorVoice: 'ru-RU, DmitryNeural',
   voicePoolLocale: 'ru-RU',
-  enabledVoices: [],
+  enabledVoices: ALL_VOICE_IDS,
   rate: 0,
   pitch: 0,
   ttsThreads: 15,
@@ -49,6 +53,10 @@ function loadFromStorage(): AppSettings {
     const saved = localStorage.getItem(StorageKeys.settings);
     if (saved) {
       const parsed: Partial<AppSettings> = JSON.parse(saved);
+      // Migration: [] used to mean "all enabled" — convert to explicit full list
+      if (parsed.enabledVoices && parsed.enabledVoices.length === 0) {
+        parsed.enabledVoices = ALL_VOICE_IDS;
+      }
       return { ...defaultSettings, ...parsed };
     }
   } catch {

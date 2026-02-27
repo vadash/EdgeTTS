@@ -118,13 +118,9 @@ export function VoicePoolTab() {
   const [filter, setFilter] = useState('');
   const [localeFilter, setLocaleFilter] = useState('all');
 
-  // Get enabled voices from settings (empty array means all enabled)
+  // Get enabled voices from settings
   const enabledVoices = computed(() => {
-    const saved = settings.enabledVoices.value;
-    if (saved.length === 0) {
-      return new Set(voices.map((v) => v.fullValue));
-    }
-    return new Set(saved);
+    return new Set(settings.enabledVoices.value);
   });
 
   // Get unique locales with multilingual category, custom sorting, and separators

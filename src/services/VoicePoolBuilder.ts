@@ -80,10 +80,9 @@ export function buildVoicePool(options: VoicePoolOptions = {}): VoicePool {
   const { language, includeMultilingual = false, enabledVoices } = options;
 
   // Start with enabled voices or all voices
-  const baseVoices =
-    enabledVoices && enabledVoices.length > 0
-      ? voices.filter((v) => enabledVoices.includes(v.fullValue))
-      : voices;
+  const baseVoices = enabledVoices
+    ? voices.filter((v) => enabledVoices.includes(v.fullValue))
+    : voices;
 
   // Filter by language
   let filtered = language
