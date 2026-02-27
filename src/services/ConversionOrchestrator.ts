@@ -402,15 +402,7 @@ export async function runConversion(
   input: OrchestratorInput,
   existingBook?: ProcessedBook | null,
 ): Promise<void> {
-  const {
-    logger,
-    textBlockSplitter,
-    llmServiceFactory,
-    workerPoolFactory,
-    audioMergerFactory,
-    voicePoolBuilder,
-    ffmpegService,
-  } = services;
+  const { logger, textBlockSplitter, llmServiceFactory, voicePoolBuilder } = services;
   const { conversion, llm, logs, data } = stores;
 
   // ==================== INPUT VALIDATION ====================
@@ -805,10 +797,9 @@ async function runTTSStage(
   signal: AbortSignal,
   report: (stage: string, current: number, total: number, message: string) => void,
   services: ConversionOrchestratorServices,
-  stores: Stores,
+  _stores: Stores,
 ): Promise<void> {
   const { logger, workerPoolFactory, audioMergerFactory, ffmpegService } = services;
-  const { conversion, llm } = stores;
 
   const directoryHandle = input.directoryHandle!;
 
