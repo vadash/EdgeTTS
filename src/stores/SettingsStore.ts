@@ -3,12 +3,45 @@
 
 import { computed, effect, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
-import voices from '@/components/VoiceSelector/voices';
 import type { AppSettings, AudioPreset } from '@/state/types';
 import { AUDIO_PRESETS } from '@/state/types';
 
-/** All voice IDs — used as the default for enabledVoices */
-const ALL_VOICE_IDS = voices.map((v) => v.fullValue);
+/** Default enabled voices curated list */
+const DEFAULT_ENABLED_VOICES = [
+  'en-US, AndrewMultilingualNeural',
+  'en-US, AvaMultilingualNeural',
+  'en-US, BrianMultilingualNeural',
+  'en-US, EmmaMultilingualNeural',
+  'fr-FR, RemyMultilingualNeural',
+  'fr-FR, VivienneMultilingualNeural',
+  'en-US, SteffanNeural',
+  'en-US, RogerNeural',
+  'en-US, JennyNeural',
+  'en-US, MichelleNeural',
+  'en-US, GuyNeural',
+  'en-US, EricNeural',
+  'en-US, EmmaNeural',
+  'en-US, ChristopherNeural',
+  'en-US, BrianNeural',
+  'en-US, AvaNeural',
+  'en-US, AndrewNeural',
+  'en-GB, ThomasNeural',
+  'en-GB, SoniaNeural',
+  'en-GB, RyanNeural',
+  'en-GB, LibbyNeural',
+  'en-CA, LiamNeural',
+  'en-CA, ClaraNeural',
+  'en-NZ, MitchellNeural',
+  'en-NZ, MollyNeural',
+  'en-US, AriaNeural',
+  'en-AU, NatashaNeural',
+  'en-HK, YanNeural',
+  'en-HK, SamNeural',
+  'en-KE, AsiliaNeural',
+  'en-KE, ChilembaNeural',
+  'en-SG, WayneNeural',
+  'en-SG, LunaNeural',
+] as const;
 
 // ============================================================================
 // Types
@@ -22,7 +55,7 @@ export type SettingsPatch = Partial<AppSettings>;
 
 const defaultSettings: AppSettings = {
   narratorVoice: 'ru-RU, DmitryNeural',
-  enabledVoices: ALL_VOICE_IDS,
+  enabledVoices: DEFAULT_ENABLED_VOICES,
   rate: 0,
   pitch: 0,
   ttsThreads: 15,
@@ -51,9 +84,9 @@ function loadFromStorage(): AppSettings {
     const saved = localStorage.getItem(StorageKeys.settings);
     if (saved) {
       const parsed: Partial<AppSettings> = JSON.parse(saved);
-      // Migration: [] used to mean "all enabled" — convert to explicit full list
+      // Migration: [] used to mean "default enabled" — convert to explicit list
       if (parsed.enabledVoices && parsed.enabledVoices.length === 0) {
-        parsed.enabledVoices = ALL_VOICE_IDS;
+        parsed.enabledVoices = DEFAULT_ENABLED_VOICES;
       }
       return { ...defaultSettings, ...parsed };
     }
