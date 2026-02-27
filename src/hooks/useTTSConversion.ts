@@ -96,7 +96,7 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
     opusCompressionLevel: s.opusCompressionLevel,
 
     directoryHandle: stores.data.directoryHandle.value,
-    detectedLanguage: stores.data.detectLanguageFromContent(),
+    detectedLanguage: stores.data.detectLanguageFromContent().language,
     dictionaryRaw: stores.data.dictionaryRaw.value,
     textContent: text,
   };

@@ -236,10 +236,12 @@ describe('DataStore', () => {
         expect(store.detectedLanguage.value).toBe('ru');
       });
 
-      it('returns detected language from method', () => {
+      it('returns DetectionResult from method', () => {
         store.setTextContent('Это русский текст.');
-        const detected = store.detectLanguageFromContent();
-        expect(detected).toBe('ru');
+        const result = store.detectLanguageFromContent();
+        expect(result.language).toBe('ru');
+        expect(result.confidence).toBeDefined();
+        expect(result.method).toBeDefined();
       });
     });
   });

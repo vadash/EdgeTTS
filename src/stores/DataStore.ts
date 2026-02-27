@@ -3,7 +3,7 @@
 
 import { signal, computed } from '@preact/signals';
 import type { ProcessedBook, DictionaryRule, TTSWorker } from '@/state/types';
-import { detectLanguage, type DetectedLanguage } from '@/utils/languageDetection';
+import { detectLanguage, type DetectedLanguage, type DetectionResult } from '@/utils/languageDetection';
 
 /**
  * Data Store - manages application data
@@ -76,15 +76,15 @@ export class DataStore {
   /**
    * Explicitly detect language from current content
    * Call this when content is loaded or before conversion
-   * @returns The detected language
+   * @returns DetectionResult with language, confidence, and method
    */
-  detectLanguageFromContent(): DetectedLanguage {
+  detectLanguageFromContent(): DetectionResult {
     const text = this.textContent.value;
     const bookText = this.book.value?.allSentences.join(' ') ?? '';
     const contentToAnalyze = text || bookText;
-    const detected = detectLanguage(contentToAnalyze);
-    this.detectedLanguage.value = detected;
-    return detected;
+    const result = detectLanguage(contentToAnalyze);
+    this.detectedLanguage.value = result.language;
+    return result;
   }
 
   // ========== Text Content Actions ==========
