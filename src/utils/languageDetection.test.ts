@@ -171,5 +171,25 @@ describe('languageDetection', () => {
       expect(result.confidence).toBe('medium');
       expect(result.method).toBe('stopwords');
     });
+
+    it('should detect Ukrainian text (Cyrillic disambiguation)', () => {
+      const text = 'Чоловік пішов у парк зі своїм собакою і діти грали на газоні. Він мав довгий день і хотів відпочити. Це було дуже гарно.';
+      expect(detectLanguage(text).language).toBe('uk');
+    });
+
+    it('should detect Bulgarian text (Cyrillic disambiguation)', () => {
+      const text = 'Мъжът отиде в парка с кучето си и децата играеха на тревата. Той имаше дълъг ден и искаше да си почине. Това беше много хубаво.';
+      expect(detectLanguage(text).language).toBe('bg');
+    });
+
+    it('should detect Persian/Farsi text (Arabic script disambiguation)', () => {
+      const text = 'مرد با سگش به پارک رفت و بچه ها روی چمن بازی می کردند. او یک روز طولانی داشت و می خواست استراحت کند.';
+      expect(detectLanguage(text).language).toBe('fa');
+    });
+
+    it('should detect Hindi text (Devanagari disambiguation)', () => {
+      const text = 'आदमी अपने कुत्ते के साथ पार्क में गया और बच्चे घास पर खेल रहे थे। उसका एक लंबा दिन था और वह आराम करना चाहता था।';
+      expect(detectLanguage(text).language).toBe('hi');
+    });
   });
 });
