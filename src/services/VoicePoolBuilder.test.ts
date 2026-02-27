@@ -93,6 +93,17 @@ describe('VoicePoolBuilder', () => {
 
       expect([...pool.male, ...pool.female].sort()).toEqual(['en-US, GuyNeural', 'en-US, JennyNeural']);
     });
+
+    it('contains non-Multilingual variants for voices that have Multilingual pairs', () => {
+      const pool = buildVoicePool({ language: 'en' });
+      const all = [...pool.male, ...pool.female];
+
+      // These are the non-Multilingual counterparts that must exist
+      expect(all).toContain('en-US, AndrewNeural');
+      expect(all).toContain('en-US, AvaNeural');
+      expect(all).toContain('en-US, BrianNeural');
+      expect(all).toContain('en-US, EmmaNeural');
+    });
   });
 
   describe('getRandomVoice', () => {
