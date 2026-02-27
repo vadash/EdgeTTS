@@ -38,6 +38,7 @@ export class VoicePoolTracker {
   private used: Set<string> = new Set();
   private pool: VoicePool;
   public narratorVoice: string;
+  private cycleCounters = { male: 0, female: 0 };
 
   constructor(pool: VoicePool, narratorVoice: string, reserved: Set<string> = new Set()) {
     this.pool = pool;
@@ -69,13 +70,16 @@ export class VoicePoolTracker {
     // Find unused voice
     const available = pool.filter((v) => !this.used.has(v));
     if (available.length > 0) {
-      const voice = available[Math.floor(Math.random() * available.length)];
+      const voice = available[0];
       this.used.add(voice);
       return voice;
     }
 
-    // Fallback: random from pool (reuse)
-    return pool[Math.floor(Math.random() * pool.length)];
+    // Fallback: cycle through pool (reuse)
+    const genderKey = gender === 'female' ? 'female' : 'male';
+    const voice = pool[this.cycleCounters[genderKey] % pool.length];
+    this.cycleCounters[genderKey]++;
+    return voice;
   }
 
   /**
