@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { VoicePool, VoiceOption } from '@/state/types';
-import { VoicePoolTracker, buildPriorityPool } from './VoiceAllocator';
+import type { VoicePool, VoiceOption, LLMCharacter } from '@/state/types';
+import { VoicePoolTracker, buildPriorityPool, randomizeBelow } from './VoiceAllocator';
 
 describe('VoicePoolTracker', () => {
   const pool: VoicePool = {
@@ -115,5 +115,79 @@ describe('buildPriorityPool', () => {
     const result = buildPriorityPool([], 'en', new Set());
     expect(result.male).toHaveLength(0);
     expect(result.female).toHaveLength(0);
+  });
+});
+
+describe('randomizeBelow', () => {
+  const vo = (fullValue: string, gender: 'male' | 'female'): VoiceOption => {
+    const [locale, name] = fullValue.split(', ');
+    return { locale, name, fullValue, gender };
+  };
+
+  const mkChar = (name: string, gender: 'male' | 'female' | 'unknown'): LLMCharacter => ({
+    canonicalName: name,
+    variations: [name],
+    gender,
+  });
+
+  it('assigns native voices before Multilingual voices', () => {
+    const chars = [
+      mkChar('Alice', 'female'), // index 0 — frozen
+      mkChar('Bob', 'male'), // index 1 — randomized
+      mkChar('Charlie', 'male'), // index 2 — randomized
+      mkChar('Dave', 'male'), // index 3 — randomized
+    ];
+    const currentMap = new Map([
+      ['Alice', 'en-US, JennyNeural'],
+      ['Bob', 'en-US, AndrewMultilingualNeural'],
+      ['Charlie', 'en-US, BrianMultilingualNeural'],
+      ['Dave', 'en-US, GuyNeural'],
+    ]);
+    const enabledVoices = [
+      vo('en-US, AndrewNeural', 'male'),
+      vo('en-US, AndrewMultilingualNeural', 'male'),
+      vo('en-US, BrianNeural', 'male'),
+      vo('en-US, BrianMultilingualNeural', 'male'),
+      vo('en-US, GuyNeural', 'male'),
+      vo('en-US, JennyNeural', 'female'),
+    ];
+
+    const result = randomizeBelow(chars, currentMap, 0, enabledVoices, 'en-US, NarratorNeural', 'en');
+
+    // Bob (index 1) should get a native voice, not a Multilingual one
+    const bobVoice = result.get('Bob')!;
+    expect(bobVoice).not.toContain('Multilingual');
+
+    // All non-Multilingual male voices should be used before any Multilingual
+    const assignedMales = [result.get('Bob')!, result.get('Charlie')!, result.get('Dave')!];
+    const firstMultiIdx = assignedMales.findIndex((v) => v.includes('Multilingual'));
+    const lastNativeIdx = assignedMales.reduce(
+      (last, v, i) => (!v.includes('Multilingual') ? i : last),
+      -1,
+    );
+    if (firstMultiIdx !== -1 && lastNativeIdx !== -1) {
+      expect(lastNativeIdx).toBeLessThan(firstMultiIdx);
+    }
+  });
+
+  it('deduplicates variant pairs — never assigns both Andrew and AndrewMultilingual', () => {
+    const chars = [
+      mkChar('Bob', 'male'),
+      mkChar('Charlie', 'male'),
+    ];
+    const currentMap = new Map<string, string>();
+    const enabledVoices = [
+      vo('en-US, AndrewNeural', 'male'),
+      vo('en-US, AndrewMultilingualNeural', 'male'),
+      vo('en-US, BrianNeural', 'male'),
+    ];
+
+    const result = randomizeBelow(chars, currentMap, -1, enabledVoices, 'en-US, NarratorNeural', 'en');
+
+    const assignedVoices = [...result.values()];
+    const hasAndrew = assignedVoices.includes('en-US, AndrewNeural');
+    const hasAndrewMulti = assignedVoices.includes('en-US, AndrewMultilingualNeural');
+    // At most one of the pair should be assigned
+    expect(hasAndrew && hasAndrewMulti).toBe(false);
   });
 });

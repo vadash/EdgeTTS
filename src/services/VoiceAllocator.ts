@@ -293,12 +293,10 @@ export function randomizeBelow(
     if (voice) reserved.add(voice);
   }
 
-  // Sort voices by priority (book language first)
-  const prioritized = sortVoicesByPriority(enabledVoices, bookLanguage, narratorVoice);
-
-  // Split by gender
-  const malePool = prioritized.filter((v) => v.gender === 'male' && !reserved.has(v.fullValue));
-  const femalePool = prioritized.filter((v) => v.gender === 'female' && !reserved.has(v.fullValue));
+  // Build priority pool with deduplication
+  const pool = buildPriorityPool(enabledVoices, bookLanguage, reserved);
+  const malePool = pool.male;
+  const femalePool = pool.female;
 
   let maleIdx = 0;
   let femaleIdx = 0;
