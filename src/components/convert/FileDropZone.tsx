@@ -56,6 +56,9 @@ export function FileDropZone() {
     if (!files || files.length === 0) return;
 
     try {
+      // Clear previous language detection
+      dataStore.clearDetectedLanguage();
+
       const allConverted: Array<{ filename: string; content: string }> = [];
 
       for (const file of Array.from(files)) {
@@ -92,6 +95,22 @@ export function FileDropZone() {
         allSentences,
         fullText,
       });
+
+      // Detect language from loaded content
+      const result = dataStore.detectLanguageFromContent();
+
+      // Store the display filename
+      const displayName = files.length === 1
+        ? (files[0] as File).name
+        : `${(files[0] as File).name} (+${files.length - 1})`;
+      dataStore.setLoadedFileName(displayName);
+
+      // Log if detection was uncertain
+      if (result.confidence === 'low') {
+        logs.warn(`Could not reliably detect book language, falling back to EN`);
+      } else {
+        logs.info(`Detected book language: ${result.language.toUpperCase()}`);
+      }
     } catch (err) {
       logs.error(`Error loading file: ${(err as Error).message}`);
     }
@@ -133,6 +152,9 @@ export function FileDropZone() {
     if (!files || files.length === 0) return;
 
     try {
+      // Clear previous language detection
+      dataStore.clearDetectedLanguage();
+
       const allConverted: Array<{ filename: string; content: string }> = [];
 
       for (const file of Array.from(files)) {
@@ -165,6 +187,22 @@ export function FileDropZone() {
         allSentences,
         fullText,
       });
+
+      // Detect language from loaded content
+      const result = dataStore.detectLanguageFromContent();
+
+      // Store the display filename
+      const displayName = files.length === 1
+        ? files[0].name
+        : `${files[0].name} (+${files.length - 1})`;
+      dataStore.setLoadedFileName(displayName);
+
+      // Log if detection was uncertain
+      if (result.confidence === 'low') {
+        logs.warn(`Could not reliably detect book language, falling back to EN`);
+      } else {
+        logs.info(`Detected book language: ${result.language.toUpperCase()}`);
+      }
     } catch (err) {
       logs.error(`Error loading file: ${(err as Error).message}`);
     }
