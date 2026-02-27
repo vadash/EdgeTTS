@@ -86,13 +86,18 @@ export function buildVoicePool(options: VoicePoolOptions = {}): VoicePool {
     : voices;
 
   // Filter by language
-  const filtered = language
+  let filtered = language
     ? baseVoices.filter(v => {
         const matchesLang = v.locale.startsWith(language.split('-')[0]);
         const matchesMulti = includeMultilingual && v.name.includes('Multilingual');
         return matchesLang || matchesMulti;
       })
     : baseVoices;
+
+  // Deduplicate Multilingual variant pairs when language is specified
+  if (language) {
+    filtered = deduplicateVariants(filtered, language);
+  }
 
   return {
     male: filtered.filter(v => v.gender === 'male').map(v => v.fullValue),

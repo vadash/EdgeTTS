@@ -106,6 +106,41 @@ describe('VoicePoolBuilder', () => {
       expect(all).toContain('en-US, BrianNeural');
       expect(all).toContain('en-US, EmmaNeural');
     });
+
+    it('deduplicates Multilingual pairs for EN book — keeps non-Multilingual', () => {
+      const pool = buildVoicePool({ language: 'en', includeMultilingual: true });
+      const all = [...pool.male, ...pool.female];
+
+      // AndrewNeural should be present, not AndrewMultilingualNeural
+      expect(all).toContain('en-US, AndrewNeural');
+      expect(all).not.toContain('en-US, AndrewMultilingualNeural');
+    });
+
+    it('deduplicates Multilingual pairs for RU book — Multilingual voices included without native pair conflict', () => {
+      const pool = buildVoicePool({ language: 'ru', includeMultilingual: true });
+      const all = [...pool.male, ...pool.female];
+
+      // Russian native voices present
+      expect(all).toContain('ru-RU, DmitryNeural');
+      expect(all).toContain('ru-RU, SvetlanaNeural');
+      // Multilingual voices present (no non-Multilingual EN voice leaks in)
+      expect(all).toContain('en-US, AndrewMultilingualNeural');
+      expect(all).not.toContain('en-US, AndrewNeural');
+    });
+
+    it('orders native voices before Multilingual in pool', () => {
+      const pool = buildVoicePool({ language: 'ru', includeMultilingual: true });
+
+      // All ru-* voices should appear before any Multilingual voice
+      const firstMultiIdx = pool.male.findIndex(v => v.includes('Multilingual'));
+      const lastNativeIdx = pool.male.reduce(
+        (last, v, i) => v.startsWith('ru') ? i : last, -1
+      );
+
+      if (firstMultiIdx !== -1 && lastNativeIdx !== -1) {
+        expect(lastNativeIdx).toBeLessThan(firstMultiIdx);
+      }
+    });
   });
 
   describe('getRandomVoice', () => {
