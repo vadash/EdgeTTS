@@ -1,7 +1,7 @@
 // Resume state checking for TTS conversion
 // Checks for cached work to resume after interruption
 
-import type { SpeakerAssignment, LLMCharacter } from '@/state/types';
+import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 
 export interface ResumeInfo {
   cachedChunks: number;
@@ -19,7 +19,7 @@ export interface PipelineState {
 
 async function tryGetDirectory(
   parent: FileSystemDirectoryHandle,
-  name: string
+  name: string,
 ): Promise<FileSystemDirectoryHandle | null> {
   try {
     return await parent.getDirectoryHandle(name);
@@ -28,10 +28,7 @@ async function tryGetDirectory(
   }
 }
 
-async function tryReadJSON<T>(
-  dir: FileSystemDirectoryHandle,
-  filename: string
-): Promise<T | null> {
+async function tryReadJSON<T>(dir: FileSystemDirectoryHandle, filename: string): Promise<T | null> {
   try {
     const fileHandle = await dir.getFileHandle(filename);
     const file = await fileHandle.getFile();
@@ -67,7 +64,7 @@ async function fileExists(dir: FileSystemDirectoryHandle, name: string): Promise
  */
 export async function checkResumeState(
   dirHandle: FileSystemDirectoryHandle,
-  log?: (msg: string) => void
+  log?: (msg: string) => void,
 ): Promise<ResumeCheckResult> {
   const tempDir = await tryGetDirectory(dirHandle, '_temp_work');
   if (!tempDir) {
@@ -83,7 +80,9 @@ export async function checkResumeState(
 
   const cachedChunks = await countChunkFiles(tempDir);
 
-  log?.(`Resume check: resumable state found (${cachedChunks} cached chunks, LLM state: ${hasLLMState})`);
+  log?.(
+    `Resume check: resumable state found (${cachedChunks} cached chunks, LLM state: ${hasLLMState})`,
+  );
   return {
     cachedChunks,
     hasLLMState,
@@ -91,7 +90,7 @@ export async function checkResumeState(
 }
 
 export async function loadPipelineState(
-  dirHandle: FileSystemDirectoryHandle
+  dirHandle: FileSystemDirectoryHandle,
 ): Promise<PipelineState | null> {
   const tempDir = await tryGetDirectory(dirHandle, '_temp_work');
   if (!tempDir) return null;

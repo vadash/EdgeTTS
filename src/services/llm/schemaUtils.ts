@@ -27,10 +27,7 @@ export type JSONSchemaFormat = {
  * @param schemaName - Name for the schema (used in OpenAI request)
  * @returns OpenAI-compatible response_format object
  */
-export function zodToJsonSchema<T>(
-  schema: z.ZodType<T>,
-  schemaName: string
-): JSONSchemaFormat {
+export function zodToJsonSchema<T>(schema: z.ZodType<T>, schemaName: string): JSONSchemaFormat {
   return {
     type: 'json_schema' as const,
     json_schema: {

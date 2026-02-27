@@ -14,6 +14,10 @@
     "test:real:repeat": "cross-env REPEAT_PROMPT=true vitest run --config vitest.real.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "check": "biome check --write .",
     "repomix": "npm run repomix:source && npm run repomix:tests",
     "repomix:source": "npx repomix --include \"**/*.ts,*.md,*.js,package.json\" --ignore \"**/*.test.ts,**/*.spec.ts,**/test/**,**/tests/**,**/vitest*.ts\" --style markdown --output repomix-source.md",
     "repomix:tests": "npx repomix --include \"**/*.test.ts,**/*.spec.ts,**/vitest*.ts,**/*.test.tsx,**/*.spec.tsx\" --style markdown --output repomix-tests.md"
@@ -32,6 +36,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.4.4",
     "@testing-library/preact": "^3.2.4",
     "@types/generic-pool": "^3.1.11",
     "@types/node": "^20.10.5",

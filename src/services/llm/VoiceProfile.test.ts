@@ -1,26 +1,45 @@
-import { describe, it, expect } from 'vitest';
-import { exportToProfile, importProfile, isCharacterVisible, assignVoicesTiered, sortVoicesByPriority, randomizeBelowVoices, type RandomizeBelowParams } from './VoiceProfile';
-import type { VoiceProfileFile, LLMCharacter, SpeakerAssignment, CharacterEntry, VoiceOption } from '@/state/types';
+import { describe, expect, it } from 'vitest';
+import type {
+  CharacterEntry,
+  LLMCharacter,
+  SpeakerAssignment,
+  VoiceOption,
+  VoiceProfileFile,
+} from '@/state/types';
+import {
+  assignVoicesTiered,
+  exportToProfile,
+  importProfile,
+  isCharacterVisible,
+  type RandomizeBelowParams,
+  randomizeBelowVoices,
+  sortVoicesByPriority,
+} from './VoiceProfile';
 
 describe('exportToProfile', () => {
   it('creates new profile when existingProfile is null', () => {
-    const characters: LLMCharacter[] = [
-      { canonicalName: 'Harry', variations: [], gender: 'male' }
-    ];
+    const characters: LLMCharacter[] = [{ canonicalName: 'Harry', variations: [], gender: 'male' }];
     const voiceMap = new Map([['Harry', 'en-GB-RyanNeural']]);
     const assignments: SpeakerAssignment[] = [
       { sentenceIndex: 0, text: 'Hello', speaker: 'Harry', voiceId: 'en-GB-RyanNeural' },
-      { sentenceIndex: 1, text: 'World', speaker: 'narrator', voiceId: 'en-US-GuyNeural' }
+      { sentenceIndex: 1, text: 'World', speaker: 'narrator', voiceId: 'en-US-GuyNeural' },
     ];
 
-    const json = exportToProfile(null, characters, voiceMap, assignments, 'en-US-GuyNeural', 'BOOK1');
+    const json = exportToProfile(
+      null,
+      characters,
+      voiceMap,
+      assignments,
+      'en-US-GuyNeural',
+      'BOOK1',
+    );
     const profile = JSON.parse(json) as VoiceProfileFile;
 
     expect(profile.version).toBe(2);
     expect(profile.narrator).toBe('en-US-GuyNeural');
     expect(profile.totalLines).toBe(2);
-    expect(profile.characters['harry'].canonicalName).toBe('Harry');
-    expect(profile.characters['harry'].lines).toBe(1);
+    expect(profile.characters.harry.canonicalName).toBe('Harry');
+    expect(profile.characters.harry.lines).toBe(1);
   });
 
   it('merges existing profile with new characters', () => {
@@ -29,7 +48,7 @@ describe('exportToProfile', () => {
       narrator: 'en-US-GuyNeural',
       totalLines: 100,
       characters: {
-        'harry': {
+        harry: {
           canonicalName: 'Harry',
           voice: 'en-GB-RyanNeural',
           gender: 'male',
@@ -37,35 +56,42 @@ describe('exportToProfile', () => {
           lines: 50,
           percentage: 50,
           lastSeenIn: 'BOOK1',
-          bookAppearances: 1
-        }
-      }
+          bookAppearances: 1,
+        },
+      },
     };
 
     const characters: LLMCharacter[] = [
       { canonicalName: 'Harry', variations: ['Harry P.'], gender: 'male' },
-      { canonicalName: 'Ron', variations: [], gender: 'male' }
+      { canonicalName: 'Ron', variations: [], gender: 'male' },
     ];
     const voiceMap = new Map([
       ['Harry', 'en-GB-RyanNeural'],
-      ['Ron', 'en-US-GuyNeural']
+      ['Ron', 'en-US-GuyNeural'],
     ]);
     const assignments: SpeakerAssignment[] = [
       { sentenceIndex: 0, text: 'Hi', speaker: 'Harry', voiceId: 'en-GB-RyanNeural' },
-      { sentenceIndex: 1, text: 'Hey', speaker: 'Ron', voiceId: 'en-US-GuyNeural' }
+      { sentenceIndex: 1, text: 'Hey', speaker: 'Ron', voiceId: 'en-US-GuyNeural' },
     ];
 
-    const json = exportToProfile(existingProfile, characters, voiceMap, assignments, 'en-US-GuyNeural', 'BOOK2');
+    const json = exportToProfile(
+      existingProfile,
+      characters,
+      voiceMap,
+      assignments,
+      'en-US-GuyNeural',
+      'BOOK2',
+    );
     const profile = JSON.parse(json) as VoiceProfileFile;
 
     // Harry should have updated counts
-    expect(profile.characters['harry'].lines).toBe(51);
-    expect(profile.characters['harry'].bookAppearances).toBe(2);
-    expect(profile.characters['harry'].lastSeenIn).toBe('BOOK2');
+    expect(profile.characters.harry.lines).toBe(51);
+    expect(profile.characters.harry.bookAppearances).toBe(2);
+    expect(profile.characters.harry.lastSeenIn).toBe('BOOK2');
 
     // Ron should be added
-    expect(profile.characters['ron'].canonicalName).toBe('Ron');
-    expect(profile.characters['ron'].lines).toBe(1);
+    expect(profile.characters.ron.canonicalName).toBe('Ron');
+    expect(profile.characters.ron.lines).toBe(1);
 
     // Total should include previous + current
     expect(profile.totalLines).toBe(102); // 100 + 2
@@ -77,7 +103,7 @@ describe('exportToProfile', () => {
       narrator: 'en-US-GuyNeural',
       totalLines: 10,
       characters: {
-        'harry_potter': {
+        harry_potter: {
           canonicalName: 'Harry Potter',
           voice: 'en-GB-RyanNeural',
           gender: 'male',
@@ -85,26 +111,37 @@ describe('exportToProfile', () => {
           lines: 10,
           percentage: 100,
           lastSeenIn: 'BOOK1',
-          bookAppearances: 1
-        }
-      }
+          bookAppearances: 1,
+        },
+      },
     };
 
     const characters: LLMCharacter[] = [
-      { canonicalName: 'Harry Potter', variations: ['Harry', 'Potter', 'The Boy Who Lived'], gender: 'male' }
+      {
+        canonicalName: 'Harry Potter',
+        variations: ['Harry', 'Potter', 'The Boy Who Lived'],
+        gender: 'male',
+      },
     ];
     const voiceMap = new Map([['Harry Potter', 'en-GB-RyanNeural']]);
     const assignments: SpeakerAssignment[] = [
-      { sentenceIndex: 0, text: 'Hi', speaker: 'Harry Potter', voiceId: 'en-GB-RyanNeural' }
+      { sentenceIndex: 0, text: 'Hi', speaker: 'Harry Potter', voiceId: 'en-GB-RyanNeural' },
     ];
 
-    const json = exportToProfile(existingProfile, characters, voiceMap, assignments, 'en-US-GuyNeural', 'BOOK2');
+    const json = exportToProfile(
+      existingProfile,
+      characters,
+      voiceMap,
+      assignments,
+      'en-US-GuyNeural',
+      'BOOK2',
+    );
     const profile = JSON.parse(json) as VoiceProfileFile;
 
-    expect(profile.characters['harry_potter'].aliases).toContain('Harry P.');
-    expect(profile.characters['harry_potter'].aliases).toContain('Harry');
-    expect(profile.characters['harry_potter'].aliases).toContain('Potter');
-    expect(profile.characters['harry_potter'].aliases).toContain('The Boy Who Lived');
+    expect(profile.characters.harry_potter.aliases).toContain('Harry P.');
+    expect(profile.characters.harry_potter.aliases).toContain('Harry');
+    expect(profile.characters.harry_potter.aliases).toContain('Potter');
+    expect(profile.characters.harry_potter.aliases).toContain('The Boy Who Lived');
   });
 
   it('calculates percentage correctly for merged profile', () => {
@@ -113,7 +150,7 @@ describe('exportToProfile', () => {
       narrator: 'en-US-GuyNeural',
       totalLines: 100, // Harry has 50 lines = 50%
       characters: {
-        'harry': {
+        harry: {
           canonicalName: 'Harry',
           voice: 'en-GB-RyanNeural',
           gender: 'male',
@@ -121,26 +158,33 @@ describe('exportToProfile', () => {
           lines: 50,
           percentage: 50,
           lastSeenIn: 'BOOK1',
-          bookAppearances: 1
-        }
-      }
+          bookAppearances: 1,
+        },
+      },
     };
 
     const characters: LLMCharacter[] = [
-      { canonicalName: 'Harry', variations: ['Harry P.'], gender: 'male' }
+      { canonicalName: 'Harry', variations: ['Harry P.'], gender: 'male' },
     ];
     const voiceMap = new Map([['Harry', 'en-GB-RyanNeural']]);
     const assignments: SpeakerAssignment[] = [
-      { sentenceIndex: 0, text: 'Hi', speaker: 'Harry', voiceId: 'en-GB-RyanNeural' }
+      { sentenceIndex: 0, text: 'Hi', speaker: 'Harry', voiceId: 'en-GB-RyanNeural' },
     ];
 
-    const json = exportToProfile(existingProfile, characters, voiceMap, assignments, 'en-US-GuyNeural', 'BOOK2');
+    const json = exportToProfile(
+      existingProfile,
+      characters,
+      voiceMap,
+      assignments,
+      'en-US-GuyNeural',
+      'BOOK2',
+    );
     const profile = JSON.parse(json) as VoiceProfileFile;
 
     // Total: 101 lines, Harry: 51 lines = 51/101 ≈ 50.495%
     expect(profile.totalLines).toBe(101);
-    expect(profile.characters['harry'].lines).toBe(51);
-    expect(Math.abs(profile.characters['harry'].percentage - 50.495)).toBeLessThan(0.01);
+    expect(profile.characters.harry.lines).toBe(51);
+    expect(Math.abs(profile.characters.harry.percentage - 50.495)).toBeLessThan(0.01);
   });
 });
 
@@ -150,12 +194,10 @@ describe('importProfile', () => {
       version: 2,
       narrator: 'en-US-GuyNeural',
       totalLines: 0,
-      characters: {}
+      characters: {},
     };
 
-    const characters: LLMCharacter[] = [
-      { canonicalName: 'Harry', variations: [], gender: 'male' }
-    ];
+    const characters: LLMCharacter[] = [{ canonicalName: 'Harry', variations: [], gender: 'male' }];
 
     const result = importProfile(JSON.stringify(profile), characters);
 
@@ -170,7 +212,7 @@ describe('importProfile', () => {
       narrator: 'en-US-GuyNeural',
       totalLines: 100,
       characters: {
-        'harry': {
+        harry: {
           canonicalName: 'Harry',
           voice: 'en-GB-RyanNeural',
           gender: 'male',
@@ -178,13 +220,13 @@ describe('importProfile', () => {
           lines: 50,
           percentage: 50,
           lastSeenIn: 'BOOK1',
-          bookAppearances: 1
-        }
-      }
+          bookAppearances: 1,
+        },
+      },
     };
 
     const characters: LLMCharacter[] = [
-      { canonicalName: 'Harry', variations: ['Potter'], gender: 'male' }
+      { canonicalName: 'Harry', variations: ['Potter'], gender: 'male' },
     ];
 
     const result = importProfile(JSON.stringify(profile), characters);
@@ -200,7 +242,7 @@ describe('importProfile', () => {
       narrator: 'en-US-GuyNeural',
       totalLines: 100,
       characters: {
-        'mae': {
+        mae: {
           canonicalName: 'Mae',
           voice: 'en-US-JennyNeural',
           gender: 'female',
@@ -208,14 +250,14 @@ describe('importProfile', () => {
           lines: 50,
           percentage: 50,
           lastSeenIn: 'BOOK1',
-          bookAppearances: 1
-        }
-      }
+          bookAppearances: 1,
+        },
+      },
     };
 
     // May/Mae/TheMay vs Mae/Mai - should match with 2 pairings
     const characters: LLMCharacter[] = [
-      { canonicalName: 'May', variations: ['Mae', 'The May'], gender: 'female' }
+      { canonicalName: 'May', variations: ['Mae', 'The May'], gender: 'female' },
     ];
 
     const result = importProfile(JSON.stringify(profile), characters);
@@ -230,7 +272,7 @@ describe('importProfile', () => {
       narrator: 'en-US-GuyNeural',
       totalLines: 100,
       characters: {
-        'harry': {
+        harry: {
           canonicalName: 'Harry',
           voice: 'en-GB-RyanNeural',
           gender: 'male',
@@ -238,14 +280,14 @@ describe('importProfile', () => {
           lines: 50,
           percentage: 50,
           lastSeenIn: 'BOOK1',
-          bookAppearances: 1
-        }
-      }
+          bookAppearances: 1,
+        },
+      },
     };
 
     const characters: LLMCharacter[] = [
       { canonicalName: 'Harry', variations: [], gender: 'male' },
-      { canonicalName: 'Ron', variations: [], gender: 'male' }
+      { canonicalName: 'Ron', variations: [], gender: 'male' },
     ];
 
     const result = importProfile(JSON.stringify(profile), characters);
@@ -265,7 +307,7 @@ describe('importProfile', () => {
     const v1Json = JSON.stringify({
       version: 1,
       narrator: 'en-US, GuyNeural',
-      voices: [{ name: 'Harry', voice: 'en-GB-RyanNeural', gender: 'male' }]
+      voices: [{ name: 'Harry', voice: 'en-GB-RyanNeural', gender: 'male' }],
     });
 
     expect(() => {
@@ -276,7 +318,7 @@ describe('importProfile', () => {
   it('throws on missing version field', () => {
     const noVersionJson = JSON.stringify({
       narrator: 'en-US, GuyNeural',
-      characters: {}
+      characters: {},
     });
 
     expect(() => {
@@ -297,7 +339,7 @@ describe('isCharacterVisible', () => {
       lines: 1,
       percentage: 0.003, // Below 0.5% (0.5% = 0.005)
       lastSeenIn: 'BOOK1',
-      bookAppearances: 1
+      bookAppearances: 1,
     };
 
     expect(isCharacterVisible(entry)).toBe(false);
@@ -312,7 +354,7 @@ describe('isCharacterVisible', () => {
       lines: 10,
       percentage: 0.5, // Exactly threshold
       lastSeenIn: 'BOOK1',
-      bookAppearances: 1
+      bookAppearances: 1,
     };
 
     const entry2: CharacterEntry = {
@@ -323,7 +365,7 @@ describe('isCharacterVisible', () => {
       lines: 100,
       percentage: 15.0,
       lastSeenIn: 'BOOK1',
-      bookAppearances: 1
+      bookAppearances: 1,
     };
 
     expect(isCharacterVisible(entry1)).toBe(true);
@@ -339,7 +381,7 @@ describe('isCharacterVisible', () => {
       lines: 5,
       percentage: IMPORTANCE_THRESHOLD,
       lastSeenIn: 'BOOK1',
-      bookAppearances: 1
+      bookAppearances: 1,
     };
 
     expect(isCharacterVisible(entry)).toBe(true);
@@ -354,11 +396,56 @@ describe('assignVoicesTiered', () => {
   ];
 
   const createCharacterEntries = (): CharacterEntry[] => [
-    { canonicalName: 'Main1', voice: '', gender: 'male', aliases: [], lines: 100, percentage: 50, lastSeenIn: 'BOOK1', bookAppearances: 1 },
-    { canonicalName: 'Main2', voice: '', gender: 'male', aliases: [], lines: 80, percentage: 40, lastSeenIn: 'BOOK1', bookAppearances: 1 },
-    { canonicalName: 'Main3', voice: '', gender: 'male', aliases: [], lines: 60, percentage: 30, lastSeenIn: 'BOOK1', bookAppearances: 1 },
-    { canonicalName: 'Minor1', voice: '', gender: 'male', aliases: [], lines: 5, percentage: 2.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
-    { canonicalName: 'Minor2', voice: '', gender: 'male', aliases: [], lines: 3, percentage: 1.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+    {
+      canonicalName: 'Main1',
+      voice: '',
+      gender: 'male',
+      aliases: [],
+      lines: 100,
+      percentage: 50,
+      lastSeenIn: 'BOOK1',
+      bookAppearances: 1,
+    },
+    {
+      canonicalName: 'Main2',
+      voice: '',
+      gender: 'male',
+      aliases: [],
+      lines: 80,
+      percentage: 40,
+      lastSeenIn: 'BOOK1',
+      bookAppearances: 1,
+    },
+    {
+      canonicalName: 'Main3',
+      voice: '',
+      gender: 'male',
+      aliases: [],
+      lines: 60,
+      percentage: 30,
+      lastSeenIn: 'BOOK1',
+      bookAppearances: 1,
+    },
+    {
+      canonicalName: 'Minor1',
+      voice: '',
+      gender: 'male',
+      aliases: [],
+      lines: 5,
+      percentage: 2.5,
+      lastSeenIn: 'BOOK1',
+      bookAppearances: 1,
+    },
+    {
+      canonicalName: 'Minor2',
+      voice: '',
+      gender: 'male',
+      aliases: [],
+      lines: 3,
+      percentage: 1.5,
+      lastSeenIn: 'BOOK1',
+      bookAppearances: 1,
+    },
   ];
 
   it('assigns unique voices to top N characters (N = voice count)', () => {
@@ -396,31 +483,92 @@ describe('assignVoicesTiered', () => {
     const voices = createVoiceOptions();
     const characters: CharacterEntry[] = [
       ...createCharacterEntries().slice(0, 3), // 3 main characters
-      { canonicalName: 'Minor1', voice: '', gender: 'male', aliases: [], lines: 1, percentage: 0.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
-      { canonicalName: 'Minor2', voice: '', gender: 'male', aliases: [], lines: 1, percentage: 0.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
-      { canonicalName: 'Minor3', voice: '', gender: 'male', aliases: [], lines: 1, percentage: 0.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
-      { canonicalName: 'Minor4', voice: '', gender: 'male', aliases: [], lines: 1, percentage: 0.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+      {
+        canonicalName: 'Minor1',
+        voice: '',
+        gender: 'male',
+        aliases: [],
+        lines: 1,
+        percentage: 0.5,
+        lastSeenIn: 'BOOK1',
+        bookAppearances: 1,
+      },
+      {
+        canonicalName: 'Minor2',
+        voice: '',
+        gender: 'male',
+        aliases: [],
+        lines: 1,
+        percentage: 0.5,
+        lastSeenIn: 'BOOK1',
+        bookAppearances: 1,
+      },
+      {
+        canonicalName: 'Minor3',
+        voice: '',
+        gender: 'male',
+        aliases: [],
+        lines: 1,
+        percentage: 0.5,
+        lastSeenIn: 'BOOK1',
+        bookAppearances: 1,
+      },
+      {
+        canonicalName: 'Minor4',
+        voice: '',
+        gender: 'male',
+        aliases: [],
+        lines: 1,
+        percentage: 0.5,
+        lastSeenIn: 'BOOK1',
+        bookAppearances: 1,
+      },
     ];
     const narratorVoice = 'narrator-voice';
 
     const result = assignVoicesTiered(characters, voices, narratorVoice);
 
     // Minor 1-4 should cycle through voices 1-3
-    const minorVoices = ['Minor1', 'Minor2', 'Minor3', 'Minor4'].map(
-      name => result.get(name)
-    );
+    const minorVoices = ['Minor1', 'Minor2', 'Minor3', 'Minor4'].map((name) => result.get(name));
     // All should be one of the available voices
     for (const voice of minorVoices) {
-      expect(voices.map(v => v.fullValue)).toContain(voice);
+      expect(voices.map((v) => v.fullValue)).toContain(voice);
     }
   });
 
   it('sorts characters by line count descending', () => {
     const voices = createVoiceOptions();
     const characters: CharacterEntry[] = [
-      { canonicalName: 'LowLines', voice: '', gender: 'male', aliases: [], lines: 5, percentage: 2.5, lastSeenIn: 'BOOK1', bookAppearances: 1 },
-      { canonicalName: 'HighLines', voice: '', gender: 'male', aliases: [], lines: 200, percentage: 80, lastSeenIn: 'BOOK1', bookAppearances: 1 },
-      { canonicalName: 'MidLines', voice: '', gender: 'male', aliases: [], lines: 100, percentage: 50, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+      {
+        canonicalName: 'LowLines',
+        voice: '',
+        gender: 'male',
+        aliases: [],
+        lines: 5,
+        percentage: 2.5,
+        lastSeenIn: 'BOOK1',
+        bookAppearances: 1,
+      },
+      {
+        canonicalName: 'HighLines',
+        voice: '',
+        gender: 'male',
+        aliases: [],
+        lines: 200,
+        percentage: 80,
+        lastSeenIn: 'BOOK1',
+        bookAppearances: 1,
+      },
+      {
+        canonicalName: 'MidLines',
+        voice: '',
+        gender: 'male',
+        aliases: [],
+        lines: 100,
+        percentage: 50,
+        lastSeenIn: 'BOOK1',
+        bookAppearances: 1,
+      },
     ];
     const narratorVoice = 'narrator-voice';
 
@@ -441,8 +589,26 @@ describe('assignVoicesTiered', () => {
   it('filters out narrator voice from assignments', () => {
     const voices = createVoiceOptions();
     const characters: CharacterEntry[] = [
-      { canonicalName: 'Narrator', voice: 'narrator-voice', gender: 'male', aliases: [], lines: 500, percentage: 90, lastSeenIn: 'BOOK1', bookAppearances: 1 },
-      { canonicalName: 'Character', voice: '', gender: 'male', aliases: [], lines: 50, percentage: 10, lastSeenIn: 'BOOK1', bookAppearances: 1 },
+      {
+        canonicalName: 'Narrator',
+        voice: 'narrator-voice',
+        gender: 'male',
+        aliases: [],
+        lines: 500,
+        percentage: 90,
+        lastSeenIn: 'BOOK1',
+        bookAppearances: 1,
+      },
+      {
+        canonicalName: 'Character',
+        voice: '',
+        gender: 'male',
+        aliases: [],
+        lines: 50,
+        percentage: 10,
+        lastSeenIn: 'BOOK1',
+        bookAppearances: 1,
+      },
     ];
     const narratorVoice = 'narrator-voice';
 
@@ -499,7 +665,7 @@ describe('sortVoicesByPriority', () => {
 
   it('excludes narrator voice from the list', () => {
     const sorted = sortVoicesByPriority(voices, 'en', 'en-US, GuyNeural');
-    expect(sorted.find(v => v.fullValue === 'en-US, GuyNeural')).toBeUndefined();
+    expect(sorted.find((v) => v.fullValue === 'en-US, GuyNeural')).toBeUndefined();
   });
 });
 
@@ -526,7 +692,7 @@ describe('randomizeBelowVoices', () => {
     const currentMap = new Map([
       ['Narrator', 'en-US, GuyNeural'],
       ['Alice', 'en-US, JennyNeural'],
-      ['Bob', 'en-US, GuyNeural'],  // duplicate - will be randomized
+      ['Bob', 'en-US, GuyNeural'], // duplicate - will be randomized
       ['Carol', 'en-US, GuyNeural'], // duplicate - will be randomized
     ]);
 

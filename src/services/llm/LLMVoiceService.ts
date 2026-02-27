@@ -1,27 +1,22 @@
-import type {
-  TextBlock,
-  LLMCharacter,
-  SpeakerAssignment,
-} from '@/state/types';
+import type { LLMCharacter, SpeakerAssignment, TextBlock } from '@/state/types';
 import type { Logger } from '../Logger';
 
 export type ProgressCallback = (current: number, total: number, message?: string) => void;
+
 import { defaultConfig } from '@/config';
-import { LLMApiClient } from './LLMApiClient';
+import { getErrorMessage } from '@/errors';
+import { withRetry } from '@/utils/retry';
+import { applyMergeGroups, buildCodeMapping, mergeCharacters } from './CharacterUtils';
 import { DebugLogger } from './DebugLogger';
-import { buildCodeMapping, mergeCharacters, applyMergeGroups } from './CharacterUtils';
-import { majorityVote, buildMergeConsensus } from './votingConsensus';
+import { LLMApiClient } from './LLMApiClient';
 import {
+  type AssignContext,
+  buildAssignPrompt,
   buildExtractPrompt,
   buildMergePrompt,
-  buildAssignPrompt,
-  type ExtractContext,
-  type MergeContext,
-  type AssignContext,
 } from './PromptStrategy';
-import { ExtractSchema, MergeSchema, AssignSchema } from './schemas';
-import { withRetry } from '@/utils/retry';
-import { getErrorMessage } from '@/errors';
+import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
+import { buildMergeConsensus, majorityVote } from './votingConsensus';
 
 /**
  * Unambiguous speech/dialogue symbols (no contraction risk):
@@ -88,9 +83,9 @@ const LLM_DELAY_MS = 1000;
  * Default retry counts for each operation
  */
 const RETRY_CONFIG = {
-  extract: Infinity,  // Extract: keep retrying until valid
-  merge: 3,           // Merge: 3 retries per vote attempt
-  assign: 3,          // Assign: 3 retries per block attempt
+  extract: Infinity, // Extract: keep retrying until valid
+  merge: 3, // Merge: 3 retries per vote attempt
+  assign: 3, // Assign: 3 retries per block attempt
 } as const;
 
 /**
@@ -130,7 +125,6 @@ export interface LLMVoiceServiceOptions {
 export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
   private apiClient: LLMApiClient;
-  private mergeApiClient: LLMApiClient;
   private abortController: AbortController | null = null;
   private logger: Logger;
 
@@ -185,7 +179,7 @@ export class LLMVoiceService {
    */
   async extractCharacters(
     blocks: TextBlock[],
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
   ): Promise<LLMCharacter[]> {
     this.logger?.info(`[Extract] Starting (${blocks.length} blocks)`);
     const allCharacters: LLMCharacter[] = [];
@@ -204,26 +198,29 @@ export class LLMVoiceService {
       const blockText = block.sentences.join('\n');
 
       const response = await withRetry(
-        () => this.apiClient.callStructured({
-          prompt: buildExtractPrompt(blockText),
-          schema: ExtractSchema,
-          schemaName: 'ExtractSchema',
-          signal: controller.signal,
-        }),
+        () =>
+          this.apiClient.callStructured({
+            prompt: buildExtractPrompt(blockText),
+            schema: ExtractSchema,
+            schemaName: 'ExtractSchema',
+            signal: controller.signal,
+          }),
         {
           maxRetries: RETRY_CONFIG.extract, // Keep retrying until valid
           signal: controller.signal,
           onRetry: (attempt, error) => {
-            this.logger?.warn(`[Extract] Block ${i + 1}/${blocks.length} retry ${attempt}: ${getErrorMessage(error)}`);
+            this.logger?.warn(
+              `[Extract] Block ${i + 1}/${blocks.length} retry ${attempt}: ${getErrorMessage(error)}`,
+            );
           },
-        }
+        },
       );
 
       allCharacters.push(...response.characters);
 
       // Small delay between requests
       if (i < blocks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
+        await new Promise((resolve) => setTimeout(resolve, LLM_DELAY_MS));
       }
     }
 
@@ -247,10 +244,13 @@ export class LLMVoiceService {
     blocks: TextBlock[],
     characterVoiceMap: Map<string, string>,
     characters: LLMCharacter[],
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
   ): Promise<SpeakerAssignment[]> {
-    const maxConcurrent = this.options.maxConcurrentRequests ?? defaultConfig.llm.maxConcurrentRequests;
-    this.logger?.info(`[Assign] Starting (${blocks.length} blocks, max ${maxConcurrent} concurrent${this.options.useVoting ? ', voting enabled' : ''})`);
+    const maxConcurrent =
+      this.options.maxConcurrentRequests ?? defaultConfig.llm.maxConcurrentRequests;
+    this.logger?.info(
+      `[Assign] Starting (${blocks.length} blocks, max ${maxConcurrent} concurrent${this.options.useVoting ? ', voting enabled' : ''})`,
+    );
     const results: SpeakerAssignment[] = [];
     let completed = 0;
 
@@ -271,12 +271,15 @@ export class LLMVoiceService {
         const blockNum = i + batchIndex + 1;
         this.logger?.info(`[assign] Starting block ${blockNum}/${blocks.length}`);
         return this.processAssignBlock(block, characterVoiceMap, characters, nameToCode, codeToName)
-          .then(result => {
+          .then((result) => {
             this.logger?.info(`[assign] Completed block ${blockNum}/${blocks.length}`);
             return result;
           })
-          .catch(err => {
-            this.logger?.error(`[assign] Error in block ${blockNum}`, err instanceof Error ? err : new Error(String(err)));
+          .catch((err) => {
+            this.logger?.error(
+              `[assign] Error in block ${blockNum}`,
+              err instanceof Error ? err : new Error(String(err)),
+            );
             throw err;
           });
       });
@@ -291,7 +294,7 @@ export class LLMVoiceService {
 
       // Small delay between batches to avoid overwhelming LLM server
       if (i + maxConcurrent < blocks.length) {
-        await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
+        await new Promise((resolve) => setTimeout(resolve, LLM_DELAY_MS));
       }
     }
 
@@ -309,17 +312,17 @@ export class LLMVoiceService {
     characterVoiceMap: Map<string, string>,
     characters: LLMCharacter[],
     nameToCode: Map<string, string>,
-    codeToName: Map<string, string>
+    codeToName: Map<string, string>,
   ): Promise<SpeakerAssignment[]> {
-    this.logger?.debug(`[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`);
+    this.logger?.debug(
+      `[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`,
+    );
 
     // Always send blocks to LLM so it has full context for speaker assignment
     // (even blocks without obvious speech symbols may contain thoughts, telepathy, etc.)
 
     // Use 0-based indexing for LLM (most models prefer this)
-    const numberedParagraphs = block.sentences
-      .map((s, i) => `[${i}] ${s}`)
-      .join('\n');
+    const numberedParagraphs = block.sentences.map((s, i) => `[${i}] ${s}`).join('\n');
 
     // Build context
     const context: AssignContext = {
@@ -330,7 +333,11 @@ export class LLMVoiceService {
       sentenceCount: block.sentences.length,
     };
 
-    const prompt = buildAssignPrompt(context.characters, context.nameToCode, context.numberedParagraphs);
+    const prompt = buildAssignPrompt(
+      context.characters,
+      context.nameToCode,
+      context.numberedParagraphs,
+    );
 
     let relativeMap: Map<number, string>;
 
@@ -346,35 +353,42 @@ export class LLMVoiceService {
 
         try {
           const response = await withRetry(
-            () => client.callStructured({
-              prompt,
-              schema: AssignSchema,
-              schemaName: 'AssignSchema',
-              signal: this.abortController?.signal,
-            }),
+            () =>
+              client.callStructured({
+                prompt,
+                schema: AssignSchema,
+                schemaName: 'AssignSchema',
+                signal: this.abortController?.signal,
+              }),
             {
               maxRetries: RETRY_CONFIG.assign,
               signal: this.abortController?.signal,
               onRetry: (attempt, error) => {
-                this.logger?.warn(`[assign] Vote ${i + 1} at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`);
+                this.logger?.warn(
+                  `[assign] Vote ${i + 1} at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`,
+                );
               },
-            }
+            },
           );
           responses.push(response);
         } catch (e) {
-          this.logger?.warn(`[assign] Vote ${i + 1} at ${block.sentenceStartIndex} failed after ${RETRY_CONFIG.assign} retries: ${getErrorMessage(e)}`);
+          this.logger?.warn(
+            `[assign] Vote ${i + 1} at ${block.sentenceStartIndex} failed after ${RETRY_CONFIG.assign} retries: ${getErrorMessage(e)}`,
+          );
           responses.push(null);
         }
 
         if (i < VOTING_TEMPERATURES.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
+          await new Promise((resolve) => setTimeout(resolve, LLM_DELAY_MS));
         }
       }
 
       // Check if all voting attempts failed - fall back to narrator
       const validResponses = responses.filter((r): r is object => r !== null);
       if (validResponses.length === 0) {
-        this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed (all voting attempts), using default voice for ${block.sentences.length} sentences`);
+        this.logger?.warn(
+          `[assign] Block at ${block.sentenceStartIndex} failed (all voting attempts), using default voice for ${block.sentences.length} sentences`,
+        );
         return block.sentences.map((text, i) => ({
           sentenceIndex: block.sentenceStartIndex + i,
           text,
@@ -398,7 +412,7 @@ export class LLMVoiceService {
       // Majority vote for each paragraph (use available responses)
       relativeMap = new Map();
       for (let i = 0; i < block.sentences.length; i++) {
-        const votes = parsedMaps.map(m => m.get(i));
+        const votes = parsedMaps.map((m) => m.get(i));
         const winner = majorityVote(votes, block.sentenceStartIndex + i);
         if (winner) relativeMap.set(i, winner);
       }
@@ -406,19 +420,22 @@ export class LLMVoiceService {
       // Single call with retry (original behavior)
       try {
         const response = await withRetry(
-          () => this.apiClient.callStructured({
-            prompt,
-            schema: AssignSchema,
-            schemaName: 'AssignSchema',
-            signal: this.abortController?.signal,
-          }),
+          () =>
+            this.apiClient.callStructured({
+              prompt,
+              schema: AssignSchema,
+              schemaName: 'AssignSchema',
+              signal: this.abortController?.signal,
+            }),
           {
             maxRetries: RETRY_CONFIG.assign,
             signal: this.abortController?.signal,
             onRetry: (attempt, error) => {
-              this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`);
+              this.logger?.warn(
+                `[assign] Block at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`,
+              );
             },
-          }
+          },
         );
 
         // Convert sparse object to Map
@@ -429,8 +446,10 @@ export class LLMVoiceService {
             relativeMap.set(index, code);
           }
         }
-      } catch (e) {
-        this.logger?.warn(`[assign] Block at ${block.sentenceStartIndex} failed after ${RETRY_CONFIG.assign} retries, using default voice for ${block.sentences.length} sentences`);
+      } catch (_e) {
+        this.logger?.warn(
+          `[assign] Block at ${block.sentenceStartIndex} failed after ${RETRY_CONFIG.assign} retries, using default voice for ${block.sentences.length} sentences`,
+        );
         return block.sentences.map((text, i) => ({
           sentenceIndex: block.sentenceStartIndex + i,
           text,
@@ -446,14 +465,15 @@ export class LLMVoiceService {
       // Trust the LLM's assignment regardless of speech symbols
       const speakerCode = relativeMap.get(relativeIndex);
       // Convert code back to canonical name
-      const speaker = speakerCode ? codeToName.get(speakerCode) ?? 'narrator' : 'narrator';
+      const speaker = speakerCode ? (codeToName.get(speakerCode) ?? 'narrator') : 'narrator';
       return {
         sentenceIndex: absoluteIndex,
         text,
         speaker,
-        voiceId: speaker === 'narrator'
-          ? this.options.narratorVoice
-          : characterVoiceMap.get(speaker) ?? this.options.narratorVoice,
+        voiceId:
+          speaker === 'narrator'
+            ? this.options.narratorVoice
+            : (characterVoiceMap.get(speaker) ?? this.options.narratorVoice),
       };
     });
   }
@@ -465,7 +485,7 @@ export class LLMVoiceService {
    */
   private async mergeCharactersWithLLM(
     characters: LLMCharacter[],
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
   ): Promise<LLMCharacter[]> {
     const { mergeVoteCount } = defaultConfig.llm;
 
@@ -475,7 +495,9 @@ export class LLMVoiceService {
     }
 
     // 5-way voting merge with random temperatures
-    this.logger?.info(`[Merge] Starting ${mergeVoteCount}-way voting merge with ${characters.length} characters`);
+    this.logger?.info(
+      `[Merge] Starting ${mergeVoteCount}-way voting merge with ${characters.length} characters`,
+    );
     const votes: number[][][] = [];
 
     for (let i = 0; i < mergeVoteCount; i++) {
@@ -484,31 +506,43 @@ export class LLMVoiceService {
       }
 
       const temp = Math.round(Math.random() * 10) / 10; // Random temperature 0.0-1.0, rounded to 0.1
-      onProgress?.(i + 1, mergeVoteCount, `Merge vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)})...`);
+      onProgress?.(
+        i + 1,
+        mergeVoteCount,
+        `Merge vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)})...`,
+      );
 
       const mergeGroups = await this.singleMerge(characters, temp, onProgress);
       if (mergeGroups !== null) {
         votes.push(mergeGroups);
-        this.logger?.info(`[Merge] Vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)}): ${mergeGroups.length} merges`);
+        this.logger?.info(
+          `[Merge] Vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)}): ${mergeGroups.length} merges`,
+        );
       } else {
-        this.logger?.warn(`[Merge] Vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)}) failed, skipping`);
+        this.logger?.warn(
+          `[Merge] Vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)}) failed, skipping`,
+        );
       }
 
       // Small delay between votes to avoid rate limits
       if (i < mergeVoteCount - 1) {
-        await new Promise(resolve => setTimeout(resolve, LLM_DELAY_MS));
+        await new Promise((resolve) => setTimeout(resolve, LLM_DELAY_MS));
       }
     }
 
     // Need at least 1 successful vote
     if (votes.length === 0) {
-      this.logger?.error(`[Merge] All ${mergeVoteCount} votes failed, returning original characters`);
+      this.logger?.error(
+        `[Merge] All ${mergeVoteCount} votes failed, returning original characters`,
+      );
       return characters;
     }
 
     // Build consensus from all votes
     const consensusGroups = buildMergeConsensus(votes, this.logger);
-    this.logger?.info(`[Merge] Consensus: ${consensusGroups.length} merges from ${votes.length} votes`);
+    this.logger?.info(
+      `[Merge] Consensus: ${consensusGroups.length} merges from ${votes.length} votes`,
+    );
 
     // Apply consensus to characters
     const result = applyMergeGroups(characters, consensusGroups);
@@ -523,16 +557,18 @@ export class LLMVoiceService {
   private async singleMerge(
     characters: LLMCharacter[],
     temperature: number,
-    onProgress?: ProgressCallback
+    _onProgress?: ProgressCallback,
   ): Promise<number[][] | null> {
-    this.logger?.info(`[Merge] Single merge: ${characters.length} characters (temp=${temperature.toFixed(2)})`);
+    this.logger?.info(
+      `[Merge] Single merge: ${characters.length} characters (temp=${temperature.toFixed(2)})`,
+    );
 
     // Create a client with the specified temperature
     const client = new LLMApiClient({
       apiKey: this.options.mergeConfig?.apiKey ?? this.options.apiKey,
       apiUrl: this.options.mergeConfig?.apiUrl ?? this.options.apiUrl,
       model: this.options.mergeConfig?.model ?? this.options.model,
-      streaming: false,  // Always non-streaming for structured outputs
+      streaming: false, // Always non-streaming for structured outputs
       reasoning: this.options.mergeConfig?.reasoning ?? this.options.reasoning,
       temperature: temperature,
       topP: this.options.mergeConfig?.topP ?? this.options.topP,
@@ -542,23 +578,28 @@ export class LLMVoiceService {
 
     try {
       const response = await withRetry(
-        () => client.callStructured({
-          prompt: buildMergePrompt(characters),
-          schema: MergeSchema,
-          schemaName: 'MergeSchema',
-          signal: this.abortController?.signal,
-        }),
+        () =>
+          client.callStructured({
+            prompt: buildMergePrompt(characters),
+            schema: MergeSchema,
+            schemaName: 'MergeSchema',
+            signal: this.abortController?.signal,
+          }),
         {
           maxRetries: RETRY_CONFIG.merge,
           signal: this.abortController?.signal,
           onRetry: (attempt, error) => {
-            this.logger?.warn(`[Merge] Retry ${attempt}/${RETRY_CONFIG.merge} (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`);
+            this.logger?.warn(
+              `[Merge] Retry ${attempt}/${RETRY_CONFIG.merge} (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`,
+            );
           },
-        }
+        },
       );
       return response.merges;
     } catch (error) {
-      this.logger?.warn(`[Merge] Vote failed after ${RETRY_CONFIG.merge} retries (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`);
+      this.logger?.warn(
+        `[Merge] Vote failed after ${RETRY_CONFIG.merge} retries (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`,
+      );
       return null;
     }
   }

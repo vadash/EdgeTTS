@@ -10,7 +10,7 @@ export class DebugLogger {
 
   constructor(
     private directoryHandle: FileSystemDirectoryHandle | null | undefined,
-    private logger?: Logger
+    private logger?: Logger,
   ) {}
 
   /** Save a JSON object to the logs/ subfolder */
@@ -23,7 +23,9 @@ export class DebugLogger {
       await writable.write(JSON.stringify(content, null, 2));
       await writable.close();
     } catch (e) {
-      this.logger?.warn('Failed to save log', { error: e instanceof Error ? e.message : String(e) });
+      this.logger?.warn('Failed to save log', {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 

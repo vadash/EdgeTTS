@@ -1,13 +1,13 @@
 // Test Module Exports
 // Export all test utilities and mocks
 
+export { createMockFFmpegService, MockFFmpegService } from './mocks/MockFFmpegService';
+export { createMockLLMService, MockLLMService } from './mocks/MockLLMService';
+export { createMockLogger, type LogCall, MockLogger } from './mocks/MockLogger';
+export { createMockSecureStorage, MockSecureStorage } from './mocks/MockSecureStorage';
 // Mocks
-export { MockTTSService, createMockTTSService } from './mocks/MockTTSService';
-export { MockWorkerPool, createMockWorkerPool } from './mocks/MockWorkerPool';
-export { MockLLMService, createMockLLMService } from './mocks/MockLLMService';
-export { MockFFmpegService, createMockFFmpegService } from './mocks/MockFFmpegService';
-export { MockLogger, createMockLogger, type LogCall } from './mocks/MockLogger';
-export { MockSecureStorage, createMockSecureStorage } from './mocks/MockSecureStorage';
+export { createMockTTSService, MockTTSService } from './mocks/MockTTSService';
+export { createMockWorkerPool, MockWorkerPool } from './mocks/MockWorkerPool';
 
 // Test container
 export {
@@ -18,11 +18,11 @@ export {
 
 // Utilities
 export {
-  renderWithProviders,
-  waitFor,
   createMockAudio,
   createMockFile,
+  renderWithProviders,
   type TestRenderOptions,
-  type TestStoresState,
   type TestRenderResult,
+  type TestStoresState,
+  waitFor,
 } from './utils';

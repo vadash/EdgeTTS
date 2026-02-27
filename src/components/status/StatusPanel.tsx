@@ -1,7 +1,7 @@
-import { useRef, useCallback, useEffect } from 'preact/hooks';
-import { useLogs, useConversion } from '@/stores';
+import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { getLogger } from '@/services';
 import type { LogLevel } from '@/services/Logger';
+import { useConversion, useLogs } from '@/stores';
 import { ProgressBar } from './ProgressBar';
 
 /**
@@ -13,7 +13,6 @@ function getLevelColor(level: LogLevel): string {
       return 'text-red-400';
     case 'warn':
       return 'text-yellow-400';
-    case 'info':
     default:
       return 'text-gray-300';
   }
@@ -105,7 +104,10 @@ export function StatusPanel() {
         aria-label="Status log"
       >
         {entries.map((entry) => (
-          <div key={entry.id} className={`${getLevelColor(entry.level)} whitespace-pre-wrap break-words`}>
+          <div
+            key={entry.id}
+            className={`${getLevelColor(entry.level)} whitespace-pre-wrap break-words`}
+          >
             [{entry.elapsed}] {entry.message}
           </div>
         ))}

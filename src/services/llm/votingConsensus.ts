@@ -6,7 +6,7 @@ import type { Logger } from '../Logger';
  */
 export function majorityVote(
   votes: (string | undefined)[],
-  paragraphIndex: number
+  paragraphIndex: number,
 ): string | undefined {
   const counts = new Map<string, number>();
   for (const v of votes) {
@@ -19,7 +19,9 @@ export function majorityVote(
   }
 
   // No majority - log debug and use 0.0 as tiebreaker
-  console.debug(`[Voting] No majority for paragraph ${paragraphIndex}: ${votes.join(', ')} → using ${votes[0]}`);
+  console.debug(
+    `[Voting] No majority for paragraph ${paragraphIndex}: ${votes.join(', ')} → using ${votes[0]}`,
+  );
   return votes[0];
 }
 
@@ -64,7 +66,9 @@ export function buildMergeConsensus(votes: number[][][], logger?: Logger): numbe
     }
   }
 
-  logger?.info(`[Merge] Consensus: ${pairCounts.size} unique pairs, ${pairsWithConsensus} with ≥2 votes`);
+  logger?.info(
+    `[Merge] Consensus: ${pairCounts.size} unique pairs, ${pairsWithConsensus} with ≥2 votes`,
+  );
 
   // Union-Find to build connected components
   const parent = new Map<number, number>();
@@ -74,7 +78,8 @@ export function buildMergeConsensus(votes: number[][][], logger?: Logger): numbe
     return parent.get(x)!;
   };
   const union = (x: number, y: number) => {
-    const px = find(x), py = find(y);
+    const px = find(x),
+      py = find(y);
     if (px !== py) parent.set(px, py);
   };
 
@@ -121,7 +126,7 @@ export function buildMergeConsensus(votes: number[][][], logger?: Logger): numbe
     }
 
     // Build group with keep first
-    result.push([keepIdx, ...members.filter(m => m !== keepIdx)]);
+    result.push([keepIdx, ...members.filter((m) => m !== keepIdx)]);
   }
 
   return result;

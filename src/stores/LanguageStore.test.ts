@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { LanguageStore, createLanguageStore, type SupportedLocale } from './LanguageStore';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StorageKeys } from '@/config/storage';
+import { createLanguageStore, type LanguageStore } from './LanguageStore';
 
 describe('LanguageStore', () => {
   let store: LanguageStore;

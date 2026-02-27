@@ -4,9 +4,9 @@
 
 import { defaultConfig } from '@/config';
 import { sanitizeFilename } from '@/utils/file';
-import { parseMP3Duration } from './MP3Parser';
 import { withPermissionRetry } from '@/utils/retry';
 import type { FFmpegService } from './FFmpegService';
+import { parseMP3Duration } from './MP3Parser';
 
 export type MergeProgressCallback = (current: number, total: number, message: string) => void;
 
@@ -89,7 +89,7 @@ export class AudioMerger {
    */
   private async getDurationMs(
     filename: string,
-    tempDirHandle: FileSystemDirectoryHandle
+    tempDirHandle: FileSystemDirectoryHandle,
   ): Promise<number> {
     try {
       const audio = await this.readChunkFromDisk(filename, tempDirHandle);
@@ -112,24 +112,12 @@ export class AudioMerger {
    */
   private async readChunkFromDisk(
     filename: string,
-    tempDirHandle: FileSystemDirectoryHandle
+    tempDirHandle: FileSystemDirectoryHandle,
   ): Promise<Uint8Array> {
     const fileHandle = await tempDirHandle.getFileHandle(filename);
     const file = await fileHandle.getFile();
     const arrayBuffer = await file.arrayBuffer();
     return new Uint8Array(arrayBuffer);
-  }
-
-  /**
-   * Get file size from disk without reading the entire file
-   */
-  private async getFileSize(
-    filename: string,
-    tempDirHandle: FileSystemDirectoryHandle
-  ): Promise<number> {
-    const fileHandle = await tempDirHandle.getFileHandle(filename);
-    const file = await fileHandle.getFile();
-    return file.size;
   }
 
   /**
@@ -140,7 +128,7 @@ export class AudioMerger {
     audioMap: Map<number, string>,
     totalSentences: number,
     fileNames: Array<[string, number]>,
-    tempDirHandle: FileSystemDirectoryHandle
+    tempDirHandle: FileSystemDirectoryHandle,
   ): Promise<MergeGroup[]> {
     const groups: MergeGroup[] = [];
 
@@ -230,7 +218,7 @@ export class AudioMerger {
     group: MergeGroup,
     totalGroups: number,
     tempDirHandle: FileSystemDirectoryHandle,
-    onProgress?: (message: string) => void
+    onProgress?: (message: string) => void,
   ): Promise<MergedFile | null> {
     const chunks: (Uint8Array | null)[] = [];
     let missingCount = 0;
@@ -253,7 +241,7 @@ export class AudioMerger {
     }
 
     // Check if ALL chunks are missing
-    if (chunks.every(c => c === null)) return null;
+    if (chunks.every((c) => c === null)) return null;
 
     // Use FFmpeg for Opus encoding
     const processedAudio = await this.ffmpegService.processAudio(
@@ -271,7 +259,7 @@ export class AudioMerger {
         opusMaxBitrate: this.config.opusMaxBitrate,
         opusCompressionLevel: this.config.opusCompressionLevel,
       },
-      onProgress
+      onProgress,
     );
 
     const filename = this.generateFilename(group, totalGroups, 'opus');
@@ -288,7 +276,7 @@ export class AudioMerger {
   }
 
   private generateFilename(group: MergeGroup, totalGroups: number, extension: string): string {
-    const durationMin = Math.round(group.durationMs / 60000);
+    const _durationMin = Math.round(group.durationMs / 60000);
     const sanitizedName = sanitizeFilename(group.filename);
 
     if (totalGroups === 1) {
@@ -305,7 +293,7 @@ export class AudioMerger {
   private async fileExistsWithContent(
     directoryHandle: FileSystemDirectoryHandle,
     filename: string,
-    folderName: string
+    folderName: string,
   ): Promise<boolean> {
     try {
       const folderHandle = await directoryHandle.getDirectoryHandle(folderName);
@@ -350,7 +338,7 @@ export class AudioMerger {
     fileNames: Array<[string, number]>,
     tempDirHandle: FileSystemDirectoryHandle,
     saveDirectoryHandle: FileSystemDirectoryHandle,
-    onProgress?: (current: number, total: number, message: string) => void
+    onProgress?: (current: number, total: number, message: string) => void,
   ): Promise<number> {
     // Check permissions upfront
     try {
@@ -365,7 +353,12 @@ export class AudioMerger {
       throw new Error(`Directory permission check failed: ${(err as Error).message}`);
     }
 
-    const groups = await this.calculateMergeGroups(audioMap, totalSentences, fileNames, tempDirHandle);
+    const groups = await this.calculateMergeGroups(
+      audioMap,
+      totalSentences,
+      fileNames,
+      tempDirHandle,
+    );
     let savedCount = 0;
     let skippedCount = 0;
 
@@ -376,21 +369,29 @@ export class AudioMerger {
       const folderName = this.getFolderName(group);
 
       // Check if file already exists
-      const fileExists = await this.fileExistsWithContent(saveDirectoryHandle, expectedFilename, folderName);
+      const fileExists = await this.fileExistsWithContent(
+        saveDirectoryHandle,
+        expectedFilename,
+        folderName,
+      );
       if (fileExists) {
         onProgress?.(i + 1, groups.length, `Skipping existing file: ${expectedFilename}`);
         skippedCount++;
         continue;
       }
 
-      onProgress?.(i + 1, groups.length, `Processing part ${i + 1}/${groups.length} (~${durationMin} min)`);
+      onProgress?.(
+        i + 1,
+        groups.length,
+        `Processing part ${i + 1}/${groups.length} (~${durationMin} min)`,
+      );
 
       const merged = await this.mergeAudioGroupAsync(
         audioMap,
         group,
         groups.length,
         tempDirHandle,
-        (msg) => onProgress?.(i + 1, groups.length, msg)
+        (msg) => onProgress?.(i + 1, groups.length, msg),
       );
 
       if (merged) {
@@ -402,7 +403,11 @@ export class AudioMerger {
     }
 
     if (skippedCount > 0) {
-      onProgress?.(groups.length, groups.length, `Skipped ${skippedCount} existing file(s), saved ${savedCount}`);
+      onProgress?.(
+        groups.length,
+        groups.length,
+        `Skipped ${skippedCount} existing file(s), saved ${savedCount}`,
+      );
     }
 
     return savedCount;
@@ -410,14 +415,12 @@ export class AudioMerger {
 
   private async saveToDirectory(
     file: MergedFile,
-    directoryHandle: FileSystemDirectoryHandle
+    directoryHandle: FileSystemDirectoryHandle,
   ): Promise<void> {
     await withPermissionRetry(directoryHandle, async () => {
       // Extract folder name from filename (remove extension and part number)
       const folderName = sanitizeFilename(
-        file.filename
-          .replace(/\s+\d{4}\.(mp3|opus)$/, '')
-          .replace(/\.(mp3|opus)$/, '')
+        file.filename.replace(/\s+\d{4}\.(mp3|opus)$/, '').replace(/\.(mp3|opus)$/, ''),
       );
 
       const folderHandle = await directoryHandle.getDirectoryHandle(folderName, { create: true });

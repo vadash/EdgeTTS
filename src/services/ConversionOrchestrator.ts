@@ -1,30 +1,33 @@
 // Conversion Orchestrator - Plain function orchestrator
 // Runs the TTS conversion workflow as a single async function
 
-import type { LLMServiceFactoryOptions } from './llm/LLMVoiceService';
+import { AppError, getErrorMessage, insufficientVoicesError, noContentError } from '@/errors';
 import type {
-  TTSConfig,
   LLMCharacter,
-  SpeakerAssignment,
-  VoiceProfileFile,
-  VoicePool,
   ProcessedBook,
+  SpeakerAssignment,
+  TTSConfig,
+  VoicePool,
+  VoiceProfileFile,
 } from '@/state/types';
 import type { Stores } from '@/stores';
-import { allocateByGender, allocateByFrequency, remapAssignments, shortVoiceId } from './VoiceAllocator';
-import { exportToProfile } from './llm/VoiceProfile';
 import { withPermissionRetry } from '@/utils/retry';
-import { checkResumeState, loadPipelineState } from './ResumeCheck';
-import { AppError, noContentError, insufficientVoicesError, getErrorMessage } from '@/errors';
-
-// Import concrete service classes
-import type { Logger } from './Logger';
-import type { TextBlockSplitter } from './TextBlockSplitter';
-import type { VoicePoolBuilder } from './VoicePoolBuilder';
-import type { LLMVoiceService } from './llm/LLMVoiceService';
-import type { TTSWorkerPool } from './TTSWorkerPool';
 import type { AudioMerger } from './AudioMerger';
 import type { FFmpegService } from './FFmpegService';
+// Import concrete service classes
+import type { Logger } from './Logger';
+import type { LLMServiceFactoryOptions, LLMVoiceService } from './llm/LLMVoiceService';
+import { exportToProfile } from './llm/VoiceProfile';
+import { checkResumeState, loadPipelineState } from './ResumeCheck';
+import type { TextBlockSplitter } from './TextBlockSplitter';
+import type { TTSWorkerPool } from './TTSWorkerPool';
+import {
+  allocateByFrequency,
+  allocateByGender,
+  remapAssignments,
+  shortVoiceId,
+} from './VoiceAllocator';
+import type { VoicePoolBuilder } from './VoicePoolBuilder';
 
 // ============================================================================
 // Orchestrator Input Types
@@ -157,7 +160,7 @@ function sanitizeText(text: string): string {
   result = result.replace(/&/g, ' and ');
 
   // 10. Multiple spaces
-  result = result.replace(/  +/g, ' ');
+  result = result.replace(/ {2,}/g, ' ');
 
   return result.trim();
 }
@@ -166,11 +169,7 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function applyDictionaryRules(
-  text: string,
-  rules: string[],
-  caseSensitive: boolean
-): string {
+function applyDictionaryRules(text: string, rules: string[], caseSensitive: boolean): string {
   let result = text;
 
   for (const rule of rules) {
@@ -233,7 +232,7 @@ function sanitizeAssignments(assignments: SpeakerAssignment[]): SpeakerAssignmen
 function applyDictionaryToAssignments(
   assignments: SpeakerAssignment[],
   dictionaryRules: string[],
-  caseSensitive: boolean
+  caseSensitive: boolean,
 ): SpeakerAssignment[] {
   if (!dictionaryRules || dictionaryRules.length === 0) {
     return assignments;
@@ -246,9 +245,12 @@ function applyDictionaryToAssignments(
 }
 
 function extractFilename(text: string): string {
-  const firstLine = text.split('\n').find(line => line.trim().length > 0);
+  const firstLine = text.split('\n').find((line) => line.trim().length > 0);
   if (firstLine) {
-    const cleaned = firstLine.trim().slice(0, 50).replace(/[<>:"/\\|?*]/g, '_');
+    const cleaned = firstLine
+      .trim()
+      .slice(0, 50)
+      .replace(/[<>:"/\\|?*]/g, '_');
     return cleaned || 'audio';
   }
   return 'audio';
@@ -270,7 +272,7 @@ function checkCancelled(signal: AbortSignal): void {
 
 async function cleanupTemp(
   directoryHandle: FileSystemDirectoryHandle,
-  logger: Logger
+  logger: Logger,
 ): Promise<void> {
   try {
     await directoryHandle.removeEntry('_temp_work', { recursive: true });
@@ -285,10 +287,10 @@ function logVoiceSummary(
   assignments: SpeakerAssignment[],
   voiceMap: Map<string, string>,
   rareVoices: { male: string; female: string; unknown: string },
-  uniqueCount: number,
+  _uniqueCount: number,
   pool: VoicePool,
   narratorVoice: string,
-  logger: Logger
+  logger: Logger,
 ): void {
   const frequency = new Map<string, number>();
   for (const a of assignments) {
@@ -313,8 +315,10 @@ function logVoiceSummary(
   report(`Pool: ${poolSize} | Unique: ${uniqueSlots} | Rare: 3`);
   report('');
 
-  const narratorLines = assignments.filter(a => a.speaker === 'narrator').length;
-  report(`  N  NARRATOR              ${String(narratorLines).padStart(3)}  ${shortVoiceId(narratorVoice)}`);
+  const narratorLines = assignments.filter((a) => a.speaker === 'narrator').length;
+  report(
+    `  N  NARRATOR              ${String(narratorLines).padStart(3)}  ${shortVoiceId(narratorVoice)}`,
+  );
   report('  ─────────────────────────────');
 
   for (let i = 0; i < sorted.length; i++) {
@@ -329,14 +333,16 @@ function logVoiceSummary(
 
     const genderChar = char.gender === 'male' ? 'M' : char.gender === 'female' ? 'F' : '?';
     const marker = isRare ? '*' : ' ';
-    report(`${marker}${String(i + 1).padStart(2)}. ${(char.canonicalName.slice(0, 16) + '                ').slice(0, 16)} ${genderChar} ${String(lines).padStart(3)}  ${shortVoiceId(voice)}`);
+    report(
+      `${marker}${String(i + 1).padStart(2)}. ${(`${char.canonicalName.slice(0, 16)}                `).slice(0, 16)} ${genderChar} ${String(lines).padStart(3)}  ${shortVoiceId(voice)}`,
+    );
   }
 
   if (sorted.length > uniqueSlots || sorted.length === 0) {
     report('  ─────────────────────────────');
-    report('  *  RARE_MALE         M      ' + shortVoiceId(rareVoices.male));
-    report('  *  RARE_FEMALE       F      ' + shortVoiceId(rareVoices.female));
-    report('  *  RARE_UNKNOWN      ?      ' + shortVoiceId(rareVoices.unknown));
+    report(`  *  RARE_MALE         M      ${shortVoiceId(rareVoices.male)}`);
+    report(`  *  RARE_FEMALE       F      ${shortVoiceId(rareVoices.female)}`);
+    report(`  *  RARE_UNKNOWN      ?      ${shortVoiceId(rareVoices.unknown)}`);
   }
 
   report('══════════════════════════════');
@@ -351,7 +357,7 @@ async function saveVoiceProfile(
   assignments: SpeakerAssignment[],
   narratorVoice: string,
   existingProfile: VoiceProfileFile | null,
-  logger: Logger
+  logger: Logger,
 ): Promise<void> {
   try {
     const bookName = extractBookName(fileNames);
@@ -365,7 +371,7 @@ async function saveVoiceProfile(
         voiceMap,
         assignments,
         narratorVoice,
-        bookName
+        bookName,
       );
 
       const fileHandle = await bookFolder.getFileHandle(fileName, { create: true });
@@ -394,9 +400,17 @@ export async function runConversion(
   stores: Stores,
   signal: AbortSignal,
   input: OrchestratorInput,
-  existingBook?: ProcessedBook | null
+  existingBook?: ProcessedBook | null,
 ): Promise<void> {
-  const { logger, textBlockSplitter, llmServiceFactory, workerPoolFactory, audioMergerFactory, voicePoolBuilder, ffmpegService } = services;
+  const {
+    logger,
+    textBlockSplitter,
+    llmServiceFactory,
+    workerPoolFactory,
+    audioMergerFactory,
+    voicePoolBuilder,
+    ffmpegService,
+  } = services;
   const { conversion, llm, logs, data } = stores;
 
   // ==================== INPUT VALIDATION ====================
@@ -469,10 +483,11 @@ export async function runConversion(
   logger.info(`Detected language: ${input.detectedLanguage.toUpperCase()}`);
 
   const text = input.textContent;
-  const fileNames = existingBook?.fileNames ?? [[extractFilename(text), 0]] as Array<[string, number]>;
+  const fileNames =
+    existingBook?.fileNames ?? ([[extractFilename(text), 0]] as Array<[string, number]>);
 
   // Progress reporter helper
-  const report = (stage: string, current: number, total: number, message: string) => {
+  const report = (stage: string, _current: number, _total: number, message: string) => {
     logger.info(message);
     updateStatus(stage, stores);
   };
@@ -521,9 +536,19 @@ export async function runConversion(
 
       try {
         characters = await llmService.extractCharacters(blocks, (current, total, message) => {
-          report('character-extraction', current, total, message ?? `Extract: Block ${current}/${total}`);
+          report(
+            'character-extraction',
+            current,
+            total,
+            message ?? `Extract: Block ${current}/${total}`,
+          );
         });
-        report('character-extraction', blocks.length, blocks.length, `Detected ${characters.length} character(s)`);
+        report(
+          'character-extraction',
+          blocks.length,
+          blocks.length,
+          `Detected ${characters.length} character(s)`,
+        );
       } finally {
         signal.removeEventListener('abort', abortHandler);
         llmService = null;
@@ -536,8 +561,12 @@ export async function runConversion(
         pool,
       });
       voiceMap = initialAllocation.voiceMap;
-      report('voice-assignment', characters.length, characters.length,
-        `Assigned ${initialAllocation.uniqueCount} voice(s) to ${characters.length} character(s)`);
+      report(
+        'voice-assignment',
+        characters.length,
+        characters.length,
+        `Assigned ${initialAllocation.uniqueCount} voice(s) to ${characters.length} character(s)`,
+      );
 
       // ==================== LLM STAGE 2: SPEAKER ASSIGNMENT ====================
       checkCancelled(signal);
@@ -559,7 +588,12 @@ export async function runConversion(
       };
 
       const assignBlocks = textBlockSplitter.createAssignBlocks(text);
-      report('speaker-assignment', 0, assignBlocks.length, '=== LLM Pass 2: Speaker Assignment ===');
+      report(
+        'speaker-assignment',
+        0,
+        assignBlocks.length,
+        '=== LLM Pass 2: Speaker Assignment ===',
+      );
 
       llmService = llmServiceFactory.create(assignLLMOptions);
       signal.addEventListener('abort', abortHandler);
@@ -573,25 +607,38 @@ export async function runConversion(
           characters,
           (current, total) => {
             report('speaker-assignment', current, total, `Assign: Block ${current}/${total}`);
-          }
+          },
         );
-        report('speaker-assignment', assignBlocks.length, assignBlocks.length,
-          `Assigned speakers to ${assignments.length} sentence(s)`);
+        report(
+          'speaker-assignment',
+          assignBlocks.length,
+          assignBlocks.length,
+          `Assigned speakers to ${assignments.length} sentence(s)`,
+        );
 
         // Save pipeline state for resume
         let tempDirHandle: FileSystemDirectoryHandle | null = null;
         try {
           tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work', { create: true });
-          const stateFile = await tempDirHandle.getFileHandle('pipeline_state.json', { create: true });
+          const stateFile = await tempDirHandle.getFileHandle('pipeline_state.json', {
+            create: true,
+          });
           const writable = await stateFile.createWritable();
-          await writable.write(JSON.stringify({
-            assignments,
-            characterVoiceMap: Object.fromEntries(voiceMap),
-            characters,
-            fileNames,
-          }));
+          await writable.write(
+            JSON.stringify({
+              assignments,
+              characterVoiceMap: Object.fromEntries(voiceMap),
+              characters,
+              fileNames,
+            }),
+          );
           await writable.close();
-          report('speaker-assignment', assignBlocks.length, assignBlocks.length, 'Saved pipeline state for resume');
+          report(
+            'speaker-assignment',
+            assignBlocks.length,
+            assignBlocks.length,
+            'Saved pipeline state for resume',
+          );
         } catch {
           // Non-fatal
         }
@@ -610,8 +657,16 @@ export async function runConversion(
       voiceMap = frequencyAllocation.voiceMap;
       assignments = remapAssignments(assignments, voiceMap, input.narratorVoice);
 
-      logVoiceSummary(characters, assignments, voiceMap, frequencyAllocation.rareVoices,
-        frequencyAllocation.uniqueCount, pool, input.narratorVoice, logger);
+      logVoiceSummary(
+        characters,
+        assignments,
+        voiceMap,
+        frequencyAllocation.rareVoices,
+        frequencyAllocation.uniqueCount,
+        pool,
+        input.narratorVoice,
+        logger,
+      );
 
       // ==================== VOICE REVIEW PAUSE ====================
       checkCancelled(signal);
@@ -625,32 +680,54 @@ export async function runConversion(
       const reviewedVoiceMap = llm.characterVoiceMap.value;
       const existingProfile = llm.loadedProfile.value;
 
-      assignments = assignments.map(a => ({
+      assignments = assignments.map((a) => ({
         ...a,
-        voiceId: a.speaker === 'narrator'
-          ? input.narratorVoice
-          : reviewedVoiceMap.get(a.speaker) ?? input.narratorVoice,
+        voiceId:
+          a.speaker === 'narrator'
+            ? input.narratorVoice
+            : (reviewedVoiceMap.get(a.speaker) ?? input.narratorVoice),
       }));
 
       checkCancelled(signal);
 
       // ==================== SAVE VOICE PROFILE ====================
-      await saveVoiceProfile(directoryHandle, fileNames, characters, reviewedVoiceMap, assignments,
-        input.narratorVoice, existingProfile, logger);
+      await saveVoiceProfile(
+        directoryHandle,
+        fileNames,
+        characters,
+        reviewedVoiceMap,
+        assignments,
+        input.narratorVoice,
+        existingProfile,
+        logger,
+      );
 
       // ==================== TEXT SANITIZATION ====================
       checkCancelled(signal);
       assignments = sanitizeAssignments(assignments);
-      report('text-sanitization', assignments.length, assignments.length, 'Text sanitization complete');
+      report(
+        'text-sanitization',
+        assignments.length,
+        assignments.length,
+        'Text sanitization complete',
+      );
 
       // ==================== DICTIONARY PROCESSING ====================
       checkCancelled(signal);
-      assignments = applyDictionaryToAssignments(assignments, input.dictionaryRaw, input.lexxRegister);
-      report('dictionary-processing', assignments.length, assignments.length, 'Dictionary processing complete');
+      assignments = applyDictionaryToAssignments(
+        assignments,
+        input.dictionaryRaw,
+        input.lexxRegister,
+      );
+      report(
+        'dictionary-processing',
+        assignments.length,
+        assignments.length,
+        'Dictionary processing complete',
+      );
 
       // Continue to TTS with assignments
       await runTTSStage(input, assignments, fileNames, signal, report, services, stores);
-
     } else {
       // ==================== RESUME MODE - SKIP LLM ====================
       characters = resumedCharacters!;
@@ -665,18 +742,31 @@ export async function runConversion(
       await llm.awaitReview();
       const reviewedVoiceMap = llm.characterVoiceMap.value;
       const existingProfile = llm.loadedProfile.value;
-      const remappedAssignments = assignments.map(a => ({
+      const remappedAssignments = assignments.map((a) => ({
         ...a,
-        voiceId: a.speaker === 'narrator'
-          ? input.narratorVoice
-          : reviewedVoiceMap.get(a.speaker) ?? input.narratorVoice,
+        voiceId:
+          a.speaker === 'narrator'
+            ? input.narratorVoice
+            : (reviewedVoiceMap.get(a.speaker) ?? input.narratorVoice),
       }));
 
-      await saveVoiceProfile(directoryHandle, fileNames, characters, reviewedVoiceMap, remappedAssignments,
-        input.narratorVoice, existingProfile, logger);
+      await saveVoiceProfile(
+        directoryHandle,
+        fileNames,
+        characters,
+        reviewedVoiceMap,
+        remappedAssignments,
+        input.narratorVoice,
+        existingProfile,
+        logger,
+      );
 
       const sanitized = sanitizeAssignments(remappedAssignments);
-      const withDictionary = applyDictionaryToAssignments(sanitized, input.dictionaryRaw, input.lexxRegister);
+      const withDictionary = applyDictionaryToAssignments(
+        sanitized,
+        input.dictionaryRaw,
+        input.lexxRegister,
+      );
 
       await runTTSStage(input, withDictionary, fileNames, signal, report, services, stores);
     }
@@ -684,12 +774,14 @@ export async function runConversion(
     // ==================== COMPLETE ====================
     conversion.complete();
     logger.info('Conversion complete!');
-
   } catch (error) {
     if (error instanceof AppError && error.isCancellation()) {
       conversion.cancel();
       logger.info('Conversion cancelled');
-    } else if ((error as Error).message === 'Pipeline cancelled' || (error as Error).message === 'Voice review cancelled') {
+    } else if (
+      (error as Error).message === 'Pipeline cancelled' ||
+      (error as Error).message === 'Voice review cancelled'
+    ) {
       conversion.cancel();
       logger.info('Conversion cancelled');
     } else {
@@ -713,7 +805,7 @@ async function runTTSStage(
   signal: AbortSignal,
   report: (stage: string, current: number, total: number, message: string) => void,
   services: ConversionOrchestratorServices,
-  stores: Stores
+  stores: Stores,
 ): Promise<void> {
   const { logger, workerPoolFactory, audioMergerFactory, ffmpegService } = services;
   const { conversion, llm } = stores;
@@ -724,7 +816,7 @@ async function runTTSStage(
   checkCancelled(signal);
 
   const chunks = assignments
-    .filter(a => /[\p{L}\p{N}]/u.test(a.text))
+    .filter((a) => /[\p{L}\p{N}]/u.test(a.text))
     .map((a, index) => ({
       text: a.text,
       voice: a.voiceId,
@@ -771,12 +863,16 @@ async function runTTSStage(
     }
 
     if (audioMap.size > 0) {
-      report('tts-conversion', audioMap.size, chunks.length,
-        `Resuming: found ${audioMap.size}/${chunks.length} cached chunks`);
+      report(
+        'tts-conversion',
+        audioMap.size,
+        chunks.length,
+        `Resuming: found ${audioMap.size}/${chunks.length} cached chunks`,
+      );
     }
   }
 
-  const remainingChunks = chunks.filter(c => !audioMap.has(c.partIndex));
+  const remainingChunks = chunks.filter((c) => !audioMap.has(c.partIndex));
 
   if (remainingChunks.length > 0) {
     await new Promise<void>((resolve, reject) => {
@@ -806,13 +902,22 @@ async function runTTSStage(
           const finalInterval = Math.max(minInterval, Math.min(reportInterval, maxInterval));
 
           if (completed % finalInterval === 0 || completed === chunks.length) {
-            report('tts-conversion', completed, chunks.length, `Written ${completed}/${chunks.length} files`);
+            report(
+              'tts-conversion',
+              completed,
+              chunks.length,
+              `Written ${completed}/${chunks.length} files`,
+            );
           }
         },
         onTaskError: (partIndex, error) => {
           failedTasks.add(partIndex);
-          report('tts-conversion', audioMap.size, chunks.length,
-            `Part ${partIndex + 1} failed: ${getErrorMessage(error)}`);
+          report(
+            'tts-conversion',
+            audioMap.size,
+            chunks.length,
+            `Part ${partIndex + 1} failed: ${getErrorMessage(error)}`,
+          );
         },
         onAllComplete: () => {
           resolve();
@@ -822,22 +927,24 @@ async function runTTSStage(
       const abortHandler = () => workerPool.clear();
       signal.addEventListener('abort', abortHandler);
 
-      workerPool.addTasks(remainingChunks.map((chunk) => {
-        let filename = fileNames[0]?.[0] ?? 'audio';
-        for (const [name, boundaryIndex] of fileNames) {
-          if (chunk.partIndex >= boundaryIndex && boundaryIndex > 0) {
-            filename = name;
+      workerPool.addTasks(
+        remainingChunks.map((chunk) => {
+          let filename = fileNames[0]?.[0] ?? 'audio';
+          for (const [name, boundaryIndex] of fileNames) {
+            if (chunk.partIndex >= boundaryIndex && boundaryIndex > 0) {
+              filename = name;
+            }
           }
-        }
 
-        return {
-          partIndex: chunk.partIndex,
-          text: chunk.text,
-          filename: filename,
-          filenum: String(chunk.partIndex + 1).padStart(4, '0'),
-          voice: chunk.voice,
-        };
-      }));
+          return {
+            partIndex: chunk.partIndex,
+            text: chunk.text,
+            filename: filename,
+            filenum: String(chunk.partIndex + 1).padStart(4, '0'),
+            voice: chunk.voice,
+          };
+        }),
+      );
 
       signal.removeEventListener('abort', abortHandler);
     });
@@ -892,7 +999,7 @@ async function runTTSStage(
     directoryHandle,
     (current, total, message) => {
       report('audio-merge', current, total, message);
-    }
+    },
   );
 
   report('audio-merge', totalChunks, totalChunks, `Saved ${savedCount} file(s)`);

@@ -1,14 +1,14 @@
 // TTSWorkerPool - Worker pool using p-queue and generic-pool
 // Uses battle-tested libraries for task scheduling and connection management
 
+import { createPool, type Pool } from 'generic-pool';
 import PQueue from 'p-queue';
-import { createPool, Pool } from 'generic-pool';
-import type { TTSConfig as VoiceConfig, StatusUpdate } from '../state/types';
-import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
-import { LadderController } from './LadderController';
-import { withRetry, AbortError } from '@/utils/retry';
 import { isAppError } from '@/errors';
+import { AbortError, withRetry } from '@/utils/retry';
+import type { StatusUpdate, TTSConfig as VoiceConfig } from '../state/types';
+import { LadderController } from './LadderController';
 import type { Logger } from './Logger';
+import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 
 export interface PoolTask {
   partIndex: number;
@@ -88,7 +88,7 @@ export class TTSWorkerPool {
         scaleDownFactor: 0.5,
       },
       this.maxWorkers,
-      this.logger
+      this.logger,
     );
 
     // Initialize p-queue with concurrency matching worker count
@@ -123,7 +123,7 @@ export class TTSWorkerPool {
         testOnBorrow: true, // Validate connection before use
         // Note: evictionRunIntervalMillis disabled - uses Node.js setTimeout().unref()
         // which doesn't exist in browsers. Idle connections cleaned up via cleanup() instead.
-      }
+      },
     );
 
     // Initialize temp directory asynchronously
@@ -185,7 +185,7 @@ export class TTSWorkerPool {
           } catch {
             // Ignore warmup errors - will retry on actual task
           }
-        })()
+        })(),
       );
     }
     await Promise.allSettled(promises);
@@ -245,7 +245,10 @@ export class TTSWorkerPool {
 
       // Build config with task-specific voice
       const taskConfig: VoiceConfig = task.voice
-        ? { ...this.voiceConfig, voice: `Microsoft Server Speech Text to Speech Voice (${task.voice})` }
+        ? {
+            ...this.voiceConfig,
+            voice: `Microsoft Server Speech Text to Speech Voice (${task.voice})`,
+          }
         : this.voiceConfig;
 
       // === CENTRALIZED RETRY LOGIC ===
@@ -277,7 +280,7 @@ export class TTSWorkerPool {
           },
           onRetry: (attempt, err, delay) => {
             this.logger?.warn(
-              `Retrying task ${task.partIndex} (Attempt ${attempt}). Waiting ${Math.round(delay)}ms. Error: ${err}`
+              `Retrying task ${task.partIndex} (Attempt ${attempt}). Waiting ${Math.round(delay)}ms. Error: ${err}`,
             );
 
             this.onStatusUpdate?.({
@@ -289,7 +292,7 @@ export class TTSWorkerPool {
             // Force disconnect on error to ensure clean state for next attempt
             currentService.disconnect();
           },
-        }
+        },
       );
 
       // Save to disk
@@ -395,7 +398,10 @@ export class TTSWorkerPool {
     this.queue.clear();
 
     // Drain connection pool (async, but we don't wait)
-    this.connectionPool.drain().then(() => this.connectionPool.clear()).catch(() => {});
+    this.connectionPool
+      .drain()
+      .then(() => this.connectionPool.clear())
+      .catch(() => {});
 
     this.completedTasks.clear();
     this.failedTasks.clear();

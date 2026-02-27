@@ -1,5 +1,5 @@
 declare module 'preact-i18n' {
-  import { ComponentChildren, FunctionalComponent, VNode } from 'preact';
+  import { ComponentChildren, FunctionalComponent } from 'preact';
 
   export interface IntlProviderProps {
     definition: Record<string, unknown>;

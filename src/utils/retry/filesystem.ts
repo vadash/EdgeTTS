@@ -10,7 +10,7 @@ import { filePermissionError } from '@/errors';
 export async function withPermissionRetry<T>(
   directoryHandle: FileSystemDirectoryHandle,
   operation: () => Promise<T>,
-  notify?: (message: string) => void
+  notify?: (message: string) => void,
 ): Promise<T> {
   try {
     return await operation();

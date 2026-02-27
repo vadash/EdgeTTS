@@ -1,17 +1,16 @@
 // Test Utilities
 // Helper functions for rendering components in tests with all providers
 
-import { render, RenderResult } from '@testing-library/preact';
+import { type RenderResult, render } from '@testing-library/preact';
+import type { ComponentChildren, VNode } from 'preact';
 import { IntlProvider } from 'preact-i18n';
-import { ComponentChildren, VNode } from 'preact';
-import { StoreProvider, createStores, Stores } from '@/stores';
-import { resetLogger, resetFFmpeg } from '@/services';
 import en from '@/i18n/en.json';
-
-// Import signal-based store actions for test setup
-import { patchSettings } from '@/stores/SettingsStore';
+import { resetFFmpeg, resetLogger } from '@/services';
+import { createStores, StoreProvider, type Stores } from '@/stores';
 import { updateProgress } from '@/stores/ConversionStore';
 import { setStageField } from '@/stores/LLMStore';
+// Import signal-based store actions for test setup
+import { patchSettings } from '@/stores/SettingsStore';
 
 export interface TestRenderOptions {
   stores?: Partial<TestStoresState>;
@@ -52,10 +51,7 @@ export interface TestRenderResult extends RenderResult {
 /**
  * Render a component with all required providers for testing
  */
-export function renderWithProviders(
-  ui: VNode,
-  options: TestRenderOptions = {}
-): TestRenderResult {
+export function renderWithProviders(ui: VNode, options: TestRenderOptions = {}): TestRenderResult {
   // Reset singletons before each test
   resetLogger();
   resetFFmpeg();
@@ -72,8 +68,10 @@ export function renderWithProviders(
     if (s.pitch !== undefined) settingsPatch.pitch = s.pitch;
     if (s.maxThreads !== undefined) settingsPatch.ttsThreads = s.maxThreads;
     if (s.outputFormat !== undefined) settingsPatch.outputFormat = s.outputFormat;
-    if (s.silenceRemovalEnabled !== undefined) settingsPatch.silenceRemovalEnabled = s.silenceRemovalEnabled;
-    if (s.normalizationEnabled !== undefined) settingsPatch.normalizationEnabled = s.normalizationEnabled;
+    if (s.silenceRemovalEnabled !== undefined)
+      settingsPatch.silenceRemovalEnabled = s.silenceRemovalEnabled;
+    if (s.normalizationEnabled !== undefined)
+      settingsPatch.normalizationEnabled = s.normalizationEnabled;
     if (s.lexxRegister !== undefined) settingsPatch.lexxRegister = s.lexxRegister;
     if (Object.keys(settingsPatch).length > 0) {
       patchSettings(settingsPatch);
@@ -112,9 +110,7 @@ export function renderWithProviders(
 
   const Wrapper = ({ children }: { children: ComponentChildren }) => (
     <StoreProvider stores={stores}>
-      <IntlProvider definition={en}>
-        {children}
-      </IntlProvider>
+      <IntlProvider definition={en}>{children}</IntlProvider>
     </StoreProvider>
   );
 
@@ -132,14 +128,14 @@ export function renderWithProviders(
 export async function waitFor(
   condition: () => boolean,
   timeout = 1000,
-  interval = 50
+  interval = 50,
 ): Promise<void> {
   const start = Date.now();
   while (!condition()) {
     if (Date.now() - start > timeout) {
       throw new Error('Condition not met within timeout');
     }
-    await new Promise(resolve => setTimeout(resolve, interval));
+    await new Promise((resolve) => setTimeout(resolve, interval));
   }
 }
 
@@ -157,10 +153,6 @@ export function createMockAudio(length = 1024): Uint8Array {
 /**
  * Create a mock File object
  */
-export function createMockFile(
-  content: string,
-  name: string,
-  type = 'text/plain'
-): File {
+export function createMockFile(content: string, name: string, type = 'text/plain'): File {
   return new File([content], name, { type });
 }

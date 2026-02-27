@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'preact/hooks';
-import { VNode } from 'preact';
+import type { VNode } from 'preact';
+import { useEffect, useState } from 'preact/hooks';
 
 export function LLMHelp() {
   const [expanded, setExpanded] = useState(false);
@@ -20,38 +20,60 @@ export function LLMHelp() {
 
   // Simple markdown to HTML converter
   const renderMarkdown = (md: string) => {
-    return md
-      .split('\n')
-      .map((line, i) => {
-        // Headers
-        if (line.startsWith('# ')) {
-          return <h2 key={i} className="text-xl font-bold mt-4 mb-2">{line.slice(2)}</h2>;
-        }
-        if (line.startsWith('## ')) {
-          return <h3 key={i} className="text-lg font-semibold mt-4 mb-2 text-accent">{line.slice(3)}</h3>;
-        }
-        if (line.startsWith('### ')) {
-          return <h4 key={i} className="font-semibold mt-3 mb-1">{line.slice(4)}</h4>;
-        }
-        // Horizontal rule
-        if (line.startsWith('---')) {
-          return <hr key={i} className="border-border my-4" />;
-        }
-        // List items
-        if (line.startsWith('- ')) {
-          return <li key={i} className="ml-4">{renderInline(line.slice(2))}</li>;
-        }
-        // Numbered list
-        if (/^\d+\. /.test(line)) {
-          return <li key={i} className="ml-4 list-decimal">{renderInline(line.replace(/^\d+\. /, ''))}</li>;
-        }
-        // Empty line
-        if (!line.trim()) {
-          return <br key={i} />;
-        }
-        // Paragraph
-        return <p key={i} className="my-1">{renderInline(line)}</p>;
-      });
+    return md.split('\n').map((line, i) => {
+      // Headers
+      if (line.startsWith('# ')) {
+        return (
+          <h2 key={i} className="text-xl font-bold mt-4 mb-2">
+            {line.slice(2)}
+          </h2>
+        );
+      }
+      if (line.startsWith('## ')) {
+        return (
+          <h3 key={i} className="text-lg font-semibold mt-4 mb-2 text-accent">
+            {line.slice(3)}
+          </h3>
+        );
+      }
+      if (line.startsWith('### ')) {
+        return (
+          <h4 key={i} className="font-semibold mt-3 mb-1">
+            {line.slice(4)}
+          </h4>
+        );
+      }
+      // Horizontal rule
+      if (line.startsWith('---')) {
+        return <hr key={i} className="border-border my-4" />;
+      }
+      // List items
+      if (line.startsWith('- ')) {
+        return (
+          <li key={i} className="ml-4">
+            {renderInline(line.slice(2))}
+          </li>
+        );
+      }
+      // Numbered list
+      if (/^\d+\. /.test(line)) {
+        return (
+          <li key={i} className="ml-4 list-decimal">
+            {renderInline(line.replace(/^\d+\. /, ''))}
+          </li>
+        );
+      }
+      // Empty line
+      if (!line.trim()) {
+        return <br key={i} />;
+      }
+      // Paragraph
+      return (
+        <p key={i} className="my-1">
+          {renderInline(line)}
+        </p>
+      );
+    });
   };
 
   // Inline formatting
@@ -93,7 +115,7 @@ export function LLMHelp() {
         parts.push(
           <code key={key++} className="bg-primary/50 px-1 rounded text-accent">
             {earliest.match[1]}
-          </code>
+          </code>,
         );
         remaining = remaining.slice(earliest.index + earliest.match[0].length);
       } else if (earliest.type === 'link') {
@@ -106,7 +128,7 @@ export function LLMHelp() {
             className="text-accent hover:underline"
           >
             {earliest.match[1]}
-          </a>
+          </a>,
         );
         remaining = remaining.slice(earliest.index + earliest.match[0].length);
       }

@@ -1,28 +1,23 @@
 // Store Context for Preact
 // Provides React-like context for state management
 
-import { createContext, ComponentChildren } from 'preact';
+import { type ComponentChildren, createContext } from 'preact';
 import { useContext } from 'preact/hooks';
 
 import type { LoggerStore } from '@/services/Logger';
 import { createLoggerStore } from '@/services/Logger';
-import { DataStore } from './DataStore';
-import { LanguageStore } from './LanguageStore';
-
-// Import signal-based stores
-import * as SettingsStore from './SettingsStore';
-import * as ConversionStore from './ConversionStore';
-import * as LLMStore from './LLMStore';
-import { createDataStore } from './DataStore';
-import { createLanguageStore } from './LanguageStore';
-
-// Import individual exports for typed hook return values
-import { settings as settingsSignal, resetSettingsStore } from './SettingsStore';
-import { conversion as conversionSignal } from './ConversionStore';
-import { llm as llmSignal, loadSettings as llmLoadSettings } from './LLMStore';
-
 // Import state types
 import type { AppSettings } from '@/state/types';
+import * as ConversionStore from './ConversionStore';
+import { conversion as conversionSignal } from './ConversionStore';
+import { createDataStore, type DataStore } from './DataStore';
+import { createLanguageStore, type LanguageStore } from './LanguageStore';
+import * as LLMStore from './LLMStore';
+import { loadSettings as llmLoadSettings, llm as llmSignal } from './LLMStore';
+// Import signal-based stores
+import * as SettingsStore from './SettingsStore';
+// Import individual exports for typed hook return values
+import { resetSettingsStore, settings as settingsSignal } from './SettingsStore';
 
 // ============================================================================
 // Store Types
@@ -77,11 +72,7 @@ interface StoreProviderProps {
  * Provider component that makes stores available to all children
  */
 export function StoreProvider({ stores, children }: StoreProviderProps) {
-  return (
-    <StoreContext.Provider value={stores}>
-      {children}
-    </StoreContext.Provider>
-  );
+  return <StoreContext.Provider value={stores}>{children}</StoreContext.Provider>;
 }
 
 // ============================================================================
@@ -109,9 +100,13 @@ export function useSettings(): SettingsStoreType {
   return {
     ...stores.settings,
     value: settingsSignal,
-    save: () => { /* Persistence is handled by effect */ },
+    save: () => {
+      /* Persistence is handled by effect */
+    },
     toObject: () => ({ ...settingsSignal.value }),
-    reset: () => { resetSettingsStore(); },
+    reset: () => {
+      resetSettingsStore();
+    },
   } as SettingsStoreType;
 }
 

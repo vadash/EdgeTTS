@@ -1,89 +1,89 @@
-import { useState, useMemo } from 'preact/hooks';
-import { signal, computed } from '@preact/signals';
+import { computed, signal } from '@preact/signals';
+import { useMemo, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { Button, Toggle } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
-import { useSettings } from '@/stores';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
+import { useSettings } from '@/stores';
 
 // Language code to full name mapping
 const LANGUAGE_NAMES: Record<string, string> = {
-  'multilingual': 'Multilingual',
-  'en': 'English',
-  'ru': 'Russian',
-  'es': 'Spanish',
-  'zh': 'Chinese',
-  'fr': 'French',
-  'de': 'German',
-  'pt': 'Portuguese',
-  'ja': 'Japanese',
-  'ko': 'Korean',
-  'it': 'Italian',
-  'ar': 'Arabic',
-  'hi': 'Hindi',
-  'tr': 'Turkish',
-  'pl': 'Polish',
-  'nl': 'Dutch',
-  'vi': 'Vietnamese',
-  'th': 'Thai',
-  'id': 'Indonesian',
-  'uk': 'Ukrainian',
-  'cs': 'Czech',
-  'sv': 'Swedish',
-  'da': 'Danish',
-  'fi': 'Finnish',
-  'nb': 'Norwegian',
-  'he': 'Hebrew',
-  'el': 'Greek',
-  'ro': 'Romanian',
-  'hu': 'Hungarian',
-  'sk': 'Slovak',
-  'bg': 'Bulgarian',
-  'hr': 'Croatian',
-  'sl': 'Slovenian',
-  'sr': 'Serbian',
-  'lt': 'Lithuanian',
-  'lv': 'Latvian',
-  'et': 'Estonian',
-  'ms': 'Malay',
-  'fil': 'Filipino',
-  'ta': 'Tamil',
-  'te': 'Telugu',
-  'bn': 'Bengali',
-  'gu': 'Gujarati',
-  'kn': 'Kannada',
-  'ml': 'Malayalam',
-  'mr': 'Marathi',
-  'ur': 'Urdu',
-  'fa': 'Persian',
-  'af': 'Afrikaans',
-  'am': 'Amharic',
-  'az': 'Azerbaijani',
-  'bs': 'Bosnian',
-  'ca': 'Catalan',
-  'cy': 'Welsh',
-  'ga': 'Irish',
-  'gl': 'Galician',
-  'is': 'Icelandic',
-  'iu': 'Inuktitut',
-  'jv': 'Javanese',
-  'ka': 'Georgian',
-  'kk': 'Kazakh',
-  'km': 'Khmer',
-  'lo': 'Lao',
-  'mk': 'Macedonian',
-  'mn': 'Mongolian',
-  'mt': 'Maltese',
-  'my': 'Burmese',
-  'ne': 'Nepali',
-  'ps': 'Pashto',
-  'si': 'Sinhala',
-  'so': 'Somali',
-  'sq': 'Albanian',
-  'su': 'Sundanese',
-  'sw': 'Swahili',
-  'uz': 'Uzbek',
-  'zu': 'Zulu',
+  multilingual: 'Multilingual',
+  en: 'English',
+  ru: 'Russian',
+  es: 'Spanish',
+  zh: 'Chinese',
+  fr: 'French',
+  de: 'German',
+  pt: 'Portuguese',
+  ja: 'Japanese',
+  ko: 'Korean',
+  it: 'Italian',
+  ar: 'Arabic',
+  hi: 'Hindi',
+  tr: 'Turkish',
+  pl: 'Polish',
+  nl: 'Dutch',
+  vi: 'Vietnamese',
+  th: 'Thai',
+  id: 'Indonesian',
+  uk: 'Ukrainian',
+  cs: 'Czech',
+  sv: 'Swedish',
+  da: 'Danish',
+  fi: 'Finnish',
+  nb: 'Norwegian',
+  he: 'Hebrew',
+  el: 'Greek',
+  ro: 'Romanian',
+  hu: 'Hungarian',
+  sk: 'Slovak',
+  bg: 'Bulgarian',
+  hr: 'Croatian',
+  sl: 'Slovenian',
+  sr: 'Serbian',
+  lt: 'Lithuanian',
+  lv: 'Latvian',
+  et: 'Estonian',
+  ms: 'Malay',
+  fil: 'Filipino',
+  ta: 'Tamil',
+  te: 'Telugu',
+  bn: 'Bengali',
+  gu: 'Gujarati',
+  kn: 'Kannada',
+  ml: 'Malayalam',
+  mr: 'Marathi',
+  ur: 'Urdu',
+  fa: 'Persian',
+  af: 'Afrikaans',
+  am: 'Amharic',
+  az: 'Azerbaijani',
+  bs: 'Bosnian',
+  ca: 'Catalan',
+  cy: 'Welsh',
+  ga: 'Irish',
+  gl: 'Galician',
+  is: 'Icelandic',
+  iu: 'Inuktitut',
+  jv: 'Javanese',
+  ka: 'Georgian',
+  kk: 'Kazakh',
+  km: 'Khmer',
+  lo: 'Lao',
+  mk: 'Macedonian',
+  mn: 'Mongolian',
+  mt: 'Maltese',
+  my: 'Burmese',
+  ne: 'Nepali',
+  ps: 'Pashto',
+  si: 'Sinhala',
+  so: 'Somali',
+  sq: 'Albanian',
+  su: 'Sundanese',
+  sw: 'Swahili',
+  uz: 'Uzbek',
+  zu: 'Zulu',
 };
 
 // Priority order for languages (most popular first)
@@ -122,16 +122,16 @@ export function VoicePoolTab() {
   const enabledVoices = computed(() => {
     const saved = settings.enabledVoices.value;
     if (saved.length === 0) {
-      return new Set(voices.map(v => v.fullValue));
+      return new Set(voices.map((v) => v.fullValue));
     }
     return new Set(saved);
   });
 
   // Get unique locales with multilingual category, custom sorting, and separators
   const locales = useMemo(() => {
-    const unique = new Set(voices.map(v => v.locale.split('-')[0]));
+    const unique = new Set(voices.map((v) => v.locale.split('-')[0]));
     // Add multilingual category if there are multilingual voices
-    const hasMultilingual = voices.some(v => v.name.includes('Multilingual'));
+    const hasMultilingual = voices.some((v) => v.name.includes('Multilingual'));
     if (hasMultilingual) {
       unique.add('multilingual');
     }
@@ -171,20 +171,23 @@ export function VoicePoolTab() {
 
   // Filter voices for narrator selection based on detected language, with separator
   const narratorVoices = useMemo(() => {
-    const multilingual = voices.filter(v => v.name.includes('Multilingual'));
-    const russian = voices.filter(v => v.locale.startsWith('ru') && !v.name.includes('Multilingual'));
+    const multilingual = voices.filter((v) => v.name.includes('Multilingual'));
+    const russian = voices.filter(
+      (v) => v.locale.startsWith('ru') && !v.name.includes('Multilingual'),
+    );
     // Return with separator marker between groups
     return [
-      ...multilingual.map(v => ({ ...v, isSeparator: false })),
+      ...multilingual.map((v) => ({ ...v, isSeparator: false })),
       { fullValue: '---', name: '---', locale: '---', gender: 'male' as const, isSeparator: true },
-      ...russian.map(v => ({ ...v, isSeparator: false })),
+      ...russian.map((v) => ({ ...v, isSeparator: false })),
     ];
   }, []);
 
   // Filter voices for pool list
   const filteredVoices = useMemo(() => {
-    return voices.filter(v => {
-      const matchesSearch = filter === '' ||
+    return voices.filter((v) => {
+      const matchesSearch =
+        filter === '' ||
         v.fullValue.toLowerCase().includes(filter.toLowerCase()) ||
         v.name.toLowerCase().includes(filter.toLowerCase());
 
@@ -211,7 +214,7 @@ export function VoicePoolTab() {
   };
 
   const enableAll = () => {
-    settings.setEnabledVoices(voices.map(v => v.fullValue));
+    settings.setEnabledVoices(voices.map((v) => v.fullValue));
   };
 
   const disableAll = () => {
@@ -238,15 +241,17 @@ export function VoicePoolTab() {
             value={settings.narratorVoice.value}
             onChange={(e) => settings.setNarratorVoice((e.target as HTMLSelectElement).value)}
           >
-            {narratorVoices.map((v) => (
+            {narratorVoices.map((v) =>
               v.isSeparator ? (
-                <option key="separator" disabled>────────────</option>
+                <option key="separator" disabled>
+                  ────────────
+                </option>
               ) : (
                 <option key={v.fullValue} value={v.fullValue}>
                   {v.fullValue} ({v.gender})
                 </option>
-              )
-            ))}
+              ),
+            )}
           </select>
           <button
             onClick={() => playVoice(settings.narratorVoice.value)}
@@ -254,7 +259,9 @@ export function VoicePoolTab() {
             className="btn btn-icon"
             aria-label="Play voice sample"
           >
-            {preview.isPlaying && preview.currentVoiceId === settings.narratorVoice.value ? '...' : '▶'}
+            {preview.isPlaying && preview.currentVoiceId === settings.narratorVoice.value
+              ? '...'
+              : '▶'}
           </button>
         </div>
       </div>
@@ -284,13 +291,17 @@ export function VoicePoolTab() {
           onChange={(e) => setLocaleFilter((e.target as HTMLSelectElement).value)}
         >
           <option value="all">All</option>
-          {locales.map(locale => (
+          {locales.map((locale) =>
             locale.startsWith('---') ? (
-              <option key={locale} disabled>────────────</option>
+              <option key={locale} disabled>
+                ────────────
+              </option>
             ) : (
-              <option key={locale} value={locale}>{LANGUAGE_NAMES[locale] || locale.toUpperCase()}</option>
-            )
-          ))}
+              <option key={locale} value={locale}>
+                {LANGUAGE_NAMES[locale] || locale.toUpperCase()}
+              </option>
+            ),
+          )}
         </select>
         <input
           type="text"
@@ -311,13 +322,13 @@ export function VoicePoolTab() {
           className="input-field w-full"
           placeholder="Enter text to test voices..."
           value={sampleText.value}
-          onInput={(e) => sampleText.value = (e.target as HTMLInputElement).value}
+          onInput={(e) => (sampleText.value = (e.target as HTMLInputElement).value)}
         />
       </div>
 
       {/* Voice List */}
       <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-        {filteredVoices.map(voice => (
+        {filteredVoices.map((voice) => (
           <div
             key={voice.fullValue}
             className="flex items-center gap-3 p-3 bg-primary rounded-lg border border-border hover:border-gray-500 transition-colors"

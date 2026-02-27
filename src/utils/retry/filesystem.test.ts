@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { withPermissionRetry } from './filesystem';
+import { describe, expect, it, vi } from 'vitest';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
+import { withPermissionRetry } from './filesystem';
 
 describe('withPermissionRetry', () => {
   it('returns result on success without retry', async () => {
@@ -29,7 +29,8 @@ describe('withPermissionRetry', () => {
     } as unknown as FileSystemDirectoryHandle;
 
     const notAllowedError = new DOMException('Permission denied', 'NotAllowedError');
-    const operation = vi.fn()
+    const operation = vi
+      .fn()
       .mockRejectedValueOnce(notAllowedError)
       .mockResolvedValueOnce('retried-success');
 
@@ -62,9 +63,7 @@ describe('withPermissionRetry', () => {
     } as unknown as FileSystemDirectoryHandle;
 
     const notAllowedError = new DOMException('Permission denied', 'NotAllowedError');
-    const operation = vi.fn()
-      .mockRejectedValueOnce(notAllowedError)
-      .mockResolvedValueOnce('ok');
+    const operation = vi.fn().mockRejectedValueOnce(notAllowedError).mockResolvedValueOnce('ok');
     const notify = vi.fn();
 
     await withPermissionRetry(handle, operation, notify);

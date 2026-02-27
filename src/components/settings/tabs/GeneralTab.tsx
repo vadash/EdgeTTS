@@ -1,6 +1,6 @@
 import { Text } from 'preact-i18n';
-import { useSettings, useLanguage } from '@/stores';
-import { Slider, Button } from '@/components/common';
+import { Button, Slider } from '@/components/common';
+import { useLanguage, useSettings } from '@/stores';
 
 export function GeneralTab() {
   const settings = useSettings();
@@ -32,7 +32,10 @@ export function GeneralTab() {
       {/* Speed Info */}
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
         <p className="text-sm text-blue-300">
-          ℹ️ <Text id="settings.speedInfo">Speed varies by voice. Adjust playback speed in the audio player.</Text>
+          ℹ️{' '}
+          <Text id="settings.speedInfo">
+            Speed varies by voice. Adjust playback speed in the audio player.
+          </Text>
         </p>
       </div>
 

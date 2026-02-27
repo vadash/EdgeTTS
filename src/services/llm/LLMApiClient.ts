@@ -1,10 +1,9 @@
 import OpenAI from 'openai';
-import { defaultConfig } from '@/config';
-import type { Logger } from '../Logger';
-import { DebugLogger } from './DebugLogger';
-import { zodToJsonSchema, type StructuredCallOptions } from './schemaUtils';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { RetriableError } from '@/errors';
+import type { Logger } from '../Logger';
+import type { DebugLogger } from './DebugLogger';
+import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
 
 export interface LLMApiClientOptions {
   apiKey: string;
@@ -46,7 +45,10 @@ function applyProviderFixes(requestBody: Record<string, unknown>, provider: stri
 
     // Mistral doesn't support OpenAI's json_schema format.
     // Use json_object mode instead (instructs model to return valid JSON).
-    if (requestBody.response_format && (requestBody.response_format as any).type === 'json_schema') {
+    if (
+      requestBody.response_format &&
+      (requestBody.response_format as any).type === 'json_schema'
+    ) {
       requestBody.response_format = { type: 'json_object' };
     }
   }
@@ -86,12 +88,15 @@ export class LLMApiClient {
       const origin = new URL(url.toString()).origin;
 
       // Full browser fingerprint
-      headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      headers.set(
+        'User-Agent',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      );
       headers.set('Accept', 'application/json, text/event-stream');
       headers.set('Accept-Language', 'en-US,en;q=0.9');
       headers.set('Accept-Encoding', 'gzip, deflate, br');
       headers.set('Origin', origin);
-      headers.set('Referer', origin + '/');
+      headers.set('Referer', `${origin}/`);
       headers.set('Connection', 'keep-alive');
       headers.set('Sec-Fetch-Dest', 'empty');
       headers.set('Sec-Fetch-Mode', 'cors');
@@ -113,7 +118,7 @@ export class LLMApiClient {
         }
         // Set origin/referer to API endpoint (not our app origin)
         headers.set('Origin', origin);
-        headers.set('Referer', origin + '/');
+        headers.set('Referer', `${origin}/`);
       }
 
       return fetch(url, { ...init, headers });
@@ -179,7 +184,7 @@ export class LLMApiClient {
         model = chunk.model || model;
         const delta = chunk.choices[0]?.delta as any;
         content += delta?.content || delta?.reasoning || '';
-      };
+      }
 
       if (!content) {
         return { success: false, error: 'Empty response from streaming endpoint' };
@@ -276,14 +281,11 @@ export class LLMApiClient {
       // Streaming path: accumulate SSE chunks
       let stream;
       try {
-        stream = await this.client.chat.completions.create(
-          requestBody as any,
-          { signal }
-        );
+        stream = await this.client.chat.completions.create(requestBody as any, { signal });
       } catch (error) {
         throw new RetriableError(
           `LLM API call failed: ${(error as Error).message}`,
-          error as Error
+          error as Error,
         );
       }
 
@@ -301,10 +303,7 @@ export class LLMApiClient {
           }
         }
       } catch (error) {
-        throw new RetriableError(
-          `Streaming failed: ${(error as Error).message}`,
-          error as Error
-        );
+        throw new RetriableError(`Streaming failed: ${(error as Error).message}`, error as Error);
       }
 
       if (finishReason === 'content_filter') {
@@ -320,14 +319,11 @@ export class LLMApiClient {
       // Non-streaming path
       let response;
       try {
-        response = await this.client.chat.completions.create(
-          requestBody as any,
-          { signal }
-        );
+        response = await this.client.chat.completions.create(requestBody as any, { signal });
       } catch (error) {
         throw new RetriableError(
           `LLM API call failed: ${(error as Error).message}`,
-          error as Error
+          error as Error,
         );
       }
 
@@ -370,10 +366,7 @@ export class LLMApiClient {
     try {
       parsed = JSON.parse(jsonContent);
     } catch (error) {
-      throw new RetriableError(
-        `JSON parse failed: ${(error as Error).message}`,
-        error as Error
-      );
+      throw new RetriableError(`JSON parse failed: ${(error as Error).message}`, error as Error);
     }
 
     try {
@@ -381,7 +374,7 @@ export class LLMApiClient {
     } catch (error) {
       throw new RetriableError(
         `Zod validation failed: ${(error as Error).message}`,
-        error as Error
+        error as Error,
       );
     }
   }

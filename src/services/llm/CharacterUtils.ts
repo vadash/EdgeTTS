@@ -89,7 +89,10 @@ export function mergeCharacters(characters: LLMCharacter[]): LLMCharacter[] {
  * Apply merge groups to create final character list
  * mergeGroups: array of 0-based index arrays, first index is "keep"
  */
-export function applyMergeGroups(characters: LLMCharacter[], mergeGroups: number[][]): LLMCharacter[] {
+export function applyMergeGroups(
+  characters: LLMCharacter[],
+  mergeGroups: number[][],
+): LLMCharacter[] {
   const mergedIndices = new Set<number>();
   const result: LLMCharacter[] = [];
 
@@ -101,18 +104,18 @@ export function applyMergeGroups(characters: LLMCharacter[], mergeGroups: number
     const keep = characters[keepIdx];
     if (!keep) continue;
 
-    const absorbed = absorbIdxs.map(i => characters[i]).filter(Boolean);
+    const absorbed = absorbIdxs.map((i) => characters[i]).filter(Boolean);
     const allChars = [keep, ...absorbed];
 
     // Merge variations and pick first non-unknown gender
     const merged: LLMCharacter = {
       canonicalName: keep.canonicalName,
-      variations: [...new Set(allChars.flatMap(c => c.variations))],
-      gender: allChars.find(c => c.gender !== 'unknown')?.gender || 'unknown'
+      variations: [...new Set(allChars.flatMap((c) => c.variations))],
+      gender: allChars.find((c) => c.gender !== 'unknown')?.gender || 'unknown',
     };
 
     result.push(merged);
-    group.forEach(i => mergedIndices.add(i));
+    group.forEach((i) => mergedIndices.add(i));
   }
 
   // Add unchanged characters
@@ -129,9 +132,7 @@ export function applyMergeGroups(characters: LLMCharacter[], mergeGroups: number
  * Count speaking frequency per character from speaker assignments
  * Returns a map of speaker name → sentence count (excludes narrator)
  */
-export function countSpeakingFrequency(
-  assignments: SpeakerAssignment[]
-): Map<string, number> {
+export function countSpeakingFrequency(assignments: SpeakerAssignment[]): Map<string, number> {
   const frequency = new Map<string, number>();
   for (const a of assignments) {
     if (a.speaker !== 'narrator') {

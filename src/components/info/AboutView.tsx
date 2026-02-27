@@ -1,5 +1,5 @@
-import { Text } from 'preact-i18n';
 import type { ComponentChildren } from 'preact';
+import { Text } from 'preact-i18n';
 
 export function AboutView() {
   return (
@@ -21,8 +21,7 @@ export function AboutView() {
           <Text id="about.whatItDoes.description">Upload a book...</Text>
         </p>
         <p>
-          <Text id="about.whatItDoes.sampleLink" />
-          {' '}
+          <Text id="about.whatItDoes.sampleLink" />{' '}
           <a
             href="https://files.catbox.moe/x6boa8.opus"
             target="_blank"
@@ -119,10 +118,24 @@ export function AboutView() {
           <Text id="about.quickStart.title">Quick Start</Text>
         </h2>
         <ol class="list-decimal list-inside space-y-2">
-          <li><Text id="about.quickStart.step1">Upload — Drop a file or paste text</Text></li>
-          <li><Text id="about.quickStart.step2">Configure — Pick voice, speed, pitch in Settings</Text></li>
-          <li><Text id="about.quickStart.step3">Enable LLM (optional) — For multi-voice books, add an API key in Settings → LLM</Text></li>
-          <li><Text id="about.quickStart.step4">Convert — Click "Save to MP3" and pick an output folder</Text></li>
+          <li>
+            <Text id="about.quickStart.step1">Upload — Drop a file or paste text</Text>
+          </li>
+          <li>
+            <Text id="about.quickStart.step2">
+              Configure — Pick voice, speed, pitch in Settings
+            </Text>
+          </li>
+          <li>
+            <Text id="about.quickStart.step3">
+              Enable LLM (optional) — For multi-voice books, add an API key in Settings → LLM
+            </Text>
+          </li>
+          <li>
+            <Text id="about.quickStart.step4">
+              Convert — Click "Save to MP3" and pick an output folder
+            </Text>
+          </li>
         </ol>
       </section>
 
@@ -131,21 +144,33 @@ export function AboutView() {
           <Text id="about.llmSetup.title">LLM Setup</Text>
         </h2>
         <p class="mb-4">
-          <Text id="about.llmSetup.description">For multi-voice audiobooks, you need an OpenAI-compatible API:</Text>
+          <Text id="about.llmSetup.description">
+            For multi-voice audiobooks, you need an OpenAI-compatible API:
+          </Text>
         </p>
         <ul class="list-disc list-inside space-y-1 mb-4">
-          <li><Text id="about.llmSetup.gemini">Google Gemini — free tier available</Text></li>
-          <li><Text id="about.llmSetup.openRouter">OpenRouter — many free models</Text></li>
-          <li><Text id="about.llmSetup.anyProvider">Any OpenAI-compatible provider</Text></li>
+          <li>
+            <Text id="about.llmSetup.gemini">Google Gemini — free tier available</Text>
+          </li>
+          <li>
+            <Text id="about.llmSetup.openRouter">OpenRouter — many free models</Text>
+          </li>
+          <li>
+            <Text id="about.llmSetup.anyProvider">Any OpenAI-compatible provider</Text>
+          </li>
         </ul>
         <p class="text-sm">
           <Text id="about.llmSetup.instructions.before" />
-          <strong><Text id="about.llmSetup.instructions.link" /></strong>
+          <strong>
+            <Text id="about.llmSetup.instructions.link" />
+          </strong>
           <Text id="about.llmSetup.instructions.after" />
         </p>
         <p class="text-sm mt-2">
           <Text id="about.llmSetup.help.before" />
-          <strong><Text id="about.llmSetup.help.icon" /></strong>
+          <strong>
+            <Text id="about.llmSetup.help.icon" />
+          </strong>
           <Text id="about.llmSetup.help.after" />
         </p>
       </section>
@@ -155,18 +180,34 @@ export function AboutView() {
           <Text id="about.techStack.title">Tech Stack</Text>
         </h2>
         <ul class="list-disc list-inside space-y-1">
-          <li><Text id="about.techStack.ui">UI: Preact + TypeScript + Tailwind CSS</Text></li>
-          <li><Text id="about.techStack.tts">TTS: Microsoft Edge WebSocket API</Text></li>
-          <li><Text id="about.techStack.audio">Audio: FFmpeg WASM</Text></li>
-          <li><Text id="about.techStack.llm">LLM: OpenAI-compatible API</Text></li>
-          <li><Text id="about.techStack.storage">Storage: IndexedDB + File System Access API</Text></li>
-          <li><Text id="about.techStack.state">State: @preact/signals</Text></li>
-          <li><Text id="about.techStack.build">Build: Vite</Text></li>
+          <li>
+            <Text id="about.techStack.ui">UI: Preact + TypeScript + Tailwind CSS</Text>
+          </li>
+          <li>
+            <Text id="about.techStack.tts">TTS: Microsoft Edge WebSocket API</Text>
+          </li>
+          <li>
+            <Text id="about.techStack.audio">Audio: FFmpeg WASM</Text>
+          </li>
+          <li>
+            <Text id="about.techStack.llm">LLM: OpenAI-compatible API</Text>
+          </li>
+          <li>
+            <Text id="about.techStack.storage">Storage: IndexedDB + File System Access API</Text>
+          </li>
+          <li>
+            <Text id="about.techStack.state">State: @preact/signals</Text>
+          </li>
+          <li>
+            <Text id="about.techStack.build">Build: Vite</Text>
+          </li>
         </ul>
       </section>
 
       <footer class="mt-12 pt-6 border-t border-border text-sm text-muted-foreground text-center">
-        <Text id="about.footer">Everything runs locally in your browser. No server, no uploads, no tracking.</Text>
+        <Text id="about.footer">
+          Everything runs locally in your browser. No server, no uploads, no tracking.
+        </Text>
       </footer>
     </div>
   );

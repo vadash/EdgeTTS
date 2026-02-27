@@ -94,12 +94,7 @@ export class AppError extends Error {
    */
   readonly timestamp: Date;
 
-  constructor(
-    code: ErrorCode,
-    message?: string,
-    cause?: Error,
-    context?: Record<string, unknown>
-  ) {
+  constructor(code: ErrorCode, message?: string, cause?: Error, context?: Record<string, unknown>) {
     super(message ?? errorMessages[code]);
     this.name = 'AppError';
     this.code = code;
@@ -250,7 +245,9 @@ export function ffmpegProcessError(cause?: Error): AppError {
  * Create file system error
  */
 export function fileSystemError(operation: string, cause?: Error): AppError {
-  return new AppError('FILE_SYSTEM_ERROR', `File operation failed: ${operation}`, cause, { operation });
+  return new AppError('FILE_SYSTEM_ERROR', `File operation failed: ${operation}`, cause, {
+    operation,
+  });
 }
 
 /**
@@ -280,7 +277,7 @@ export function noContentError(): AppError {
 export function insufficientVoicesError(maleCount: number, femaleCount: number): AppError {
   return new AppError(
     'INSUFFICIENT_VOICES',
-    `Need 5+ voices (2+ male, 2+ female). Got: ${maleCount} male, ${femaleCount} female`
+    `Need 5+ voices (2+ male, 2+ female). Got: ${maleCount} male, ${femaleCount} female`,
   );
 }
 
@@ -292,7 +289,10 @@ export function insufficientVoicesError(maleCount: number, femaleCount: number):
  * Retriable error - signals the caller should retry with a new connection
  */
 export class RetriableError extends Error {
-  constructor(message: string, public readonly cause?: Error) {
+  constructor(
+    message: string,
+    public readonly cause?: Error,
+  ) {
     super(message);
     this.name = 'RetriableError';
     if (Error.captureStackTrace) {

@@ -1,8 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
-import { FFmpegService } from './FFmpegService';
-import type { AudioProcessingConfig } from './FFmpegService';
+import { describe, expect, it } from 'vitest';
 import { LoggerStore } from '@/services/Logger';
-import { AudioPreset } from '@/state/types';
+import type { AudioProcessingConfig } from './FFmpegService';
+import { FFmpegService } from './FFmpegService';
 
 describe('AudioProcessingConfig', () => {
   it('should accept Opus encoding parameters', () => {
@@ -65,7 +64,7 @@ describe('FFmpegService Opus integration', () => {
     const allCalls: string[] = [];
     (service as any).ffmpeg = {
       exec: async (args: string[]) => {
-        allCalls.push(...args);  // Spread the array of args
+        allCalls.push(...args); // Spread the array of args
         return;
       },
       writeFile: () => {},

@@ -45,7 +45,10 @@ export class KeepAwake {
   private startAudioContext(): void {
     try {
       // Create audio context
-      this.audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      this.audioContext = new (
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      )();
 
       // Create oscillator (generates tone)
       this.oscillator = this.audioContext.createOscillator();
@@ -71,13 +74,15 @@ export class KeepAwake {
     if (!navigator.locks) return;
 
     // Request a lock that stays held until we release it
-    navigator.locks.request('tts-conversion-active', { mode: 'exclusive' }, () => {
-      return new Promise<void>((resolve) => {
-        this.lockResolver = resolve;
+    navigator.locks
+      .request('tts-conversion-active', { mode: 'exclusive' }, () => {
+        return new Promise<void>((resolve) => {
+          this.lockResolver = resolve;
+        });
+      })
+      .catch(() => {
+        // Lock request failed or was aborted
       });
-    }).catch(() => {
-      // Lock request failed or was aborted
-    });
   }
 
   private async startScreenWakeLock(): Promise<void> {

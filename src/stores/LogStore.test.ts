@@ -1,7 +1,7 @@
 // LoggerStore Tests
 // Test the LoggerStore functionality
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { LoggerStore } from '@/services/Logger';
 
 describe('LoggerStore', () => {

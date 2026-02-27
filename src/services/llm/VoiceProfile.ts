@@ -1,9 +1,15 @@
-import type { VoiceProfileFile, LLMCharacter, SpeakerAssignment, CharacterEntry, VoiceOption } from '@/state/types';
-import { matchCharacter } from './NameMatcher';
-import { countSpeakingFrequency } from './CharacterUtils';
+import type {
+  CharacterEntry,
+  LLMCharacter,
+  SpeakerAssignment,
+  VoiceOption,
+  VoiceProfileFile,
+} from '@/state/types';
 import { IMPORTANCE_THRESHOLD } from '@/state/types';
 import type { DetectedLanguage } from '@/utils/languageDetection';
 import { allocateTiered, randomizeBelow, sortVoicesByPriority } from '../VoiceAllocator';
+import { countSpeakingFrequency } from './CharacterUtils';
+import { matchCharacter } from './NameMatcher';
 
 /**
  * Export to cumulative profile format (version 2)
@@ -15,9 +21,8 @@ export function exportToProfile(
   currentVoiceMap: Map<string, string>,
   assignments: SpeakerAssignment[],
   narratorVoice: string,
-  sessionName: string
+  sessionName: string,
 ): string {
-
   // 1. Count current session's dialogue per character
   const currentCounts = countSpeakingFrequency(assignments);
   const currentTotalLines = assignments.length;
@@ -39,9 +44,7 @@ export function exportToProfile(
     const currentLines = currentCounts.get(char.canonicalName) ?? 0;
 
     // Try to find matching entry in existing profile
-    const matchedEntry = existingProfile
-      ? matchCharacter(char, merged)
-      : undefined;
+    const matchedEntry = existingProfile ? matchCharacter(char, merged) : undefined;
 
     if (matchedEntry) {
       // Existing: update counts
@@ -71,7 +74,7 @@ export function exportToProfile(
         lines: currentLines,
         percentage: (currentLines / newTotalLines) * 100,
         lastSeenIn: sessionName,
-        bookAppearances: 1
+        bookAppearances: 1,
       };
     }
   }
@@ -81,7 +84,7 @@ export function exportToProfile(
     version: 2,
     narrator: narratorVoice,
     totalLines: newTotalLines,
-    characters: merged
+    characters: merged,
   };
 
   return JSON.stringify(output, null, 2);
@@ -95,7 +98,7 @@ export function exportToProfile(
  */
 export function importProfile(
   profileJson: string,
-  currentCharacters: LLMCharacter[]
+  currentCharacters: LLMCharacter[],
 ): {
   voiceMap: Map<string, string>;
   matchedCharacters: Set<string>;
@@ -115,7 +118,7 @@ export function importProfile(
   for (const char of currentCharacters) {
     // First try exact canonical name match
     let matchedEntry = Object.values(voiceProfile.characters).find(
-      entry => entry.canonicalName === char.canonicalName
+      (entry) => entry.canonicalName === char.canonicalName,
     );
 
     // If no exact match, try fuzzy matching via matchCharacter
@@ -154,16 +157,16 @@ export function isCharacterVisible(entry: CharacterEntry): boolean {
 export function assignVoicesTiered(
   characters: CharacterEntry[],
   availableVoices: VoiceOption[],
-  narratorVoice: string
+  narratorVoice: string,
 ): Map<string, string> {
   return allocateTiered(
-    characters.map(c => ({
+    characters.map((c) => ({
       canonicalName: c.canonicalName,
       voice: c.voice,
       lines: c.lines,
     })),
     availableVoices,
-    narratorVoice
+    narratorVoice,
   );
 }
 
@@ -196,7 +199,7 @@ export function randomizeBelowVoices(params: RandomizeBelowParams): Map<string, 
     params.clickedIndex,
     params.enabledVoices,
     params.narratorVoice,
-    params.bookLanguage
+    params.bookLanguage,
   );
 }
 

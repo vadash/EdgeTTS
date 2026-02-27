@@ -1,9 +1,9 @@
-import { AppShell } from './components/layout';
-import { Router } from './router';
 import { ConvertView } from './components/convert';
+import { AboutView } from './components/info';
+import { AppShell } from './components/layout';
 import { SettingsView } from './components/settings';
 import { StatusView } from './components/status';
-import { AboutView } from './components/info';
+import { Router } from './router';
 
 export function App() {
   return (

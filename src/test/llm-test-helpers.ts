@@ -1,21 +1,25 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { Logger } from '@/services/Logger';
 import { LLMVoiceService } from '@/services/llm';
 import { TextBlockSplitter } from '@/services/TextBlockSplitter';
-import { testConfig } from '../../test.config.local';
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
-import type { TestFixture, ExpectedDialogue } from './fixtures';
-import type { Logger } from '@/services/Logger';
+import { testConfig } from '../../test.config.local';
+import type { ExpectedDialogue } from './fixtures';
 import { speakerMatchesCharacter } from './fixtures';
-import * as fs from 'fs';
-import * as path from 'path';
 
 /**
  * Console logger for tests
  */
 const testLogger: Logger = {
-  debug: (message: string, data?: Record<string, unknown>) => console.log(`[DEBUG] ${message}`, data || ''),
-  info: (message: string, data?: Record<string, unknown>) => console.log(`[INFO] ${message}`, data || ''),
-  warn: (message: string, data?: Record<string, unknown>) => console.warn(`[WARN] ${message}`, data || ''),
-  error: (message: string, error?: Error, data?: Record<string, unknown>) => console.error(`[ERROR] ${message}`, error, data || ''),
+  debug: (message: string, data?: Record<string, unknown>) =>
+    console.log(`[DEBUG] ${message}`, data || ''),
+  info: (message: string, data?: Record<string, unknown>) =>
+    console.log(`[INFO] ${message}`, data || ''),
+  warn: (message: string, data?: Record<string, unknown>) =>
+    console.warn(`[WARN] ${message}`, data || ''),
+  error: (message: string, error?: Error, data?: Record<string, unknown>) =>
+    console.error(`[ERROR] ${message}`, error, data || ''),
 };
 
 /**
@@ -49,7 +53,7 @@ export interface DialogueCheckResult {
 export function validateConfig(): void {
   if (!testConfig.apiKey || !testConfig.apiUrl || !testConfig.model) {
     throw new Error(
-      'Please populate test.config.local.ts with apiKey, apiUrl, and model before running real API tests'
+      'Please populate test.config.local.ts with apiKey, apiUrl, and model before running real API tests',
     );
   }
 }
@@ -109,7 +113,7 @@ export async function runExtract(
   service: LLMVoiceService,
   splitter: TextBlockSplitter,
   text: string,
-  verbose = true
+  verbose = true,
 ): Promise<ExtractResult> {
   const blocks = splitter.createExtractBlocks(text);
 
@@ -140,7 +144,7 @@ export async function runAssign(
   splitter: TextBlockSplitter,
   text: string,
   characters: LLMCharacter[],
-  verbose = true
+  verbose = true,
 ): Promise<AssignResult> {
   const blocks = splitter.createAssignBlocks(text);
 
@@ -163,11 +167,11 @@ export async function runAssign(
       if (verbose) {
         console.log(`    Block ${current}/${total}`);
       }
-    }
+    },
   );
   const durationMs = Date.now() - startTime;
 
-  const dialogueCount = assignments.filter(a => a.speaker !== 'narrator').length;
+  const dialogueCount = assignments.filter((a) => a.speaker !== 'narrator').length;
 
   return {
     assignments,
@@ -182,13 +186,15 @@ export async function runAssign(
  * Handles: " " ' ' ` ` and various Unicode quote characters
  */
 function normalizeQuotes(text: string): string {
-  return text
-    // Double quotes
-    .replace(/[\u201C\u201D\u201E\u00AB\u00BB]/g, '"')
-    // Single quotes/apostrophes (right single quote is most common apostrophe)
-    .replace(/[\u2018\u2019\u201A\u201B\u2039\u203A\u02BC\u2032\uFF07]/g, "'")
-    // Em dash -> hyphen
-    .replace(/[\u2014\u2015\u2212]/g, '-');
+  return (
+    text
+      // Double quotes
+      .replace(/[\u201C\u201D\u201E\u00AB\u00BB]/g, '"')
+      // Single quotes/apostrophes (right single quote is most common apostrophe)
+      .replace(/[\u2018\u2019\u201A\u201B\u2039\u203A\u02BC\u2032\uFF07]/g, "'")
+      // Em dash -> hyphen
+      .replace(/[\u2014\u2015\u2212]/g, '-')
+  );
 }
 
 /**
@@ -196,10 +202,10 @@ function normalizeQuotes(text: string): string {
  */
 export function findAssignment(
   assignments: SpeakerAssignment[],
-  textContains: string
+  textContains: string,
 ): SpeakerAssignment | undefined {
   const normalizedSearch = normalizeQuotes(textContains);
-  return assignments.find(a => normalizeQuotes(a.text).includes(normalizedSearch));
+  return assignments.find((a) => normalizeQuotes(a.text).includes(normalizedSearch));
 }
 
 /**
@@ -209,7 +215,7 @@ export function findAssignment(
 export function checkDialogue(
   assignments: SpeakerAssignment[],
   expected: ExpectedDialogue,
-  characters?: LLMCharacter[]
+  characters?: LLMCharacter[],
 ): DialogueCheckResult {
   const assignment = findAssignment(assignments, expected.textContains);
 
@@ -250,7 +256,7 @@ export function logExtractResults(result: ExtractResult): void {
   console.log('\n  === Extract Results ===');
   console.log(`  Duration: ${result.durationMs}ms`);
   console.log(`  Characters found: ${result.characters.length}`);
-  result.characters.forEach(c => {
+  result.characters.forEach((c) => {
     console.log(`    - ${c.canonicalName} (${c.gender})`);
     if (c.variations.length > 1) {
       console.log(`      Variations: ${c.variations.join(', ')}`);
@@ -269,7 +275,7 @@ export function logAssignResults(result: AssignResult): void {
 
   // Group by speaker
   const bySpeaker = new Map<string, number>();
-  result.assignments.forEach(a => {
+  result.assignments.forEach((a) => {
     bySpeaker.set(a.speaker, (bySpeaker.get(a.speaker) || 0) + 1);
   });
 
@@ -291,18 +297,24 @@ export function logDialogueChecks(results: DialogueCheckResult[]): void {
   let failed = 0;
   let notFound = 0;
 
-  results.forEach(r => {
+  results.forEach((r) => {
     const status = !r.found ? '❓' : r.matched ? '✓' : '✗';
     const marker = r.expected.strict ? '[STRICT]' : '[lenient]';
 
     if (!r.found) {
-      console.log(`  ${status} ${marker} "${r.expected.textContains.substring(0, 30)}..." - NOT FOUND`);
+      console.log(
+        `  ${status} ${marker} "${r.expected.textContains.substring(0, 30)}..." - NOT FOUND`,
+      );
       notFound++;
     } else if (r.matched) {
-      console.log(`  ${status} ${marker} "${r.expected.textContains.substring(0, 30)}..." → ${r.actualSpeaker} (expected: ${r.expected.speaker})`);
+      console.log(
+        `  ${status} ${marker} "${r.expected.textContains.substring(0, 30)}..." → ${r.actualSpeaker} (expected: ${r.expected.speaker})`,
+      );
       passed++;
     } else {
-      console.log(`  ${status} ${marker} "${r.expected.textContains.substring(0, 30)}..." → ${r.actualSpeaker} (expected: ${r.expected.speaker})`);
+      console.log(
+        `  ${status} ${marker} "${r.expected.textContains.substring(0, 30)}..." → ${r.actualSpeaker} (expected: ${r.expected.speaker})`,
+      );
       failed++;
     }
   });

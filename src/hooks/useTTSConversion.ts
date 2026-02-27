@@ -2,18 +2,16 @@
 // Orchestrator is now a plain function with external AbortSignal
 
 import { useCallback, useRef } from 'preact/hooks';
-import { useStores } from '@/stores';
-import type { Stores } from '@/stores';
-import { runConversion, type OrchestratorInput } from '@/services/ConversionOrchestrator';
 import { getOrchestratorServices } from '@/services';
+import { type OrchestratorInput, runConversion } from '@/services/ConversionOrchestrator';
 import { getKeepAwake } from '@/services/KeepAwake';
 import type { ProcessedBook } from '@/state/types';
-
+import type { Stores } from '@/stores';
+import { useStores } from '@/stores';
+import { isProcessing, progress, setError } from '@/stores/ConversionStore';
+import { isConfigured, llm } from '@/stores/LLMStore';
 // Import signal-based stores directly for snapshot access
 import { settings } from '@/stores/SettingsStore';
-import { llm } from '@/stores/LLMStore';
-import { isConfigured } from '@/stores/LLMStore';
-import { isProcessing, progress, setError } from '@/stores/ConversionStore';
 
 /**
  * Hook return type
@@ -113,43 +111,49 @@ export function useTTSConversion(): UseTTSConversionResult {
   /**
    * Start conversion
    */
-  const startConversion = useCallback(async (
-    text: string,
-    existingBook?: ProcessedBook | null
-  ) => {
-    // Check if already processing
-    if (isProcessing.value) {
-      stores.logs.info('Conversion already in progress');
-      return;
-    }
-
-    // Build input snapshot from current store state
-    const input = buildInput(stores, text);
-
-    // Create abort controller for this conversion
-    abortControllerRef.current = new AbortController();
-
-    // Get orchestrator services bundle
-    const orchestratorServices = getOrchestratorServices();
-
-    // Start keep-awake to prevent background throttling
-    const keepAwake = getKeepAwake();
-    await keepAwake.start();
-
-    try {
-      await runConversion(orchestratorServices, stores, abortControllerRef.current.signal, input, existingBook);
-    } catch (error) {
-      // Error is already logged by orchestrator
-      // Just ensure we're not in processing state
+  const startConversion = useCallback(
+    async (text: string, existingBook?: ProcessedBook | null) => {
+      // Check if already processing
       if (isProcessing.value) {
-        setError((error as Error).message);
+        stores.logs.info('Conversion already in progress');
+        return;
       }
-    } finally {
-      // Stop keep-awake when conversion ends
-      keepAwake.stop();
-      abortControllerRef.current = null;
-    }
-  }, [stores]);
+
+      // Build input snapshot from current store state
+      const input = buildInput(stores, text);
+
+      // Create abort controller for this conversion
+      abortControllerRef.current = new AbortController();
+
+      // Get orchestrator services bundle
+      const orchestratorServices = getOrchestratorServices();
+
+      // Start keep-awake to prevent background throttling
+      const keepAwake = getKeepAwake();
+      await keepAwake.start();
+
+      try {
+        await runConversion(
+          orchestratorServices,
+          stores,
+          abortControllerRef.current.signal,
+          input,
+          existingBook,
+        );
+      } catch (error) {
+        // Error is already logged by orchestrator
+        // Just ensure we're not in processing state
+        if (isProcessing.value) {
+          setError((error as Error).message);
+        }
+      } finally {
+        // Stop keep-awake when conversion ends
+        keepAwake.stop();
+        abortControllerRef.current = null;
+      }
+    },
+    [stores],
+  );
 
   /**
    * Cancel conversion

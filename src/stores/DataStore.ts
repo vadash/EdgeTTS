@@ -1,9 +1,13 @@
 // Data Store
 // Manages application data (text content, book, dictionary, file handles)
 
-import { signal, computed } from '@preact/signals';
-import type { ProcessedBook, DictionaryRule, TTSWorker } from '@/state/types';
-import { detectLanguage, type DetectedLanguage, type DetectionResult } from '@/utils/languageDetection';
+import { computed, signal } from '@preact/signals';
+import type { DictionaryRule, ProcessedBook, TTSWorker } from '@/state/types';
+import {
+  type DetectedLanguage,
+  type DetectionResult,
+  detectLanguage,
+} from '@/utils/languageDetection';
 
 /**
  * Data Store - manages application data
@@ -42,37 +46,31 @@ export class DataStore {
   /**
    * Check if there's content to convert
    */
-  readonly hasContent = computed(() =>
-    this.textContent.value.length > 0 || this.book.value !== null
+  readonly hasContent = computed(
+    () => this.textContent.value.length > 0 || this.book.value !== null,
   );
 
   /**
    * Get total sentence count
    */
-  readonly sentenceCount = computed(() =>
-    this.book.value?.allSentences.length ?? 0
-  );
+  readonly sentenceCount = computed(() => this.book.value?.allSentences.length ?? 0);
 
   /**
    * Get file names from book
    */
-  readonly fileNames = computed(() =>
-    this.book.value?.fileNames ?? []
-  );
+  readonly fileNames = computed(() => this.book.value?.fileNames ?? []);
 
   /**
    * Check if dictionary has rules
    */
-  readonly hasDictionary = computed(() =>
-    this.dictionary.value.length > 0 || this.dictionaryRaw.value.length > 0
+  readonly hasDictionary = computed(
+    () => this.dictionary.value.length > 0 || this.dictionaryRaw.value.length > 0,
   );
 
   /**
    * Check if directory handle is available
    */
-  readonly hasDirectoryHandle = computed(() =>
-    this.directoryHandle.value !== null
-  );
+  readonly hasDirectoryHandle = computed(() => this.directoryHandle.value !== null);
 
   // ========== Language Detection ==========
 
@@ -160,14 +158,12 @@ export class DataStore {
   }
 
   updateWorker(id: number, updates: Partial<TTSWorker>): void {
-    const workers = this.activeWorkers.value.map(w =>
-      w.id === id ? { ...w, ...updates } : w
-    );
+    const workers = this.activeWorkers.value.map((w) => (w.id === id ? { ...w, ...updates } : w));
     this.activeWorkers.value = workers;
   }
 
   removeWorker(id: number): void {
-    this.activeWorkers.value = this.activeWorkers.value.filter(w => w.id !== id);
+    this.activeWorkers.value = this.activeWorkers.value.filter((w) => w.id !== id);
   }
 
   clearWorkers(): void {

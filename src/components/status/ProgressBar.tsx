@@ -12,13 +12,12 @@ export function ProgressBar({ current, total, eta }: ProgressBarProps) {
   return (
     <div className="space-y-2">
       <div className="progress-bar">
-        <div
-          className="progress-bar-fill"
-          style={{ width: `${percentage}%` }}
-        />
+        <div className="progress-bar-fill" style={{ width: `${percentage}%` }} />
       </div>
       <div className="flex justify-between text-xs text-gray-400">
-        <span>{current} / {total} ({percentage}%)</span>
+        <span>
+          {current} / {total} ({percentage}%)
+        </span>
         {eta && <span>ETA: {eta}</span>}
       </div>
     </div>

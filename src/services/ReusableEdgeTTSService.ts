@@ -1,11 +1,11 @@
 // ReusableEdgeTTSService - WebSocket-based TTS with connection reuse
 // Implements state machine for connection management
 
-import { sha256 } from '../utils/sha256';
-import { generateConnectionId } from '../utils/uuid';
 import { defaultConfig } from '@/config';
 import { RetriableError } from '@/errors';
 import type { TTSConfig } from '../state/types';
+import { sha256 } from '../utils/sha256';
+import { generateConnectionId } from '../utils/uuid';
 import type { Logger } from './Logger';
 
 // Windows epoch for Sec-MS-GEC generation
@@ -329,7 +329,10 @@ export class ReusableEdgeTTSService {
       this.socket.onmessage = null;
       this.socket.onclose = null;
       this.socket.onerror = null;
-      if (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING) {
+      if (
+        this.socket.readyState === WebSocket.OPEN ||
+        this.socket.readyState === WebSocket.CONNECTING
+      ) {
         this.socket.close();
       }
       this.socket = null;
@@ -355,7 +358,7 @@ export class ReusableEdgeTTSService {
       timeZoneName: 'short',
     };
     const dateString = date.toLocaleString('en-US', options);
-    return dateString.replace(/\u200E/g, '') + ' GMT+0000 (Coordinated Universal Time)';
+    return `${dateString.replace(/\u200E/g, '')} GMT+0000 (Coordinated Universal Time)`;
   }
 
   private makeSSML(text: string, config: TTSConfig): string {

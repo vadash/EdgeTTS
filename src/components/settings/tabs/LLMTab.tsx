@@ -1,12 +1,12 @@
 import { useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import { useLLM } from '@/stores';
+import { Button, TabPanel, Tabs } from '@/components/common';
 import { getLogger } from '@/services';
 import { LLMVoiceService } from '@/services/llm';
-import { Tabs, TabPanel, Button } from '@/components/common';
+import { useLLM } from '@/stores';
+import type { LLMStage, StageConfig } from '@/stores/LLMStore';
 import { LLMHelp } from './LLMHelp';
 import { StageConfigForm, type TestResult } from './StageConfigForm';
-import type { LLMStage, StageConfig } from '@/stores/LLMStore';
 
 const stageTabs = [
   { id: 'extract', label: 'Extract', icon: '1️⃣' },
@@ -14,10 +14,13 @@ const stageTabs = [
   { id: 'assign', label: 'Assign', icon: '3️⃣' },
 ];
 
-type TestState = Record<LLMStage, {
-  testing: boolean;
-  result: TestResult | null;
-}>;
+type TestState = Record<
+  LLMStage,
+  {
+    testing: boolean;
+    result: TestResult | null;
+  }
+>;
 
 const initialTestState: TestState = {
   extract: { testing: false, result: null },
@@ -33,16 +36,16 @@ export function LLMTab() {
   const handleTestConnection = async (stage: LLMStage, useStreaming: boolean) => {
     const config = llm[stage].value;
     if (!config.apiKey) {
-      setTestState(prev => ({
+      setTestState((prev) => ({
         ...prev,
-        [stage]: { ...prev[stage], result: { success: false, error: 'API key is required' } }
+        [stage]: { ...prev[stage], result: { success: false, error: 'API key is required' } },
       }));
       return;
     }
 
-    setTestState(prev => ({
+    setTestState((prev) => ({
       ...prev,
-      [stage]: { ...prev[stage], testing: true, result: null }
+      [stage]: { ...prev[stage], testing: true, result: null },
     }));
 
     const service = new LLMVoiceService({
@@ -57,9 +60,9 @@ export function LLMTab() {
       ? await service.testConnectionStreaming()
       : await service.testConnection();
 
-    setTestState(prev => ({
+    setTestState((prev) => ({
       ...prev,
-      [stage]: { ...prev[stage], testing: false, result }
+      [stage]: { ...prev[stage], testing: false, result },
     }));
 
     // Auto-save on success
@@ -71,14 +74,16 @@ export function LLMTab() {
   const handleStageFieldChange = <K extends keyof StageConfig>(
     stage: LLMStage,
     field: K,
-    value: StageConfig[K]
+    value: StageConfig[K],
   ) => {
     llm.setStageField(stage, field, value);
   };
 
   const handleCopySettings = (sourceStage: LLMStage) => {
     const sourceConfig = llm[sourceStage].value;
-    const targetStages = ['extract', 'merge', 'assign'].filter<LLMStage>((s): s is LLMStage => s !== sourceStage);
+    const targetStages = ['extract', 'merge', 'assign'].filter<LLMStage>(
+      (s): s is LLMStage => s !== sourceStage,
+    );
 
     for (const target of targetStages) {
       llm.setStageField(target, 'apiKey', sourceConfig.apiKey);
@@ -124,9 +129,15 @@ export function LLMTab() {
 
       {/* Stage description */}
       <div className="text-sm text-gray-400 space-y-1">
-        <p><strong>Extract:</strong> <Text id="llm.extractDesc">Detects characters from text</Text></p>
-        <p><strong>Merge:</strong> <Text id="llm.mergeDesc">Deduplicates detected characters</Text></p>
-        <p><strong>Assign:</strong> <Text id="llm.assignDesc">Assigns speakers to sentences</Text></p>
+        <p>
+          <strong>Extract:</strong> <Text id="llm.extractDesc">Detects characters from text</Text>
+        </p>
+        <p>
+          <strong>Merge:</strong> <Text id="llm.mergeDesc">Deduplicates detected characters</Text>
+        </p>
+        <p>
+          <strong>Assign:</strong> <Text id="llm.assignDesc">Assigns speakers to sentences</Text>
+        </p>
       </div>
 
       {/* Prompt Repetition Section */}
@@ -150,10 +161,14 @@ export function LLMTab() {
               type="button"
               role="switch"
               aria-checked={llm.extract.value.repeatPrompt}
-              onClick={() => handleStageFieldChange('extract', 'repeatPrompt', !llm.extract.value.repeatPrompt)}
+              onClick={() =>
+                handleStageFieldChange('extract', 'repeatPrompt', !llm.extract.value.repeatPrompt)
+              }
               className={`toggle ${llm.extract.value.repeatPrompt ? 'toggle-checked' : ''}`}
             >
-              <span className={`toggle-thumb ${llm.extract.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`} />
+              <span
+                className={`toggle-thumb ${llm.extract.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`}
+              />
             </button>
             <span className="text-sm text-gray-300">
               <Text id="llm.extract">Extract</Text>
@@ -164,10 +179,14 @@ export function LLMTab() {
               type="button"
               role="switch"
               aria-checked={llm.merge.value.repeatPrompt}
-              onClick={() => handleStageFieldChange('merge', 'repeatPrompt', !llm.merge.value.repeatPrompt)}
+              onClick={() =>
+                handleStageFieldChange('merge', 'repeatPrompt', !llm.merge.value.repeatPrompt)
+              }
               className={`toggle ${llm.merge.value.repeatPrompt ? 'toggle-checked' : ''}`}
             >
-              <span className={`toggle-thumb ${llm.merge.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`} />
+              <span
+                className={`toggle-thumb ${llm.merge.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`}
+              />
             </button>
             <span className="text-sm text-gray-300">
               <Text id="llm.merge">Merge</Text>
@@ -178,10 +197,14 @@ export function LLMTab() {
               type="button"
               role="switch"
               aria-checked={llm.assign.value.repeatPrompt}
-              onClick={() => handleStageFieldChange('assign', 'repeatPrompt', !llm.assign.value.repeatPrompt)}
+              onClick={() =>
+                handleStageFieldChange('assign', 'repeatPrompt', !llm.assign.value.repeatPrompt)
+              }
               className={`toggle ${llm.assign.value.repeatPrompt ? 'toggle-checked' : ''}`}
             >
-              <span className={`toggle-thumb ${llm.assign.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`} />
+              <span
+                className={`toggle-thumb ${llm.assign.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`}
+              />
             </button>
             <span className="text-sm text-gray-300">
               <Text id="llm.assign">Assign</Text>

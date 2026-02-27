@@ -1,19 +1,15 @@
 // Voice Review Modal
 // Allows user to review and edit voice assignments after character extraction
 
-import { useState, useRef } from 'preact/hooks';
 import { signal } from '@preact/signals';
+import { useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import type { LLMCharacter, VoiceProfileFile } from '@/state/types';
-import { useSettings, useLLM, useLogs, useData } from '@/stores';
-import { useVoicePreview } from '@/hooks/useVoicePreview';
 import { Button } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
-import {
-  importProfile,
-  readJSONFile,
-  randomizeBelowVoices,
-} from '@/services/llm/VoiceProfile';
+import { useVoicePreview } from '@/hooks/useVoicePreview';
+import { importProfile, randomizeBelowVoices, readJSONFile } from '@/services/llm/VoiceProfile';
+import type { VoiceProfileFile } from '@/state/types';
+import { useData, useLLM, useLogs, useSettings } from '@/stores';
 
 interface VoiceReviewModalProps {
   onConfirm: () => void;
@@ -44,14 +40,18 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
 
   // Get enabled voices, grouped by gender
   const enabledVoices = settings.enabledVoices.value;
-  const maleVoices = voices.filter(v => v.gender === 'male' && enabledVoices.includes(v.fullValue));
-  const femaleVoices = voices.filter(v => v.gender === 'female' && enabledVoices.includes(v.fullValue));
+  const maleVoices = voices.filter(
+    (v) => v.gender === 'male' && enabledVoices.includes(v.fullValue),
+  );
+  const femaleVoices = voices.filter(
+    (v) => v.gender === 'female' && enabledVoices.includes(v.fullValue),
+  );
 
   const handleVoiceChange = (characterName: string, newVoice: string) => {
     const oldVoice = voiceMap.get(characterName) ?? '';
 
     // Find current character's index in sorted list
-    const currentIndex = sortedCharacters.findIndex(c => c.canonicalName === characterName);
+    const currentIndex = sortedCharacters.findIndex((c) => c.canonicalName === characterName);
 
     // Look for characters BELOW that have the newVoice and swap them
     if (currentIndex >= 0 && oldVoice !== newVoice) {
@@ -83,7 +83,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
   };
 
   const handleRandomizeBelow = (clickedIndex: number) => {
-    const enabledVoiceOptions = voices.filter(v => enabledVoices.includes(v.fullValue));
+    const enabledVoiceOptions = voices.filter((v) => enabledVoices.includes(v.fullValue));
     const newMap = randomizeBelowVoices({
       sortedCharacters,
       currentVoiceMap: voiceMap,
@@ -107,7 +107,11 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
     try {
       setImportError(null);
       const json = await readJSONFile(file);
-      const { voiceMap: importedMap, matchedCharacters, unmatchedCharacters } = importProfile(json, characters);
+      const {
+        voiceMap: importedMap,
+        matchedCharacters,
+        unmatchedCharacters,
+      } = importProfile(json, characters);
 
       // Merge imported voices into current map
       const newMap = new Map(voiceMap);
@@ -122,7 +126,9 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
 
       const matchCount = matchedCharacters.size;
       const unmatchCount = unmatchedCharacters.length;
-      logs.info(`Imported voices: ${matchCount} matched, ${unmatchCount} unmatched from ${file.name}`);
+      logs.info(
+        `Imported voices: ${matchCount} matched, ${unmatchCount} unmatched from ${file.name}`,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Import failed';
       setImportError(message);
@@ -141,9 +147,12 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
   // Gender symbol
   const genderSymbol = (gender: 'male' | 'female' | 'unknown') => {
     switch (gender) {
-      case 'male': return 'M';
-      case 'female': return 'F';
-      default: return '?';
+      case 'male':
+        return 'M';
+      case 'female':
+        return 'F';
+      default:
+        return '?';
     }
   };
 
@@ -173,7 +182,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
             type="text"
             className="input-field w-full mt-1"
             value={sampleText.value}
-            onInput={(e) => sampleText.value = (e.target as HTMLInputElement).value}
+            onInput={(e) => (sampleText.value = (e.target as HTMLInputElement).value)}
             placeholder="Enter sample text to preview voices..."
           />
         </div>
@@ -208,17 +217,22 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
                       <select
                         className="select-field w-full text-sm"
                         value={currentVoice}
-                        onChange={(e) => handleVoiceChange(char.canonicalName, (e.target as HTMLSelectElement).value)}
+                        onChange={(e) =>
+                          handleVoiceChange(
+                            char.canonicalName,
+                            (e.target as HTMLSelectElement).value,
+                          )
+                        }
                       >
                         <optgroup label="Male">
-                          {maleVoices.map(v => (
+                          {maleVoices.map((v) => (
                             <option key={v.fullValue} value={v.fullValue}>
                               {shortVoiceName(v.fullValue)}
                             </option>
                           ))}
                         </optgroup>
                         <optgroup label="Female">
-                          {femaleVoices.map(v => (
+                          {femaleVoices.map((v) => (
                             <option key={v.fullValue} value={v.fullValue}>
                               {shortVoiceName(v.fullValue)}
                             </option>
@@ -270,9 +284,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
             onChange={handleImportFile}
             className="hidden"
           />
-          {importError && (
-            <p className="text-red-400 text-sm mt-2">{importError}</p>
-          )}
+          {importError && <p className="text-red-400 text-sm mt-2">{importError}</p>}
         </div>
 
         {/* Footer */}

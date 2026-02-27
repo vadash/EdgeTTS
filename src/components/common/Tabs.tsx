@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 
 export interface Tab {
   id: string;
@@ -36,9 +36,7 @@ export function Tabs({ tabs, defaultTab, children }: TabsProps) {
           </button>
         ))}
       </div>
-      <div className="tab-content">
-        {children(activeTab)}
-      </div>
+      <div className="tab-content">{children(activeTab)}</div>
     </div>
   );
 }

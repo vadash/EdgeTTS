@@ -6,8 +6,8 @@
  * - Browser-instance specific (won't work if copied elsewhere)
  */
 
-import type { ILogger } from './Logger';
 import { IndexedDBNames } from '@/config/storage';
+import type { ILogger } from './Logger';
 
 const KEY_ID = 'master';
 
@@ -47,7 +47,7 @@ async function getOrCreateKey(): Promise<CryptoKey> {
   const key = await crypto.subtle.generateKey(
     { name: 'AES-GCM', length: 256 },
     false, // non-extractable - critical for security
-    ['encrypt', 'decrypt']
+    ['encrypt', 'decrypt'],
   );
 
   // Store in IndexedDB
@@ -70,11 +70,7 @@ export async function encryptValue(plaintext: string): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(plaintext);
 
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    encoded
-  );
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
 
   // Combine IV + ciphertext and base64 encode
   const combined = new Uint8Array(iv.length + ciphertext.byteLength);
@@ -89,16 +85,12 @@ export async function decryptValue(encrypted: string, logger?: ILogger): Promise
 
   try {
     const key = await getOrCreateKey();
-    const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+    const combined = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
 
     const iv = combined.slice(0, 12);
     const ciphertext = combined.slice(12);
 
-    const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      ciphertext
-    );
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
 
     return new TextDecoder().decode(decrypted);
   } catch {

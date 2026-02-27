@@ -1,7 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { levenshtein, findMaxPairings, matchCharacter } from './NameMatcher';
-import type { LLMCharacter } from '@/state/types';
-import type { CharacterEntry } from '@/state/types';
+import { describe, expect, it } from 'vitest';
+import type { CharacterEntry, LLMCharacter } from '@/state/types';
+import { findMaxPairings, levenshtein, matchCharacter } from './NameMatcher';
 
 describe('levenshtein', () => {
   it('returns 0 for identical strings', () => {
@@ -77,7 +76,9 @@ describe('findMaxPairings', () => {
 
 describe('matchCharacter', () => {
   // Helper to create test profile
-  const createProfile = (entries: Array<{ name: string; aliases: string[] }>): Record<string, CharacterEntry> => {
+  const createProfile = (
+    entries: Array<{ name: string; aliases: string[] }>,
+  ): Record<string, CharacterEntry> => {
     const result: Record<string, CharacterEntry> = {};
     for (const entry of entries) {
       const key = entry.name.toLowerCase().replace(/\s+/g, '_');
@@ -89,7 +90,7 @@ describe('matchCharacter', () => {
         lines: 100,
         percentage: 10.0,
         lastSeenIn: 'BOOK1',
-        bookAppearances: 1
+        bookAppearances: 1,
       };
     }
     return result;
@@ -103,7 +104,11 @@ describe('matchCharacter', () => {
 
   it('matches when canonical names are identical', () => {
     const profile = createProfile([{ name: 'Harry Potter', aliases: ['Harry', 'Potter'] }]);
-    const char: LLMCharacter = { canonicalName: 'Harry Potter', variations: ['Harry'], gender: 'male' };
+    const char: LLMCharacter = {
+      canonicalName: 'Harry Potter',
+      variations: ['Harry'],
+      gender: 'male',
+    };
     const result = matchCharacter(char, profile);
     expect(result?.canonicalName).toBe('Harry Potter');
   });
@@ -117,10 +122,12 @@ describe('matchCharacter', () => {
   });
 
   it('matches when canonical name matches a profile alias', () => {
-    const profile = createProfile([{
-      name: 'Erick Flatt',
-      aliases: ['Erick', 'Archmage', 'Flatt']
-    }]);
+    const profile = createProfile([
+      {
+        name: 'Erick Flatt',
+        aliases: ['Erick', 'Archmage', 'Flatt'],
+      },
+    ]);
     const char: LLMCharacter = { canonicalName: 'Erick', variations: [], gender: 'male' };
     const result = matchCharacter(char, profile);
     expect(result?.canonicalName).toBe('Erick Flatt');
@@ -136,10 +143,12 @@ describe('matchCharacter', () => {
   it('does not match when only a variation matches (not canonical)', () => {
     // "Dad" is a variation of current char, matches alias in profile,
     // but canonical "John" doesn't match anything — no shortcut
-    const profile = createProfile([{
-      name: 'Erick Flatt',
-      aliases: ['Dad', 'Archmage']
-    }]);
+    const profile = createProfile([
+      {
+        name: 'Erick Flatt',
+        aliases: ['Dad', 'Archmage'],
+      },
+    ]);
     const char: LLMCharacter = { canonicalName: 'John', variations: ['Dad'], gender: 'male' };
     const result = matchCharacter(char, profile);
     // Falls through to fuzzy matching, which won't find 2 pairings
@@ -150,7 +159,11 @@ describe('matchCharacter', () => {
     // May/Mae/TheMay vs Mae/Mai
     // (Mae,Mae)=0, (May,Mai)=1 = 2 pairings
     const profile = createProfile([{ name: 'Mae', aliases: ['Mai'] }]);
-    const char: LLMCharacter = { canonicalName: 'May', variations: ['Mae', 'The May'], gender: 'female' };
+    const char: LLMCharacter = {
+      canonicalName: 'May',
+      variations: ['Mae', 'The May'],
+      gender: 'female',
+    };
     const result = matchCharacter(char, profile);
     expect(result?.canonicalName).toBe('Mae');
   });
@@ -165,7 +178,7 @@ describe('matchCharacter', () => {
   it('matches across multiple profile entries', () => {
     const profile = createProfile([
       { name: 'Harry Potter', aliases: ['Harry', 'Potter'] },
-      { name: 'Ron Weasley', aliases: ['Ron'] }
+      { name: 'Ron Weasley', aliases: ['Ron'] },
     ]);
     const char: LLMCharacter = { canonicalName: 'Harry', variations: ['Potter'], gender: 'male' };
     const result = matchCharacter(char, profile);
@@ -177,9 +190,25 @@ describe('matchCharacter', () => {
       // M=4, N=9, min=4, min-1=3, which is > MIN_NAME_PAIRINGS, so required=3
       // Use truly unrelated names with distances > 2
       const profile = createProfile([
-        { name: 'Alexander', aliases: ['Benjamin', 'Christopher', 'Dominic', 'Edward', 'Frederick', 'George', 'Henry', 'Ignatius'] }
+        {
+          name: 'Alexander',
+          aliases: [
+            'Benjamin',
+            'Christopher',
+            'Dominic',
+            'Edward',
+            'Frederick',
+            'George',
+            'Henry',
+            'Ignatius',
+          ],
+        },
       ]);
-      const char: LLMCharacter = { canonicalName: 'Zephyr', variations: ['Apollo', 'Atlas'], gender: 'male' };
+      const char: LLMCharacter = {
+        canonicalName: 'Zephyr',
+        variations: ['Apollo', 'Atlas'],
+        gender: 'male',
+      };
 
       // With min(4,9)-1 = 3, need 3 pairings to match
       // These names are very different, so we won't get 3 pairings
@@ -190,9 +219,13 @@ describe('matchCharacter', () => {
     it('requires 3 pairings when comparing 4 names vs 4 names (min(4,4)-1=3)', () => {
       // M=4, N=4, min=4, min-1=3, required=3
       const profile = createProfile([
-        { name: 'Alpha', aliases: ['Bravo', 'Charlie'] } // 4 names total
+        { name: 'Alpha', aliases: ['Bravo', 'Charlie'] }, // 4 names total
       ]);
-      const char: LLMCharacter = { canonicalName: 'Apple', variations: ['Bat', 'Cat'], gender: 'male' }; // 4 names total
+      const char: LLMCharacter = {
+        canonicalName: 'Apple',
+        variations: ['Bat', 'Cat'],
+        gender: 'male',
+      }; // 4 names total
 
       // Only 2 good pairings at best (Apple/Alpha=5, Bat/Bravo=4, Cat/Charlie=5 - all > MAX_EDITS=2)
       const result = matchCharacter(char, profile);
@@ -202,9 +235,16 @@ describe('matchCharacter', () => {
     it('matches with 3 pairings when comparing 4 names vs 9 names', () => {
       // Create a scenario where we get exactly 3 good pairings
       const profile = createProfile([
-        { name: 'Tom', aliases: ['Tim', 'Tam', 'Tomas', 'Timmeh', 'Tommy', 'Thom', 'Thomas', 'Tomek'] }
+        {
+          name: 'Tom',
+          aliases: ['Tim', 'Tam', 'Tomas', 'Timmeh', 'Tommy', 'Thom', 'Thomas', 'Tomek'],
+        },
       ]);
-      const char: LLMCharacter = { canonicalName: 'Tom', variations: ['Tim', 'Tam'], gender: 'male' };
+      const char: LLMCharacter = {
+        canonicalName: 'Tom',
+        variations: ['Tim', 'Tam'],
+        gender: 'male',
+      };
 
       // Tom->Tom (0), Tim->Tim (0), Tam->Tam (0) = 3 pairings
       // M=4, N=9, required = max(2, 4-1) = 3
@@ -215,7 +255,10 @@ describe('matchCharacter', () => {
     it('still requires MIN_NAME_PAIRINGS=2 when comparing 2 names vs 10 names', () => {
       // M=2, N=10, min=2, min-1=1, required = max(2, 1) = 2
       const profile = createProfile([
-        { name: 'Harry', aliases: ['H', 'Harr', 'Har', 'Ha', 'Potter', 'P', 'H.P.', 'HP', 'The Boy'] }
+        {
+          name: 'Harry',
+          aliases: ['H', 'Harr', 'Har', 'Ha', 'Potter', 'P', 'H.P.', 'HP', 'The Boy'],
+        },
       ]);
       const char: LLMCharacter = { canonicalName: 'Harry', variations: ['H'], gender: 'male' };
 

@@ -4,8 +4,8 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 import { defaultConfig } from '@/config';
-import type { Logger } from './Logger';
 import { buildFilterChain } from './audio/buildFilterChain';
+import type { Logger } from './Logger';
 
 export type FFmpegProgressCallback = (message: string) => void;
 
@@ -96,7 +96,7 @@ export class FFmpegService {
         return true;
       } catch (err) {
         this.logger?.warn('FFmpeg reload from cached blob URLs failed, fetching from CDN', {
-          error: err instanceof Error ? err.message : String(err)
+          error: err instanceof Error ? err.message : String(err),
         });
         // Invalidate cache and fall through to CDN fetch
         this.cachedCoreURL = null;
@@ -109,14 +109,8 @@ export class FFmpegService {
       onProgress?.(`Loading FFmpeg from CDN ${i + 1}/${CDN_MIRRORS.length}...`);
 
       try {
-        const coreURL = await toBlobURL(
-          `${cdn.baseUrl}/${cdn.coreJs}`,
-          'text/javascript'
-        );
-        const wasmURL = await toBlobURL(
-          `${cdn.baseUrl}/${cdn.wasmJs}`,
-          'application/wasm'
-        );
+        const coreURL = await toBlobURL(`${cdn.baseUrl}/${cdn.coreJs}`, 'text/javascript');
+        const wasmURL = await toBlobURL(`${cdn.baseUrl}/${cdn.wasmJs}`, 'application/wasm');
 
         await ffmpeg.load({ coreURL, wasmURL });
         this.ffmpeg = ffmpeg;
@@ -128,8 +122,9 @@ export class FFmpegService {
         onProgress?.('FFmpeg loaded successfully');
         return true;
       } catch (err) {
-        this.logger?.warn(`FFmpeg CDN ${cdn.baseUrl} failed`, { error: err instanceof Error ? err.message : String(err) });
-        continue;
+        this.logger?.warn(`FFmpeg CDN ${cdn.baseUrl} failed`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
@@ -153,7 +148,7 @@ export class FFmpegService {
   async processAudio(
     chunks: (Uint8Array | null)[],
     config: AudioProcessingConfig,
-    onProgress?: (message: string) => void
+    onProgress?: (message: string) => void,
   ): Promise<Uint8Array> {
     // Proactively refresh FFmpeg to prevent WASM memory exhaustion after many operations
     if (this.operationCount >= this.MAX_OPERATIONS_BEFORE_REFRESH) {
@@ -179,18 +174,23 @@ export class FFmpegService {
     try {
       // Generate silence file upfront (for gaps and missing chunk placeholders)
       const silenceGapMs = config.silenceGapMs ?? 200; // Default 200ms for missing chunks
-      const hasMissingChunks = chunks.some(c => c === null);
-      const needsGaps = silenceGapMs > 0 && chunks.filter(c => c !== null).length > 1;
+      const hasMissingChunks = chunks.some((c) => c === null);
+      const needsGaps = silenceGapMs > 0 && chunks.filter((c) => c !== null).length > 1;
 
       if (hasMissingChunks || needsGaps) {
         onProgress?.(`Generating ${silenceGapMs}ms silence...`);
         await ffmpeg.exec([
-          '-f', 'lavfi',
-          '-i', `anullsrc=r=${defaultConfig.audio.sampleRate}:cl=mono`,
-          '-t', String(silenceGapMs / 1000),
-          '-c:a', 'libmp3lame',
-          '-b:a', '96k',
-          'silence.mp3'
+          '-f',
+          'lavfi',
+          '-i',
+          `anullsrc=r=${defaultConfig.audio.sampleRate}:cl=mono`,
+          '-t',
+          String(silenceGapMs / 1000),
+          '-c:a',
+          'libmp3lame',
+          '-b:a',
+          '96k',
+          'silence.mp3',
         ]);
       }
 
@@ -212,7 +212,7 @@ export class FFmpegService {
 
       // Create concat file list (with silence for gaps and missing chunks)
       const concatLines: string[] = [];
-      const actualFiles = inputFiles.filter(f => f !== null);
+      const actualFiles = inputFiles.filter((f) => f !== null);
       let actualFileIdx = 0;
 
       for (let i = 0; i < inputFiles.length; i++) {
@@ -235,11 +235,7 @@ export class FFmpegService {
       const filters = buildFilterChain(config);
 
       // Build FFmpeg arguments
-      const args = [
-        '-f', 'concat',
-        '-safe', '0',
-        '-i', 'concat.txt',
-      ];
+      const args = ['-f', 'concat', '-safe', '0', '-i', 'concat.txt'];
 
       if (filters) {
         args.push('-af', filters);
@@ -251,14 +247,20 @@ export class FFmpegService {
       const compression = config.opusCompressionLevel ?? defaultConfig.audio.opusCompression;
 
       args.push(
-        '-c:a', 'libopus',
-        '-b:a', `${minBitrate}k`,
-        '-compression_level', String(compression),
-        '-vbr', 'on',
+        '-c:a',
+        'libopus',
+        '-b:a',
+        `${minBitrate}k`,
+        '-compression_level',
+        String(compression),
+        '-vbr',
+        'on',
         ...(maxBitrate > minBitrate ? ['-maxrate', `${maxBitrate}k`] : []),
-        '-ar', String(defaultConfig.audio.sampleRate),
-        '-ac', config.stereoWidth ? '2' : '1',
-        'output.opus'
+        '-ar',
+        String(defaultConfig.audio.sampleRate),
+        '-ac',
+        config.stereoWidth ? '2' : '1',
+        'output.opus',
       );
 
       onProgress?.('Processing audio with FFmpeg...');

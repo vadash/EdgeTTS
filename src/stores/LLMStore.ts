@@ -1,11 +1,11 @@
 // LLM Store
 // Manages LLM settings and character detection state
 
-import { signal, computed } from '@preact/signals';
-import type { LLMCharacter, SpeakerAssignment, VoiceProfileFile } from '@/state/types';
-import { encryptValue, decryptValue } from '@/services/SecureStorage';
-import type { LoggerStore } from '@/services/Logger';
+import { computed, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
+import type { LoggerStore } from '@/services/Logger';
+import { decryptValue, encryptValue } from '@/services/SecureStorage';
+import type { LLMCharacter, SpeakerAssignment, VoiceProfileFile } from '@/state/types';
 
 // ============================================================================
 // Types
@@ -122,10 +122,11 @@ let reviewRejecter: ((reason: Error) => void) | null = null;
 // Computed Properties
 // ============================================================================
 
-export const isConfigured = computed(() =>
-  llm.value.extract.apiKey.length > 0 ||
-  llm.value.merge.apiKey.length > 0 ||
-  llm.value.assign.apiKey.length > 0
+export const isConfigured = computed(
+  () =>
+    llm.value.extract.apiKey.length > 0 ||
+    llm.value.merge.apiKey.length > 0 ||
+    llm.value.assign.apiKey.length > 0,
 );
 
 export const isProcessing = computed(() => {
@@ -139,7 +140,7 @@ export const blockProgress = computed(() => ({
 }));
 
 export const characterNames = computed(() =>
-  llm.value.detectedCharacters.map(c => c.canonicalName)
+  llm.value.detectedCharacters.map((c) => c.canonicalName),
 );
 
 export const characterLineCounts = computed(() => {
@@ -157,7 +158,7 @@ export const characterLineCounts = computed(() => {
 // Persistence
 // ============================================================================
 
-let savePending = false;
+let _savePending = false;
 let saveTimer: number | null = null;
 
 async function saveSettings(): Promise<void> {
@@ -166,7 +167,7 @@ async function saveSettings(): Promise<void> {
     saveTimer = null;
   }
 
-  savePending = true;
+  _savePending = true;
 
   try {
     const [extractKey, mergeKey, assignKey] = await Promise.all([
@@ -183,7 +184,7 @@ async function saveSettings(): Promise<void> {
     };
     localStorage.setItem(StorageKeys.llmSettings, JSON.stringify(settings));
   } finally {
-    savePending = false;
+    _savePending = false;
   }
 }
 
@@ -230,7 +231,7 @@ export async function loadSettings(logStore: LoggerStore): Promise<void> {
     logStore.error(
       'Failed to load LLM settings',
       e instanceof Error ? e : undefined,
-      e instanceof Error ? undefined : { error: String(e) }
+      e instanceof Error ? undefined : { error: String(e) },
     );
   }
 }
@@ -255,7 +256,7 @@ export function setUseVoting(value: boolean): void {
 export function setStageField<K extends keyof StageConfig>(
   stage: LLMStage,
   field: K,
-  value: StageConfig[K]
+  value: StageConfig[K],
 ): void {
   const current = llm.value[stage];
   patchState({ [stage]: { ...current, [field]: value } });

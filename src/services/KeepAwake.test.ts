@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('KeepAwake - visibility guard', () => {
-  let originalNavigator: Navigator;
+  let _originalNavigator: Navigator;
   let mockWakeLock: { request: ReturnType<typeof vi.fn> };
   let addEventListenerSpy: ReturnType<typeof vi.spyOn>;
 
@@ -48,10 +48,7 @@ describe('KeepAwake - visibility guard', () => {
     expect(mockWakeLock.request).not.toHaveBeenCalled();
 
     // But, visibility listener should still be registered
-    expect(addEventListenerSpy).toHaveBeenCalledWith(
-      'visibilitychange',
-      expect.any(Function)
-    );
+    expect(addEventListenerSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
 
     keepAwake.stop();
   });

@@ -16,12 +16,7 @@ export function Select({ label, id, options, className = '', value, ...props }: 
           {label}
         </label>
       )}
-      <select
-        id={selectId}
-        className={`select-field ${className}`.trim()}
-        value={value}
-        {...props}
-      >
+      <select id={selectId} className={`select-field ${className}`.trim()} value={value} {...props}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}

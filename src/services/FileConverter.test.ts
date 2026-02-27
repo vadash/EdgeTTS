@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import {
-  convertFb2ToTxt,
-  convertEpubToTxt,
-  convertZipToTxt,
-  convertFileToTxt,
-} from './FileConverter';
 import JSZip from 'jszip';
+import { describe, expect, it } from 'vitest';
+import {
+  convertEpubToTxt,
+  convertFb2ToTxt,
+  convertFileToTxt,
+  convertZipToTxt,
+} from './FileConverter';
 
 describe('FileConverter', () => {
   describe('convertFb2ToTxt', () => {
@@ -63,22 +63,28 @@ describe('FileConverter', () => {
       const zip = new JSZip();
 
       // Add toc.ncx
-      zip.file('OEBPS/toc.ncx', `<?xml version="1.0" encoding="UTF-8"?>
+      zip.file(
+        'OEBPS/toc.ncx',
+        `<?xml version="1.0" encoding="UTF-8"?>
 <ncx>
   <navMap>
     <navPoint>
       <content src="chapter1.xhtml"/>
     </navPoint>
   </navMap>
-</ncx>`);
+</ncx>`,
+      );
 
       // Add chapter content
-      zip.file('OEBPS/chapter1.xhtml', `<?xml version="1.0" encoding="UTF-8"?>
+      zip.file(
+        'OEBPS/chapter1.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
   <body>
     <p>Chapter one content.</p>
   </body>
-</html>`);
+</html>`,
+      );
 
       const epubData = await zip.generateAsync({ type: 'arraybuffer' });
       const result = await convertEpubToTxt(epubData);
@@ -98,7 +104,9 @@ describe('FileConverter', () => {
     it('handles multiple chapters', async () => {
       const zip = new JSZip();
 
-      zip.file('OEBPS/toc.ncx', `<?xml version="1.0" encoding="UTF-8"?>
+      zip.file(
+        'OEBPS/toc.ncx',
+        `<?xml version="1.0" encoding="UTF-8"?>
 <ncx>
   <navMap>
     <navPoint>
@@ -108,17 +116,24 @@ describe('FileConverter', () => {
       <content src="ch2.xhtml"/>
     </navPoint>
   </navMap>
-</ncx>`);
+</ncx>`,
+      );
 
-      zip.file('OEBPS/ch1.xhtml', `<?xml version="1.0" encoding="UTF-8"?>
+      zip.file(
+        'OEBPS/ch1.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
   <body><p>Chapter 1</p></body>
-</html>`);
+</html>`,
+      );
 
-      zip.file('OEBPS/ch2.xhtml', `<?xml version="1.0" encoding="UTF-8"?>
+      zip.file(
+        'OEBPS/ch2.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
   <body><p>Chapter 2</p></body>
-</html>`);
+</html>`,
+      );
 
       const epubData = await zip.generateAsync({ type: 'arraybuffer' });
       const result = await convertEpubToTxt(epubData);
@@ -138,18 +153,21 @@ describe('FileConverter', () => {
       const results = await convertZipToTxt(zipData);
 
       expect(results).toHaveLength(2);
-      expect(results.find(r => r.filename === 'book1')?.content).toBe('Content of book one.');
-      expect(results.find(r => r.filename === 'book2')?.content).toBe('Content of book two.');
+      expect(results.find((r) => r.filename === 'book1')?.content).toBe('Content of book one.');
+      expect(results.find((r) => r.filename === 'book2')?.content).toBe('Content of book two.');
     });
 
     it('processes FB2 files in ZIP', async () => {
       const zip = new JSZip();
-      zip.file('book.fb2', `<?xml version="1.0" encoding="UTF-8"?>
+      zip.file(
+        'book.fb2',
+        `<?xml version="1.0" encoding="UTF-8"?>
 <FictionBook>
   <body>
     <section><p>FB2 content.</p></section>
   </body>
-</FictionBook>`);
+</FictionBook>`,
+      );
 
       const zipData = await zip.generateAsync({ type: 'arraybuffer' });
       const results = await convertZipToTxt(zipData);

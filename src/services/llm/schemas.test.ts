@@ -1,8 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  ExtractSchema, ExtractCharacterSchema,
-  MergeSchema, AssignSchema,
-  type ExtractResponse, type MergeResponse, type AssignResponse
+  type AssignResponse,
+  AssignSchema,
+  ExtractCharacterSchema,
+  type ExtractResponse,
+  ExtractSchema,
+  type MergeResponse,
+  MergeSchema,
 } from './schemas';
 
 describe('Zod Schemas', () => {
@@ -11,7 +15,7 @@ describe('Zod Schemas', () => {
       const result = ExtractCharacterSchema.safeParse({
         canonicalName: 'Alice',
         variations: ['Alice', 'Al'],
-        gender: 'female'
+        gender: 'female',
       });
       expect(result.success).toBe(true);
     });
@@ -20,7 +24,7 @@ describe('Zod Schemas', () => {
       const result = ExtractCharacterSchema.safeParse({
         canonicalName: '',
         variations: ['x'],
-        gender: 'male'
+        gender: 'male',
       });
       expect(result.success).toBe(false);
     });
@@ -29,7 +33,7 @@ describe('Zod Schemas', () => {
       const result = ExtractCharacterSchema.safeParse({
         canonicalName: 'Bob',
         variations: ['Bob'],
-        gender: 'invalid'
+        gender: 'invalid',
       });
       expect(result.success).toBe(false);
     });
@@ -39,9 +43,7 @@ describe('Zod Schemas', () => {
     it('accepts valid response with reasoning', () => {
       const result = ExtractSchema.safeParse({
         reasoning: 'Found 2 characters',
-        characters: [
-          { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }
-        ]
+        characters: [{ canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }],
       });
       expect(result.success).toBe(true);
     });
@@ -49,9 +51,7 @@ describe('Zod Schemas', () => {
     it('accepts null reasoning (stays null)', () => {
       const result = ExtractSchema.safeParse({
         reasoning: null,
-        characters: [
-          { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }
-        ]
+        characters: [{ canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }],
       });
       expect(result.success).toBe(true);
       if (result.success) {
@@ -67,7 +67,7 @@ describe('Zod Schemas', () => {
     it('rejects empty characters array', () => {
       const result = ExtractSchema.safeParse({
         reasoning: null,
-        characters: []
+        characters: [],
       });
       expect(result.success).toBe(false);
     });
@@ -77,7 +77,10 @@ describe('Zod Schemas', () => {
     it('accepts valid merge groups', () => {
       const result = MergeSchema.safeParse({
         reasoning: null,
-        merges: [[0, 1], [2, 3]]
+        merges: [
+          [0, 1],
+          [2, 3],
+        ],
       });
       expect(result.success).toBe(true);
     });
@@ -85,7 +88,7 @@ describe('Zod Schemas', () => {
     it('rejects single-element groups', () => {
       const result = MergeSchema.safeParse({
         reasoning: null,
-        merges: [[0]]
+        merges: [[0]],
       });
       expect(result.success).toBe(false);
     });
@@ -93,7 +96,7 @@ describe('Zod Schemas', () => {
     it('rejects negative indices', () => {
       const result = MergeSchema.safeParse({
         reasoning: null,
-        merges: [[-1, 0]]
+        merges: [[-1, 0]],
       });
       expect(result.success).toBe(false);
     });
@@ -103,7 +106,7 @@ describe('Zod Schemas', () => {
     it('accepts valid sparse assignments', () => {
       const result = AssignSchema.safeParse({
         reasoning: 'Assigning speakers',
-        assignments: { '0': 'A', '5': 'B', '12': 'C' }
+        assignments: { '0': 'A', '5': 'B', '12': 'C' },
       });
       expect(result.success).toBe(true);
     });
@@ -111,7 +114,7 @@ describe('Zod Schemas', () => {
     it('accepts empty assignments (edge case)', () => {
       const result = AssignSchema.safeParse({
         reasoning: null,
-        assignments: {}
+        assignments: {},
       });
       expect(result.success).toBe(true);
     });
@@ -121,7 +124,7 @@ describe('Zod Schemas', () => {
     it('ExtractResponse matches inferred type', () => {
       const data: ExtractResponse = {
         reasoning: 'test',
-        characters: [{ canonicalName: 'X', variations: ['X'], gender: 'male' }]
+        characters: [{ canonicalName: 'X', variations: ['X'], gender: 'male' }],
       };
       expect(ExtractSchema.safeParse(data).success).toBe(true);
     });
@@ -129,7 +132,7 @@ describe('Zod Schemas', () => {
     it('MergeResponse matches inferred type', () => {
       const data: MergeResponse = {
         reasoning: null,
-        merges: [[0, 1]]
+        merges: [[0, 1]],
       };
       expect(MergeSchema.safeParse(data).success).toBe(true);
     });
@@ -137,7 +140,7 @@ describe('Zod Schemas', () => {
     it('AssignResponse matches inferred type', () => {
       const data: AssignResponse = {
         reasoning: null,
-        assignments: { '0': 'A' }
+        assignments: { '0': 'A' },
       };
       expect(AssignSchema.safeParse(data).success).toBe(true);
     });

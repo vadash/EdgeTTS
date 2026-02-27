@@ -2,17 +2,17 @@
 // ES Modules handle singletons naturally - no DI container needed
 
 import type { LoggerStore } from '@/services/Logger';
-import type { LLMServiceFactoryOptions } from './llm/LLMVoiceService';
-import type { WorkerPoolOptions } from './TTSWorkerPool';
 import type { MergerConfig } from './AudioMerger';
-import { Logger, createLogger } from './Logger';
-import { FFmpegService } from './FFmpegService';
-import { TextBlockSplitter } from './TextBlockSplitter';
-import { VoicePoolBuilder } from './VoicePoolBuilder';
-import { LLMVoiceService } from './llm/LLMVoiceService';
-import { TTSWorkerPool } from './TTSWorkerPool';
 import { AudioMerger } from './AudioMerger';
+import { FFmpegService } from './FFmpegService';
+import { createLogger, type Logger } from './Logger';
+import type { LLMServiceFactoryOptions } from './llm/LLMVoiceService';
+import { LLMVoiceService } from './llm/LLMVoiceService';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
+import { TextBlockSplitter } from './TextBlockSplitter';
+import type { WorkerPoolOptions } from './TTSWorkerPool';
+import { TTSWorkerPool } from './TTSWorkerPool';
+import { VoicePoolBuilder } from './VoicePoolBuilder';
 
 // ============================================================================
 // Core Singletons (initialized once)
@@ -139,12 +139,16 @@ export function getOrchestratorServices(): ConversionOrchestratorServices {
 // Re-exports for convenience
 // ============================================================================
 
-export { Logger, createLogger, createLoggerStore } from './Logger';
+// Export orchestrator types and function
+export type {
+  ConversionOrchestratorServices,
+  OrchestratorInput,
+  StageLLMConfig,
+  WorkflowProgress,
+} from './ConversionOrchestrator';
+export { runConversion } from './ConversionOrchestrator';
 export { FFmpegService } from './FFmpegService';
+export { createLogger, createLoggerStore, Logger } from './Logger';
+export { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 export { TextBlockSplitter } from './TextBlockSplitter';
 export { VoicePoolBuilder } from './VoicePoolBuilder';
-export { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
-
-// Export orchestrator types and function
-export type { OrchestratorInput, ConversionOrchestratorServices, WorkflowProgress, StageLLMConfig } from './ConversionOrchestrator';
-export { runConversion } from './ConversionOrchestrator';

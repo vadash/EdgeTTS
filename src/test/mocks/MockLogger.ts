@@ -38,23 +38,23 @@ export class MockLogger implements Logger {
 
   // Test helpers
   getInfoCalls(): LogCall[] {
-    return this.calls.filter(c => c.level === 'info');
+    return this.calls.filter((c) => c.level === 'info');
   }
 
   getWarnCalls(): LogCall[] {
-    return this.calls.filter(c => c.level === 'warn');
+    return this.calls.filter((c) => c.level === 'warn');
   }
 
   getErrorCalls(): LogCall[] {
-    return this.calls.filter(c => c.level === 'error');
+    return this.calls.filter((c) => c.level === 'error');
   }
 
   getDebugCalls(): LogCall[] {
-    return this.calls.filter(c => c.level === 'debug');
+    return this.calls.filter((c) => c.level === 'debug');
   }
 
   hasMessage(message: string): boolean {
-    return this.calls.some(c => c.message.includes(message));
+    return this.calls.some((c) => c.message.includes(message));
   }
 
   reset(): void {

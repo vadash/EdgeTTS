@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 // We need to test that mergeAudioGroupSync strips headers.
 // Since mergeAudioGroupSync is private, we test via the public mergeAndSave path
@@ -27,10 +27,10 @@ describe('AudioMerger - MP3 header stripping', () => {
     id3Header[9] = 0x64;
 
     const mp3Frame = new Uint8Array(288);
-    mp3Frame[0] = 0xFF;
-    mp3Frame[1] = 0xF2;
-    mp3Frame[2] = 0xA4;
-    mp3Frame[3] = 0xC0;
+    mp3Frame[0] = 0xff;
+    mp3Frame[1] = 0xf2;
+    mp3Frame[2] = 0xa4;
+    mp3Frame[3] = 0xc0;
 
     const chunkWithHeader = new Uint8Array(398);
     chunkWithHeader.set(id3Header, 0);
@@ -55,10 +55,10 @@ describe('AudioMerger - MP3 header stripping', () => {
 
     // Pure MP3 frame, no ID3 tag
     const mp3Frame = new Uint8Array(288);
-    mp3Frame[0] = 0xFF;
-    mp3Frame[1] = 0xF2;
-    mp3Frame[2] = 0xA4;
-    mp3Frame[3] = 0xC0;
+    mp3Frame[0] = 0xff;
+    mp3Frame[1] = 0xf2;
+    mp3Frame[2] = 0xa4;
+    mp3Frame[3] = 0xc0;
 
     const id3Offset = skipID3v2Tag(mp3Frame);
     expect(id3Offset).toBe(0);
@@ -75,10 +75,10 @@ describe('AudioMerger - MP3 header stripping', () => {
 
     // 5 junk bytes + MP3 frame
     const chunk = new Uint8Array(293);
-    chunk[5] = 0xFF;
-    chunk[6] = 0xF2;
-    chunk[7] = 0xA4;
-    chunk[8] = 0xC0;
+    chunk[5] = 0xff;
+    chunk[6] = 0xf2;
+    chunk[7] = 0xa4;
+    chunk[8] = 0xc0;
 
     const id3Offset = skipID3v2Tag(chunk);
     expect(id3Offset).toBe(0);

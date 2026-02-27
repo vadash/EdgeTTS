@@ -22,11 +22,13 @@ export class MockWorkerPool {
 
   getFailedTasks = vi.fn(() => this.failedTasks);
 
-  getProgress = vi.fn((): WorkerPoolProgress => ({
-    completed: this.completed,
-    total: this.tasks.length,
-    failed: this.failedTasks.size,
-  }));
+  getProgress = vi.fn(
+    (): WorkerPoolProgress => ({
+      completed: this.completed,
+      total: this.tasks.length,
+      failed: this.failedTasks.size,
+    }),
+  );
 
   clear = vi.fn(() => {
     this.tasks = [];

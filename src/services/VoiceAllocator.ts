@@ -3,7 +3,7 @@
  * Consolidates logic from VoiceAssigner, VoiceRemappingStep, and VoiceProfile
  */
 
-import type { VoicePool, LLMCharacter, VoiceOption, SpeakerAssignment } from '@/state/types';
+import type { LLMCharacter, SpeakerAssignment, VoiceOption, VoicePool } from '@/state/types';
 import type { DetectedLanguage } from '@/utils/languageDetection';
 import { countSpeakingFrequency } from './llm/CharacterUtils';
 
@@ -37,13 +37,12 @@ export interface VoiceAllocationOptions {
 export class VoicePoolTracker {
   private used: Set<string> = new Set();
   private pool: VoicePool;
-  private narratorVoice: string;
 
   constructor(pool: VoicePool, narratorVoice: string, reserved: Set<string> = new Set()) {
     this.pool = pool;
     this.narratorVoice = narratorVoice;
     this.used.add(narratorVoice);
-    reserved.forEach(v => this.used.add(v));
+    reserved.forEach((v) => this.used.add(v));
   }
 
   /**
@@ -65,7 +64,7 @@ export class VoicePoolTracker {
     }
 
     // Find unused voice
-    const available = pool.filter(v => !this.used.has(v));
+    const available = pool.filter((v) => !this.used.has(v));
     if (available.length > 0) {
       const voice = available[Math.floor(Math.random() * available.length)];
       this.used.add(voice);
@@ -98,7 +97,7 @@ export class VoicePoolTracker {
   }
 
   private countUsedIn(pool: string[]): number {
-    return pool.filter(v => this.used.has(v)).length;
+    return pool.filter((v) => this.used.has(v)).length;
   }
 }
 
@@ -108,7 +107,7 @@ export class VoicePoolTracker {
  */
 export function allocateByGender(
   characters: LLMCharacter[],
-  options: VoiceAllocationOptions
+  options: VoiceAllocationOptions,
 ): VoiceAllocation {
   const tracker = new VoicePoolTracker(options.pool, options.narratorVoice, options.reservedVoices);
   const voiceMap = new Map<string, string>();
@@ -152,7 +151,7 @@ export function allocateByGender(
 export function allocateByFrequency(
   characters: LLMCharacter[],
   assignments: SpeakerAssignment[],
-  options: VoiceAllocationOptions
+  options: VoiceAllocationOptions,
 ): VoiceAllocation {
   const tracker = new VoicePoolTracker(options.pool, options.narratorVoice, options.reservedVoices);
   const voiceMap = new Map<string, string>();
@@ -217,16 +216,16 @@ export function allocateByFrequency(
 export function allocateTiered(
   characters: Array<{ canonicalName: string; voice: string; lines: number }>,
   availableVoices: VoiceOption[],
-  narratorVoice: string
+  narratorVoice: string,
 ): Map<string, string> {
   const result = new Map<string, string>();
 
   // Filter out narrator, sort by lines
   const sorted = characters
-    .filter(c => c.voice !== narratorVoice)
+    .filter((c) => c.voice !== narratorVoice)
     .sort((a, b) => b.lines - a.lines);
 
-  const voices = availableVoices.map(v => v.fullValue);
+  const voices = availableVoices.map((v) => v.fullValue);
 
   // Top N get unique voices
   for (let i = 0; i < Math.min(voices.length, sorted.length); i++) {
@@ -251,7 +250,7 @@ export function randomizeBelow(
   clickedIndex: number,
   enabledVoices: VoiceOption[],
   narratorVoice: string,
-  bookLanguage: DetectedLanguage
+  bookLanguage: DetectedLanguage,
 ): Map<string, string> {
   const newMap = new Map(currentVoiceMap);
 
@@ -270,23 +269,22 @@ export function randomizeBelow(
   const prioritized = sortVoicesByPriority(enabledVoices, bookLanguage, narratorVoice);
 
   // Split by gender
-  const malePool = prioritized.filter(v => v.gender === 'male' && !reserved.has(v.fullValue));
-  const femalePool = prioritized.filter(v => v.gender === 'female' && !reserved.has(v.fullValue));
+  const malePool = prioritized.filter((v) => v.gender === 'male' && !reserved.has(v.fullValue));
+  const femalePool = prioritized.filter((v) => v.gender === 'female' && !reserved.has(v.fullValue));
 
   let maleIdx = 0;
   let femaleIdx = 0;
 
   for (let i = clickedIndex + 1; i < sortedCharacters.length; i++) {
     const char = sortedCharacters[i];
-    const pool = char.gender === 'female' && femalePool.length > 0
-      ? femalePool
-      : malePool.length > 0
-        ? malePool
-        : femalePool;
+    const pool =
+      char.gender === 'female' && femalePool.length > 0
+        ? femalePool
+        : malePool.length > 0
+          ? malePool
+          : femalePool;
 
-    const idx = char.gender === 'female' && femalePool.length > 0
-      ? femaleIdx++
-      : maleIdx++;
+    const idx = char.gender === 'female' && femalePool.length > 0 ? femaleIdx++ : maleIdx++;
 
     if (pool.length > 0) {
       newMap.set(char.canonicalName, pool[idx % pool.length].fullValue);
@@ -302,9 +300,9 @@ export function randomizeBelow(
 export function sortVoicesByPriority(
   voices: VoiceOption[],
   bookLanguage: DetectedLanguage,
-  narratorVoice: string
+  narratorVoice: string,
 ): VoiceOption[] {
-  const filtered = voices.filter(v => v.fullValue !== narratorVoice);
+  const filtered = voices.filter((v) => v.fullValue !== narratorVoice);
   const langPrefix = bookLanguage === 'ru' ? 'ru' : 'en';
 
   const bookLang: VoiceOption[] = [];
@@ -330,13 +328,11 @@ export function sortVoicesByPriority(
 export function remapAssignments(
   assignments: SpeakerAssignment[],
   voiceMap: Map<string, string>,
-  narratorVoice: string
+  narratorVoice: string,
 ): SpeakerAssignment[] {
-  return assignments.map(a => ({
+  return assignments.map((a) => ({
     ...a,
-    voiceId: a.speaker === 'narrator'
-      ? narratorVoice
-      : voiceMap.get(a.speaker) ?? narratorVoice,
+    voiceId: a.speaker === 'narrator' ? narratorVoice : (voiceMap.get(a.speaker) ?? narratorVoice),
   }));
 }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import en from '@/i18n/en.json';
 
 describe('English i18n - Opus settings', () => {

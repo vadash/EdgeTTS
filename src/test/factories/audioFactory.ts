@@ -8,7 +8,7 @@ import type { MergedFile } from '@/services/AudioMerger';
  */
 export function createTestAudioData(sizeBytes: number = 1000): Uint8Array {
   // Simple fake MP3 frame header + padding
-  const header = new Uint8Array([0xFF, 0xFB, 0x90, 0x00]);
+  const header = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);
   const padding = new Uint8Array(Math.max(0, sizeBytes - 4));
 
   const result = new Uint8Array(sizeBytes);
@@ -21,7 +21,10 @@ export function createTestAudioData(sizeBytes: number = 1000): Uint8Array {
 /**
  * Create a map of test audio chunks
  */
-export function createTestAudioMap(count: number = 5, chunkSize: number = 1000): Map<number, Uint8Array> {
+export function createTestAudioMap(
+  count: number = 5,
+  chunkSize: number = 1000,
+): Map<number, Uint8Array> {
   const audioMap = new Map<number, Uint8Array>();
 
   for (let i = 0; i < count; i++) {

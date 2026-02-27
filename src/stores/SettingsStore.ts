@@ -1,11 +1,10 @@
 // Settings Store
 // Manages user preferences and application settings
 
-import { signal, computed, effect } from '@preact/signals';
+import { computed, effect, signal } from '@preact/signals';
+import { StorageKeys } from '@/config/storage';
 import type { AppSettings, AudioPreset } from '@/state/types';
 import { AUDIO_PRESETS } from '@/state/types';
-import type { LoggerStore } from '@/services/Logger';
-import { StorageKeys } from '@/config/storage';
 
 // ============================================================================
 // Types
@@ -66,11 +65,11 @@ export const settings = signal<AppSettings>(loadFromStorage());
 
 // Computed display values
 export const rateDisplay = computed(() =>
-  settings.value.rate >= 0 ? `+${settings.value.rate}%` : `${settings.value.rate}%`
+  settings.value.rate >= 0 ? `+${settings.value.rate}%` : `${settings.value.rate}%`,
 );
 
 export const pitchDisplay = computed(() =>
-  settings.value.pitch >= 0 ? `+${settings.value.pitch}Hz` : `${settings.value.pitch}Hz`
+  settings.value.pitch >= 0 ? `+${settings.value.pitch}Hz` : `${settings.value.pitch}Hz`,
 );
 
 // Computed for each setting (for component access)
@@ -202,7 +201,7 @@ export function setStereoWidthEnabled(value: boolean): void {
 }
 
 export function applyOpusPreset(preset: AudioPreset): void {
-  const config = AUDIO_PRESETS.find(p => p.name === preset);
+  const config = AUDIO_PRESETS.find((p) => p.name === preset);
   if (!config) return;
 
   settings.value = {

@@ -182,4 +182,3 @@ export function getRetryDelay(attempt: number, config: RetryConfig = defaultConf
   const index = Math.min(attempt, config.delays.length - 1);
   return config.delays[index];
 }
-

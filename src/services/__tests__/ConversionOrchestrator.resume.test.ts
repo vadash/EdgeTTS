@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { checkResumeState } from '@/services/ResumeCheck';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
-import { checkResumeState, type ResumeCheckResult } from '@/services/ResumeCheck';
 
 describe('checkResumeState', () => {
   it('returns null when _temp_work does not exist', async () => {
@@ -24,11 +24,15 @@ describe('checkResumeState', () => {
     // Write pipeline state
     const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
     const stateWritable = await stateFile.createWritable();
-    await stateWritable.write(JSON.stringify({
-      assignments: [{ text: 'Hi', sentenceIndex: 0, speaker: 'Narrator', voiceId: 'en-US-AriaNeural' }],
-      characterVoiceMap: { Narrator: 'en-US-AriaNeural' },
-      fileNames: [],
-    }));
+    await stateWritable.write(
+      JSON.stringify({
+        assignments: [
+          { text: 'Hi', sentenceIndex: 0, speaker: 'Narrator', voiceId: 'en-US-AriaNeural' },
+        ],
+        characterVoiceMap: { Narrator: 'en-US-AriaNeural' },
+        fileNames: [],
+      }),
+    );
     await stateWritable.close();
 
     const result = await checkResumeState(dirHandle);
@@ -44,11 +48,13 @@ describe('checkResumeState', () => {
     // Write pipeline state
     const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
     const stateWritable = await stateFile.createWritable();
-    await stateWritable.write(JSON.stringify({
-      assignments: [],
-      characterVoiceMap: {},
-      fileNames: [],
-    }));
+    await stateWritable.write(
+      JSON.stringify({
+        assignments: [],
+        characterVoiceMap: {},
+        fileNames: [],
+      }),
+    );
     await stateWritable.close();
 
     // Write chunk files

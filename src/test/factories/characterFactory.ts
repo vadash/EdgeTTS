@@ -37,7 +37,9 @@ export function createTestCharacters(count: number = 3): LLMCharacter[] {
 /**
  * Create a test speaker assignment
  */
-export function createTestAssignment(overrides: Partial<SpeakerAssignment> = {}): SpeakerAssignment {
+export function createTestAssignment(
+  overrides: Partial<SpeakerAssignment> = {},
+): SpeakerAssignment {
   return {
     sentenceIndex: 0,
     text: 'Hello, world!',
@@ -87,9 +89,10 @@ export function createTestVoiceMap(characters: LLMCharacter[]): Map<string, stri
       voice = femaleVoices[femaleIndex % femaleVoices.length];
       femaleIndex++;
     } else {
-      voice = maleIndex <= femaleIndex
-        ? maleVoices[maleIndex++ % maleVoices.length]
-        : femaleVoices[femaleIndex++ % femaleVoices.length];
+      voice =
+        maleIndex <= femaleIndex
+          ? maleVoices[maleIndex++ % maleVoices.length]
+          : femaleVoices[femaleIndex++ % femaleVoices.length];
     }
 
     voiceMap.set(char.canonicalName, voice);

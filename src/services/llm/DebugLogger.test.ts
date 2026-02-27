@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DebugLogger } from './DebugLogger';
 
 function createMockDirectoryHandle() {
@@ -49,7 +49,7 @@ describe('DebugLogger', () => {
 
     expect(mockLogger.warn).toHaveBeenCalledWith(
       'Failed to save log',
-      expect.objectContaining({ error: 'FS error' })
+      expect.objectContaining({ error: 'FS error' }),
     );
   });
 

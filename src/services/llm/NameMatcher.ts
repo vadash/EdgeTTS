@@ -1,5 +1,4 @@
-import type { LLMCharacter } from '@/state/types';
-import type { CharacterEntry } from '@/state/types';
+import type { CharacterEntry, LLMCharacter } from '@/state/types';
 import { MAX_NAME_EDITS, MIN_NAME_PAIRINGS } from '@/state/types';
 
 /**
@@ -14,7 +13,9 @@ export function levenshtein(a: string, b: string): number {
   if (an === 0) return bn;
   if (bn === 0) return an;
 
-  const matrix = Array(an + 1).fill(null).map(() => Array(bn + 1).fill(0));
+  const matrix = Array(an + 1)
+    .fill(null)
+    .map(() => Array(bn + 1).fill(0));
 
   for (let i = 0; i <= an; i++) matrix[i][0] = i;
   for (let j = 0; j <= bn; j++) matrix[0][j] = j;
@@ -23,9 +24,9 @@ export function levenshtein(a: string, b: string): number {
     for (let j = 1; j <= bn; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
       matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,      // deletion
-        matrix[i][j - 1] + 1,      // insertion
-        matrix[i - 1][j - 1] + cost // substitution
+        matrix[i - 1][j] + 1, // deletion
+        matrix[i][j - 1] + 1, // insertion
+        matrix[i - 1][j - 1] + cost, // substitution
       );
     }
   }
@@ -42,17 +43,14 @@ export function levenshtein(a: string, b: string): number {
 export function findMaxPairings(
   setA: string[],
   setB: string[],
-  maxEdits: number
+  maxEdits: number,
 ): [number, number][] {
   // Build adjacency matrix: distance for each pair
   const matrix: number[][] = [];
   for (let i = 0; i < setA.length; i++) {
     matrix[i] = [];
     for (let j = 0; j < setB.length; j++) {
-      const dist = levenshtein(
-        setA[i].toLowerCase(),
-        setB[j].toLowerCase()
-      );
+      const dist = levenshtein(setA[i].toLowerCase(), setB[j].toLowerCase());
       matrix[i][j] = dist <= maxEdits ? dist : Infinity;
     }
   }
@@ -70,7 +68,7 @@ export function findMaxPairings(
       }
     }
   }
-  cells.sort((a, b) => a[2] - b[2]);  // Sort by distance ascending
+  cells.sort((a, b) => a[2] - b[2]); // Sort by distance ascending
 
   for (const [row, col] of cells) {
     if (!usedRows.has(row) && !usedCols.has(col)) {
@@ -91,7 +89,7 @@ export function findMaxPairings(
  */
 export function matchCharacter(
   char: LLMCharacter,
-  profile: Record<string, CharacterEntry>
+  profile: Record<string, CharacterEntry>,
 ): CharacterEntry | undefined {
   const charNames = [char.canonicalName, ...char.variations];
   const canonicalLower = char.canonicalName.toLowerCase();
@@ -100,7 +98,7 @@ export function matchCharacter(
     const entryNames = [entry.canonicalName, ...entry.aliases];
 
     // Shortcut: if canonical name exactly matches any profile name, immediate match
-    if (entryNames.some(n => n.toLowerCase() === canonicalLower)) {
+    if (entryNames.some((n) => n.toLowerCase() === canonicalLower)) {
       return entry;
     }
 
@@ -110,7 +108,7 @@ export function matchCharacter(
     // Calculate dynamic threshold: max(MIN_NAME_PAIRINGS, min(M, N) - 1)
     const requiredPairings = Math.max(
       MIN_NAME_PAIRINGS,
-      Math.min(charNames.length, entryNames.length) - 1
+      Math.min(charNames.length, entryNames.length) - 1,
     );
 
     if (pairings.length >= requiredPairings) {

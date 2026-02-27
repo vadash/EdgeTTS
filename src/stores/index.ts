@@ -1,160 +1,154 @@
 // Stores Module
 // Export all stores and related functionality
 
-// Signal-based stores - export entire modules
-export * as SettingsStoreModule from './SettingsStore';
-export * as ConversionStoreModule from './ConversionStore';
-export * as LLMStoreModule from './LLMStore';
-
 // Store classes (for LogStore, DataStore, LanguageStore which are still class-based)
 export type { LoggerStore } from '@/services/Logger';
 export { createLoggerStore } from '@/services/Logger';
-export { DataStore, createDataStore } from './DataStore';
-export { LanguageStore, createLanguageStore } from './LanguageStore';
-
 // Store types
-export type { ConversionStatus, Progress, ConversionError, ResumeInfo } from './ConversionStore';
-export type { LLMProcessingStatus } from './LLMStore';
-export type { SupportedLocale } from './LanguageStore';
-
-// Context and hooks
+export type { ConversionError, ConversionStatus, Progress, ResumeInfo } from './ConversionStore';
+export * as ConversionStoreModule from './ConversionStore';
 export {
-  StoreProvider,
-  useStores,
-  useSettings,
-  useConversion,
-  useLLM,
-  useLogs,
-  useData,
-  useLanguage,
-  createStores,
-  initializeStores,
-  type Stores,
-} from './StoreContext';
-
-// Re-export commonly used items from signal stores for convenience
-export {
-  settings,
-  patchSettings,
-  rateDisplay,
-  pitchDisplay,
-  resetSettings,
-  resetSettingsStore,
-  // Computed values
-  voice,
-  narratorVoice,
-  voicePoolLocale,
-  enabledVoices,
-  rate,
-  pitch,
-  ttsThreads,
-  llmThreads,
-  lexxRegister,
-  showDopSettings,
-  isLiteMode,
-  statusAreaWidth,
-  outputFormat,
-  silenceRemovalEnabled,
-  normalizationEnabled,
-  deEssEnabled,
-  silenceGapMs,
-  eqEnabled,
-  compressorEnabled,
-  fadeInEnabled,
-  stereoWidthEnabled,
-  opusPreset,
-  opusMinBitrate,
-  opusMaxBitrate,
-  opusCompressionLevel,
-  // Individual setters
-  setVoice,
-  setNarratorVoice,
-  setVoicePoolLocale,
-  setEnabledVoices,
-  setRate,
-  setPitch,
-  setTtsThreads,
-  setLlmThreads,
-  setLexxRegister,
-  setShowDopSettings,
-  setIsLiteMode,
-  setStatusAreaWidth,
-  setOutputFormat,
-  setSilenceRemovalEnabled,
-  setNormalizationEnabled,
-  setDeEssEnabled,
-  setSilenceGapMs,
-  setEqEnabled,
-  setCompressorEnabled,
-  setFadeInEnabled,
-  setStereoWidthEnabled,
-  applyOpusPreset,
-  setOpusMinBitrate,
-  setOpusMaxBitrate,
-  setOpusCompressionLevel,
-} from './SettingsStore';
-
-export {
-  conversion,
-  startConversion,
-  setStatus,
-  updateProgress,
-  setError,
-  complete,
   cancel,
-  resetConversionStore,
-  isProcessing,
-  progressPercent,
-  elapsedTime,
-  estimatedTimeRemaining,
-  // Computed values
-  progress,
-  status,
-  startTime,
-  error as conversionError,
-  resumeInfo,
-  ffmpegLoaded,
-  ffmpegLoading,
-  ffmpegError,
+  cancelResume,
+  complete,
   // Resume functions
   confirmResume,
-  cancelResume,
+  conversion,
+  elapsedTime,
+  error as conversionError,
+  estimatedTimeRemaining,
+  ffmpegError,
+  ffmpegLoaded,
+  ffmpegLoading,
+  isProcessing,
+  // Computed values
+  progress,
+  progressPercent,
+  resetConversionStore,
+  resumeInfo,
+  setError,
+  setStatus,
+  startConversion,
+  startTime,
+  status,
+  updateProgress,
 } from './ConversionStore';
-
+export { createDataStore, DataStore } from './DataStore';
+export type { SupportedLocale } from './LanguageStore';
+export { createLanguageStore, LanguageStore } from './LanguageStore';
+export type { LLMProcessingStatus } from './LLMStore';
+export * as LLMStoreModule from './LLMStore';
 export {
-  llm,
-  setProcessingStatus,
-  setCharacters,
-  setVoiceMap,
-  setSpeakerAssignments,
-  setPendingReview,
+  addCharacter,
+  assign,
   awaitReview,
-  confirmReview,
   cancelReview,
-  resetProcessingState,
-  isConfigured,
-  isProcessing as llmIsProcessing,
   // Computed values
   characterVoiceMap,
-  loadedProfile,
-  pendingReview,
+  confirmReview,
   detectedCharacters,
-  speakerAssignments,
-  processingStatus,
   error as llmError,
   extract,
+  getStageConfig,
+  isConfigured,
+  isProcessing as llmIsProcessing,
+  llm,
+  loadedProfile,
   merge,
-  assign,
-  useVoting,
+  pendingReview,
+  processingStatus,
+  removeCharacter,
+  removeVoiceMapping,
+  resetProcessingState,
+  setCharacters,
+  setLoadedProfile,
+  setPendingReview,
+  setProcessingStatus,
+  setSpeakerAssignments,
+  setStageConfig,
+  setStageField,
   // Other functions
   setUseVoting,
-  setStageField,
-  setStageConfig,
-  getStageConfig,
-  addCharacter,
+  setVoiceMap,
+  speakerAssignments,
   updateCharacter,
-  removeCharacter,
   updateVoiceMapping,
-  removeVoiceMapping,
-  setLoadedProfile,
+  useVoting,
 } from './LLMStore';
+// Signal-based stores - export entire modules
+export * as SettingsStoreModule from './SettingsStore';
+// Re-export commonly used items from signal stores for convenience
+export {
+  applyOpusPreset,
+  compressorEnabled,
+  deEssEnabled,
+  enabledVoices,
+  eqEnabled,
+  fadeInEnabled,
+  isLiteMode,
+  lexxRegister,
+  llmThreads,
+  narratorVoice,
+  normalizationEnabled,
+  opusCompressionLevel,
+  opusMaxBitrate,
+  opusMinBitrate,
+  opusPreset,
+  outputFormat,
+  patchSettings,
+  pitch,
+  pitchDisplay,
+  rate,
+  rateDisplay,
+  resetSettings,
+  resetSettingsStore,
+  setCompressorEnabled,
+  setDeEssEnabled,
+  setEnabledVoices,
+  setEqEnabled,
+  setFadeInEnabled,
+  setIsLiteMode,
+  setLexxRegister,
+  setLlmThreads,
+  setNarratorVoice,
+  setNormalizationEnabled,
+  setOpusCompressionLevel,
+  setOpusMaxBitrate,
+  setOpusMinBitrate,
+  setOutputFormat,
+  setPitch,
+  setRate,
+  setShowDopSettings,
+  setSilenceGapMs,
+  setSilenceRemovalEnabled,
+  setStatusAreaWidth,
+  setStereoWidthEnabled,
+  setTtsThreads,
+  settings,
+  // Individual setters
+  setVoice,
+  setVoicePoolLocale,
+  showDopSettings,
+  silenceGapMs,
+  silenceRemovalEnabled,
+  statusAreaWidth,
+  stereoWidthEnabled,
+  ttsThreads,
+  // Computed values
+  voice,
+  voicePoolLocale,
+} from './SettingsStore';
+// Context and hooks
+export {
+  createStores,
+  initializeStores,
+  StoreProvider,
+  type Stores,
+  useConversion,
+  useData,
+  useLanguage,
+  useLLM,
+  useLogs,
+  useSettings,
+  useStores,
+} from './StoreContext';

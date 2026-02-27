@@ -1,18 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { LLMApiClient } from './LLMApiClient';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LLMCharacter } from '@/state/types';
 import { LLMVoiceService } from './LLMVoiceService';
 import { MergeSchema } from './schemas';
-import type { LLMCharacter } from '@/state/types';
 
 // Mock OpenAI client
 vi.mock('openai', () => ({
   default: vi.fn().mockImplementation(() => ({
     chat: {
       completions: {
-        create: vi.fn()
-      }
-    }
-  }))
+        create: vi.fn(),
+      },
+    },
+  })),
 }));
 
 describe('LLMVoiceService - Merge with Structured Outputs', () => {
@@ -21,7 +20,7 @@ describe('LLMVoiceService - Merge with Structured Outputs', () => {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-    debug: vi.fn()
+    debug: vi.fn(),
   };
 
   const testCharacters: LLMCharacter[] = [
@@ -36,34 +35,39 @@ describe('LLMVoiceService - Merge with Structured Outputs', () => {
 
   it('merges characters using structured output', async () => {
     const mockResponse = {
-      choices: [{
-        message: {
-          content: JSON.stringify({
-            reasoning: 'Alice and Alicia are the same person',
-            merges: [[0, 1]]  // Merge Alice (0) and Alicia (1)
-          }),
-          refusal: null
-        }
-      }]
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              reasoning: 'Alice and Alicia are the same person',
+              merges: [[0, 1]], // Merge Alice (0) and Alicia (1)
+            }),
+            refusal: null,
+          },
+        },
+      ],
     };
 
     // Setup mock before creating service
     const openai = await import('openai');
     const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(() => ({
-      chat: {
-        completions: {
-          create: mockCreate
-        }
-      }
-    } as any));
+    vi.mocked(openai.default).mockImplementation(
+      () =>
+        ({
+          chat: {
+            completions: {
+              create: mockCreate,
+            },
+          },
+        }) as any,
+    );
 
     service = new LLMVoiceService({
       apiKey: 'test-key',
       apiUrl: 'https://api.openai.com/v1',
       model: 'gpt-4o-mini',
       narratorVoice: 'narrator',
-      logger: mockLogger
+      logger: mockLogger,
     });
 
     // Access internal merge method via the public method
@@ -75,34 +79,39 @@ describe('LLMVoiceService - Merge with Structured Outputs', () => {
 
   it('handles empty merges (no duplicates)', async () => {
     const mockResponse = {
-      choices: [{
-        message: {
-          content: JSON.stringify({
-            reasoning: null,
-            merges: []  // No merges needed
-          }),
-          refusal: null
-        }
-      }]
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              reasoning: null,
+              merges: [], // No merges needed
+            }),
+            refusal: null,
+          },
+        },
+      ],
     };
 
     // Setup mock before creating service
     const openai = await import('openai');
     const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(() => ({
-      chat: {
-        completions: {
-          create: mockCreate
-        }
-      }
-    } as any));
+    vi.mocked(openai.default).mockImplementation(
+      () =>
+        ({
+          chat: {
+            completions: {
+              create: mockCreate,
+            },
+          },
+        }) as any,
+    );
 
     service = new LLMVoiceService({
       apiKey: 'test-key',
       apiUrl: 'https://api.openai.com/v1',
       model: 'gpt-4o-mini',
       narratorVoice: 'narrator',
-      logger: mockLogger
+      logger: mockLogger,
     });
 
     const result = await (service as any).mergeCharactersWithLLM(testCharacters);
@@ -115,7 +124,7 @@ describe('LLMVoiceService - Merge with Structured Outputs', () => {
     // Schema should reject single-element groups
     const result = MergeSchema.safeParse({
       reasoning: null,
-      merges: [[0]]  // Invalid: single element
+      merges: [[0]], // Invalid: single element
     });
 
     expect(result.success).toBe(false);

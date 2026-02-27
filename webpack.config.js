@@ -1,13 +1,13 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { CleanWebpackPlugin } from 'clean-webpack-plugin';
+import CopyWebpackPlugin from 'copy-webpack-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
-import CopyWebpackPlugin from 'copy-webpack-plugin';
-import { CleanWebpackPlugin } from 'clean-webpack-plugin';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default (env, argv) => {
+export default (_env, argv) => {
   const isProduction = argv.mode === 'production';
 
   return {
@@ -24,7 +24,7 @@ export default (env, argv) => {
     resolve: {
       extensions: ['.ts', '.tsx', '.js', '.jsx'],
       alias: {
-        'react': 'preact/compat',
+        react: 'preact/compat',
         'react-dom': 'preact/compat',
         '@': path.resolve(__dirname, 'src'),
       },

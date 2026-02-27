@@ -1,11 +1,10 @@
-import { Text } from 'preact-i18n';
-import { Tabs, TabPanel } from '@/components/common';
-import { GeneralTab } from './tabs/GeneralTab';
-import { VoicePoolTab } from './tabs/VoicePoolTab';
-import { LLMTab } from './tabs/LLMTab';
+import { TabPanel, Tabs } from '@/components/common';
 import { AudioTab } from './tabs/AudioTab';
 import { DictionaryTab } from './tabs/DictionaryTab';
 import { ExportImportTab } from './tabs/ExportImportTab';
+import { GeneralTab } from './tabs/GeneralTab';
+import { LLMTab } from './tabs/LLMTab';
+import { VoicePoolTab } from './tabs/VoicePoolTab';
 
 const tabs = [
   { id: 'general', label: 'General', icon: '⚙️' },

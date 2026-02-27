@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { zodToJsonSchema } from './schemaUtils';
+import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { zodToJsonSchema } from './schemaUtils';
 
 describe('schemaUtils', () => {
   it('converts simple schema to JSON Schema format', () => {
     const schema = z.object({
       name: z.string(),
-      age: z.number().int()
+      age: z.number().int(),
     });
 
     const result = zodToJsonSchema(schema, 'TestSchema');
@@ -32,7 +32,7 @@ describe('schemaUtils', () => {
   it('sets additionalProperties: false for objects', () => {
     const schema = z.object({
       required: z.string(),
-      optional: z.string().optional()
+      optional: z.string().optional(),
     });
 
     const result = zodToJsonSchema(schema, 'StrictSchema');
@@ -45,7 +45,7 @@ describe('schemaUtils', () => {
   it('handles nullable fields correctly for OpenAI strict mode', () => {
     const schema = z.object({
       reasoning: z.string().nullable(),
-      content: z.string()
+      content: z.string(),
     });
 
     const result = zodToJsonSchema(schema, 'NullableTest');
@@ -59,7 +59,7 @@ describe('schemaUtils', () => {
   it('uses z.record() with 2-arg form', () => {
     // This ensures we're using Zod 4 compatible record syntax
     const schema = z.object({
-      assignments: z.record(z.string(), z.string())
+      assignments: z.record(z.string(), z.string()),
     });
 
     const result = zodToJsonSchema(schema, 'RecordTest');

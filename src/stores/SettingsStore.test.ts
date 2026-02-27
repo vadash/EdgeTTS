@@ -1,17 +1,17 @@
 // SettingsStore Tests
 // Test the SettingsStore signal-based API
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  settings,
-  rateDisplay,
-  pitchDisplay,
   applyOpusPreset,
-  setOpusMinBitrate,
-  setOpusMaxBitrate,
-  setOpusCompressionLevel,
   patchSettings,
+  pitchDisplay,
+  rateDisplay,
   resetSettings,
+  setOpusCompressionLevel,
+  setOpusMaxBitrate,
+  setOpusMinBitrate,
+  settings,
 } from '@/stores/SettingsStore';
 
 describe('SettingsStore', () => {

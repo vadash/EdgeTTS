@@ -1,7 +1,7 @@
 import { useRef } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import { useData, useSettings, useLogs } from '@/stores';
 import { Button, Toggle } from '@/components/common';
+import { useData, useLogs, useSettings } from '@/stores';
 
 export function DictionaryTab() {
   const dataStore = useData();
@@ -18,7 +18,7 @@ export function DictionaryTab() {
 
     try {
       const text = await file.text();
-      const newRules = text.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+      const newRules = text.split('\n').filter((line) => line.trim() && !line.startsWith('#'));
       dataStore.setDictionaryRaw(newRules);
       logs.info(`Loaded dictionary: ${file.name} (${newRules.length} rules)`);
     } catch (err) {
@@ -78,9 +78,7 @@ export function DictionaryTab() {
             <Button onClick={handleExport}>
               💾 <Text id="settings.export">Export</Text>
             </Button>
-            <Button onClick={handleClear}>
-              🗑️
-            </Button>
+            <Button onClick={handleClear}>🗑️</Button>
           </>
         )}
       </div>

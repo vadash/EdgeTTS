@@ -21,7 +21,7 @@ export interface RetryOptions {
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
-  options: RetryOptions = {}
+  options: RetryOptions = {},
 ): Promise<T> {
   const {
     maxRetries = 3,
@@ -36,7 +36,7 @@ export async function withRetry<T>(
   const retries = maxRetries === Infinity ? Number.MAX_SAFE_INTEGER : maxRetries;
 
   return pRetry(
-    async (attemptNumber) => {
+    async (_attemptNumber) => {
       // Check for cancellation before each attempt
       if (signal?.aborted) {
         throw new AbortError('Operation cancelled');
@@ -61,10 +61,10 @@ export async function withRetry<T>(
 
         // Calculate delay for callback (p-retry handles actual delay)
         const jitter = Math.random() * 1000;
-        const nextDelay = Math.min(baseDelay * Math.pow(2, context.attemptNumber - 1) + jitter, maxDelay);
+        const nextDelay = Math.min(baseDelay * 2 ** (context.attemptNumber - 1) + jitter, maxDelay);
 
         onRetry?.(context.attemptNumber, actualError, nextDelay);
       },
-    }
+    },
   );
 }

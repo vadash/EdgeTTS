@@ -1,7 +1,7 @@
 // Logger Module
 // Consolidated logger with LogStore integration
 
-import { signal, computed } from '@preact/signals';
+import { computed, signal } from '@preact/signals';
 
 export type LogLevel = 'info' | 'warn' | 'error';
 
@@ -111,9 +111,7 @@ export class Logger implements ILogger {
    */
   error(message: string, error?: Error, data?: Record<string, unknown>): void {
     const formatted = this.formatMessage(message);
-    const errorData = error
-      ? { ...data, error: error.message, stack: error.stack }
-      : data;
+    const errorData = error ? { ...data, error: error.message, stack: error.stack } : data;
 
     console.error(`[ERROR] ${formatted}`, error ?? '', data ?? '');
     this.store?.add('error', formatted, errorData);
@@ -221,9 +219,7 @@ export class LoggerStore implements ILogger {
    * Add error entry
    */
   error(message: string, error?: Error, data?: Record<string, unknown>): void {
-    const errorData = error
-      ? { ...data, error: error.message, stack: error.stack }
-      : data;
+    const errorData = error ? { ...data, error: error.message, stack: error.stack } : data;
     this.add('error', message, errorData);
   }
 
@@ -260,7 +256,10 @@ export class LoggerStore implements ILogger {
    */
   toText(): string {
     return this.entries.value
-      .map(e => `[${e.elapsed}] [${e.level.toUpperCase()}] ${e.message}${e.data ? ' ' + JSON.stringify(e.data) : ''}`)
+      .map(
+        (e) =>
+          `[${e.elapsed}] [${e.level.toUpperCase()}] ${e.message}${e.data ? ` ${JSON.stringify(e.data)}` : ''}`,
+      )
       .join('\n');
   }
 
@@ -275,7 +274,7 @@ export class LoggerStore implements ILogger {
    * Export logs for display (formatted strings)
    */
   toDisplayLines(): string[] {
-    return this.entries.value.map(e => `[${e.elapsed}] ${e.message}`);
+    return this.entries.value.map((e) => `[${e.elapsed}] ${e.message}`);
   }
 
   /**

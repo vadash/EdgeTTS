@@ -5,20 +5,20 @@
  * MPEG Audio Version lookup table
  */
 const MPEG_VERSIONS = {
-  0b00: 2.5, // MPEG Version 2.5
-  0b01: null, // Reserved
-  0b10: 2, // MPEG Version 2
-  0b11: 1, // MPEG Version 1
+  0: 2.5, // MPEG Version 2.5
+  1: null, // Reserved
+  2: 2, // MPEG Version 2
+  3: 1, // MPEG Version 1
 } as const;
 
 /**
  * Layer description lookup table
  */
 const LAYERS = {
-  0b00: null, // Reserved
-  0b01: 3, // Layer III
-  0b10: 2, // Layer II
-  0b11: 1, // Layer I
+  0: null, // Reserved
+  1: 3, // Layer III
+  2: 2, // Layer II
+  3: 1, // Layer I
 } as const;
 
 /**
@@ -191,7 +191,8 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
   } else {
     // For mono, use 72; for stereo/joint/dual, use 144
     const channelCoefficient = channelMode === 'mono' ? 72 : 144;
-    frameSize = Math.floor((channelCoefficient * bitrate * 1000) / sampleRate) + (paddingBit ? 1 : 0);
+    frameSize =
+      Math.floor((channelCoefficient * bitrate * 1000) / sampleRate) + (paddingBit ? 1 : 0);
   }
 
   // Calculate frame duration in milliseconds
@@ -249,7 +250,7 @@ export function skipID3v2Tag(buffer: Uint8Array): number {
  */
 export function parseMP3Duration(
   buffer: Uint8Array,
-  maxFramesToSample: number = 100
+  maxFramesToSample: number = 100,
 ): number | null {
   if (buffer.length < 10) {
     return null;
@@ -268,7 +269,7 @@ export function parseMP3Duration(
   let totalDurationMs = 0;
   let frameCount = 0;
   let totalBytesAnalyzed = 0;
-  let lastValidFrameSize = 0;
+  let _lastValidFrameSize = 0;
 
   while (offset < buffer.length && frameCount < maxFramesToSample) {
     const header = parseFrameHeader(buffer, offset);
@@ -282,7 +283,7 @@ export function parseMP3Duration(
 
     totalDurationMs += header.frameDurationMs;
     totalBytesAnalyzed += header.frameSize;
-    lastValidFrameSize = header.frameSize;
+    _lastValidFrameSize = header.frameSize;
     frameCount++;
     offset += header.frameSize;
   }

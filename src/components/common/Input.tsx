@@ -14,11 +14,7 @@ export function Input({ label, id, className = '', ...props }: InputProps) {
           {label}
         </label>
       )}
-      <input
-        id={inputId}
-        className={`input-field ${className}`.trim()}
-        {...props}
-      />
+      <input id={inputId} className={`input-field ${className}`.trim()} {...props} />
     </div>
   );
 }

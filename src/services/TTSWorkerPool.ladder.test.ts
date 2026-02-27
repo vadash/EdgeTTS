@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { TTSWorkerPool, type WorkerPoolOptions, type PoolTask } from './TTSWorkerPool';
-import type { TTSConfig as VoiceConfig } from '@/state/types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
+import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from './TTSWorkerPool';
 
 vi.mock('./ReusableEdgeTTSService', () => ({
   ReusableEdgeTTSService: vi.fn().mockImplementation(() => ({
@@ -42,7 +41,7 @@ describe('TTSWorkerPool - Ladder Integration', () => {
     pool = new TTSWorkerPool(options);
 
     // Spy on connectionPool.acquire
-    const acquireSpy = vi.spyOn(pool['connectionPool'], 'acquire');
+    const acquireSpy = vi.spyOn(pool.connectionPool, 'acquire');
 
     await pool.warmup();
 
@@ -54,8 +53,8 @@ describe('TTSWorkerPool - Ladder Integration', () => {
     pool = new TTSWorkerPool(options);
 
     // Check that ladder exists internally
-    expect(pool['ladder']).toBeDefined();
-    expect(pool['ladder'].getCurrentWorkers()).toBe(2);
+    expect(pool.ladder).toBeDefined();
+    expect(pool.ladder.getCurrentWorkers()).toBe(2);
   });
 
   it('records successful task for ladder evaluation', async () => {

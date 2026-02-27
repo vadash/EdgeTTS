@@ -1,12 +1,12 @@
-import { readdirSync, writeFileSync, statSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readdirSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const deployDir = process.argv[2] || resolve(__dirname, '..', 'dist');
 
 // Get all version directories
-const dirs = readdirSync(deployDir).filter(name => {
+const dirs = readdirSync(deployDir).filter((name) => {
   const path = resolve(deployDir, name);
   return statSync(path).isDirectory();
 });
@@ -18,9 +18,7 @@ const versions = dirs.sort((a, b) => {
   return b.localeCompare(a, undefined, { numeric: true });
 });
 
-const versionList = versions
-  .map(v => `      <li><a href="./${v}/">${v}</a></li>`)
-  .join('\n');
+const versionList = versions.map((v) => `      <li><a href="./${v}/">${v}</a></li>`).join('\n');
 
 const html = `<!DOCTYPE html>
 <html lang="en">

@@ -1,21 +1,21 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { fixtures, findCharacter, type TestFixture } from './fixtures';
-import {
-  createService,
-  createSplitter,
-  loadFixtureText,
-  runExtract,
-  runAssign,
-  checkDialogue,
-  logExtractResults,
-  logAssignResults,
-  logDialogueChecks,
-  getValidSpeakers,
-  type ExtractResult,
-  type AssignResult,
-} from './llm-test-helpers';
+import { beforeAll, describe, expect, it } from 'vitest';
 import type { LLMVoiceService } from '@/services/llm';
 import type { TextBlockSplitter } from '@/services/TextBlockSplitter';
+import { findCharacter, fixtures, type TestFixture } from './fixtures';
+import {
+  type AssignResult,
+  checkDialogue,
+  createService,
+  createSplitter,
+  type ExtractResult,
+  getValidSpeakers,
+  loadFixtureText,
+  logAssignResults,
+  logDialogueChecks,
+  logExtractResults,
+  runAssign,
+  runExtract,
+} from './llm-test-helpers';
 
 /**
  * Real API tests for LLM Extract and Assign (speaker assignment)
@@ -91,30 +91,30 @@ describe('LLM Real API Tests', () => {
       });
 
       it('should only use valid speakers', () => {
-        const canonicalNames = extractResult.characters.map(c => c.canonicalName);
+        const canonicalNames = extractResult.characters.map((c) => c.canonicalName);
         const validSpeakers = getValidSpeakers(canonicalNames);
 
         for (const assignment of assignResult.assignments) {
           expect(
             validSpeakers.has(assignment.speaker),
-            `Invalid speaker: ${assignment.speaker}`
+            `Invalid speaker: ${assignment.speaker}`,
           ).toBe(true);
         }
       });
 
       it('should attribute dialogue lines correctly', () => {
-        const results = fixture.expectedDialogueLines.map(expected =>
-          checkDialogue(assignResult.assignments, expected, extractResult.characters)
+        const results = fixture.expectedDialogueLines.map((expected) =>
+          checkDialogue(assignResult.assignments, expected, extractResult.characters),
         );
 
         logDialogueChecks(results);
 
         // Check strict assertions
-        const strictFailures = results.filter(r => r.expected.strict && !r.matched);
+        const strictFailures = results.filter((r) => r.expected.strict && !r.matched);
         for (const failure of strictFailures) {
           expect.fail(
             `Strict assertion failed: "${failure.expected.textContains}" ` +
-            `expected ${failure.expected.speaker}, got ${failure.actualSpeaker}`
+              `expected ${failure.expected.speaker}, got ${failure.actualSpeaker}`,
           );
         }
       });

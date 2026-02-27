@@ -1,12 +1,18 @@
+import { StatusPanel } from '@/components/status';
+import {
+  cancelResume,
+  cancelReview,
+  confirmResume,
+  confirmReview,
+  pendingReview,
+  resumeInfo,
+} from '@/stores';
+import { ConvertButton } from './ConvertButton';
 import { FileDropZone } from './FileDropZone';
 import { QuickVoiceSelect } from './QuickVoiceSelect';
-import { ConvertButton } from './ConvertButton';
+import { ResumeModal } from './ResumeModal';
 import { TextEditor } from './TextEditor';
 import { VoiceReviewModal } from './VoiceReviewModal';
-import { ResumeModal } from './ResumeModal';
-import { StatusPanel } from '@/components/status';
-import { pendingReview, confirmReview, cancelReview } from '@/stores';
-import { resumeInfo, confirmResume, cancelResume } from '@/stores';
 
 export function ConvertView() {
   return (
@@ -40,10 +46,7 @@ export function ConvertView() {
 
       {/* Voice Review Modal */}
       {pendingReview.value && (
-        <VoiceReviewModal
-          onConfirm={() => confirmReview()}
-          onCancel={() => cancelReview()}
-        />
+        <VoiceReviewModal onConfirm={() => confirmReview()} onCancel={() => cancelReview()} />
       )}
 
       {/* Resume Modal */}

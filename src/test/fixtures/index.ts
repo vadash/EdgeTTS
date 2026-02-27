@@ -1,4 +1,4 @@
-import type { LLMCharacter } from "@/state/types";
+import type { LLMCharacter } from '@/state/types';
 
 /**
  * Test fixture definitions for LLM prompt tuning
@@ -6,7 +6,7 @@ import type { LLMCharacter } from "@/state/types";
 
 export interface ExpectedCharacter {
   name: string; // partial match (case-insensitive)
-  gender: "male" | "female" | "unknown";
+  gender: 'male' | 'female' | 'unknown';
 }
 
 export interface ExpectedDialogue {
@@ -27,47 +27,63 @@ export interface TestFixture {
  */
 export const fixtures: TestFixture[] = [
   {
-    name: "sample_3_en_royalroad",
-    file: "sample_3_en_royalroad.txt",
+    name: 'sample_3_en_royalroad',
+    file: 'sample_3_en_royalroad.txt',
     expectedCharacters: [
-      { name: "Mirian", gender: "female" },
-      { name: "Nicolus", gender: "male" },
-      { name: "Professor Seneca", gender: "female" },
-      { name: "Professor Viridian", gender: "male" },
-      { name: "Valen", gender: "female" },
+      { name: 'Mirian', gender: 'female' },
+      { name: 'Nicolus', gender: 'male' },
+      { name: 'Professor Seneca', gender: 'female' },
+      { name: 'Professor Viridian', gender: 'male' },
+      { name: 'Valen', gender: 'female' },
     ],
     expectedDialogueLines: [
       // Mirian to guard (guard responses skipped)
-      { textContains: "Hi, sorry to bother you", speaker: "Mirian", strict: false },
-      { textContains: "It's just", speaker: "Mirian", strict: false },
-      { textContains: "I just thought you might want to know", speaker: "Mirian", strict: false },
+      { textContains: 'Hi, sorry to bother you', speaker: 'Mirian', strict: false },
+      { textContains: "It's just", speaker: 'Mirian', strict: false },
+      { textContains: 'I just thought you might want to know', speaker: 'Mirian', strict: false },
 
       // Professor Seneca's class
-      { textContains: "Alright, class", speaker: "Professor Seneca", strict: false },
-      { textContains: "Remember, we started our class", speaker: "Professor Seneca", strict: false },
-      { textContains: "It will be now", speaker: "Professor Seneca", strict: false },
-      { textContains: "Alchemical mana is classified in three ways", speaker: "Professor Seneca", strict: false },
-      { textContains: "Next, mana is classified", speaker: "Professor Seneca", strict: false },
+      { textContains: 'Alright, class', speaker: 'Professor Seneca', strict: false },
+      {
+        textContains: 'Remember, we started our class',
+        speaker: 'Professor Seneca',
+        strict: false,
+      },
+      { textContains: 'It will be now', speaker: 'Professor Seneca', strict: false },
+      {
+        textContains: 'Alchemical mana is classified in three ways',
+        speaker: 'Professor Seneca',
+        strict: false,
+      },
+      { textContains: 'Next, mana is classified', speaker: 'Professor Seneca', strict: false },
 
       // Nicolus interactions
-      { textContains: "Damn", speaker: "Nicolus", strict: false },
-      { textContains: "Hey. Want to study together", speaker: "Nicolus", strict: false },
-      { textContains: "Sure", speaker: "Mirian", strict: false },
-      { textContains: "I'll meet you after that", speaker: "Nicolus", strict: false },
+      { textContains: 'Damn', speaker: 'Nicolus', strict: false },
+      { textContains: 'Hey. Want to study together', speaker: 'Nicolus', strict: false },
+      { textContains: 'Sure', speaker: 'Mirian', strict: false },
+      { textContains: "I'll meet you after that", speaker: 'Nicolus', strict: false },
 
       // Professor Viridian's class
-      { textContains: "Regal cordyline, ruby variety", speaker: "Professor Viridian", strict: false },
-      { textContains: "Glycomyriate", speaker: "Valen", strict: false },
-      { textContains: "Very volatile when their mana flow is destabilized", speaker: "Valen", strict: false },
-      { textContains: "Observe", speaker: "Professor Viridian", strict: false },
-      { textContains: "Observe, the golden crown", speaker: "Professor Viridian", strict: false },
+      {
+        textContains: 'Regal cordyline, ruby variety',
+        speaker: 'Professor Viridian',
+        strict: false,
+      },
+      { textContains: 'Glycomyriate', speaker: 'Valen', strict: false },
+      {
+        textContains: 'Very volatile when their mana flow is destabilized',
+        speaker: 'Valen',
+        strict: false,
+      },
+      { textContains: 'Observe', speaker: 'Professor Viridian', strict: false },
+      { textContains: 'Observe, the golden crown', speaker: 'Professor Viridian', strict: false },
 
       // Mirian and Valen interaction at the end
-      { textContains: "Did you see that", speaker: "Mirian", strict: false },
-      { textContains: "Sorry", speaker: "Mirian", strict: false },
-      { textContains: "Yeah", speaker: "Valen", strict: false },
-      { textContains: "Isn't that corridor forbidden", speaker: "Valen", strict: false },
-      { textContains: "We should tell Professor Viridian", speaker: "Mirian", strict: false },
+      { textContains: 'Did you see that', speaker: 'Mirian', strict: false },
+      { textContains: 'Sorry', speaker: 'Mirian', strict: false },
+      { textContains: 'Yeah', speaker: 'Valen', strict: false },
+      { textContains: "Isn't that corridor forbidden", speaker: 'Valen', strict: false },
+      { textContains: 'We should tell Professor Viridian', speaker: 'Mirian', strict: false },
     ],
   },
 ];
@@ -76,25 +92,19 @@ export const fixtures: TestFixture[] = [
  * Helper to find a character by name (case-insensitive partial match)
  * Checks both canonicalName and all variations
  */
-export function findCharacter(
-  characters: LLMCharacter[],
-  name: string
-): LLMCharacter | undefined {
+export function findCharacter(characters: LLMCharacter[], name: string): LLMCharacter | undefined {
   const lowerName = name.toLowerCase();
   return characters.find(
     (c) =>
       c.canonicalName.toLowerCase().includes(lowerName) ||
-      c.variations.some((v) => v.toLowerCase().includes(lowerName))
+      c.variations.some((v) => v.toLowerCase().includes(lowerName)),
   );
 }
 
 /**
  * Helper to check if a character exists in the list
  */
-export function hasCharacter(
-  characters: LLMCharacter[],
-  name: string
-): boolean {
+export function hasCharacter(characters: LLMCharacter[], name: string): boolean {
   return findCharacter(characters, name) !== undefined;
 }
 
@@ -105,7 +115,7 @@ export function hasCharacter(
 export function speakerMatchesCharacter(
   speaker: string,
   expectedName: string,
-  characters: LLMCharacter[]
+  characters: LLMCharacter[],
 ): boolean {
   const speakerLower = speaker.toLowerCase();
   const expectedLower = expectedName.toLowerCase();
@@ -142,7 +152,7 @@ export function speakerMatchesCharacter(
  */
 export function resolveCharacterFromSpeaker(
   speaker: string,
-  characters: LLMCharacter[]
+  characters: LLMCharacter[],
 ): LLMCharacter | undefined {
   const speakerLower = speaker.toLowerCase();
 

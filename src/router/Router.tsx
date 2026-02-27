@@ -1,5 +1,5 @@
-import type { FunctionalComponent, ComponentChildren } from 'preact';
-import { isConvertRoute, isSettingsRoute, isLogsRoute, isAboutRoute } from './useRoute';
+import type { ComponentChildren } from 'preact';
+import { isAboutRoute, isLogsRoute, isSettingsRoute } from './useRoute';
 
 interface RouterProps {
   convertView: ComponentChildren;

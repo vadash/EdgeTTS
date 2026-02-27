@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { DataStore, createDataStore } from './DataStore';
-import type { ProcessedBook, DictionaryRule, TTSWorker } from '@/state/types';
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { DictionaryRule, ProcessedBook, TTSWorker } from '@/state/types';
+import { createDataStore, type DataStore } from './DataStore';
 
 describe('DataStore', () => {
   let store: DataStore;
@@ -50,7 +50,10 @@ describe('DataStore', () => {
   describe('book management', () => {
     const mockBook: ProcessedBook = {
       allSentences: ['Sentence 1.', 'Sentence 2.'],
-      fileNames: [['chapter1', 0], ['chapter2', 1]],
+      fileNames: [
+        ['chapter1', 0],
+        ['chapter2', 1],
+      ],
     };
 
     it('sets book', () => {
@@ -143,7 +146,6 @@ describe('DataStore', () => {
       expect(current).toBe(5);
       expect(store.fileNameIndex.value).toBe(6);
     });
-
   });
 
   describe('computed properties', () => {
@@ -180,7 +182,10 @@ describe('DataStore', () => {
       });
 
       it('returns file names from book', () => {
-        const fileNames: [string, number][] = [['ch1', 0], ['ch2', 5]];
+        const fileNames: [string, number][] = [
+          ['ch1', 0],
+          ['ch2', 5],
+        ];
         store.setBook({ allSentences: ['A.'], fileNames });
         expect(store.fileNames.value).toEqual(fileNames);
       });

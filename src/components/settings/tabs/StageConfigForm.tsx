@@ -1,6 +1,6 @@
 import { Text } from 'preact-i18n';
-import { Button, Toggle, Select, Slider } from '@/components/common';
-import type { StageConfig, ReasoningLevel } from '@/stores/LLMStore';
+import { Button, Select, Slider, Toggle } from '@/components/common';
+import type { ReasoningLevel, StageConfig } from '@/stores/LLMStore';
 
 const reasoningOptions = [
   { value: 'off', label: 'Off' },
@@ -43,18 +43,14 @@ export function StageConfigForm({
 
   const handleReasoningChange = (e: Event) => {
     const value = (e.target as HTMLSelectElement).value;
-    onChange('reasoning', value === 'off' ? null : value as ReasoningLevel);
+    onChange('reasoning', value === 'off' ? null : (value as ReasoningLevel));
   };
 
   return (
     <div className="space-y-4">
       {/* Copy Settings Button */}
       {onCopySettings && (
-        <Button
-          onClick={onCopySettings}
-          variant="default"
-          className="w-full"
-        >
+        <Button onClick={onCopySettings} variant="default" className="w-full">
           📋 <Text id="llm.copySettings">Copy to other stages</Text>
         </Button>
       )}
@@ -160,7 +156,9 @@ export function StageConfigForm({
         {/* Hint about reasoning mode */}
         {isReasoningEnabled && (
           <p className="text-xs text-yellow-500">
-            <Text id="llm.reasoningDisablesParams">Temperature and Top-P are disabled when reasoning mode is enabled</Text>
+            <Text id="llm.reasoningDisablesParams">
+              Temperature and Top-P are disabled when reasoning mode is enabled
+            </Text>
           </p>
         )}
       </div>
@@ -191,10 +189,12 @@ export function StageConfigForm({
             {testResult.success ? (
               <>
                 <Text id="llm.connectionSuccess">Connection successful!</Text>
-                {testResult.model && <span className="text-gray-400 ml-1">({testResult.model})</span>}
+                {testResult.model && (
+                  <span className="text-gray-400 ml-1">({testResult.model})</span>
+                )}
               </>
             ) : (
-              <>{testResult.error}</>
+              testResult.error
             )}
           </div>
         )}

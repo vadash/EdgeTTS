@@ -21,10 +21,7 @@ export function Button({
   const sizeClasses = size === 'sm' ? 'btn-sm' : size === 'icon' ? 'btn-icon' : '';
 
   return (
-    <button
-      className={`btn ${variantClasses} ${sizeClasses} ${className}`.trim()}
-      {...props}
-    >
+    <button className={`btn ${variantClasses} ${sizeClasses} ${className}`.trim()} {...props}>
       {children}
     </button>
   );

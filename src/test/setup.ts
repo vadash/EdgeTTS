@@ -1,7 +1,7 @@
 // Test setup file for Vitest
 // Configures the testing environment with mocks and utilities
 
-import { vi, afterEach } from 'vitest';
+import { afterEach, vi } from 'vitest';
 
 // Mock p-retry - executes immediately without retry
 vi.mock('p-retry', () => ({
@@ -25,7 +25,7 @@ vi.mock('p-queue', () => ({
       // Trigger idle event after task completes
       setTimeout(() => {
         const idleListeners = this.listeners.get('idle') || [];
-        idleListeners.forEach(listener => listener());
+        idleListeners.forEach((listener) => listener());
       }, 0);
       return result;
     });
@@ -36,39 +36,53 @@ vi.mock('p-queue', () => ({
       }
       this.listeners.get(event)!.push(listener);
     });
-    get size() { return 0; }
-    get pending() { return 0; }
+    get size() {
+      return 0;
+    }
+    get pending() {
+      return 0;
+    }
   },
 }));
 
 // Mock generic-pool - simple acquire/release without actual pooling
 vi.mock('generic-pool', () => ({
-  createPool: vi.fn((factory: { create: () => Promise<unknown>; destroy: (obj: unknown) => Promise<void> }) => {
-    let created: unknown[] = [];
-    return {
-      acquire: vi.fn(async () => {
-        const obj = await factory.create();
-        created.push(obj);
-        return obj;
-      }),
-      release: vi.fn(async () => {}),
-      destroy: vi.fn(async (obj: unknown) => {
-        await factory.destroy(obj);
-        created = created.filter(c => c !== obj);
-      }),
-      drain: vi.fn(async () => {}),
-      clear: vi.fn(async () => {
-        for (const obj of created) {
+  createPool: vi.fn(
+    (factory: { create: () => Promise<unknown>; destroy: (obj: unknown) => Promise<void> }) => {
+      let created: unknown[] = [];
+      return {
+        acquire: vi.fn(async () => {
+          const obj = await factory.create();
+          created.push(obj);
+          return obj;
+        }),
+        release: vi.fn(async () => {}),
+        destroy: vi.fn(async (obj: unknown) => {
           await factory.destroy(obj);
-        }
-        created = [];
-      }),
-      get size() { return created.length; },
-      get available() { return created.length; },
-      get borrowed() { return 0; },
-      get pending() { return 0; },
-    };
-  }),
+          created = created.filter((c) => c !== obj);
+        }),
+        drain: vi.fn(async () => {}),
+        clear: vi.fn(async () => {
+          for (const obj of created) {
+            await factory.destroy(obj);
+          }
+          created = [];
+        }),
+        get size() {
+          return created.length;
+        },
+        get available() {
+          return created.length;
+        },
+        get borrowed() {
+          return 0;
+        },
+        get pending() {
+          return 0;
+        },
+      };
+    },
+  ),
 }));
 
 // Mock browser APIs

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseMP3Duration, findSyncWord, skipID3v2Tag } from './MP3Parser';
+import { describe, expect, it } from 'vitest';
+import { findSyncWord, parseMP3Duration, skipID3v2Tag } from './MP3Parser';
 
 describe('MP3Parser - Edge TTS format', () => {
   it('should correctly parse MPEG Version 2, Layer III, 24kHz, 96kbps MONO', () => {
@@ -15,8 +15,11 @@ describe('MP3Parser - Edge TTS format', () => {
     // Frame duration: (576 / 24000) * 1000 = 24ms
 
     const frameData = new Uint8Array([
-      0xFF, 0xF2, 0xA4, 0xC0,  // Frame header (4 bytes)
-      ...new Uint8Array(284),     // Rest of frame data (288 - 4 = 284)
+      0xff,
+      0xf2,
+      0xa4,
+      0xc0, // Frame header (4 bytes)
+      ...new Uint8Array(284), // Rest of frame data (288 - 4 = 284)
     ]);
 
     const duration = parseMP3Duration(frameData);
@@ -28,8 +31,11 @@ describe('MP3Parser - Edge TTS format', () => {
 
   it('should correctly parse 100 frames of Edge TTS format', () => {
     const singleFrame = new Uint8Array([
-      0xFF, 0xF2, 0xA4, 0xC0,  // Frame header (mono)
-      ...new Uint8Array(284),     // Frame data
+      0xff,
+      0xf2,
+      0xa4,
+      0xc0, // Frame header (mono)
+      ...new Uint8Array(284), // Frame data
     ]);
 
     // Create 100 frames
@@ -43,10 +49,7 @@ describe('MP3Parser - Edge TTS format', () => {
   });
 
   it('should correctly extrapolate for larger files', () => {
-    const singleFrame = new Uint8Array([
-      0xFF, 0xF2, 0xA4, 0xC0,
-      ...new Uint8Array(284),
-    ]);
+    const singleFrame = new Uint8Array([0xff, 0xf2, 0xa4, 0xc0, ...new Uint8Array(284)]);
 
     // Create 100 frames + 50 more frames (total 150)
     const data = new Uint8Array(150 * 288);
@@ -66,12 +69,12 @@ describe('MP3Parser - Edge TTS format', () => {
 
 describe('findSyncWord', () => {
   it('finds sync word at start of buffer', () => {
-    const buffer = new Uint8Array([0xFF, 0xF2, 0xA4, 0xC0]);
+    const buffer = new Uint8Array([0xff, 0xf2, 0xa4, 0xc0]);
     expect(findSyncWord(buffer, 0)).toBe(0);
   });
 
   it('finds sync word after junk bytes', () => {
-    const buffer = new Uint8Array([0x00, 0x00, 0x00, 0xFF, 0xF2, 0xA4, 0xC0]);
+    const buffer = new Uint8Array([0x00, 0x00, 0x00, 0xff, 0xf2, 0xa4, 0xc0]);
     expect(findSyncWord(buffer, 0)).toBe(3);
   });
 
@@ -82,14 +85,14 @@ describe('findSyncWord', () => {
 
   it('respects startOffset parameter', () => {
     // Two sync words: at 0 and at 4
-    const buffer = new Uint8Array([0xFF, 0xF2, 0x00, 0x00, 0xFF, 0xE0, 0x00]);
+    const buffer = new Uint8Array([0xff, 0xf2, 0x00, 0x00, 0xff, 0xe0, 0x00]);
     expect(findSyncWord(buffer, 1)).toBe(4);
   });
 });
 
 describe('skipID3v2Tag', () => {
   it('returns 0 when no ID3v2 tag present', () => {
-    const buffer = new Uint8Array([0xFF, 0xF2, 0xA4, 0xC0, ...new Uint8Array(280)]);
+    const buffer = new Uint8Array([0xff, 0xf2, 0xa4, 0xc0, ...new Uint8Array(280)]);
     expect(skipID3v2Tag(buffer)).toBe(0);
   });
 

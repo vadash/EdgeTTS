@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { AudioPreset, AUDIO_PRESETS } from '@/state/types';
+import { describe, expect, it } from 'vitest';
 import type { AppSettings } from '@/state/types';
+import { AUDIO_PRESETS, AudioPreset } from '@/state/types';
 
 describe('AudioPreset', () => {
   it('should have all preset values', () => {
@@ -10,12 +10,12 @@ describe('AudioPreset', () => {
   });
 
   it('AUDIO_PRESETS should have correct configuration', () => {
-    const pc = AUDIO_PRESETS.find(p => p.name === AudioPreset.PC);
+    const pc = AUDIO_PRESETS.find((p) => p.name === AudioPreset.PC);
     expect(pc?.minBitrate).toBe(32);
     expect(pc?.maxBitrate).toBe(64);
     expect(pc?.compressionLevel).toBe(10);
 
-    const mobile = AUDIO_PRESETS.find(p => p.name === AudioPreset.MOBILE);
+    const mobile = AUDIO_PRESETS.find((p) => p.name === AudioPreset.MOBILE);
     expect(mobile?.minBitrate).toBe(32);
     expect(mobile?.maxBitrate).toBe(96);
     expect(mobile?.compressionLevel).toBe(3);
@@ -72,7 +72,7 @@ describe('AppSettings interface', () => {
   });
 });
 
-import type { VoiceProfileFile, CharacterEntry, VoiceAssignment } from '@/state/types';
+import type { CharacterEntry, VoiceAssignment, VoiceProfileFile } from '@/state/types';
 
 describe('VoiceProfile Types', () => {
   it('should define VoiceProfileFile type', () => {
@@ -81,7 +81,7 @@ describe('VoiceProfile Types', () => {
       narrator: 'en-US-GuyNeural',
       totalLines: 1000,
       characters: {
-        'harry_potter': {
+        harry_potter: {
           canonicalName: 'Harry Potter',
           voice: 'en-GB-RyanNeural',
           gender: 'male',
@@ -89,9 +89,9 @@ describe('VoiceProfile Types', () => {
           lines: 150,
           percentage: 15.0,
           lastSeenIn: 'BOOK1',
-          bookAppearances: 1
-        }
-      }
+          bookAppearances: 1,
+        },
+      },
     };
     expect(profile.version).toBe(2);
   });
@@ -105,7 +105,7 @@ describe('VoiceProfile Types', () => {
       lines: 100,
       percentage: 10.0,
       lastSeenIn: 'BOOK1',
-      bookAppearances: 1
+      bookAppearances: 1,
     };
     expect(entry.canonicalName).toBe('Harry Potter');
   });
@@ -114,7 +114,7 @@ describe('VoiceProfile Types', () => {
     const assignment: VoiceAssignment = {
       character: 'Harry Potter',
       voice: 'en-GB-RyanNeural',
-      shared: false
+      shared: false,
     };
     expect(assignment.shared).toBe(false);
   });

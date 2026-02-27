@@ -1,15 +1,17 @@
-import { describe, it, expect } from 'vitest';
-import { parseExtractResponse, parseAssignResponse, parseMergeResponse } from './PromptStrategy';
+import { describe, expect, it } from 'vitest';
+import { parseAssignResponse, parseExtractResponse, parseMergeResponse } from './PromptStrategy';
 
 describe('parseExtractResponse', () => {
   it('passes through valid responses unchanged', () => {
     const response = {
       reasoning: null,
-      characters: [{
-        canonicalName: 'Erick',
-        variations: ['Erick'],
-        gender: 'male',
-      }],
+      characters: [
+        {
+          canonicalName: 'Erick',
+          variations: ['Erick'],
+          gender: 'male',
+        },
+      ],
     };
     const result = parseExtractResponse(response);
     expect(result.characters[0]).toEqual({
@@ -22,11 +24,13 @@ describe('parseExtractResponse', () => {
   it('validates required fields', () => {
     const response = {
       reasoning: null,
-      characters: [{
-        canonicalName: 'Erick',
-        variations: ['Erick'],
-        gender: 'male',
-      }],
+      characters: [
+        {
+          canonicalName: 'Erick',
+          variations: ['Erick'],
+          gender: 'male',
+        },
+      ],
     };
     const result = parseExtractResponse(response);
     expect(result.characters).toHaveLength(1);
@@ -37,10 +41,16 @@ describe('parseMergeResponse', () => {
   it('passes through valid merge responses', () => {
     const response = {
       reasoning: 'Merging similar characters',
-      merges: [[0, 1], [2, 3]],
+      merges: [
+        [0, 1],
+        [2, 3],
+      ],
     };
     const result = parseMergeResponse(response);
-    expect(result.merges).toEqual([[0, 1], [2, 3]]);
+    expect(result.merges).toEqual([
+      [0, 1],
+      [2, 3],
+    ]);
     expect(result.reasoning).toBe('Merging similar characters');
   });
 

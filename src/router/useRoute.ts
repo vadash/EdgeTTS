@@ -1,4 +1,4 @@
-import { signal, computed } from '@preact/signals';
+import { computed, signal } from '@preact/signals';
 
 export const routes = {
   convert: '#/',
@@ -8,7 +8,7 @@ export const routes = {
 } as const;
 
 export type RouteKey = keyof typeof routes;
-export type RouteHash = typeof routes[RouteKey];
+export type RouteHash = (typeof routes)[RouteKey];
 
 // Current hash signal
 const currentHash = signal(window.location.hash || routes.convert);
@@ -27,8 +27,9 @@ export function navigate(route: RouteKey | RouteHash): void {
 }
 
 // Computed route helpers
-export const isConvertRoute = computed(() =>
-  currentHash.value === routes.convert || currentHash.value === '' || currentHash.value === '#'
+export const isConvertRoute = computed(
+  () =>
+    currentHash.value === routes.convert || currentHash.value === '' || currentHash.value === '#',
 );
 export const isSettingsRoute = computed(() => currentHash.value === routes.settings);
 export const isLogsRoute = computed(() => currentHash.value === routes.logs);

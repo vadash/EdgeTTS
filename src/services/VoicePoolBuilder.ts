@@ -1,6 +1,5 @@
 import { voices } from '../components/VoiceSelector/voices';
-import type { VoicePool, VoiceOption } from '../state/types';
-import type { DetectedLanguage } from '../utils/languageDetection';
+import type { VoiceOption, VoicePool } from '../state/types';
 
 /**
  * Build options for voice pool
@@ -25,7 +24,7 @@ export interface VoicePoolOptions {
  */
 export function deduplicateVariants(
   candidates: VoiceOption[],
-  bookLanguage: string
+  bookLanguage: string,
 ): VoiceOption[] {
   const langPrefix = bookLanguage.split('-')[0];
 
@@ -81,13 +80,14 @@ export function buildVoicePool(options: VoicePoolOptions = {}): VoicePool {
   const { language, includeMultilingual = false, enabledVoices } = options;
 
   // Start with enabled voices or all voices
-  let baseVoices = enabledVoices && enabledVoices.length > 0
-    ? voices.filter(v => enabledVoices.includes(v.fullValue))
-    : voices;
+  const baseVoices =
+    enabledVoices && enabledVoices.length > 0
+      ? voices.filter((v) => enabledVoices.includes(v.fullValue))
+      : voices;
 
   // Filter by language
   let filtered = language
-    ? baseVoices.filter(v => {
+    ? baseVoices.filter((v) => {
         const matchesLang = v.locale.startsWith(language.split('-')[0]);
         const matchesMulti = includeMultilingual && v.name.includes('Multilingual');
         return matchesLang || matchesMulti;
@@ -100,8 +100,8 @@ export function buildVoicePool(options: VoicePoolOptions = {}): VoicePool {
   }
 
   return {
-    male: filtered.filter(v => v.gender === 'male').map(v => v.fullValue),
-    female: filtered.filter(v => v.gender === 'female').map(v => v.fullValue),
+    male: filtered.filter((v) => v.gender === 'male').map((v) => v.fullValue),
+    female: filtered.filter((v) => v.gender === 'female').map((v) => v.fullValue),
   };
 }
 
@@ -111,24 +111,27 @@ export function buildVoicePool(options: VoicePoolOptions = {}): VoicePool {
 export function getRandomVoice(
   gender: 'male' | 'female' | 'unknown',
   options: VoicePoolOptions = {},
-  excludeVoices: Set<string> = new Set()
+  excludeVoices: Set<string> = new Set(),
 ): string {
   const pool = buildVoicePool(options);
 
   let candidates: string[];
   if (gender === 'male') {
-    candidates = pool.male.filter(v => !excludeVoices.has(v));
+    candidates = pool.male.filter((v) => !excludeVoices.has(v));
   } else if (gender === 'female') {
-    candidates = pool.female.filter(v => !excludeVoices.has(v));
+    candidates = pool.female.filter((v) => !excludeVoices.has(v));
   } else {
-    candidates = [...pool.male, ...pool.female].filter(v => !excludeVoices.has(v));
+    candidates = [...pool.male, ...pool.female].filter((v) => !excludeVoices.has(v));
   }
 
   // If all excluded, fall back to full pool
   if (candidates.length === 0) {
-    candidates = gender === 'male' ? pool.male :
-                 gender === 'female' ? pool.female :
-                 [...pool.male, ...pool.female];
+    candidates =
+      gender === 'male'
+        ? pool.male
+        : gender === 'female'
+          ? pool.female
+          : [...pool.male, ...pool.female];
   }
 
   return candidates[Math.floor(Math.random() * candidates.length)];

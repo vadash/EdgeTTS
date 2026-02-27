@@ -1,6 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
-import { runConversion, type ConversionOrchestratorServices, type OrchestratorInput } from '../ConversionOrchestrator';
+import { describe, expect, it, vi } from 'vitest';
 import type { Stores } from '@/stores';
+import {
+  type ConversionOrchestratorServices,
+  type OrchestratorInput,
+  runConversion,
+} from '../ConversionOrchestrator';
 
 function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorInput {
   return {
@@ -30,9 +34,30 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
     opusMinBitrate: 24,
     opusMaxBitrate: 64,
     opusCompressionLevel: 10,
-    extractConfig: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 },
-    mergeConfig: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 },
-    assignConfig: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 },
+    extractConfig: {
+      apiKey: 'k',
+      apiUrl: 'u',
+      model: 'm',
+      streaming: false,
+      temperature: 0,
+      topP: 1,
+    },
+    mergeConfig: {
+      apiKey: 'k',
+      apiUrl: 'u',
+      model: 'm',
+      streaming: false,
+      temperature: 0,
+      topP: 1,
+    },
+    assignConfig: {
+      apiKey: 'k',
+      apiUrl: 'u',
+      model: 'm',
+      streaming: false,
+      temperature: 0,
+      topP: 1,
+    },
     ...overrides,
   };
 }
@@ -85,9 +110,15 @@ function createMockStores(): Stores {
       resetProcessingState: vi.fn(),
       setError: vi.fn(),
       isConfigured: { value: true },
-      extract: { value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 } },
-      merge: { value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 } },
-      assign: { value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 } },
+      extract: {
+        value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 },
+      },
+      merge: {
+        value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 },
+      },
+      assign: {
+        value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 },
+      },
       useVoting: { value: false },
     } as any,
     logs: {
@@ -150,7 +181,9 @@ describe('runConversion', () => {
     const services = createMockServices();
     const signal = new AbortController().signal;
     const input = createMockInput({ isLLMConfigured: false });
-    await expect(runConversion(services, stores, signal, input)).rejects.toThrow('LLM API key not configured');
+    await expect(runConversion(services, stores, signal, input)).rejects.toThrow(
+      'LLM API key not configured',
+    );
   });
 
   it('throws when no directory handle', async () => {
@@ -158,15 +191,17 @@ describe('runConversion', () => {
     const services = createMockServices();
     const signal = new AbortController().signal;
     const input = createMockInput({ directoryHandle: null });
-    await expect(runConversion(services, stores, signal, input)).rejects.toThrow('Please select an output directory');
+    await expect(runConversion(services, stores, signal, input)).rejects.toThrow(
+      'Please select an output directory',
+    );
   });
 
   it('calls conversion.cancel when resume declined', async () => {
     const stores = createMockStores();
     stores.conversion.awaitResumeConfirmation = vi.fn().mockResolvedValue(false);
-    const services = createMockServices();
-    const signal = new AbortController().signal;
-    const input = createMockInput();
+    const _services = createMockServices();
+    const _signal = new AbortController().signal;
+    const _input = createMockInput();
 
     // The orchestrator checks for resume state via directoryHandle
     // With a mock handle that has no _temp_work, it proceeds past resume check

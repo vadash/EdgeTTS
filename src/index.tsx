@@ -1,12 +1,12 @@
 import { render } from 'preact';
 import { IntlProvider } from 'preact-i18n';
 import { App } from './App';
-import { StoreProvider, createStores, initializeStores } from './stores';
-import { getLogger } from './services';
-import type { SupportedLocale } from './stores/LanguageStore';
-import type { Logger } from './services/Logger';
 import en from './i18n/en.json';
 import ru from './i18n/ru.json';
+import { getLogger } from './services';
+import type { Logger } from './services/Logger';
+import { createStores, initializeStores, StoreProvider } from './stores';
+import type { SupportedLocale } from './stores/LanguageStore';
 import './styles/tailwind.css';
 
 // i18n definitions map
@@ -32,7 +32,7 @@ async function init() {
             <App />
           </IntlProvider>
         </StoreProvider>,
-        root
+        root,
       );
     };
 

@@ -1,7 +1,7 @@
 // Conversion Store
 // Manages conversion process state and progress
 
-import { signal, computed, effect } from '@preact/signals';
+import { computed, effect, signal } from '@preact/signals';
 
 // ============================================================================
 // Types
@@ -113,7 +113,12 @@ export const estimatedTimeRemaining = computed(() => {
   const { current, total } = conversion.value.progress;
   const status = conversion.value.status;
 
-  if (status !== 'llm-extract' && status !== 'llm-assign' && status !== 'converting' && status !== 'merging') {
+  if (
+    status !== 'llm-extract' &&
+    status !== 'llm-assign' &&
+    status !== 'converting' &&
+    status !== 'merging'
+  ) {
     return null;
   }
 
@@ -130,7 +135,7 @@ export const estimatedTimeRemaining = computed(() => {
 // Effects
 // ============================================================================
 
-const beforeUnloadHandler = (e: BeforeUnloadEvent): string | void => {
+const beforeUnloadHandler = (e: BeforeUnloadEvent): string | undefined => {
   if (isProcessing.value) {
     e.preventDefault();
     e.returnValue = '';
@@ -168,7 +173,12 @@ export function startConversion(): void {
 
 export function setStatus(status: ConversionStatus): void {
   const newState = { ...conversion.value, status };
-  if (status === 'llm-extract' || status === 'llm-assign' || status === 'converting' || status === 'merging') {
+  if (
+    status === 'llm-extract' ||
+    status === 'llm-assign' ||
+    status === 'converting' ||
+    status === 'merging'
+  ) {
     newState.phaseStartTime = Date.now();
     newState.progress = { current: 0, total: conversion.value.progress.total };
   }

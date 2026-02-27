@@ -18,7 +18,14 @@ export default {
         border: '#404040',
       },
       fontFamily: {
-        sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: [
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          'Segoe UI',
+          'Roboto',
+          'sans-serif',
+        ],
         mono: ['Consolas', 'Monaco', 'Courier New', 'monospace'],
       },
       borderRadius: {

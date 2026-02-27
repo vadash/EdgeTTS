@@ -1,7 +1,7 @@
 // Language Store
 // Manages application language/locale settings
 
-import { signal, computed } from '@preact/signals';
+import { computed, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
 
 /**

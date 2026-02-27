@@ -24,7 +24,7 @@ export const ExtractSchema = baseSchema.extend({
 // Merge stage schema
 export const MergeSchema = baseSchema.extend({
   merges: z.array(
-    z.array(z.number().int().min(0)).min(2) // Each group has 2+ indices
+    z.array(z.number().int().min(0)).min(2), // Each group has 2+ indices
   ),
 });
 

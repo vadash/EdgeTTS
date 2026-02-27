@@ -1,9 +1,8 @@
 import { useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import { useSettings, useLLM, useData, useLogs } from '@/stores';
 import { Button } from '@/components/common';
-
 import type { AppSettings } from '@/state/types';
+import { useData, useLLM, useLogs, useSettings } from '@/stores';
 import type { LLMStage } from '@/stores/LLMStore';
 
 interface StageExportConfig {
@@ -33,7 +32,10 @@ export function ExportImportTab() {
   const data = useData();
   const logs = useLogs();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [lastAction, setLastAction] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [lastAction, setLastAction] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const exportStageConfig = (stage: LLMStage): StageExportConfig => {
     const config = llm[stage].value;
@@ -78,8 +80,10 @@ export function ExportImportTab() {
     if (config.apiUrl) llm.setStageField(stage, 'apiUrl', config.apiUrl);
     if (config.model) llm.setStageField(stage, 'model', config.model);
     if (config.streaming !== undefined) llm.setStageField(stage, 'streaming', config.streaming);
-    if (config.reasoning !== undefined) llm.setStageField(stage, 'reasoning', config.reasoning as any);
-    if (config.temperature !== undefined) llm.setStageField(stage, 'temperature', config.temperature);
+    if (config.reasoning !== undefined)
+      llm.setStageField(stage, 'reasoning', config.reasoning as any);
+    if (config.temperature !== undefined)
+      llm.setStageField(stage, 'temperature', config.temperature);
     if (config.topP !== undefined) llm.setStageField(stage, 'topP', config.topP);
   };
 
@@ -107,8 +111,10 @@ export function ExportImportTab() {
       if (s.llmThreads !== undefined) settings.setLlmThreads(s.llmThreads as number);
       // outputFormat is always 'opus' now, skip importing
 
-      if (s.silenceRemovalEnabled !== undefined) settings.setSilenceRemovalEnabled(s.silenceRemovalEnabled as boolean);
-      if (s.normalizationEnabled !== undefined) settings.setNormalizationEnabled(s.normalizationEnabled as boolean);
+      if (s.silenceRemovalEnabled !== undefined)
+        settings.setSilenceRemovalEnabled(s.silenceRemovalEnabled as boolean);
+      if (s.normalizationEnabled !== undefined)
+        settings.setNormalizationEnabled(s.normalizationEnabled as boolean);
       if (s.lexxRegister !== undefined) settings.setLexxRegister(s.lexxRegister as boolean);
 
       // Import LLM settings (excluding API key)
@@ -194,7 +200,10 @@ export function ExportImportTab() {
         <p className="text-sm text-gray-400">
           <Text id="settings.resetHint">Restore all settings to their default values</Text>
         </p>
-        <Button onClick={handleReset} className="w-full text-red-400 border-red-500/30 hover:border-red-400">
+        <Button
+          onClick={handleReset}
+          className="w-full text-red-400 border-red-500/30 hover:border-red-400"
+        >
           🔄 <Text id="settings.resetButton">Reset to Defaults</Text>
         </Button>
       </div>

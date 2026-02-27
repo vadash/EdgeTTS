@@ -19,7 +19,7 @@ export function Slider({
   step = 1,
   onChange,
   formatValue = (v) => String(v),
-  disabled = false
+  disabled = false,
 }: SliderProps) {
   return (
     <div className={`space-y-2 ${disabled ? 'opacity-50' : ''}`}>

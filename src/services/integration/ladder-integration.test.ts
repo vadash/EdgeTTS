@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TTSWorkerPool, type WorkerPoolOptions, type PoolTask } from '../TTSWorkerPool';
-import type { TTSConfig as VoiceConfig } from '@/state/types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
+import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from '../TTSWorkerPool';
 
 vi.mock('../ReusableEdgeTTSService', () => ({
   ReusableEdgeTTSService: vi.fn().mockImplementation(() => ({

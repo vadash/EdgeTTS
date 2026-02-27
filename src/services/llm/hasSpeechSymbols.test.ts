@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { hasSpeechSymbols } from './LLMVoiceService';
 
 describe('hasSpeechSymbols', () => {
@@ -104,7 +104,7 @@ describe('hasSpeechSymbols', () => {
 
   describe('mixed content', () => {
     it('detects speech even with contractions present', () => {
-      expect(hasSpeechSymbols("She said, \"I don't know\"")).toBe(true);
+      expect(hasSpeechSymbols('She said, "I don\'t know"')).toBe(true);
       expect(hasSpeechSymbols('\u00ABI don\u2019t know\u00BB')).toBe(true);
     });
 

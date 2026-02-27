@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { TTSWorkerPool, type WorkerPoolOptions, type PoolTask } from './TTSWorkerPool';
-import type { TTSConfig as VoiceConfig, StatusUpdate } from '@/state/types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StatusUpdate, TTSConfig as VoiceConfig } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
+import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from './TTSWorkerPool';
 
 // Mock the ReusableEdgeTTSService
 vi.mock('./ReusableEdgeTTSService', () => {
@@ -18,6 +18,7 @@ vi.mock('./ReusableEdgeTTSService', () => {
 
 // Get the mocked class for access in tests
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
+
 const MockedReusableEdgeTTSService = vi.mocked(ReusableEdgeTTSService);
 
 describe('TTSWorkerPool', () => {
@@ -222,7 +223,7 @@ describe('TTSWorkerPool', () => {
         expect.objectContaining({
           partIndex: 0,
           message: expect.stringContaining('Processing'),
-        })
+        }),
       );
     });
 
@@ -267,7 +268,7 @@ describe('TTSWorkerPool', () => {
           config: expect.objectContaining({
             voice: expect.stringContaining('ru-RU, DmitryNeural'),
           }),
-        })
+        }),
       );
     });
 
@@ -282,7 +283,7 @@ describe('TTSWorkerPool', () => {
           config: expect.objectContaining({
             voice: defaultVoiceConfig.voice,
           }),
-        })
+        }),
       );
     });
   });
@@ -302,7 +303,7 @@ describe('TTSWorkerPool', () => {
         expect.objectContaining({
           partIndex: 0,
           message: expect.stringContaining('Processing'),
-        })
+        }),
       );
     });
   });

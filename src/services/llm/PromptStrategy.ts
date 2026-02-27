@@ -1,11 +1,11 @@
 // PromptStrategy.ts - LLM Prompt building, validation, and parsing
 // Pure functions for character extraction, merging, and speaker assignment
 
-import type { LLMPrompt } from './LLMApiClient';
-import type { LLMCharacter } from '@/state/types';
-import type { ExtractResponse, MergeResponse, AssignResponse } from './schemas';
 import { LLM_PROMPTS } from '@/config/prompts';
-import { ExtractSchema, MergeSchema, AssignSchema } from './schemas';
+import type { LLMCharacter } from '@/state/types';
+import type { LLMPrompt } from './LLMApiClient';
+import type { ExtractResponse, MergeResponse } from './schemas';
+import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
 
 // ============================================================================
 // Context Types
@@ -44,7 +44,10 @@ export function buildExtractPrompt(textBlock: string): LLMPrompt {
 
 export function buildMergePrompt(characters: LLMCharacter[]): LLMPrompt {
   const characterList = characters
-    .map((c, i) => `${i}. canonicalName: "${c.canonicalName}", variations: ${JSON.stringify(c.variations)}, gender: ${c.gender}`)
+    .map(
+      (c, i) =>
+        `${i}. canonicalName: "${c.canonicalName}", variations: ${JSON.stringify(c.variations)}, gender: ${c.gender}`,
+    )
     .join('\n');
 
   return {
@@ -56,7 +59,7 @@ export function buildMergePrompt(characters: LLMCharacter[]): LLMPrompt {
 export function buildAssignPrompt(
   characters: LLMCharacter[],
   nameToCode: Map<string, string>,
-  numberedParagraphs: string
+  numberedParagraphs: string,
 ): LLMPrompt {
   const characterLines = characters.map((char) => {
     const code = nameToCode.get(char.canonicalName)!;

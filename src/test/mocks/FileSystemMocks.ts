@@ -6,10 +6,7 @@ interface SharedMockState {
   subdirs: Map<string, FileSystemDirectoryHandle>;
 }
 
-function createMockFile(
-  name: string,
-  files: Map<string, Uint8Array>
-): FileSystemFileHandle {
+function createMockFile(name: string, files: Map<string, Uint8Array>): FileSystemFileHandle {
   return {
     kind: 'file',
     name,
@@ -20,7 +17,8 @@ function createMockFile(
         name,
         type: 'application/octet-stream',
         size: data.length,
-        arrayBuffer: async () => data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
+        arrayBuffer: async () =>
+          data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
         text: async () => new TextDecoder().decode(data),
         slice: () => file,
         stream: () => new ReadableStream(),
@@ -28,7 +26,7 @@ function createMockFile(
       return file;
     },
     createWritable: async () => {
-      let chunks: Uint8Array[] = [];
+      const chunks: Uint8Array[] = [];
       return {
         write: async (data: BufferSource | Blob | string) => {
           if (typeof data === 'string') {
@@ -55,7 +53,16 @@ function createMockFile(
         truncate: async () => {},
         abort: async () => {},
         locked: false,
-        getWriter: () => ({ write: async () => {}, close: async () => {}, abort: async () => {}, closed: Promise.resolve(), desiredSize: 0, ready: Promise.resolve(), releaseLock: () => {} } as unknown as WritableStreamDefaultWriter<unknown>),
+        getWriter: () =>
+          ({
+            write: async () => {},
+            close: async () => {},
+            abort: async () => {},
+            closed: Promise.resolve(),
+            desiredSize: 0,
+            ready: Promise.resolve(),
+            releaseLock: () => {},
+          }) as unknown as WritableStreamDefaultWriter<unknown>,
       } as unknown as FileSystemWritableFileStream;
     },
     queryPermission: async () => 'granted' as PermissionState,
@@ -65,7 +72,7 @@ function createMockFile(
 
 function createMockDirectoryHandleWithState(
   state: SharedMockState,
-  name: string = 'test-dir'
+  name: string = 'test-dir',
 ): FileSystemDirectoryHandle {
   const { files, subdirs } = state;
 
@@ -82,7 +89,7 @@ function createMockDirectoryHandleWithState(
       }
       const newDir = createMockDirectoryHandleWithState(
         { files: new Map(), subdirs: new Map() },
-        subdirName
+        subdirName,
       );
       subdirs.set(subdirName, newDir);
       return newDir;
@@ -93,7 +100,7 @@ function createMockDirectoryHandleWithState(
       }
       return createMockFile(fileName, files);
     },
-    removeEntry: async (name: string, options?: { recursive?: boolean }) => {
+    removeEntry: async (name: string, _options?: { recursive?: boolean }) => {
       files.delete(name);
       subdirs.delete(name);
     },

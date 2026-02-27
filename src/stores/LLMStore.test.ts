@@ -1,37 +1,35 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LLMCharacter } from '@/state/types';
 import {
-  llm,
+  addCharacter,
+  awaitReview,
+  blockProgress,
+  cancelReview,
+  characterLineCounts,
+  characterNames,
+  confirmReview,
+  getStageConfig,
   isConfigured,
   isProcessing,
-  blockProgress,
-  characterNames,
-  characterLineCounts,
-  setUseVoting,
-  setStageField,
-  setStageConfig,
-  getStageConfig,
-  setProcessingStatus,
-  setBlockProgress,
-  setError,
-  setCharacters,
-  addCharacter,
-  updateCharacter,
+  llm,
   removeCharacter,
-  setVoiceMap,
-  updateVoiceMapping,
   removeVoiceMapping,
-  setSpeakerAssignments,
+  resetLLMStore,
+  resetProcessingState,
+  setBlockProgress,
+  setCharacters,
+  setError,
   setLoadedProfile,
   setPendingReview,
-  awaitReview,
-  confirmReview,
-  cancelReview,
-  resetProcessingState,
-  resetLLMStore,
-  loadSettings,
+  setProcessingStatus,
+  setSpeakerAssignments,
+  setStageConfig,
+  setStageField,
+  setUseVoting,
+  setVoiceMap,
+  updateCharacter,
+  updateVoiceMapping,
 } from './LLMStore';
-import type { LLMCharacter } from '@/state/types';
-import { StorageKeys } from '@/config/storage';
 
 // Mock SecureStorage
 vi.mock('@/services/SecureStorage', () => ({
@@ -244,7 +242,10 @@ describe('LLMStore', () => {
 
   describe('voice map actions', () => {
     it('sets voice map', () => {
-      const map = new Map([['Alice', 'voice-1'], ['Bob', 'voice-2']]);
+      const map = new Map([
+        ['Alice', 'voice-1'],
+        ['Bob', 'voice-2'],
+      ]);
       setVoiceMap(map);
       expect(llm.value.characterVoiceMap.get('Alice')).toBe('voice-1');
       expect(llm.value.characterVoiceMap.get('Bob')).toBe('voice-2');

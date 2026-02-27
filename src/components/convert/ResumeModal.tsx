@@ -19,16 +19,14 @@ export function ResumeModal({ info, onContinue, onCancel }: ResumeModalProps) {
           <h2 className="text-lg font-semibold">↻ Previous Session Found</h2>
         </div>
         <div className="px-4 py-4 space-y-2 text-sm">
-          {info.hasLLMState && (
-            <p className="text-green-400">✓ LLM voice assignments cached</p>
-          )}
-          {info.cachedChunks > 0 && (
-            <p>{info.cachedChunks} audio chunks cached.</p>
-          )}
+          {info.hasLLMState && <p className="text-green-400">✓ LLM voice assignments cached</p>}
+          {info.cachedChunks > 0 && <p>{info.cachedChunks} audio chunks cached.</p>}
         </div>
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
           <Button onClick={onCancel}>Cancel</Button>
-          <Button variant="primary" onClick={onContinue}>Continue</Button>
+          <Button variant="primary" onClick={onContinue}>
+            Continue
+          </Button>
         </div>
       </div>
     </div>

@@ -28,26 +28,28 @@ export class MockFFmpegService {
 
   getLoadError = vi.fn(() => this.loadError);
 
-  processAudio = vi.fn(async (
-    chunks: Uint8Array[],
-    config: AudioProcessingOptions,
-    onProgress?: FFmpegProgressCallback
-  ): Promise<Uint8Array> => {
-    if (!this.loaded) {
-      throw new Error('FFmpeg not loaded');
-    }
-    onProgress?.('Processing audio...');
-    // Return concatenated chunks as mock processed audio
-    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-    const result = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const chunk of chunks) {
-      result.set(chunk, offset);
-      offset += chunk.length;
-    }
-    onProgress?.('Audio processing complete');
-    return result;
-  });
+  processAudio = vi.fn(
+    async (
+      chunks: Uint8Array[],
+      _config: AudioProcessingOptions,
+      onProgress?: FFmpegProgressCallback,
+    ): Promise<Uint8Array> => {
+      if (!this.loaded) {
+        throw new Error('FFmpeg not loaded');
+      }
+      onProgress?.('Processing audio...');
+      // Return concatenated chunks as mock processed audio
+      const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const result = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+      }
+      onProgress?.('Audio processing complete');
+      return result;
+    },
+  );
 
   terminate = vi.fn(() => {
     this.loaded = false;

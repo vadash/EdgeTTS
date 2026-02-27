@@ -9,10 +9,7 @@ import type { ConvertedFile } from '../state/types';
  */
 export function convertFb2ToTxt(fb2String: string): string {
   const parser = new DOMParser();
-  const fb2Doc = parser.parseFromString(
-    fb2String.replace(/<p>/g, '\n<p>'),
-    'application/xml'
-  );
+  const fb2Doc = parser.parseFromString(fb2String.replace(/<p>/g, '\n<p>'), 'application/xml');
 
   let textContent = '';
   const bodyNode = fb2Doc.getElementsByTagName('body')[0];
@@ -22,7 +19,7 @@ export function convertFb2ToTxt(fb2String: string): string {
     for (let i = 0; i < sectionNodes.length; i++) {
       const sectionNode = sectionNodes[i];
       const sectionText = sectionNode.textContent;
-      textContent += sectionText + '\n\n';
+      textContent += `${sectionText}\n\n`;
     }
   }
 
@@ -45,7 +42,7 @@ export async function convertEpubToTxt(epubBinary: ArrayBuffer | Blob | File): P
   });
 
   // Parse TOC
-  const tocFile = zip.file(tocPath + 'toc.ncx');
+  const tocFile = zip.file(`${tocPath}toc.ncx`);
   if (!tocFile) {
     throw new Error('Could not find toc.ncx in EPUB');
   }
@@ -79,7 +76,7 @@ export async function convertEpubToTxt(epubBinary: ArrayBuffer | Blob | File): P
       for (let i = 0; i < textNodes.length; i++) {
         const node = textNodes[i];
         if (node.textContent?.trim() !== '') {
-          textContent += node.textContent?.trim() + '\n';
+          textContent += `${node.textContent?.trim()}\n`;
         }
       }
       textContent += '\n\n';
@@ -92,13 +89,15 @@ export async function convertEpubToTxt(epubBinary: ArrayBuffer | Blob | File): P
 /**
  * Process a ZIP archive and extract text files
  */
-export async function convertZipToTxt(zipFile: File | Blob | ArrayBuffer): Promise<ConvertedFile[]> {
+export async function convertZipToTxt(
+  zipFile: File | Blob | ArrayBuffer,
+): Promise<ConvertedFile[]> {
   const results: ConvertedFile[] = [];
   const zip = await JSZip.loadAsync(zipFile);
 
   const promises: Promise<void>[] = [];
 
-  zip.forEach((relativePath, file) => {
+  zip.forEach((_relativePath, file) => {
     const fileNameLower = file.name.toLowerCase();
     const baseName = file.name.slice(0, file.name.lastIndexOf('.'));
 
@@ -106,20 +105,20 @@ export async function convertZipToTxt(zipFile: File | Blob | ArrayBuffer): Promi
       promises.push(
         file.async('text').then((content) => {
           results.push({ filename: baseName, content });
-        })
+        }),
       );
     } else if (fileNameLower.endsWith('.fb2')) {
       promises.push(
         file.async('text').then((content) => {
           results.push({ filename: baseName, content: convertFb2ToTxt(content) });
-        })
+        }),
       );
     } else if (fileNameLower.endsWith('.epub')) {
       promises.push(
         file.async('arraybuffer').then(async (content) => {
           const text = await convertEpubToTxt(content);
           results.push({ filename: baseName, content: text });
-        })
+        }),
       );
     }
   });

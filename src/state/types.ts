@@ -4,7 +4,7 @@
 export enum AudioPreset {
   PC = 'pc',
   MOBILE = 'mobile',
-  CUSTOM = 'custom'
+  CUSTOM = 'custom',
 }
 
 export interface AudioPresetConfig {
@@ -120,7 +120,14 @@ interface FileSystemHandlePermissionDescriptor {
 interface ShowDirectoryPickerOptions {
   id?: string;
   mode?: 'read' | 'readwrite';
-  startIn?: FileSystemHandle | 'desktop' | 'documents' | 'downloads' | 'music' | 'pictures' | 'videos';
+  startIn?:
+    | FileSystemHandle
+    | 'desktop'
+    | 'documents'
+    | 'downloads'
+    | 'music'
+    | 'pictures'
+    | 'videos';
 }
 
 declare global {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { detectLanguage } from './languageDetection';
 
 describe('languageDetection', () => {
@@ -55,7 +55,8 @@ describe('languageDetection', () => {
     });
 
     it('should detect German text', () => {
-      const text = 'Der Mann ging mit seinem Hund in den Park und die Kinder spielten auf der Wiese.';
+      const text =
+        'Der Mann ging mit seinem Hund in den Park und die Kinder spielten auf der Wiese.';
       expect(detectLanguage(text).language).toBe('de');
     });
 
@@ -111,84 +112,100 @@ describe('languageDetection', () => {
     });
 
     it('should detect German text', () => {
-      const text = 'Der Mann ging mit seinem Hund in den Park und die Kinder spielten auf der Wiese. Er hatte einen langen Tag hinter sich und wollte sich ausruhen.';
+      const text =
+        'Der Mann ging mit seinem Hund in den Park und die Kinder spielten auf der Wiese. Er hatte einen langen Tag hinter sich und wollte sich ausruhen.';
       expect(detectLanguage(text).language).toBe('de');
     });
 
     it('should detect French text', () => {
-      const text = "L'homme est allé dans le parc avec son chien et les enfants jouaient sur la pelouse. Il avait eu une longue journée et voulait se reposer.";
+      const text =
+        "L'homme est allé dans le parc avec son chien et les enfants jouaient sur la pelouse. Il avait eu une longue journée et voulait se reposer.";
       expect(detectLanguage(text).language).toBe('fr');
     });
 
     it('should detect Spanish text', () => {
-      const text = 'El hombre fue al parque con su perro y los niños jugaban en el césped. Había tenido un largo día y quería descansar.';
+      const text =
+        'El hombre fue al parque con su perro y los niños jugaban en el césped. Había tenido un largo día y quería descansar.';
       expect(detectLanguage(text).language).toBe('es');
     });
 
     it('should detect Italian text', () => {
-      const text = "L'uomo è andato al parco con il suo cane e i bambini giocavano sul prato. Aveva avuto una lunga giornata e voleva riposarsi.";
+      const text =
+        "L'uomo è andato al parco con il suo cane e i bambini giocavano sul prato. Aveva avuto una lunga giornata e voleva riposarsi.";
       expect(detectLanguage(text).language).toBe('it');
     });
 
     it('should detect Portuguese text', () => {
-      const text = 'O homem foi ao parque com o seu cão e as crianças brincavam na relva. Ele tinha tido um longo dia e queria descansar.';
+      const text =
+        'O homem foi ao parque com o seu cão e as crianças brincavam na relva. Ele tinha tido um longo dia e queria descansar.';
       expect(detectLanguage(text).language).toBe('pt');
     });
 
     it('should detect Dutch text', () => {
-      const text = 'De man ging naar het park met zijn hond en de kinderen speelden op het gras. Hij had een lange dag gehad en wilde uitrusten.';
+      const text =
+        'De man ging naar het park met zijn hond en de kinderen speelden op het gras. Hij had een lange dag gehad en wilde uitrusten.';
       expect(detectLanguage(text).language).toBe('nl');
     });
 
     it('should detect Polish text', () => {
-      const text = 'Mężczyzna poszedł do parku ze swoim psem a dzieci bawiły się na trawniku. Miał za sobą długi dzień i chciał odpocząć.';
+      const text =
+        'Mężczyzna poszedł do parku ze swoim psem a dzieci bawiły się na trawniku. Miał za sobą długi dzień i chciał odpocząć.';
       expect(detectLanguage(text).language).toBe('pl');
     });
 
     it('should detect Turkish text', () => {
-      const text = 'Adam köpeğiyle birlikte parka gitti ve çocuklar çimlerde oynuyorlardı. Uzun bir günün ardından dinlenmek istiyordu.';
+      const text =
+        'Adam köpeğiyle birlikte parka gitti ve çocuklar çimlerde oynuyorlardı. Uzun bir günün ardından dinlenmek istiyordu.';
       expect(detectLanguage(text).language).toBe('tr');
     });
 
     it('should detect Czech text', () => {
-      const text = 'Muž šel do parku se svým psem a děti si hrály na trávníku. Měl za sebou dlouhý den a chtěl si odpočinout.';
+      const text =
+        'Muž šel do parku se svým psem a děti si hrály na trávníku. Měl za sebou dlouhý den a chtěl si odpočinout.';
       expect(detectLanguage(text).language).toBe('cs');
     });
 
     it('should detect Swedish text', () => {
-      const text = 'Mannen gick till parken med sin hund och barnen lekte på gräsmattan. Han hade haft en lång dag och ville vila sig.';
+      const text =
+        'Mannen gick till parken med sin hund och barnen lekte på gräsmattan. Han hade haft en lång dag och ville vila sig.';
       expect(detectLanguage(text).language).toBe('sv');
     });
 
     it('should detect Indonesian text', () => {
-      const text = 'Pria itu pergi ke taman dengan anjingnya dan anak-anak bermain di rumput. Dia sudah memiliki hari yang panjang dan ingin beristirahat.';
+      const text =
+        'Pria itu pergi ke taman dengan anjingnya dan anak-anak bermain di rumput. Dia sudah memiliki hari yang panjang dan ingin beristirahat.';
       expect(detectLanguage(text).language).toBe('id');
     });
 
     it('should return medium confidence for stopword-detected languages', () => {
-      const text = 'Der Mann ging mit seinem Hund in den Park und die Kinder spielten auf der Wiese.';
+      const text =
+        'Der Mann ging mit seinem Hund in den Park und die Kinder spielten auf der Wiese.';
       const result = detectLanguage(text);
       expect(result.confidence).toBe('medium');
       expect(result.method).toBe('stopwords');
     });
 
     it('should detect Ukrainian text (Cyrillic disambiguation)', () => {
-      const text = 'Чоловік пішов у парк зі своїм собакою і діти грали на газоні. Він мав довгий день і хотів відпочити. Це було дуже гарно.';
+      const text =
+        'Чоловік пішов у парк зі своїм собакою і діти грали на газоні. Він мав довгий день і хотів відпочити. Це було дуже гарно.';
       expect(detectLanguage(text).language).toBe('uk');
     });
 
     it('should detect Bulgarian text (Cyrillic disambiguation)', () => {
-      const text = 'Мъжът отиде в парка с кучето си и децата играеха на тревата. Той имаше дълъг ден и искаше да си почине. Това беше много хубаво.';
+      const text =
+        'Мъжът отиде в парка с кучето си и децата играеха на тревата. Той имаше дълъг ден и искаше да си почине. Това беше много хубаво.';
       expect(detectLanguage(text).language).toBe('bg');
     });
 
     it('should detect Persian/Farsi text (Arabic script disambiguation)', () => {
-      const text = 'مرد با سگش به پارک رفت و بچه ها روی چمن بازی می کردند. او یک روز طولانی داشت و می خواست استراحت کند.';
+      const text =
+        'مرد با سگش به پارک رفت و بچه ها روی چمن بازی می کردند. او یک روز طولانی داشت و می خواست استراحت کند.';
       expect(detectLanguage(text).language).toBe('fa');
     });
 
     it('should detect Hindi text (Devanagari disambiguation)', () => {
-      const text = 'आदमी अपने कुत्ते के साथ पार्क में गया और बच्चे घास पर खेल रहे थे। उसका एक लंबा दिन था और वह आराम करना चाहता था।';
+      const text =
+        'आदमी अपने कुत्ते के साथ पार्क में गया और बच्चे घास पर खेल रहे थे। उसका एक लंबा दिन था और वह आराम करना चाहता था।';
       expect(detectLanguage(text).language).toBe('hi');
     });
   });

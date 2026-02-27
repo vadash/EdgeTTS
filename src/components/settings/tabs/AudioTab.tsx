@@ -1,7 +1,7 @@
 import { Text } from 'preact-i18n';
-import { useSettings, useConversion } from '@/stores';
-import { Toggle, Button } from '@/components/common';
-import { AudioPreset, AUDIO_PRESETS } from '@/state/types';
+import { Button, Toggle } from '@/components/common';
+import { AUDIO_PRESETS } from '@/state/types';
+import { useConversion, useSettings } from '@/stores';
 
 export function AudioTab() {
   const settings = useSettings();
@@ -20,7 +20,7 @@ export function AudioTab() {
 
         {/* Preset Buttons */}
         <div className="grid grid-cols-2 gap-2">
-          {AUDIO_PRESETS.map(preset => (
+          {AUDIO_PRESETS.map((preset) => (
             <button
               key={preset.name}
               onClick={() => settings.applyOpusPreset(preset.name)}
@@ -39,7 +39,9 @@ export function AudioTab() {
         <div>
           <div className="flex justify-between text-sm">
             <Text id="settings.minBitrate">Min Bitrate</Text>
-            <span className="font-mono">{settings.opusMinBitrate.value} <Text id="settings.kbps">kbps</Text></span>
+            <span className="font-mono">
+              {settings.opusMinBitrate.value} <Text id="settings.kbps">kbps</Text>
+            </span>
           </div>
           <input
             type="range"
@@ -47,7 +49,9 @@ export function AudioTab() {
             max="256"
             step="2"
             value={settings.opusMinBitrate.value}
-            onChange={(e) => settings.setOpusMinBitrate(Number((e.target as HTMLInputElement).value))}
+            onChange={(e) =>
+              settings.setOpusMinBitrate(Number((e.target as HTMLInputElement).value))
+            }
             className="w-full"
           />
         </div>
@@ -56,7 +60,9 @@ export function AudioTab() {
         <div>
           <div className="flex justify-between text-sm">
             <Text id="settings.maxBitrate">Max Bitrate</Text>
-            <span className="font-mono">{settings.opusMaxBitrate.value} <Text id="settings.kbps">kbps</Text></span>
+            <span className="font-mono">
+              {settings.opusMaxBitrate.value} <Text id="settings.kbps">kbps</Text>
+            </span>
           </div>
           <input
             type="range"
@@ -64,7 +70,9 @@ export function AudioTab() {
             max="256"
             step="2"
             value={settings.opusMaxBitrate.value}
-            onChange={(e) => settings.setOpusMaxBitrate(Number((e.target as HTMLInputElement).value))}
+            onChange={(e) =>
+              settings.setOpusMaxBitrate(Number((e.target as HTMLInputElement).value))
+            }
             className="w-full"
           />
         </div>
@@ -81,7 +89,9 @@ export function AudioTab() {
             max="10"
             step="1"
             value={settings.opusCompressionLevel.value}
-            onChange={(e) => settings.setOpusCompressionLevel(Number((e.target as HTMLInputElement).value))}
+            onChange={(e) =>
+              settings.setOpusCompressionLevel(Number((e.target as HTMLInputElement).value))
+            }
             className="w-full"
           />
           <p className="text-xs text-gray-500 mt-1">
@@ -101,10 +111,7 @@ export function AudioTab() {
             <Text id="settings.eqHint">Add warmth and reduce digital harshness</Text>
           </div>
         </div>
-        <Toggle
-          checked={settings.eqEnabled.value}
-          onChange={(v) => settings.setEqEnabled(v)}
-        />
+        <Toggle checked={settings.eqEnabled.value} onChange={(v) => settings.setEqEnabled(v)} />
       </div>
 
       {/* 2. De-Ess */}
@@ -146,7 +153,9 @@ export function AudioTab() {
             <Text id="settings.compressor">Compressor</Text>
           </div>
           <div className="text-sm text-gray-400">
-            <Text id="settings.compressorHint">Smooth out volume differences for consistent listening</Text>
+            <Text id="settings.compressorHint">
+              Smooth out volume differences for consistent listening
+            </Text>
           </div>
         </div>
         <Toggle
@@ -194,7 +203,9 @@ export function AudioTab() {
             <Text id="settings.stereoWidth">Stereo Width</Text>
           </div>
           <div className="text-sm text-gray-400">
-            <Text id="settings.stereoWidthHint">Pseudo-stereo for headphone comfort (doubles file size)</Text>
+            <Text id="settings.stereoWidthHint">
+              Pseudo-stereo for headphone comfort (doubles file size)
+            </Text>
           </div>
         </div>
         <Toggle
@@ -237,22 +248,34 @@ export function AudioTab() {
             <span className="px-2 py-0.5 text-xs rounded bg-blue-500/20 text-blue-400">EQ</span>
           )}
           {settings.deEssEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-purple-500/20 text-purple-400">De-Ess</span>
+            <span className="px-2 py-0.5 text-xs rounded bg-purple-500/20 text-purple-400">
+              De-Ess
+            </span>
           )}
           {settings.silenceRemovalEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-green-500/20 text-green-400">Silence</span>
+            <span className="px-2 py-0.5 text-xs rounded bg-green-500/20 text-green-400">
+              Silence
+            </span>
           )}
           {settings.compressorEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-yellow-500/20 text-yellow-400">Compress</span>
+            <span className="px-2 py-0.5 text-xs rounded bg-yellow-500/20 text-yellow-400">
+              Compress
+            </span>
           )}
           {settings.normalizationEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-orange-500/20 text-orange-400">Normalize</span>
+            <span className="px-2 py-0.5 text-xs rounded bg-orange-500/20 text-orange-400">
+              Normalize
+            </span>
           )}
           {settings.normalizationEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-orange-500/20 text-orange-400">Limiter</span>
+            <span className="px-2 py-0.5 text-xs rounded bg-orange-500/20 text-orange-400">
+              Limiter
+            </span>
           )}
           {settings.fadeInEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-cyan-500/20 text-cyan-400">Fade-In</span>
+            <span className="px-2 py-0.5 text-xs rounded bg-cyan-500/20 text-cyan-400">
+              Fade-In
+            </span>
           )}
           {settings.stereoWidthEnabled.value && (
             <span className="px-2 py-0.5 text-xs rounded bg-pink-500/20 text-pink-400">Stereo</span>

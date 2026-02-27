@@ -22,7 +22,7 @@ export class LadderController {
   constructor(
     private config: LadderConfig,
     private readonly maxWorkers: number,
-    private readonly logger?: Logger
+    private readonly logger?: Logger,
   ) {
     this.currentWorkers = this.minWorkers;
   }
@@ -53,17 +53,20 @@ export class LadderController {
       return;
     }
 
-    const successes = this.history.filter(h => h.success).length;
+    const successes = this.history.filter((h) => h.success).length;
     const successRate = successes / this.history.length;
 
     // Check for errors that should trigger scale down
     // If any task failed after max retries, scale down immediately
-    const hasHardFailure = this.history.some(h => !h.success && h.retries >= 10);
+    const hasHardFailure = this.history.some((h) => !h.success && h.retries >= 10);
 
     if (hasHardFailure) {
       this.scaleDown();
       this.tasksSinceLastScaleUp = 0;
-    } else if (successRate >= this.config.successThreshold && this.tasksSinceLastScaleUp >= this.config.sampleSize) {
+    } else if (
+      successRate >= this.config.successThreshold &&
+      this.tasksSinceLastScaleUp >= this.config.sampleSize
+    ) {
       // Scale up if success rate is high AND we've processed enough tasks since last scale up
       this.scaleUp();
       this.tasksSinceLastScaleUp = 0;
@@ -83,7 +86,10 @@ export class LadderController {
   }
 
   private scaleDown(): void {
-    const newValue = Math.max(this.minWorkers, Math.floor(this.currentWorkers * this.config.scaleDownFactor));
+    const newValue = Math.max(
+      this.minWorkers,
+      Math.floor(this.currentWorkers * this.config.scaleDownFactor),
+    );
     if (newValue < this.currentWorkers) {
       this.currentWorkers = newValue;
       this.logger?.warn(`Ladder scaled down to ${this.currentWorkers} workers due to errors`);
