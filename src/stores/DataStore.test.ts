@@ -243,6 +243,34 @@ describe('DataStore', () => {
         expect(result.confidence).toBeDefined();
         expect(result.method).toBeDefined();
       });
+
+      it('clears detected language', () => {
+        store.setTextContent('Это русский текст с множеством слов.');
+        store.detectLanguageFromContent();
+        expect(store.detectedLanguage.value).toBe('ru');
+        store.clearDetectedLanguage();
+        expect(store.detectedLanguage.value).toBe('');
+      });
+
+      it('allows manual language override', () => {
+        store.setTextContent('This is English text.');
+        store.detectLanguageFromContent();
+        expect(store.detectedLanguage.value).toBe('en');
+        store.setDetectedLanguage('de');
+        expect(store.detectedLanguage.value).toBe('de');
+      });
+
+      it('stores loaded file name', () => {
+        expect(store.loadedFileName.value).toBe('');
+        store.setLoadedFileName('mybook.epub');
+        expect(store.loadedFileName.value).toBe('mybook.epub');
+      });
+
+      it('clears loaded file name on clear()', () => {
+        store.setLoadedFileName('mybook.epub');
+        store.clear();
+        expect(store.loadedFileName.value).toBe('');
+      });
     });
   });
 

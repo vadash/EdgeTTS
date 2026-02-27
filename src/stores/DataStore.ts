@@ -34,6 +34,9 @@ export class DataStore {
   // Language detection (explicit signal, not computed)
   readonly detectedLanguage = signal<DetectedLanguage>('en');
 
+  // File naming state
+  readonly loadedFileName = signal<string>('');
+
   // ========== Computed Properties ==========
 
   /**
@@ -85,6 +88,18 @@ export class DataStore {
     const result = detectLanguage(contentToAnalyze);
     this.detectedLanguage.value = result.language;
     return result;
+  }
+
+  clearDetectedLanguage(): void {
+    this.detectedLanguage.value = '';
+  }
+
+  setDetectedLanguage(lang: DetectedLanguage): void {
+    this.detectedLanguage.value = lang;
+  }
+
+  setLoadedFileName(name: string): void {
+    this.loadedFileName.value = name;
   }
 
   // ========== Text Content Actions ==========
@@ -195,6 +210,7 @@ export class DataStore {
     this.fileNameIndex.value = 1;
     this.numBook.value = 0;
     this.numText.value = 0;
+    this.loadedFileName.value = '';
   }
 
   /**
