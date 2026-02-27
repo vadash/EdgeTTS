@@ -349,6 +349,63 @@ export function sortVoicesByPriority(
 }
 
 /**
+ * Assign voices to unmatched characters from priority pool.
+ * Used after JSON import to fill gaps.
+ *
+ * - Characters in importedMap with valid (enabled) voices are preserved
+ * - Characters with invalid voices or missing from importedMap get assigned from pool
+ * - Uses buildPriorityPool for dedup + ordering
+ */
+export function assignUnmatchedFromPool(
+  characters: LLMCharacter[],
+  importedMap: Map<string, string>,
+  enabledVoices: VoiceOption[],
+  narratorVoice: string,
+  bookLanguage: DetectedLanguage,
+): Map<string, string> {
+  const enabledSet = new Set(enabledVoices.map((v) => v.fullValue));
+  const result = new Map<string, string>();
+  const reserved = new Set<string>([narratorVoice]);
+
+  // First pass: collect valid imported voices
+  for (const char of characters) {
+    const imported = importedMap.get(char.canonicalName);
+    if (imported && enabledSet.has(imported)) {
+      result.set(char.canonicalName, imported);
+      reserved.add(imported);
+    }
+  }
+
+  // Build priority pool excluding reserved voices
+  const pool = buildPriorityPool(enabledVoices, bookLanguage, reserved);
+
+  // Second pass: assign unmatched characters
+  const malePool = pool.male;
+  const femalePool = pool.female;
+  let maleIdx = 0;
+  let femaleIdx = 0;
+
+  for (const char of characters) {
+    if (result.has(char.canonicalName)) continue; // already assigned
+
+    const genderPool =
+      char.gender === 'female' && femalePool.length > 0
+        ? femalePool
+        : malePool.length > 0
+          ? malePool
+          : femalePool;
+
+    const idx = char.gender === 'female' && femalePool.length > 0 ? femaleIdx++ : maleIdx++;
+
+    if (genderPool.length > 0) {
+      result.set(char.canonicalName, genderPool[idx % genderPool.length].fullValue);
+    }
+  }
+
+  return result;
+}
+
+/**
  * Remap voiceId in speaker assignments
  */
 export function remapAssignments(

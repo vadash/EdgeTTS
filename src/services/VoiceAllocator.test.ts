@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VoicePool, VoiceOption, LLMCharacter } from '@/state/types';
-import { VoicePoolTracker, buildPriorityPool, randomizeBelow } from './VoiceAllocator';
+import { VoicePoolTracker, buildPriorityPool, randomizeBelow, assignUnmatchedFromPool } from './VoiceAllocator';
 
 describe('VoicePoolTracker', () => {
   const pool: VoicePool = {
@@ -188,6 +188,98 @@ describe('randomizeBelow', () => {
     const hasAndrew = assignedVoices.includes('en-US, AndrewNeural');
     const hasAndrewMulti = assignedVoices.includes('en-US, AndrewMultilingualNeural');
     // At most one of the pair should be assigned
+    expect(hasAndrew && hasAndrewMulti).toBe(false);
+  });
+});
+
+describe('assignUnmatchedFromPool', () => {
+  const vo = (fullValue: string, gender: 'male' | 'female'): VoiceOption => {
+    const [locale, name] = fullValue.split(', ');
+    return { locale, name, fullValue, gender };
+  };
+
+  const mkChar = (name: string, gender: 'male' | 'female' | 'unknown'): LLMCharacter => ({
+    canonicalName: name,
+    variations: [name],
+    gender,
+  });
+
+  it('assigns unmatched characters from priority pool sequentially', () => {
+    const chars = [
+      mkChar('Alice', 'female'),
+      mkChar('Bob', 'male'),
+      mkChar('Charlie', 'male'),
+    ];
+    const importedMap = new Map([
+      ['Alice', 'en-US, JennyNeural'],
+      // Bob and Charlie are unmatched
+    ]);
+    const enabledVoices = [
+      vo('en-US, AndrewNeural', 'male'),
+      vo('en-US, BrianNeural', 'male'),
+      vo('en-US, JennyNeural', 'female'),
+    ];
+
+    const result = assignUnmatchedFromPool(
+      chars,
+      importedMap,
+      enabledVoices,
+      'en-US, NarratorNeural',
+      'en',
+    );
+
+    expect(result.get('Alice')).toBe('en-US, JennyNeural'); // preserved
+    expect(result.get('Bob')).toBe('en-US, AndrewNeural'); // first available male
+    expect(result.get('Charlie')).toBe('en-US, BrianNeural'); // second available male
+  });
+
+  it('replaces imported voices not in enabled list', () => {
+    const chars = [
+      mkChar('Alice', 'female'),
+    ];
+    const importedMap = new Map([
+      ['Alice', 'de-DE, KatjaNeural'], // not in enabled list
+    ]);
+    const enabledVoices = [
+      vo('en-US, JennyNeural', 'female'),
+      vo('en-US, AriaNeural', 'female'),
+    ];
+
+    const result = assignUnmatchedFromPool(
+      chars,
+      importedMap,
+      enabledVoices,
+      'en-US, NarratorNeural',
+      'en',
+    );
+
+    // Alice's voice should be replaced with an enabled voice
+    expect(result.get('Alice')).toBe('en-US, JennyNeural');
+  });
+
+  it('deduplicates Multilingual pairs in assignment', () => {
+    const chars = [
+      mkChar('Bob', 'male'),
+      mkChar('Charlie', 'male'),
+    ];
+    const importedMap = new Map<string, string>(); // all unmatched
+    const enabledVoices = [
+      vo('en-US, AndrewNeural', 'male'),
+      vo('en-US, AndrewMultilingualNeural', 'male'),
+      vo('en-US, BrianNeural', 'male'),
+    ];
+
+    const result = assignUnmatchedFromPool(
+      chars,
+      importedMap,
+      enabledVoices,
+      'en-US, NarratorNeural',
+      'en',
+    );
+
+    const assignedVoices = [...result.values()];
+    const hasAndrew = assignedVoices.includes('en-US, AndrewNeural');
+    const hasAndrewMulti = assignedVoices.includes('en-US, AndrewMultilingualNeural');
     expect(hasAndrew && hasAndrewMulti).toBe(false);
   });
 });
