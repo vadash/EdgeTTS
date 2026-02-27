@@ -25,7 +25,9 @@ vi.mock('p-queue', () => ({
       // Trigger idle event after task completes
       setTimeout(() => {
         const idleListeners = this.listeners.get('idle') || [];
-        idleListeners.forEach((listener) => listener());
+        for (const listener of idleListeners) {
+          void listener();
+        }
       }, 0);
       return result;
     });

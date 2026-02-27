@@ -43,11 +43,12 @@ export function QuickVoiceSelect() {
 
   return (
     <div className="space-y-2">
-      <label className="input-label">
+      <label className="input-label" htmlFor="quick-voice-select">
         <Text id="settings.voice">Voice</Text>
       </label>
       <div className="flex gap-2">
         <select
+          id="quick-voice-select"
           className="select-field flex-1"
           value={settings.value.narratorVoice}
           onChange={(e) => patchSettings({ narratorVoice: (e.target as HTMLSelectElement).value })}
@@ -65,6 +66,7 @@ export function QuickVoiceSelect() {
           )}
         </select>
         <button
+          type="button"
           onClick={playVoiceSample}
           disabled={preview.isPlaying}
           className="btn btn-icon"

@@ -81,7 +81,11 @@ export function ExportImportTab() {
     if (config.model) llm.setStageField(stage, 'model', config.model);
     if (config.streaming !== undefined) llm.setStageField(stage, 'streaming', config.streaming);
     if (config.reasoning !== undefined)
-      llm.setStageField(stage, 'reasoning', config.reasoning as any);
+      llm.setStageField(
+        stage,
+        'reasoning',
+        config.reasoning as 'auto' | 'high' | 'medium' | 'low' | null,
+      );
     if (config.temperature !== undefined)
       llm.setStageField(stage, 'temperature', config.temperature);
     if (config.topP !== undefined) llm.setStageField(stage, 'topP', config.topP);

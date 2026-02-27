@@ -27,6 +27,7 @@ export function Tabs({ tabs, defaultTab, children }: TabsProps) {
       <div className="tabs-list">
         {tabs.map((tab) => (
           <button
+            type="button"
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`tab-trigger ${activeTab === tab.id ? 'tab-trigger-active' : ''}`}

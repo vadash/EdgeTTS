@@ -25,6 +25,7 @@ export function Header() {
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
           <button
+            type="button"
             onClick={() => navigate('convert')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
               ${
@@ -36,6 +37,7 @@ export function Header() {
             <Text id="nav.convert">Convert</Text>
           </button>
           <button
+            type="button"
             onClick={() => navigate('settings')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
               ${
@@ -47,6 +49,7 @@ export function Header() {
             <Text id="nav.settings">Settings</Text>
           </button>
           <button
+            type="button"
             onClick={() => navigate('about')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors
               ${
@@ -62,6 +65,7 @@ export function Header() {
         {/* Language Selector */}
         <div className="flex items-center gap-1 bg-primary rounded-lg p-1">
           <button
+            type="button"
             onClick={() => setLocale('en')}
             className={`px-3 py-1.5 rounded text-sm font-medium transition-colors
               ${current === 'en' ? 'bg-accent text-white' : 'text-gray-400 hover:text-white'}`}
@@ -70,6 +74,7 @@ export function Header() {
             EN
           </button>
           <button
+            type="button"
             onClick={() => setLocale('ru')}
             className={`px-3 py-1.5 rounded text-sm font-medium transition-colors
               ${current === 'ru' ? 'bg-accent text-white' : 'text-gray-400 hover:text-white'}`}

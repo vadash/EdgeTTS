@@ -6,6 +6,7 @@ export function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 bg-primary-secondary border-t border-border md:hidden pb-safe">
       <div className="flex items-center justify-around">
         <button
+          type="button"
           onClick={() => navigate('convert')}
           className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 transition-colors
             ${isConvertRoute.value ? 'text-accent' : 'text-gray-400 active:text-white'}`}
@@ -24,6 +25,7 @@ export function BottomNav() {
         </button>
 
         <button
+          type="button"
           onClick={() => navigate('settings')}
           className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 transition-colors
             ${isSettingsRoute.value ? 'text-accent' : 'text-gray-400 active:text-white'}`}
@@ -48,6 +50,7 @@ export function BottomNav() {
         </button>
 
         <button
+          type="button"
           onClick={() => navigate('logs')}
           className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 transition-colors
             ${isLogsRoute.value ? 'text-accent' : 'text-gray-400 active:text-white'}`}
@@ -66,6 +69,7 @@ export function BottomNav() {
         </button>
 
         <button
+          type="button"
           onClick={() => navigate('about')}
           className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 transition-colors
             ${isAboutRoute.value ? 'text-accent' : 'text-gray-400 active:text-white'}`}

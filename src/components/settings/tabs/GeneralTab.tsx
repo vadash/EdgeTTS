@@ -10,17 +10,19 @@ export function GeneralTab() {
     <div className="space-y-6">
       {/* Language */}
       <div>
-        <label className="input-label">
+        <span className="input-label">
           <Text id="settings.language">Language</Text>
-        </label>
+        </span>
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={() => language.setLocale('en')}
             className={`flex-1 btn ${language.locale.value === 'en' ? 'btn-primary' : ''}`}
           >
             English
           </button>
           <button
+            type="button"
             onClick={() => language.setLocale('ru')}
             className={`flex-1 btn ${language.locale.value === 'ru' ? 'btn-primary' : ''}`}
           >

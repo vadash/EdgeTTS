@@ -36,8 +36,12 @@ describe('VoicePoolBuilder', () => {
 
       expect(pool.male.length).toBeGreaterThan(0);
       expect(pool.female.length).toBeGreaterThan(0);
-      pool.male.forEach((v) => expect(v.startsWith('en')).toBe(true));
-      pool.female.forEach((v) => expect(v.startsWith('en')).toBe(true));
+      for (const v of pool.male) {
+        expect(v.startsWith('en')).toBe(true);
+      }
+      for (const v of pool.female) {
+        expect(v.startsWith('en')).toBe(true);
+      }
     });
 
     it('separates male and female voices', () => {
@@ -50,7 +54,9 @@ describe('VoicePoolBuilder', () => {
       expect(uniqueFemale.size).toBe(pool.female.length);
 
       const maleSet = new Set(pool.male);
-      pool.female.forEach((v) => expect(maleSet.has(v)).toBe(false));
+      for (const v of pool.female) {
+        expect(maleSet.has(v)).toBe(false);
+      }
     });
 
     it('returns all voices when no options specified', () => {

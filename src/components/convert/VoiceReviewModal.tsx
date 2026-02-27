@@ -165,6 +165,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
             <Text id="voiceReview.title">Voice Review</Text>
           </h2>
           <button
+            type="button"
             onClick={onCancel}
             className="text-gray-400 hover:text-white p-1"
             aria-label="Close"
@@ -175,10 +176,11 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
 
         {/* Sample text input */}
         <div className="px-4 py-3 border-b border-border">
-          <label className="input-label text-sm">
+          <label className="input-label text-sm" htmlFor="sample-text-input">
             <Text id="voiceReview.sampleText">Sample text</Text>:
           </label>
           <input
+            id="sample-text-input"
             type="text"
             className="input-field w-full mt-1"
             value={sampleText.value}
@@ -242,6 +244,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
                     </td>
                     <td className="py-2">
                       <button
+                        type="button"
                         className="btn btn-sm px-2"
                         onClick={() => handlePlayPreview(currentVoice)}
                         disabled={preview.isPlaying && preview.currentVoiceId === currentVoice}
@@ -252,6 +255,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
                     </td>
                     <td className="py-2">
                       <button
+                        type="button"
                         className="btn btn-sm px-2"
                         onClick={() => handleRandomizeBelow(index)}
                         title="Randomize voices below"

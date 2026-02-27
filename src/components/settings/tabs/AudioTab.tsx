@@ -22,6 +22,7 @@ export function AudioTab() {
         <div className="grid grid-cols-2 gap-2">
           {AUDIO_PRESETS.map((preset) => (
             <button
+              type="button"
               key={preset.name}
               onClick={() => settings.applyOpusPreset(preset.name)}
               className={`text-xs p-2 rounded ${

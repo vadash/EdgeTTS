@@ -67,6 +67,7 @@ export function StatusPanel() {
         <span className="text-sm text-gray-400">Status</span>
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={handleClear}
             className="p-1.5 rounded hover:bg-primary-tertiary transition-colors"
             title="Clear"
@@ -74,6 +75,7 @@ export function StatusPanel() {
             🗑️
           </button>
           <button
+            type="button"
             onClick={handleCopy}
             className="p-1.5 rounded hover:bg-primary-tertiary transition-colors"
             title="Copy"
@@ -81,6 +83,7 @@ export function StatusPanel() {
             📋
           </button>
           <button
+            type="button"
             onClick={handleExport}
             className="p-1.5 rounded hover:bg-primary-tertiary transition-colors"
             title="Export"
@@ -100,8 +103,9 @@ export function StatusPanel() {
       {/* Log entries - scrollable with colored lines */}
       <div
         ref={containerRef}
+        role="log"
+        aria-live="polite"
         className="flex-1 overflow-y-auto p-3 font-mono text-sm"
-        aria-label="Status log"
       >
         {entries.map((entry) => (
           <div

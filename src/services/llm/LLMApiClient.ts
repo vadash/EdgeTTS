@@ -1,9 +1,26 @@
+import type OpenAIType from 'openai';
 import OpenAI from 'openai';
 import type { z } from 'zod';
 import { RetriableError } from '@/errors';
 import type { Logger } from '../Logger';
 import type { DebugLogger } from './DebugLogger';
 import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
+
+type ChatCompletion = OpenAIType.Chat.Completions.ChatCompletion;
+type ChatCompletionChunk = OpenAIType.Chat.Completions.ChatCompletionChunk;
+
+type ResponseFormat =
+  | { type: 'text' }
+  | { type: 'json_object' }
+  | {
+      type: 'json_schema';
+      json_schema: {
+        name: string;
+        description?: string;
+        schema?: Record<string, unknown>;
+        strict?: boolean;
+      };
+    };
 
 export interface LLMApiClientOptions {
   apiKey: string;
@@ -45,10 +62,8 @@ function applyProviderFixes(requestBody: Record<string, unknown>, provider: stri
 
     // Mistral doesn't support OpenAI's json_schema format.
     // Use json_object mode instead (instructs model to return valid JSON).
-    if (
-      requestBody.response_format &&
-      (requestBody.response_format as any).type === 'json_schema'
-    ) {
+    const responseFormat = requestBody.response_format as ResponseFormat | undefined;
+    if (responseFormat && responseFormat.type === 'json_schema') {
       requestBody.response_format = { type: 'json_object' };
     }
   }
@@ -153,14 +168,14 @@ export class LLMApiClient {
         stream: false,
       });
 
-      const message = response.choices[0]?.message as any;
-      const content = message?.content || message?.reasoning;
+      const message = response.choices[0]?.message;
+      const content = message?.content || (message as unknown as { reasoning?: string })?.reasoning;
       if (!content) {
         return { success: false, error: 'Empty response from model' };
       }
 
       return { success: true, model: response.model };
-    } catch (e: any) {
+    } catch (e) {
       return { success: false, error: this.formatApiError(e) };
     }
   }
@@ -182,8 +197,8 @@ export class LLMApiClient {
 
       for await (const chunk of stream) {
         model = chunk.model || model;
-        const delta = chunk.choices[0]?.delta as any;
-        content += delta?.content || delta?.reasoning || '';
+        const delta = chunk.choices[0]?.delta;
+        content += delta?.content || (delta as unknown as { reasoning?: string })?.reasoning || '';
       }
 
       if (!content) {
@@ -191,7 +206,7 @@ export class LLMApiClient {
       }
 
       return { success: true, model };
-    } catch (e: any) {
+    } catch (e) {
       return { success: false, error: this.formatApiError(e) };
     }
   }
@@ -199,13 +214,20 @@ export class LLMApiClient {
   /**
    * Format API error for user display
    */
-  private formatApiError(e: any): string {
+  private formatApiError(e: unknown): string {
     // OpenAI SDK error structure
-    if (e?.error?.message) {
-      return e.error.message;
+    const apiError = e as {
+      error?: { message?: string };
+      status?: number;
+      statusText?: string;
+      cause?: { code?: string };
+      message?: string;
+    };
+    if (apiError.error?.message) {
+      return apiError.error.message;
     }
     // HTTP status errors
-    if (e?.status) {
+    if (typeof apiError.status === 'number') {
       const statusMap: Record<number, string> = {
         400: 'Bad Request - Check API URL format',
         401: 'Unauthorized - Invalid API key',
@@ -216,18 +238,20 @@ export class LLMApiClient {
         502: 'Bad Gateway - API provider unreachable',
         503: 'Service Unavailable - API provider down',
       };
-      return statusMap[e.status] || `HTTP ${e.status}: ${e.statusText || 'Error'}`;
+      return (
+        statusMap[apiError.status] || `HTTP ${apiError.status}: ${apiError.statusText || 'Error'}`
+      );
     }
     // Network/fetch errors
-    if (e?.cause?.code === 'ENOTFOUND' || e?.message?.includes('fetch')) {
+    if (apiError.cause?.code === 'ENOTFOUND' || apiError.message?.includes('fetch')) {
       return 'Network Error - Check API URL and internet connection';
     }
     // Timeout
-    if (e?.message?.includes('timeout') || e?.message?.includes('Timeout')) {
+    if (apiError.message?.includes('timeout') || apiError.message?.includes('Timeout')) {
       return 'Request Timeout - Server took too long to respond';
     }
     // CORS
-    if (e?.message?.includes('CORS') || e?.message?.includes('cors')) {
+    if (apiError.message?.includes('CORS') || apiError.message?.includes('cors')) {
       return 'CORS Error - API does not allow browser requests';
     }
     // Generic Error object
@@ -257,7 +281,7 @@ export class LLMApiClient {
   }: StructuredCallOptions<T>): Promise<T> {
     const useStreaming = this.options.streaming ?? false;
 
-    const requestBody: any = {
+    const requestBody: Record<string, unknown> = {
       model: this.options.model,
       messages: [
         { role: 'system', content: prompt.system },
@@ -279,47 +303,57 @@ export class LLMApiClient {
 
     if (useStreaming) {
       // Streaming path: accumulate SSE chunks
-      let stream;
       try {
-        stream = await this.client.chat.completions.create(requestBody as any, { signal });
+        // biome-ignore lint/suspicious/noExplicitAny: OpenAI SDK types don't support conditional streaming well
+        const streamResult = await this.client.chat.completions.create({
+          ...requestBody,
+          stream: true,
+        } as any);
+
+        const stream = streamResult as unknown as AsyncIterable<ChatCompletionChunk>;
+
+        let accumulated = '';
+        let finishReason: string | null = null;
+
+        try {
+          for await (const chunk of stream) {
+            const delta = chunk.choices[0]?.delta;
+            if (delta?.content) {
+              accumulated += delta.content;
+            }
+            if (chunk.choices[0]?.finish_reason) {
+              finishReason = chunk.choices[0].finish_reason;
+            }
+          }
+        } catch (error) {
+          throw new RetriableError(`Streaming failed: ${(error as Error).message}`, error as Error);
+        }
+
+        if (finishReason === 'content_filter') {
+          throw new RetriableError('Response refused by content filter');
+        }
+
+        if (!accumulated) {
+          throw new RetriableError('Empty response from LLM');
+        }
+
+        content = accumulated;
       } catch (error) {
         throw new RetriableError(
           `LLM API call failed: ${(error as Error).message}`,
           error as Error,
         );
       }
-
-      let accumulated = '';
-      let finishReason: string | null = null;
-
-      try {
-        for await (const chunk of stream as any) {
-          const delta = chunk.choices[0]?.delta;
-          if (delta?.content) {
-            accumulated += delta.content;
-          }
-          if (chunk.choices[0]?.finish_reason) {
-            finishReason = chunk.choices[0].finish_reason;
-          }
-        }
-      } catch (error) {
-        throw new RetriableError(`Streaming failed: ${(error as Error).message}`, error as Error);
-      }
-
-      if (finishReason === 'content_filter') {
-        throw new RetriableError('Response refused by content filter');
-      }
-
-      if (!accumulated) {
-        throw new RetriableError('Empty response from LLM');
-      }
-
-      content = accumulated;
     } else {
       // Non-streaming path
-      let response;
+      let response: ChatCompletion;
       try {
-        response = await this.client.chat.completions.create(requestBody as any, { signal });
+        // biome-ignore lint/suspicious/noExplicitAny: OpenAI SDK types don't support conditional streaming well
+        response = await this.client.chat.completions.create({
+          ...requestBody,
+          stream: false,
+        } as any);
+        response = response as ChatCompletion;
       } catch (error) {
         throw new RetriableError(
           `LLM API call failed: ${(error as Error).message}`,
@@ -327,7 +361,7 @@ export class LLMApiClient {
         );
       }
 
-      const message = (response as any).choices[0]?.message;
+      const message = response.choices[0]?.message;
 
       if (message?.refusal) {
         throw new RetriableError(`LLM refused: ${message.refusal}`);

@@ -153,18 +153,17 @@ describe('LLMApiClient.callStructured', () => {
       schemaName: 'TestSchema',
     });
 
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        stream: false,
-        response_format: expect.objectContaining({
-          type: 'json_schema',
-          json_schema: expect.objectContaining({
-            strict: true,
-          }),
-        }),
-      }),
-      expect.any(Object),
-    );
+    expect(mockCreate).toHaveBeenCalled();
+    const callArgs = mockCreate.mock.calls[0][0];
+    expect(callArgs).toMatchObject({
+      stream: false,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          strict: true,
+        },
+      },
+    });
   });
 
   it('strips markdown fences from response', async () => {
@@ -237,10 +236,9 @@ describe('LLMApiClient.callStructured', () => {
     expect(result).toEqual({ value: 'streamed' });
 
     // Verify stream: true was passed
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ stream: true }),
-      expect.any(Object),
-    );
+    expect(mockCreate).toHaveBeenCalled();
+    const callArgs = mockCreate.mock.calls[0][0];
+    expect(callArgs).toMatchObject({ stream: true });
   });
 
   it('throws on content_filter finish_reason during streaming', async () => {
@@ -340,9 +338,8 @@ describe('LLMApiClient.callStructured', () => {
     });
 
     expect(result).toEqual({ value: 'ok' });
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ stream: false }),
-      expect.any(Object),
-    );
+    expect(mockCreate).toHaveBeenCalled();
+    const callArgs = mockCreate.mock.calls[0][0];
+    expect(callArgs).toMatchObject({ stream: false });
   });
 });

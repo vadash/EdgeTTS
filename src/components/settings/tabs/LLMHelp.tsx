@@ -20,37 +20,41 @@ export function LLMHelp() {
 
   // Simple markdown to HTML converter
   const renderMarkdown = (md: string) => {
-    return md.split('\n').map((line, i) => {
+    const lines = md.split('\n');
+    return lines.map((line, i) => {
+      // Create a stable key from line content and position
+      const key = `line-${i}-${line.slice(0, 20).replace(/\s/g, '-')}`;
+
       // Headers
       if (line.startsWith('# ')) {
         return (
-          <h2 key={i} className="text-xl font-bold mt-4 mb-2">
+          <h2 key={key} className="text-xl font-bold mt-4 mb-2">
             {line.slice(2)}
           </h2>
         );
       }
       if (line.startsWith('## ')) {
         return (
-          <h3 key={i} className="text-lg font-semibold mt-4 mb-2 text-accent">
+          <h3 key={key} className="text-lg font-semibold mt-4 mb-2 text-accent">
             {line.slice(3)}
           </h3>
         );
       }
       if (line.startsWith('### ')) {
         return (
-          <h4 key={i} className="font-semibold mt-3 mb-1">
+          <h4 key={key} className="font-semibold mt-3 mb-1">
             {line.slice(4)}
           </h4>
         );
       }
       // Horizontal rule
       if (line.startsWith('---')) {
-        return <hr key={i} className="border-border my-4" />;
+        return <hr key={key} className="border-border my-4" />;
       }
       // List items
       if (line.startsWith('- ')) {
         return (
-          <li key={i} className="ml-4">
+          <li key={key} className="ml-4">
             {renderInline(line.slice(2))}
           </li>
         );
@@ -58,18 +62,18 @@ export function LLMHelp() {
       // Numbered list
       if (/^\d+\. /.test(line)) {
         return (
-          <li key={i} className="ml-4 list-decimal">
+          <li key={key} className="ml-4 list-decimal">
             {renderInline(line.replace(/^\d+\. /, ''))}
           </li>
         );
       }
       // Empty line
       if (!line.trim()) {
-        return <br key={i} />;
+        return <br key={key} />;
       }
       // Paragraph
       return (
-        <p key={i} className="my-1">
+        <p key={key} className="my-1">
           {renderInline(line)}
         </p>
       );
@@ -140,6 +144,7 @@ export function LLMHelp() {
   return (
     <div className="border border-border rounded-lg overflow-hidden">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className="w-full px-4 py-3 flex items-center justify-between bg-primary/30 hover:bg-primary/50 transition-colors"
       >

@@ -37,12 +37,15 @@ export interface VoiceAllocationOptions {
 export class VoicePoolTracker {
   private used: Set<string> = new Set();
   private pool: VoicePool;
+  public narratorVoice: string;
 
   constructor(pool: VoicePool, narratorVoice: string, reserved: Set<string> = new Set()) {
     this.pool = pool;
     this.narratorVoice = narratorVoice;
     this.used.add(narratorVoice);
-    reserved.forEach((v) => this.used.add(v));
+    for (const v of reserved) {
+      this.used.add(v);
+    }
   }
 
   /**

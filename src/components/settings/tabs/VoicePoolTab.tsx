@@ -232,11 +232,12 @@ export function VoicePoolTab() {
     <div className="space-y-4">
       {/* Narrator Voice Selection */}
       <div className="space-y-2">
-        <label className="text-sm font-medium">
+        <label className="text-sm font-medium" htmlFor="narrator-voice-select">
           <Text id="settings.narratorVoice">Narrator Voice</Text>
         </label>
         <div className="flex gap-2">
           <select
+            id="narrator-voice-select"
             className="select-field flex-1"
             value={settings.narratorVoice.value}
             onChange={(e) => settings.setNarratorVoice((e.target as HTMLSelectElement).value)}
@@ -254,6 +255,7 @@ export function VoicePoolTab() {
             )}
           </select>
           <button
+            type="button"
             onClick={() => playVoice(settings.narratorVoice.value)}
             disabled={preview.isPlaying}
             className="btn btn-icon"
@@ -314,10 +316,11 @@ export function VoicePoolTab() {
 
       {/* Sample Text */}
       <div>
-        <label className="text-sm text-gray-400 mb-1 block">
+        <label className="text-sm text-gray-400 mb-1 block" htmlFor="sample-text-input-pool">
           <Text id="settings.sampleText">Sample text</Text>
         </label>
         <input
+          id="sample-text-input-pool"
           type="text"
           className="input-field w-full"
           placeholder="Enter text to test voices..."
@@ -344,6 +347,7 @@ export function VoicePoolTab() {
               </div>
             </div>
             <button
+              type="button"
               onClick={() => playVoice(voice.fullValue)}
               disabled={preview.isPlaying}
               className="btn btn-sm btn-icon"

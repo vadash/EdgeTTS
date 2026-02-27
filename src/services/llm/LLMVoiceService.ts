@@ -62,7 +62,7 @@ export const hasSpeechSymbols = (text: string): boolean => {
   // Check apostrophe-like chars - only count if NOT a contraction
   // Reset regex lastIndex for global regex
   APOSTROPHE_LIKE_REGEX.lastIndex = 0;
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = APOSTROPHE_LIKE_REGEX.exec(text)) !== null) {
     if (!isContraction(text, match.index)) return true;
   }
@@ -125,6 +125,7 @@ export interface LLMVoiceServiceOptions {
 export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
   private apiClient: LLMApiClient;
+  public mergeApiClient: LLMApiClient;
   private abortController: AbortController | null = null;
   private logger: Logger;
 
@@ -398,9 +399,10 @@ export class LLMVoiceService {
       }
 
       // Parse valid responses: convert sparse assignments to Map<number, string>
-      const parsedMaps = validResponses.map((r: any) => {
+      const parsedMaps = validResponses.map((r) => {
         const map = new Map<number, string>();
-        for (const [key, code] of Object.entries(r.assignments)) {
+        const assignments = r as unknown as { assignments: Record<string, unknown> };
+        for (const [key, code] of Object.entries(assignments.assignments)) {
           const idx = parseInt(key, 10);
           if (codeToName.has(code as string)) {
             map.set(idx, code as string);

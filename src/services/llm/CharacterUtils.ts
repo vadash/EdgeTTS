@@ -115,7 +115,9 @@ export function applyMergeGroups(
     };
 
     result.push(merged);
-    group.forEach((i) => mergedIndices.add(i));
+    for (const i of group) {
+      mergedIndices.add(i);
+    }
   }
 
   // Add unchanged characters

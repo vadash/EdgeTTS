@@ -285,12 +285,20 @@ export function FileDropZone() {
     <div className="space-y-3">
       {/* File Drop Zone */}
       <div
+        role="button"
+        tabIndex={0}
         className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
           ${isDragging ? 'border-accent bg-accent/10' : 'border-border hover:border-gray-500'}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
       >
         <input
           ref={inputRef}
@@ -312,7 +320,11 @@ export function FileDropZone() {
 
       {/* Dictionary Upload */}
       <div className="flex items-center gap-2">
-        <button onClick={() => dictInputRef.current?.click()} className="flex-1 btn text-sm">
+        <button
+          type="button"
+          onClick={() => dictInputRef.current?.click()}
+          className="flex-1 btn text-sm"
+        >
           <span>📖</span>
           <Text id="files.dictionary">Dictionary</Text>
           {dictRulesCount > 0 && <span className="text-accent">({dictRulesCount})</span>}

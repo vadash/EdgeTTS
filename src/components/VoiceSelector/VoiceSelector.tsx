@@ -49,15 +49,15 @@ export function VoiceSelector() {
 
   return (
     <div class="voice-selector">
-      <label class="voice-selector-label" id="voice-label">
+      <label class="voice-selector-label" htmlFor="voice-select">
         <Text id="settings.voice">Voice</Text>:
       </label>
       <div class="voice-selector-row">
         <select
+          id="voice-select"
           class="voice-select"
           value={settings.value.narratorVoice}
           onChange={(e) => patchSettings({ narratorVoice: (e.target as HTMLSelectElement).value })}
-          aria-labelledby="voice-label"
         >
           {filteredVoices.value.map((v) =>
             v.isSeparator ? (
@@ -72,6 +72,7 @@ export function VoiceSelector() {
           )}
         </select>
         <button
+          type="button"
           class="play-sample-btn"
           onClick={playVoiceSample}
           disabled={preview.isPlaying}

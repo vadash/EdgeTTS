@@ -57,10 +57,11 @@ export function StageConfigForm({
 
       {/* API Key */}
       <div className="space-y-1">
-        <label className="input-label">
+        <label className="input-label" htmlFor="api-key-input">
           <Text id="llm.apiKey">API Key</Text>
         </label>
         <input
+          id="api-key-input"
           type="password"
           className="input-field"
           value={config.apiKey}
@@ -71,10 +72,11 @@ export function StageConfigForm({
 
       {/* API URL */}
       <div className="space-y-1">
-        <label className="input-label">
+        <label className="input-label" htmlFor="api-url-input">
           <Text id="llm.apiUrl">API URL</Text>
         </label>
         <input
+          id="api-url-input"
           type="text"
           className="input-field"
           value={config.apiUrl}
@@ -85,10 +87,11 @@ export function StageConfigForm({
 
       {/* Model */}
       <div className="space-y-1">
-        <label className="input-label">
+        <label className="input-label" htmlFor="model-input">
           <Text id="llm.model">Model</Text>
         </label>
         <input
+          id="model-input"
           type="text"
           className="input-field"
           value={config.model}
