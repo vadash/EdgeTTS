@@ -125,6 +125,7 @@ export interface LLMVoiceServiceOptions {
 export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
   private apiClient: LLMApiClient;
+  private mergeApiClient: LLMApiClient | null = null;
   private abortController: AbortController | null = null;
   private logger: Logger;
 
