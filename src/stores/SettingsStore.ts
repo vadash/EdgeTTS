@@ -21,9 +21,7 @@ export type SettingsPatch = Partial<AppSettings>;
 // ============================================================================
 
 const defaultSettings: AppSettings = {
-  voice: 'ru-RU, DmitryNeural',
   narratorVoice: 'ru-RU, DmitryNeural',
-  voicePoolLocale: 'ru-RU',
   enabledVoices: ALL_VOICE_IDS,
   rate: 0,
   pitch: 0,
@@ -81,9 +79,7 @@ export const pitchDisplay = computed(() =>
 );
 
 // Computed for each setting (for component access)
-export const voice = computed(() => settings.value.voice);
 export const narratorVoice = computed(() => settings.value.narratorVoice);
-export const voicePoolLocale = computed(() => settings.value.voicePoolLocale);
 export const enabledVoices = computed(() => settings.value.enabledVoices);
 export const rate = computed(() => settings.value.rate);
 export const pitch = computed(() => settings.value.pitch);
@@ -124,16 +120,8 @@ export function patchSettings(patch: SettingsPatch): void {
 }
 
 // Individual setters for components that need them
-export function setVoice(value: string): void {
-  settings.value = { ...settings.value, voice: value };
-}
-
 export function setNarratorVoice(value: string): void {
   settings.value = { ...settings.value, narratorVoice: value };
-}
-
-export function setVoicePoolLocale(value: string): void {
-  settings.value = { ...settings.value, voicePoolLocale: value };
 }
 
 export function setEnabledVoices(value: string[]): void {

@@ -125,18 +125,12 @@ export {
   setStereoWidthEnabled,
   setTtsThreads,
   settings,
-  // Individual setters
-  setVoice,
-  setVoicePoolLocale,
   showDopSettings,
   silenceGapMs,
   silenceRemovalEnabled,
   statusAreaWidth,
   stereoWidthEnabled,
   ttsThreads,
-  // Computed values
-  voice,
-  voicePoolLocale,
 } from './SettingsStore';
 // Context and hooks
 export {

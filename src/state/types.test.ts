@@ -26,9 +26,7 @@ describe('AppSettings interface', () => {
   it('should accept Opus encoding settings', () => {
     const settings: AppSettings = {
       // Required existing fields (minimal subset for type check)
-      voice: 'ru-RU, DmitryNeural',
       narratorVoice: 'ru-RU, DmitryNeural',
-      voicePoolLocale: 'ru-RU',
       enabledVoices: [],
       rate: 0,
       pitch: 0,

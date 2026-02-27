@@ -106,7 +106,6 @@ export function ExportImportTab() {
 
       // Import settings
       const s = importData.settings;
-      if (s.voice) settings.setVoice(s.voice as string);
       if (s.narratorVoice) settings.setNarratorVoice(s.narratorVoice as string);
       if (s.enabledVoices) settings.setEnabledVoices(s.enabledVoices as string[]);
       if (s.rate !== undefined) settings.setRate(s.rate as number);

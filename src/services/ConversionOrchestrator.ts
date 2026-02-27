@@ -71,7 +71,6 @@ export interface OrchestratorInput {
 
   // Settings
   narratorVoice: string;
-  voice: string;
   pitch: number;
   rate: number;
   ttsThreads: number;
@@ -822,7 +821,7 @@ async function runTTSStage(
   report('tts-conversion', 0, chunks.length, `Converting ${chunks.length} chunks to audio...`);
 
   const ttsConfig: TTSConfig = {
-    voice: `Microsoft Server Speech Text to Speech Voice (${input.voice})`,
+    voice: `Microsoft Server Speech Text to Speech Voice (${input.narratorVoice})`,
     pitch: input.pitch >= 0 ? `+${input.pitch}Hz` : `${input.pitch}Hz`,
     rate: input.rate >= 0 ? `+${input.rate}%` : `${input.rate}%`,
     volume: '+0%',

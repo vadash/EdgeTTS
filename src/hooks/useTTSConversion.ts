@@ -73,7 +73,6 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
     useVoting: l.useVoting,
 
     narratorVoice: s.narratorVoice,
-    voice: s.voice,
     pitch: s.pitch,
     rate: s.rate,
     ttsThreads: s.ttsThreads,

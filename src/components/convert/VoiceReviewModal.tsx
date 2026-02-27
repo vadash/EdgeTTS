@@ -90,7 +90,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
       currentVoiceMap: voiceMap,
       clickedIndex,
       enabledVoices: enabledVoiceOptions,
-      narratorVoice: settings.voice.value,
+      narratorVoice: settings.narratorVoice.value,
       bookLanguage: data.detectedLanguage.value,
     });
     llm.setVoiceMap(newMap);
@@ -120,7 +120,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
         sortedCharacters,
         importedMap,
         enabledVoiceOptions,
-        settings.voice.value,
+        settings.narratorVoice.value,
         data.detectedLanguage.value,
       );
       llm.setVoiceMap(newMap);
