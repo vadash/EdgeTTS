@@ -3,7 +3,9 @@ import {
   VoicePoolBuilder,
   buildVoicePool,
   getRandomVoice,
+  deduplicateVariants,
 } from './VoicePoolBuilder';
+import type { VoiceOption } from '../state/types';
 
 describe('VoicePoolBuilder', () => {
   describe('VoicePoolBuilder class', () => {
@@ -145,5 +147,92 @@ describe('VoicePoolBuilder', () => {
       const voice = getRandomVoice('male', { language: 'en' }, excluded);
       expect(pool.male).toContain(voice);
     });
+  });
+});
+
+describe('deduplicateVariants', () => {
+  // Helper to create VoiceOption objects for testing
+  const vo = (fullValue: string, gender: 'male' | 'female'): VoiceOption => {
+    const [locale, name] = fullValue.split(', ');
+    return { locale, name, fullValue, gender };
+  };
+
+  it('keeps non-Multilingual variant for native-language book', () => {
+    const candidates = [
+      vo('en-US, AndrewMultilingualNeural', 'male'),
+      vo('en-US, AndrewNeural', 'male'),
+      vo('en-US, AriaNeural', 'female'),
+    ];
+    const result = deduplicateVariants(candidates, 'en');
+
+    const names = result.map(v => v.fullValue);
+    expect(names).toContain('en-US, AndrewNeural');
+    expect(names).not.toContain('en-US, AndrewMultilingualNeural');
+    expect(names).toContain('en-US, AriaNeural');
+  });
+
+  it('keeps Multilingual variant for foreign-language book', () => {
+    const candidates = [
+      vo('ru-RU, DmitryNeural', 'male'),
+      vo('en-US, AndrewMultilingualNeural', 'male'),
+    ];
+    const result = deduplicateVariants(candidates, 'ru');
+
+    const names = result.map(v => v.fullValue);
+    expect(names).toContain('ru-RU, DmitryNeural');
+    expect(names).toContain('en-US, AndrewMultilingualNeural');
+  });
+
+  it('passes through voices with no Multilingual pair unchanged', () => {
+    const candidates = [
+      vo('en-US, GuyNeural', 'male'),
+      vo('en-US, JennyNeural', 'female'),
+    ];
+    const result = deduplicateVariants(candidates, 'en');
+
+    expect(result).toHaveLength(2);
+  });
+
+  it('orders non-Multilingual voices before Multilingual', () => {
+    const candidates = [
+      vo('en-US, AndrewMultilingualNeural', 'male'),
+      vo('en-US, GuyNeural', 'male'),
+      vo('ru-RU, DmitryNeural', 'male'),
+    ];
+    const result = deduplicateVariants(candidates, 'ru');
+
+    // DmitryNeural (native, non-multi) should come before AndrewMultilingualNeural
+    const dmitryIdx = result.findIndex(v => v.name === 'DmitryNeural');
+    const andrewIdx = result.findIndex(v => v.name === 'AndrewMultilingualNeural');
+    expect(dmitryIdx).toBeLessThan(andrewIdx);
+  });
+
+  it('handles empty input', () => {
+    expect(deduplicateVariants([], 'en')).toEqual([]);
+  });
+
+  it('deduplicates multiple pairs at once', () => {
+    const candidates = [
+      vo('en-US, AndrewMultilingualNeural', 'male'),
+      vo('en-US, AndrewNeural', 'male'),
+      vo('en-US, BrianMultilingualNeural', 'male'),
+      vo('en-US, BrianNeural', 'male'),
+      vo('en-US, AvaMultilingualNeural', 'female'),
+      vo('en-US, AvaNeural', 'female'),
+      vo('en-US, AriaNeural', 'female'),
+    ];
+    const result = deduplicateVariants(candidates, 'en');
+
+    const names = result.map(v => v.fullValue);
+    // Non-Multilingual variants kept for EN book
+    expect(names).toContain('en-US, AndrewNeural');
+    expect(names).toContain('en-US, BrianNeural');
+    expect(names).toContain('en-US, AvaNeural');
+    expect(names).toContain('en-US, AriaNeural');
+    // Multilingual variants removed
+    expect(names).not.toContain('en-US, AndrewMultilingualNeural');
+    expect(names).not.toContain('en-US, BrianMultilingualNeural');
+    expect(names).not.toContain('en-US, AvaMultilingualNeural');
+    expect(result).toHaveLength(4);
   });
 });

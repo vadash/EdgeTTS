@@ -1,5 +1,5 @@
 import { voices } from '../components/VoiceSelector/voices';
-import type { VoicePool } from '../state/types';
+import type { VoicePool, VoiceOption } from '../state/types';
 import type { DetectedLanguage } from '../utils/languageDetection';
 
 /**
@@ -12,6 +12,63 @@ export interface VoicePoolOptions {
   includeMultilingual?: boolean;
   /** Only include voices in this allowlist */
   enabledVoices?: string[];
+}
+
+/**
+ * Deduplicate Multilingual variant pairs and sort by priority.
+ *
+ * For pairs (e.g., AndrewNeural + AndrewMultilingualNeural in same locale):
+ *   - If the voice's locale matches book language → keep non-Multilingual
+ *   - Otherwise → keep Multilingual
+ *
+ * Returns voices sorted: non-Multilingual first, Multilingual last.
+ */
+export function deduplicateVariants(
+  candidates: VoiceOption[],
+  bookLanguage: string
+): VoiceOption[] {
+  const langPrefix = bookLanguage.split('-')[0];
+
+  // Group by locale + baseName to find pairs
+  // baseName: strip "Multilingual" → "AndrewMultilingualNeural" becomes "AndrewNeural"
+  const groups = new Map<string, { native?: VoiceOption; multilingual?: VoiceOption }>();
+
+  for (const voice of candidates) {
+    const isMultilingual = voice.name.includes('Multilingual');
+    const baseName = voice.name.replace('Multilingual', '');
+    const key = `${voice.locale}|${baseName}`;
+
+    if (!groups.has(key)) groups.set(key, {});
+    const group = groups.get(key)!;
+
+    if (isMultilingual) {
+      group.multilingual = voice;
+    } else {
+      group.native = voice;
+    }
+  }
+
+  // Resolve each group to a single voice
+  const result: VoiceOption[] = [];
+  for (const group of groups.values()) {
+    if (group.native && group.multilingual) {
+      // Pair exists — pick based on book language
+      const isNativeLocale = group.native.locale.startsWith(langPrefix);
+      result.push(isNativeLocale ? group.native : group.multilingual);
+    } else {
+      // No pair — keep whichever exists
+      result.push((group.native ?? group.multilingual)!);
+    }
+  }
+
+  // Sort: non-Multilingual first, Multilingual last
+  result.sort((a, b) => {
+    const aMulti = a.name.includes('Multilingual') ? 1 : 0;
+    const bMulti = b.name.includes('Multilingual') ? 1 : 0;
+    return aMulti - bMulti;
+  });
+
+  return result;
 }
 
 /**
