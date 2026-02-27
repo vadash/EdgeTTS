@@ -772,11 +772,11 @@ describe('randomizeBelowVoices', () => {
 
     const result = randomizeBelowVoices(params);
 
-    // Should cycle: Davis, Guy, Davis, Guy (alphabetically sorted)
-    expect(result.get('Bob')).toBe('en-US, DavisNeural');
-    expect(result.get('Charlie')).toBe('en-US, GuyNeural');
-    expect(result.get('Dan')).toBe('en-US, DavisNeural');
-    expect(result.get('Eve')).toBe('en-US, GuyNeural');
+    // Should cycle in input order: Guy, Davis, Guy, Davis
+    expect(result.get('Bob')).toBe('en-US, GuyNeural');
+    expect(result.get('Charlie')).toBe('en-US, DavisNeural');
+    expect(result.get('Dan')).toBe('en-US, GuyNeural');
+    expect(result.get('Eve')).toBe('en-US, DavisNeural');
   });
 
   it('falls back to other gender when pool is empty', () => {

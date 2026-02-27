@@ -7,6 +7,7 @@ import { Text } from 'preact-i18n';
 import { Button } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
+import { assignUnmatchedFromPool } from '@/services/VoiceAllocator';
 import { importProfile, randomizeBelowVoices, readJSONFile } from '@/services/llm/VoiceProfile';
 import type { VoiceProfileFile } from '@/state/types';
 import { useData, useLLM, useLogs, useSettings } from '@/stores';
@@ -113,21 +114,30 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
         unmatchedCharacters,
       } = importProfile(json, characters);
 
-      // Merge imported voices into current map
-      const newMap = new Map(voiceMap);
-      for (const [name, voice] of importedMap) {
-        newMap.set(name, voice);
-      }
+      // Reassign unmatched + invalid voices from priority pool
+      const enabledVoiceOptions = voices.filter((v) => enabledVoices.includes(v.fullValue));
+      const newMap = assignUnmatchedFromPool(
+        sortedCharacters,
+        importedMap,
+        enabledVoiceOptions,
+        settings.voice.value,
+        data.detectedLanguage.value,
+      );
       llm.setVoiceMap(newMap);
 
       // Store the parsed profile for cumulative merge during export
       const parsed = JSON.parse(json) as VoiceProfileFile;
       llm.setLoadedProfile(parsed);
 
-      const matchCount = matchedCharacters.size;
-      const unmatchCount = unmatchedCharacters.length;
+      // Count how many imported voices were not in enabled list
+      const enabledSet = new Set(enabledVoices);
+      const replacedCount = [...importedMap.values()].filter(
+        (v) => !enabledSet.has(v),
+      ).length;
+      const matchCount = matchedCharacters.size - replacedCount;
+      const unmatchCount = unmatchedCharacters.length + replacedCount;
       logs.info(
-        `Imported voices: ${matchCount} matched, ${unmatchCount} unmatched from ${file.name}`,
+        `Imported voices: ${matchCount} matched, ${unmatchCount} reassigned from ${file.name}`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Import failed';
