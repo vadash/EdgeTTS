@@ -78,7 +78,8 @@ CRITICAL FORMAT RULES:
   "reasoning": "No characters share names or roles.",
   "merges": []
 }
-</examples>`,
+</examples>
+/no_think`,
 
   userTemplate: `<character_list>
 {{characters}}

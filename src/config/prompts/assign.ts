@@ -94,7 +94,8 @@ CRITICAL FORMAT RULES:
     "2": "B"
   }
 }
-</examples>`,
+</examples>
+/no_think`,
 
   userTemplate: `<speaker_codes>
 {{characterLines}}

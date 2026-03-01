@@ -107,7 +107,8 @@ I grabbed my sword. "Thanks."
     }
   ]
 }
-</examples>`,
+</examples>
+/no_think`,
 
   userTemplate: `<input_text>
 {{text}}
