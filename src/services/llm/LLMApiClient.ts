@@ -284,6 +284,7 @@ export class LLMApiClient {
       ],
       stream: useStreaming,
       response_format: zodToJsonSchema(schema, schemaName),
+      enable_thinking: this.options.reasoning !== null,
     };
 
     applyProviderFixes(requestBody, this.provider);
