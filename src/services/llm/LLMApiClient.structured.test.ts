@@ -55,7 +55,7 @@ describe('LLMApiClient.callStructured', () => {
     });
 
     const result = await (client as any).callStructured({
-      prompt: { system: 'test', user: 'test' },
+      messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
       schema: TestSchema,
       schemaName: 'TestSchema',
     });
@@ -88,7 +88,7 @@ describe('LLMApiClient.callStructured', () => {
 
     await expect(
       (client as any).callStructured({
-        prompt: { system: 'test', user: 'test' },
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
         schema: TestSchema,
         schemaName: 'TestSchema',
       }),
@@ -120,7 +120,7 @@ describe('LLMApiClient.callStructured', () => {
 
     await expect(
       (client as any).callStructured({
-        prompt: { system: 'test', user: 'test' },
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
         schema: TestSchema,
         schemaName: 'TestSchema',
       }),
@@ -148,7 +148,7 @@ describe('LLMApiClient.callStructured', () => {
     });
 
     await (client as any).callStructured({
-      prompt: { system: 'test', user: 'test' },
+      messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
       schema: TestSchema,
       schemaName: 'TestSchema',
     });
@@ -187,7 +187,7 @@ describe('LLMApiClient.callStructured', () => {
     });
 
     const result = await (client as any).callStructured({
-      prompt: { system: 'test', user: 'test' },
+      messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
       schema: TestSchema,
       schemaName: 'TestSchema',
     });
@@ -228,7 +228,7 @@ describe('LLMApiClient.callStructured', () => {
     });
 
     const result = await (client as any).callStructured({
-      prompt: { system: 'test', user: 'test' },
+      messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
       schema: TestSchema,
       schemaName: 'TestSchema',
     });
@@ -273,7 +273,7 @@ describe('LLMApiClient.callStructured', () => {
 
     await expect(
       (client as any).callStructured({
-        prompt: { system: 'test', user: 'test' },
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
         schema: TestSchema,
         schemaName: 'TestSchema',
       }),
@@ -309,7 +309,7 @@ describe('LLMApiClient.callStructured', () => {
 
     await expect(
       (client as any).callStructured({
-        prompt: { system: 'test', user: 'test' },
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
         schema: TestSchema,
         schemaName: 'TestSchema',
       }),
@@ -332,7 +332,7 @@ describe('LLMApiClient.callStructured', () => {
     });
 
     const result = await (client as any).callStructured({
-      prompt: { system: 'test', user: 'test' },
+      messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
       schema: TestSchema,
       schemaName: 'TestSchema',
     });
