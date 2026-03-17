@@ -9,7 +9,19 @@
 3. **TTS**: `TTSWorkerPool` manages WebSocket connections to Edge TTS using a `LadderController` to scale concurrency based on rate limits.
 4. **Merge**: `AudioMerger` streams downloaded chunks through `FFmpegService` (WASM) to concatenate, apply filters (EQ, compression), and encode to Opus/MP3.
 
+## FFmpeg Service
+
+**Location**: `src/services/FFmpegService.ts`
+
+FFmpeg WASM is bundled **locally** (not loaded from CDN):
+- Files copied by `CopyWebpackPlugin` from `node_modules/@ffmpeg/core/dist/umd/`
+- Output paths: `./ffmpeg-core.js`, `./ffmpeg-core.wasm`
+- Uses `toBlobURL()` to create blob URLs for the WASM loader
+
+**Lifecycle**: WASM memory leaks are a risk. `FFmpegService` proactively terminates and reloads itself after a set number of operations.
+
 ## Gotchas & Rules
 - **Memory Management**: Do NOT load entire audio files into memory. `TTSWorkerPool` writes chunks to a local `_temp_work` folder immediately. `AudioMerger` reads them sequentially.
-- **FFmpeg Lifecycle**: WASM memory leaks are a risk. `FFmpegService` proactively terminates and reloads itself after a set number of operations.
+- **File System**: The app writes directly to the user's hard drive to prevent OOM errors. All file operations MUST use `withPermissionRetry` to handle browser security drops.
+- **Async Resilience**: Network and WebSocket calls must use the internal `withRetry` utility (which wraps `p-retry`) to survive sleep modes and rate limits.
 - **State**: Services should remain as stateless as possible. Pass data via arguments or update the UI via the imported `Stores`.
