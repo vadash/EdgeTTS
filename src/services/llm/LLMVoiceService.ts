@@ -201,7 +201,7 @@ export class LLMVoiceService {
       const response = await withRetry(
         () =>
           this.apiClient.callStructured({
-            prompt: buildExtractPrompt(blockText),
+            messages: buildExtractPrompt(blockText),
             schema: ExtractSchema,
             schemaName: 'ExtractSchema',
             signal: controller.signal,
@@ -334,7 +334,7 @@ export class LLMVoiceService {
       sentenceCount: block.sentences.length,
     };
 
-    const prompt = buildAssignPrompt(
+    const assignMessages = buildAssignPrompt(
       context.characters,
       context.nameToCode,
       context.numberedParagraphs,
@@ -356,7 +356,7 @@ export class LLMVoiceService {
           const response = await withRetry(
             () =>
               client.callStructured({
-                prompt,
+                messages: assignMessages,
                 schema: AssignSchema,
                 schemaName: 'AssignSchema',
                 signal: this.abortController?.signal,
@@ -424,7 +424,7 @@ export class LLMVoiceService {
         const response = await withRetry(
           () =>
             this.apiClient.callStructured({
-              prompt,
+              messages: assignMessages,
               schema: AssignSchema,
               schemaName: 'AssignSchema',
               signal: this.abortController?.signal,
@@ -582,7 +582,7 @@ export class LLMVoiceService {
       const response = await withRetry(
         () =>
           client.callStructured({
-            prompt: buildMergePrompt(characters),
+            messages: buildMergePrompt(characters),
             schema: MergeSchema,
             schemaName: 'MergeSchema',
             signal: this.abortController?.signal,
