@@ -2,6 +2,7 @@ import type OpenAIType from 'openai';
 import OpenAI from 'openai';
 import type { z } from 'zod';
 import { RetriableError } from '@/errors';
+import { safeParseJSON } from '@/utils/text';
 import type { Logger } from '../Logger';
 import type { DebugLogger } from './DebugLogger';
 import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
@@ -35,11 +36,6 @@ export interface LLMApiClientOptions {
 }
 
 export type PassType = 'extract' | 'merge' | 'assign' | 'structured';
-
-export interface LLMPrompt {
-  system: string;
-  user: string;
-}
 
 /**
  * Detect provider from API URL or model name
@@ -273,15 +269,12 @@ export class LLMApiClient {
    * @returns Parsed and validated result matching the schema
    * @throws Error if LLM refuses or returns empty response
    */
-  async callStructured<T>({ prompt, schema, schemaName }: StructuredCallOptions<T>): Promise<T> {
+  async callStructured<T>({ messages, schema, schemaName }: StructuredCallOptions<T>): Promise<T> {
     const useStreaming = this.options.streaming ?? false;
 
     const requestBody: Record<string, unknown> = {
       model: this.options.model,
-      messages: [
-        { role: 'system', content: prompt.system },
-        { role: 'user', content: prompt.user },
-      ],
+      messages,
       stream: useStreaming,
       response_format: zodToJsonSchema(schema, schemaName),
       enable_thinking: this.options.reasoning !== null,
@@ -378,32 +371,6 @@ export class LLMApiClient {
       this.debugLogger.markLogged('structured');
     }
 
-    return this.parseStructuredResponse(content, schema);
-  }
-
-  /**
-   * Parse JSON content and validate with Zod schema.
-   * Shared by both streaming and non-streaming paths.
-   */
-  private parseStructuredResponse<T>(content: string, schema: z.ZodType<T>): T {
-    let jsonContent = content.trim();
-    const fenceMatch = jsonContent.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-    if (fenceMatch) jsonContent = fenceMatch[1].trim();
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonContent);
-    } catch (error) {
-      throw new RetriableError(`JSON parse failed: ${(error as Error).message}`, error as Error);
-    }
-
-    try {
-      return schema.parse(parsed);
-    } catch (error) {
-      throw new RetriableError(
-        `Zod validation failed: ${(error as Error).message}`,
-        error as Error,
-      );
-    }
+    return safeParseJSON(content, schema);
   }
 }
