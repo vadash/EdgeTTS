@@ -1,5 +1,7 @@
+import { ZodError } from 'zod';
+
 // Structured Error Types
-// Provides typed errors with codes for consistent error handling
+// provides typed errors with codes for consistent error handling
 
 /**
  * Error codes for the application
@@ -304,8 +306,8 @@ export class RetriableError extends Error {
 /**
  * Check if error indicates the connection should be retried
  */
-export function isRetriableError(error: unknown): error is RetriableError {
-  return error instanceof RetriableError;
+export function isRetriableError(error: unknown): boolean {
+  return error instanceof RetriableError || error instanceof ZodError;
 }
 
 /**
