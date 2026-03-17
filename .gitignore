@@ -31,3 +31,5 @@ test.config.local.ts
 /.claude/
 /repomix-*
 /tmp/
+
+/logs/
