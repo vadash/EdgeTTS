@@ -1,10 +1,7 @@
 import { z } from 'zod';
 
 export interface StructuredCallOptions<T> {
-  prompt: {
-    system: string;
-    user: string;
-  };
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
   schema: z.ZodType<T>;
   schemaName: string;
   signal?: AbortSignal;
