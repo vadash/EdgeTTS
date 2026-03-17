@@ -38,8 +38,6 @@ export interface AudioProcessingConfig {
   opusCompressionLevel?: number;
 }
 
-const CDN_MIRRORS = defaultConfig.ffmpeg.cdnMirrors;
-
 /**
  * FFmpegService
  * Container-managed singleton (no static getInstance)
@@ -66,25 +64,24 @@ export class FFmpegService {
   }
 
   /**
-   * Load FFmpeg WASM from CDN with fallback mirrors
+   * Load FFmpeg WASM from local bundle (copied by Webpack)
    */
   async load(onProgress?: (message: string) => void): Promise<boolean> {
     if (this.loaded) return true;
     if (this.loadPromise) return this.loadPromise;
 
-    this.loadPromise = this.tryLoadFromMirrors(onProgress);
+    this.loadPromise = this.tryLoadLocal(onProgress);
     return this.loadPromise;
   }
 
-  private async tryLoadFromMirrors(onProgress?: (message: string) => void): Promise<boolean> {
+  private async tryLoadLocal(onProgress?: (message: string) => void): Promise<boolean> {
     const ffmpeg = new FFmpeg();
 
-    // Set up logging
     ffmpeg.on('log', ({ message }) => {
       this.logger?.debug(`[FFmpeg] ${message}`);
     });
 
-    // Reuse cached blob URLs if available (avoids CDN fetch on proactive refresh)
+    // Reuse cached blob URLs if available (avoids re-fetch on proactive refresh)
     if (this.cachedCoreURL && this.cachedWasmURL) {
       try {
         onProgress?.('Reloading FFmpeg from cache...');
@@ -95,42 +92,37 @@ export class FFmpegService {
         onProgress?.('FFmpeg reloaded from cache');
         return true;
       } catch (err) {
-        this.logger?.warn('FFmpeg reload from cached blob URLs failed, fetching from CDN', {
+        this.logger?.warn('FFmpeg reload from cached blob URLs failed, refetching locally', {
           error: err instanceof Error ? err.message : String(err),
         });
-        // Invalidate cache and fall through to CDN fetch
         this.cachedCoreURL = null;
         this.cachedWasmURL = null;
       }
     }
 
-    for (let i = 0; i < CDN_MIRRORS.length; i++) {
-      const cdn = CDN_MIRRORS[i];
-      onProgress?.(`Loading FFmpeg from CDN ${i + 1}/${CDN_MIRRORS.length}...`);
+    onProgress?.('Loading local FFmpeg WebAssembly...');
 
-      try {
-        const coreURL = await toBlobURL(`${cdn.baseUrl}/${cdn.coreJs}`, 'text/javascript');
-        const wasmURL = await toBlobURL(`${cdn.baseUrl}/${cdn.wasmJs}`, 'application/wasm');
+    try {
+      // Use relative paths to the files copied by Webpack CopyWebpackPlugin
+      const baseURL = '.';
+      const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript');
+      const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm');
 
-        await ffmpeg.load({ coreURL, wasmURL });
-        this.ffmpeg = ffmpeg;
-        this.loaded = true;
-        this.loadError = null;
-        // Cache blob URLs for future proactive refreshes
-        this.cachedCoreURL = coreURL;
-        this.cachedWasmURL = wasmURL;
-        onProgress?.('FFmpeg loaded successfully');
-        return true;
-      } catch (err) {
-        this.logger?.warn(`FFmpeg CDN ${cdn.baseUrl} failed`, {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
+      await ffmpeg.load({ coreURL, wasmURL });
+
+      this.ffmpeg = ffmpeg;
+      this.loaded = true;
+      this.loadError = null;
+      this.cachedCoreURL = coreURL;
+      this.cachedWasmURL = wasmURL;
+      onProgress?.('FFmpeg loaded successfully from local bundle');
+      return true;
+    } catch (err) {
+      this.loadError = `Failed to load local FFmpeg: ${err instanceof Error ? err.message : String(err)}`;
+      this.logger?.error(this.loadError);
+      onProgress?.(this.loadError);
+      return false;
     }
-
-    this.loadError = 'All FFmpeg CDN mirrors failed. Using MP3 fallback.';
-    onProgress?.(this.loadError);
-    return false;
   }
 
   isAvailable(): boolean {
