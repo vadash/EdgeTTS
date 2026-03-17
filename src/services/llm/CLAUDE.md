@@ -23,7 +23,7 @@ Prompts in `src/config/prompts/` are split into components:
 Stages: `extract.ts` → `merge.ts` → `assign.ts`
 
 ### Shared Prompt Constants (`src/config/prompts/shared.ts`)
-- **`SYSTEM_PREAMBLE_CN/EN`**: Frames task as production pipeline with pre-authorization
+- **`SYSTEM_PREAMBLE_CN`**: Frames task as production pipeline with pre-authorization
 - **`MIRROR_LANGUAGE_RULES`**: Ensures output values match source text language
 - **`EXECUTION_TRIGGER`**: Final instruction defeating recency bias
 - **`PREFILL_PRESETS`**: Assistant prefills (`cn_compliance`, `pure_think`, `json_only`, etc.)
