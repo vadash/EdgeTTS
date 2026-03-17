@@ -1,5 +1,6 @@
 import { jsonrepair } from 'jsonrepair';
 import type { z } from 'zod';
+import { RetriableError } from '@/errors';
 
 /**
  * Strip thinking/reasoning tags from LLM response.
@@ -150,7 +151,7 @@ export function safeParseJSON<T>(input: string, schema: z.ZodType<T>): T {
     const repaired = jsonrepair(cleaned);
     parsed = JSON.parse(repaired);
   } catch (error) {
-    throw new Error(`JSON repair/parse failed: ${(error as Error).message}`);
+    throw new RetriableError(`JSON repair/parse failed: ${(error as Error).message}`, error as Error);
   }
 
   // Validate against Zod schema (throws ZodError on mismatch)
