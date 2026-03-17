@@ -61,20 +61,6 @@ export interface RetryConfig {
   delays: number[];
 }
 
-export interface FFmpegCDNMirror {
-  /** Base URL for FFmpeg files */
-  baseUrl: string;
-  /** Core JS filename */
-  coreJs: string;
-  /** WASM filename */
-  wasmJs: string;
-}
-
-export interface FFmpegConfig {
-  /** CDN mirrors for loading FFmpeg */
-  cdnMirrors: FFmpegCDNMirror[];
-}
-
 export interface EdgeTTSApiConfig {
   /** WebSocket base URL */
   baseUrl: string;
@@ -91,7 +77,6 @@ export interface AppConfig {
   audio: AudioConfig;
   llm: LLMConfig;
   retry: RetryConfig;
-  ffmpeg: FFmpegConfig;
   edgeTtsApi: EdgeTTSApiConfig;
 }
 
@@ -135,26 +120,6 @@ export const defaultConfig: AppConfig = {
     // Shared retry delays for TTS and LLM - stays on last value forever
     // Extended to 10 minutes max to handle rate limiting
     delays: [5000, 10000, 30000, 60000, 120000, 300000, 600000],
-  },
-
-  ffmpeg: {
-    cdnMirrors: [
-      {
-        baseUrl: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd',
-        coreJs: 'ffmpeg-core.js',
-        wasmJs: 'ffmpeg-core.wasm',
-      },
-      {
-        baseUrl: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd',
-        coreJs: 'ffmpeg-core.js',
-        wasmJs: 'ffmpeg-core.wasm',
-      },
-      {
-        baseUrl: 'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/umd',
-        coreJs: 'ffmpeg-core.min.js',
-        wasmJs: 'ffmpeg-core.wasm',
-      },
-    ],
   },
 
   edgeTtsApi: {

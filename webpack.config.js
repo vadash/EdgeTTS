@@ -68,7 +68,8 @@ export default (_env, argv) => {
         patterns: [
           { from: 'public/RU.lexx', to: 'RU.lexx' },
           { from: 'public/*.md', to: '[name][ext]' },
-          // Copy 404.html to dist root for GitHub Pages (one level up from dist/latest/)
+          { from: 'node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.js', to: 'ffmpeg-core.js' },
+          { from: 'node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm', to: 'ffmpeg-core.wasm' },
           ...(isProduction ? [{ from: 'public/404.html', to: '../404.html' }] : []),
         ],
       }),
