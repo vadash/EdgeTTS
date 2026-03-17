@@ -3,7 +3,8 @@
 
 import { LLM_PROMPTS } from '@/config/prompts';
 import type { LLMCharacter } from '@/state/types';
-import type { LLMPrompt } from './LLMApiClient';
+import type { LLMMessage } from './promptFormatters';
+import { assembleSystemPrompt, assembleUserConstraints, buildMessages } from './promptFormatters';
 import type { ExtractResponse, MergeResponse } from './schemas';
 import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
 
@@ -35,14 +36,16 @@ export interface AssignResult {
 // Prompt Building
 // ============================================================================
 
-export function buildExtractPrompt(textBlock: string): LLMPrompt {
-  return {
-    system: LLM_PROMPTS.extract.system,
-    user: LLM_PROMPTS.extract.userTemplate.replace('{{text}}', textBlock),
-  };
+export function buildExtractPrompt(textBlock: string): LLMMessage[] {
+  const p = LLM_PROMPTS.extract;
+  const sys = assembleSystemPrompt(p.role, p.examples);
+  const constraints = assembleUserConstraints(p.rules, p.schemaText);
+  const user = p.userTemplate.replace('{{text}}', textBlock);
+  return buildMessages(sys, `${user}\n\n${constraints}`);
 }
 
-export function buildMergePrompt(characters: LLMCharacter[]): LLMPrompt {
+export function buildMergePrompt(characters: LLMCharacter[]): LLMMessage[] {
+  const p = LLM_PROMPTS.merge;
   const characterList = characters
     .map(
       (c, i) =>
@@ -50,17 +53,19 @@ export function buildMergePrompt(characters: LLMCharacter[]): LLMPrompt {
     )
     .join('\n');
 
-  return {
-    system: LLM_PROMPTS.merge.system,
-    user: LLM_PROMPTS.merge.userTemplate.replace('{{characters}}', characterList),
-  };
+  const sys = assembleSystemPrompt(p.role, p.examples);
+  const constraints = assembleUserConstraints(p.rules, p.schemaText);
+  const user = p.userTemplate.replace('{{characters}}', characterList);
+  return buildMessages(sys, `${user}\n\n${constraints}`);
 }
 
 export function buildAssignPrompt(
   characters: LLMCharacter[],
   nameToCode: Map<string, string>,
   numberedParagraphs: string,
-): LLMPrompt {
+): LLMMessage[] {
+  const p = LLM_PROMPTS.assign;
+
   const characterLines = characters.map((char) => {
     const code = nameToCode.get(char.canonicalName)!;
     const aliases = char.variations.filter((v) => v !== char.canonicalName);
@@ -78,20 +83,18 @@ export function buildAssignPrompt(
   const characterLinesStr = characterLines.join('\n');
   const unnamedEntriesStr = unnamedEntries.join('\n');
 
-  const system = LLM_PROMPTS.assign.system
-    .replaceAll('{{characterLines}}', characterLinesStr)
-    .replaceAll('{{unnamedEntries}}', unnamedEntriesStr);
+  const sys = assembleSystemPrompt(p.role, p.examples);
+  const constraints = assembleUserConstraints(p.rules, p.schemaText);
+  const user = p.userTemplate
+    .replace('{{paragraphs}}', numberedParagraphs)
+    .replace('{{characterLines}}', characterLinesStr)
+    .replace('{{unnamedEntries}}', unnamedEntriesStr);
 
-  const user = LLM_PROMPTS.assign.userTemplate
-    .replaceAll('{{paragraphs}}', numberedParagraphs)
-    .replaceAll('{{characterLines}}', characterLinesStr)
-    .replaceAll('{{unnamedEntries}}', unnamedEntriesStr);
-
-  return { system, user };
+  return buildMessages(sys, `${user}\n\n${constraints}`);
 }
 
 // ============================================================================
-// Response Parsing (simplified - no repair needed)
+// Response Parsing
 // ============================================================================
 
 export function parseExtractResponse(response: unknown): ExtractResponse {
