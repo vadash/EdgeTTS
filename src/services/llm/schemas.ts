@@ -15,7 +15,7 @@ export const ExtractCharacterSchema = z.object({
   canonicalName: z.string().min(1),
   variations: z.array(z.string().min(1)),
   gender: z.enum(['male', 'female', 'unknown']),
-});
+}).strict();
 
 export const ExtractSchema = baseSchema.extend({
   characters: z.array(ExtractCharacterSchema).min(1),

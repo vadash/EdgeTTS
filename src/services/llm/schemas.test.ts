@@ -39,6 +39,27 @@ describe('Zod Schemas', () => {
     });
   });
 
+  describe('ExtractCharacterSchema strict mode', () => {
+    it('rejects extra keys at root level', () => {
+      const result = ExtractCharacterSchema.safeParse({
+        canonicalName: 'Alice',
+        variations: ['Alice'],
+        gender: 'female',
+        extraField: 'should be rejected',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts valid object without extra keys', () => {
+      const result = ExtractCharacterSchema.safeParse({
+        canonicalName: 'Alice',
+        variations: ['Alice'],
+        gender: 'female',
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe('ExtractSchema', () => {
     it('accepts valid response with reasoning', () => {
       const result = ExtractSchema.safeParse({
