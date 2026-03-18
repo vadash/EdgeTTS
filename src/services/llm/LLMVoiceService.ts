@@ -198,10 +198,11 @@ export class LLMVoiceService {
       const block = blocks[i];
       const blockText = block.sentences.join('\n');
 
+      const extractMessages = buildExtractPrompt(blockText);
       const response = await withRetry(
         () =>
           this.apiClient.callStructured({
-            messages: buildExtractPrompt(blockText),
+            messages: extractMessages,
             schema: ExtractSchema,
             schemaName: 'ExtractSchema',
             signal: controller.signal,
@@ -218,6 +219,11 @@ export class LLMVoiceService {
       );
 
       allCharacters.push(...response.characters);
+
+      // Save first extract phase log
+      if (i === 0) {
+        await this.apiClient.debugLogger?.savePhaseLog('extract', { messages: extractMessages }, response);
+      }
 
       // Small delay between requests
       if (i < blocks.length - 1) {
