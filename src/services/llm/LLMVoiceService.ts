@@ -520,7 +520,7 @@ export class LLMVoiceService {
         `Merge vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)})...`,
       );
 
-      const mergeGroups = await this.singleMerge(characters, temp, onProgress);
+      const mergeGroups = await this.singleMerge(characters, temp, onProgress, i);
       if (mergeGroups !== null) {
         votes.push(mergeGroups);
         this.logger?.info(
@@ -566,10 +566,13 @@ export class LLMVoiceService {
     characters: LLMCharacter[],
     temperature: number,
     _onProgress?: ProgressCallback,
+    voteIndex?: number, // track which vote this is
   ): Promise<number[][] | null> {
     this.logger?.info(
       `[Merge] Single merge: ${characters.length} characters (temp=${temperature.toFixed(2)})`,
     );
+
+    const mergeMessages = buildMergePrompt(characters);
 
     // Create a client with the specified temperature
     const client = new LLMApiClient({
@@ -580,7 +583,7 @@ export class LLMVoiceService {
       reasoning: this.options.mergeConfig?.reasoning ?? this.options.reasoning,
       temperature: temperature,
       topP: this.options.mergeConfig?.topP ?? this.options.topP,
-      debugLogger: new DebugLogger(this.options.directoryHandle, this.logger),
+      debugLogger: this.apiClient.debugLogger, // share debugLogger
       logger: this.logger,
     });
 
@@ -588,7 +591,7 @@ export class LLMVoiceService {
       const response = await withRetry(
         () =>
           client.callStructured({
-            messages: buildMergePrompt(characters),
+            messages: mergeMessages,
             schema: MergeSchema,
             schemaName: 'MergeSchema',
             signal: this.abortController?.signal,
@@ -603,6 +606,12 @@ export class LLMVoiceService {
           },
         },
       );
+
+      // Save first merge phase log
+      if (voteIndex === 0) {
+        await this.apiClient.debugLogger?.savePhaseLog('merge', { messages: mergeMessages }, response);
+      }
+
       return response.merges;
     } catch (error) {
       this.logger?.warn(
