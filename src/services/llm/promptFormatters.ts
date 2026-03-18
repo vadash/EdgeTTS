@@ -44,12 +44,14 @@ export function assembleUserConstraints(rules: string, schemaText: string): stri
  *
  * @param systemBody - Task-specific system prompt (role + examples)
  * @param userBody - The actual content (text/characters/paragraphs) + constraints
- * @param prefill - Which prefill preset to use (default: pure_think)
+ * @param detectedLanguage - Detected language code ('zh' for Chinese, others use EN)
+ * @param prefill - Which prefill preset to use (default: auto, which resolves based on language)
  * @param preamble - System preamble (default: CN)
  */
 export function buildMessages(
   systemBody: string,
   userBody: string,
+  detectedLanguage: string = 'en',
   prefill: PrefillPreset = DEFAULT_PREFILL,
   preamble: string = SYSTEM_PREAMBLE_CN,
 ): LLMMessage[] {
@@ -58,7 +60,13 @@ export function buildMessages(
     { role: 'user', content: userBody },
   ];
 
-  const prefillContent = PREFILL_PRESETS[prefill];
+  // Resolve 'auto' based on detected language
+  let actualPrefill = prefill;
+  if (prefill === 'auto') {
+    actualPrefill = detectedLanguage === 'zh' ? 'cn_compliance' : 'en_compliance';
+  }
+
+  const prefillContent = PREFILL_PRESETS[actualPrefill];
   if (prefillContent) {
     messages.push({ role: 'assistant', content: prefillContent });
   }
