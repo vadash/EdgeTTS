@@ -6,6 +6,7 @@ import type { Logger } from '../Logger';
  */
 export class DebugLogger {
   private errorCounter: number = 0;
+  private loggedPhases: Set<string> = new Set();
 
   constructor(
     private directoryHandle: FileSystemDirectoryHandle | null | undefined,
@@ -42,8 +43,27 @@ export class DebugLogger {
     await this.saveLog(respFile, { content: responseContent });
   }
 
-  /** Reset error counter for a new conversion */
+  /** Reset error counter AND phase tracking for a new conversion */
   resetLogging(): void {
     this.errorCounter = 0;
+    this.loggedPhases.clear();
+  }
+
+  /** Save first request/response for a phase (extract, merge, assign) */
+  async savePhaseLog(
+    phase: 'extract' | 'merge' | 'assign',
+    requestBody: object,
+    responseContent: object,
+  ): Promise<void> {
+    // Only save once per phase per conversion
+    if (this.loggedPhases.has(phase)) return;
+
+    this.loggedPhases.add(phase);
+
+    const reqFile = `${phase}_request.json`;
+    const respFile = `${phase}_response.json`;
+
+    await this.saveLog(reqFile, requestBody);
+    await this.saveLog(respFile, responseContent);
   }
 }

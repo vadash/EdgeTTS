@@ -105,4 +105,81 @@ describe('DebugLogger', () => {
     // Should not throw
     await logger.saveErrorLog({ req: 1 }, 'response');
   });
+
+  it('savePhaseLog writes phase_request.json and phase_response.json files', async () => {
+    const { mockDirHandle, mockLogsFolder, mockWritable } = createMockDirectoryHandle();
+    const logger = new DebugLogger(mockDirHandle);
+
+    await logger.savePhaseLog('extract', { model: 'gpt-4', messages: [] }, { characters: [] });
+
+    // Should save extract_request.json and extract_response.json
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_response.json', { create: true });
+
+    // Verify content was written
+    const writeCalls = mockWritable.write.mock.calls;
+    expect(writeCalls[0][0]).toContain('gpt-4'); // request content
+    expect(writeCalls[1][0]).toContain('characters'); // response content
+  });
+
+  it('savePhaseLog only logs first call per phase', async () => {
+    const { mockDirHandle, mockLogsFolder } = createMockDirectoryHandle();
+    const logger = new DebugLogger(mockDirHandle);
+
+    // First call should save
+    await logger.savePhaseLog('extract', { req: 1 }, { res: 1 });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_response.json', { create: true });
+
+    // Reset the mock to check second call
+    mockLogsFolder.getFileHandle.mockClear();
+
+    // Second call for same phase should be ignored
+    await logger.savePhaseLog('extract', { req: 2 }, { res: 2 });
+    expect(mockLogsFolder.getFileHandle).not.toHaveBeenCalled();
+  });
+
+  it('savePhaseLog logs different phases independently', async () => {
+    const { mockDirHandle, mockLogsFolder } = createMockDirectoryHandle();
+    const logger = new DebugLogger(mockDirHandle);
+
+    // Log extract phase
+    await logger.savePhaseLog('extract', { phase: 'extract' }, { result: 'extract' });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_response.json', { create: true });
+
+    // Log merge phase - should also save
+    await logger.savePhaseLog('merge', { phase: 'merge' }, { result: 'merge' });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('merge_request.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('merge_response.json', { create: true });
+
+    // Log assign phase - should also save
+    await logger.savePhaseLog('assign', { phase: 'assign' }, { result: 'assign' });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('assign_request.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('assign_response.json', { create: true });
+  });
+
+  it('resetLogging clears phase tracking', async () => {
+    const { mockDirHandle, mockLogsFolder } = createMockDirectoryHandle();
+    const logger = new DebugLogger(mockDirHandle);
+
+    // First call saves
+    await logger.savePhaseLog('extract', { req: 1 }, { res: 1 });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledTimes(2); // request + response
+
+    mockLogsFolder.getFileHandle.mockClear();
+
+    // Reset logging
+    logger.resetLogging();
+
+    // After reset, should save again
+    await logger.savePhaseLog('extract', { req: 2 }, { res: 2 });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledTimes(2); // request + response
+  });
+
+  it('savePhaseLog does nothing when no directory handle', async () => {
+    const logger = new DebugLogger(null);
+    // Should not throw
+    await logger.savePhaseLog('extract', { req: 1 }, { res: 1 });
+  });
 });
