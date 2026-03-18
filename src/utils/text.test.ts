@@ -1,6 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { stripThinkingTags, extractBalancedJSON, safeParseJSON } from './text';
+import { stripThinkingTags, extractBalancedJSON, safeParseJSON, stripPairedTag } from './text';
+
+describe('stripPairedTag', () => {
+  it('removes paired tags case-insensitively', () => {
+    const input = '<THINK>content</think>';
+    expect(stripPairedTag(input, 'think')).toBe('content');
+  });
+
+  it('removes tags with attributes', () => {
+    const input = '<think type="internal">content</think>';
+    expect(stripPairedTag(input, 'think')).toBe('content');
+  });
+
+  it('leaves unclosed tags alone', () => {
+    const input = '<think>content without close';
+    expect(stripPairedTag(input, 'think')).toBe(input);
+  });
+
+  it('removes multiple paired tags', () => {
+    const input = '<think>first</think> middle <think>second</think>';
+    expect(stripPairedTag(input, 'think')).toBe('first middle second');
+  });
+
+  it('handles tags with uppercase attributes', () => {
+    const input = '<THINK TYPE="internal">content</think>';
+    expect(stripPairedTag(input, 'think')).toBe('content');
+  });
+});
 
 describe('stripThinkingTags', () => {
   it('removes paired <think>...</think> blocks', () => {

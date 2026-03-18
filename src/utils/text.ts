@@ -3,6 +3,43 @@ import type { z } from 'zod';
 import { RetriableError } from '@/errors';
 
 /**
+ * Case-insensitive, attribute-aware tag stripping.
+ * Handles: <think>...</think>, <THINK>...</think>, <think type="internal">...</think>
+ * Syncs lowercase index positions with original case string.
+ */
+export function stripPairedTag(text: string, tagName: string): string {
+  let result = text;
+  let lowerResult = result.toLowerCase();
+  const openTag = `<${tagName.toLowerCase()}`;
+  const closeTag = `</${tagName.toLowerCase()}>`;
+
+  while (true) {
+    const startIdx = lowerResult.indexOf(openTag);
+    if (startIdx === -1) break; // No more tags
+
+    // Find the closing bracket of the opening tag to handle attributes
+    const openEndIdx = lowerResult.indexOf('>', startIdx);
+    if (openEndIdx === -1) break; // Malformed tag, abort to be safe
+
+    const closeIdx = lowerResult.indexOf(closeTag, openEndIdx);
+    if (closeIdx === -1) break; // Unclosed tag, leave it alone
+
+    const closeEndIdx = closeIdx + closeTag.length;
+
+    // Keep content BEFORE opening tag + content BETWEEN tags + content AFTER closing tag
+    result =
+      result.slice(0, startIdx) +
+      result.slice(openEndIdx + 1, closeIdx) +
+      result.slice(closeEndIdx);
+
+    // Re-sync the lowercase version for the next iteration
+    lowerResult = result.toLowerCase();
+  }
+
+  return result;
+}
+
+/**
  * Strip thinking/reasoning tags from LLM response.
  * Handles XML tags, bracket tags, asterisk thinking, parenthesized thinking,
  * and orphaned closing tags (from assistant prefill).
