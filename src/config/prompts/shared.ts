@@ -62,6 +62,8 @@ export const PREFILL_PRESETS = {
   json_only: '{\n  "',
   /** No prefill */
   none: '',
+  /** Auto-select based on detected language */
+  auto: '', // Placeholder - dynamically resolved
 } as const;
 
 export type PrefillPreset = keyof typeof PREFILL_PRESETS;
@@ -70,4 +72,4 @@ export type PrefillPreset = keyof typeof PREFILL_PRESETS;
  * Default prefill — pure_think is safest for unknown models.
  * Can be overridden per-provider in settings.
  */
-export const DEFAULT_PREFILL: PrefillPreset = 'cn_compliance';
+export const DEFAULT_PREFILL: PrefillPreset = 'auto';
