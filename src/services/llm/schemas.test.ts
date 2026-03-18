@@ -189,6 +189,33 @@ describe('Zod Schemas', () => {
     });
   });
 
+  describe('AssignSchema strict mode', () => {
+    it('rejects extra keys at root level', () => {
+      const result = AssignSchema.safeParse({
+        reasoning: null,
+        assignments: { '0': 'A' },
+        extraField: 'should be rejected',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts valid object without extra keys', () => {
+      const result = AssignSchema.safeParse({
+        reasoning: null,
+        assignments: { '0': 'A' },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('allows dynamic keys in assignments (z.record behavior)', () => {
+      const result = AssignSchema.safeParse({
+        reasoning: null,
+        assignments: { '0': 'A', '5': 'B', '999': 'C' },
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe('Type exports', () => {
     it('ExtractResponse matches inferred type', () => {
       const data: ExtractResponse = {

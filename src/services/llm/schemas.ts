@@ -32,7 +32,7 @@ export const MergeSchema = baseSchema.extend({
 // NOTE: z.record() requires 2 args in Zod 4 (single-arg form removed)
 export const AssignSchema = baseSchema.extend({
   assignments: z.record(z.string(), z.string()), // Sparse: {"0": "A", "5": "B"}
-});
+}).strict();
 
 // Type exports (nullable reasoning stays nullable in type)
 export type ExtractResponse = z.infer<typeof ExtractSchema>;
