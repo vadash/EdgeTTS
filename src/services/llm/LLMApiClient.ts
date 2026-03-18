@@ -73,7 +73,7 @@ export class LLMApiClient {
   private options: LLMApiClientOptions;
   private logger?: Logger;
   private client: OpenAI;
-  private debugLogger?: DebugLogger;
+  public debugLogger?: DebugLogger;
   private provider: string;
 
   constructor(options: LLMApiClientOptions) {
