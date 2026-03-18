@@ -106,6 +106,7 @@ export interface LLMVoiceServiceOptions {
   maxConcurrentRequests?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: Logger; // Required - prevents silent failures
+  detectedLanguage?: string; // NEW - for auto prefill selection
   // Optional separate config for merge stage
   mergeConfig?: {
     apiKey: string;
@@ -129,6 +130,7 @@ export class LLMVoiceService {
   private abortController: AbortController | null = null;
   private logger: Logger;
   private isFirstAssignBlock: boolean = true; // track first assign block
+  private detectedLanguage: string; // NEW - store for prompt building
 
   constructor(options: LLMVoiceServiceOptions) {
     if (!options.logger) {
@@ -136,6 +138,7 @@ export class LLMVoiceService {
     }
     this.options = options;
     this.logger = options.logger;
+    this.detectedLanguage = options.detectedLanguage ?? 'en'; // NEW - default to English
     const debugLogger = new DebugLogger(options.directoryHandle, options.logger);
     this.apiClient = new LLMApiClient({
       apiKey: options.apiKey,
@@ -199,7 +202,7 @@ export class LLMVoiceService {
       const block = blocks[i];
       const blockText = block.sentences.join('\n');
 
-      const extractMessages = buildExtractPrompt(blockText);
+      const extractMessages = buildExtractPrompt(blockText, this.detectedLanguage);
       const response = await withRetry(
         () =>
           this.apiClient.callStructured({
@@ -346,6 +349,7 @@ export class LLMVoiceService {
       context.characters,
       context.nameToCode,
       context.numberedParagraphs,
+      this.detectedLanguage,
     );
 
     let relativeMap: Map<number, string>;
@@ -587,7 +591,7 @@ export class LLMVoiceService {
       `[Merge] Single merge: ${characters.length} characters (temp=${temperature.toFixed(2)})`,
     );
 
-    const mergeMessages = buildMergePrompt(characters);
+    const mergeMessages = buildMergePrompt(characters, this.detectedLanguage);
 
     // Create a client with the specified temperature
     const client = new LLMApiClient({
