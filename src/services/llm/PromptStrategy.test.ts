@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { parseAssignResponse, parseExtractResponse, parseMergeResponse } from './PromptStrategy';
+import {
+  parseAssignResponse,
+  parseExtractResponse,
+  parseMergeResponse,
+  buildExtractPrompt,
+  buildMergePrompt,
+  buildAssignPrompt,
+} from './PromptStrategy';
+import type { LLMCharacter } from '@/state/types';
 
 describe('parseExtractResponse', () => {
   it('passes through valid responses unchanged', () => {
@@ -129,5 +137,33 @@ describe('parseAssignResponse', () => {
     expect(result.speakerMap.get(5)).toBe('B');
     expect(result.speakerMap.get(10)).toBe('C');
     expect(result.speakerMap.get(1)).toBeUndefined();
+  });
+});
+
+describe('Prompt builders accept detectedLanguage', () => {
+  it('buildExtractPrompt accepts detectedLanguage', () => {
+    const result = buildExtractPrompt('Some text', 'zh');
+    expect(result).toHaveLength(3);
+    expect(result[0].role).toBe('system');
+    expect(result[1].role).toBe('user');
+    expect(result[2].role).toBe('assistant');
+  });
+
+  it('buildMergePrompt accepts detectedLanguage', () => {
+    const characters: LLMCharacter[] = [
+      { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
+    ];
+    const result = buildMergePrompt(characters, 'en');
+    expect(result).toHaveLength(3);
+  });
+
+  it('buildAssignPrompt accepts detectedLanguage', () => {
+    const characters: LLMCharacter[] = [
+      { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
+    ];
+    const nameToCode = new Map([['Alice', 'A']]);
+    const numberedParagraphs = '[0] Some text';
+    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en');
+    expect(result).toHaveLength(3);
   });
 });
