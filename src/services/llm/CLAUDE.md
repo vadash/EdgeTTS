@@ -10,6 +10,8 @@ We use a 3-message structure to defeat recency bias and improve compliance:
 2. **User**: Content + Constraints (language rules + task rules + schema + execution trigger)
 3. **Assistant**: Prefill (biases model into correct reasoning track)
 
+**Language-Aware Prefill Selection**: `detectedLanguage` parameter propagates from `ConversionOrchestrator` → `LLMVoiceService` → `PromptStrategy` → `buildMessages`. When `prefill='auto'`, resolves to `cn_compliance` for `zh`, `en_compliance` otherwise.
+
 See `promptFormatters.ts` for message assembly functions.
 
 ### Prompt Structure
@@ -26,14 +28,20 @@ Stages: `extract.ts` → `merge.ts` → `assign.ts`
 - **`SYSTEM_PREAMBLE_CN`**: Frames task as production pipeline with pre-authorization
 - **`MIRROR_LANGUAGE_RULES`**: Ensures output values match source text language
 - **`EXECUTION_TRIGGER`**: Final instruction defeating recency bias
-- **`PREFILL_PRESETS`**: Assistant prefills (`cn_compliance`, `pure_think`, `json_only`, etc.)
+- **`PREFILL_PRESETS`**: Assistant prefills including `'auto'` for language-aware selection
+  - `auto`: Resolves to `cn_compliance` for Chinese (`zh`), `en_compliance` otherwise
+  - `cn_compliance`: Best for Kimi/Qwen (Chinese compliance framing)
+  - `en_compliance`: English compliance framing
+  - `pure_think`: Minimal prefill — safest default for most models
+  - `json_only`: Skip reasoning, start JSON directly
 
 ## JSON Repair Pipeline
 
 **Location**: `src/utils/text.ts`
 
 `safeParseJSON<T>(input, schema)` applies multi-stage repair:
-1. Strip thinking/reasoning tags (`<think>`, `[THINK]`, `*thinks*`, etc.)
+1. Strip thinking/reasoning tags using **index-based extraction** (not regex) to prevent catastrophic backtracking
+   - Paired tags: `stripPairedTag()` handles `<think>`, `[THINK]`, `*thinks*`, etc.)
 2. Strip markdown code fences
 3. Extract last balanced JSON block (dodges `<tool_call>` hallucinations)
 4. Sanitize LLM syntax hallucinations (string concatenation `+`, dangling plus)
@@ -50,10 +58,11 @@ Used by `LLMApiClient.callStructured()` instead of native parsing.
 
 ## Schemas
 
-- **`schemas.ts`**: Zod v4 schemas for Extract, Merge, Assign stages
+- **`schemas.ts`**: Zod v4 schemas for Extract, Merge, Assign stages with `.strict()` mode enabled
 - **`schemaUtils.ts`**: Type utilities and response helpers
 
 All schemas include `reasoning` field (nullable) for chain-of-thought extraction.
+**`.strict()` mode** rejects extra keys at root level — future-proofs against LLM hallucinations adding unexpected fields.
 
 ## Consensus Voting
 
