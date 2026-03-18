@@ -3,14 +3,14 @@ import { z } from 'zod';
 import { stripThinkingTags, extractBalancedJSON, safeParseJSON, stripPairedTag, stripBracketTag } from './text';
 
 describe('stripPairedTag', () => {
-  it('removes paired tags case-insensitively', () => {
-    const input = '<THINK>content</think>';
-    expect(stripPairedTag(input, 'think')).toBe('content');
+  it('removes paired tags and their content case-insensitively', () => {
+    const input = '<THINK>internal content</think>external content';
+    expect(stripPairedTag(input, 'think')).toBe('external content');
   });
 
-  it('removes tags with attributes', () => {
-    const input = '<think type="internal">content</think>';
-    expect(stripPairedTag(input, 'think')).toBe('content');
+  it('removes tags with attributes and their content', () => {
+    const input = '<think type="internal">content</think>after';
+    expect(stripPairedTag(input, 'think')).toBe('after');
   });
 
   it('leaves unclosed tags alone', () => {
@@ -18,14 +18,14 @@ describe('stripPairedTag', () => {
     expect(stripPairedTag(input, 'think')).toBe(input);
   });
 
-  it('removes multiple paired tags', () => {
-    const input = '<think>first</think> middle <think>second</think>';
-    expect(stripPairedTag(input, 'think')).toBe('first middle second');
+  it('removes multiple paired tags with content', () => {
+    const input = '<think>first</think> middle <think>second</think> end';
+    expect(stripPairedTag(input, 'think')).toBe(' middle  end');
   });
 
   it('handles tags with uppercase attributes', () => {
-    const input = '<THINK TYPE="internal">content</think>';
-    expect(stripPairedTag(input, 'think')).toBe('content');
+    const input = '<THINK TYPE="internal">content</think>after';
+    expect(stripPairedTag(input, 'think')).toBe('after');
   });
 });
 
@@ -95,6 +95,40 @@ describe('stripThinkingTags', () => {
   it('handles text with no thinking tags', () => {
     const text = '{"clean": "json"}';
     expect(stripThinkingTags(text)).toBe('{"clean": "json"}');
+  });
+
+  it('prevents catastrophic backtracking on large unclosed tags', () => {
+    // This test verifies that index-based extraction prevents regex DoS
+    // Previous regex-based implementation could hang on 50KB+ unclosed tags
+    const largeContent = 'x'.repeat(50000);
+    const text = `start  ${largeContent} end`;
+
+    const start = Date.now();
+    const result = stripThinkingTags(text);
+    const elapsed = Date.now() - start;
+
+    // Should complete in under 100ms (previously could take 30+ seconds)
+    expect(elapsed).toBeLessThan(100);
+    // Should preserve the text since tag is unclosed
+    expect(result).toBe(text);
+  });
+
+  it('handles various orphaned closing tag formats', () => {
+    // These test orphaned closing tags from assistant prefill scenarios
+    const variants = [
+      '</think>content',
+      '</thinking>content',
+      '</THINK>content',
+    ];
+    for (const v of variants) {
+      expect(stripThinkingTags(v)).toBe('content');
+    }
+  });
+
+  it('handles multiline orphaned closing tags', () => {
+    // Orphaned close tags may span multiple lines
+    const text = '\n\n</think>\n{"result": true}';
+    expect(stripThinkingTags(text)).toBe('{"result": true}');
   });
 });
 

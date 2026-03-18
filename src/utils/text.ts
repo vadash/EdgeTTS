@@ -21,16 +21,42 @@ export function stripPairedTag(text: string, tagName: string): string {
     const openEndIdx = lowerResult.indexOf('>', startIdx);
     if (openEndIdx === -1) break; // Malformed tag, abort to be safe
 
-    const closeIdx = lowerResult.indexOf(closeTag, openEndIdx);
-    if (closeIdx === -1) break; // Unclosed tag, leave it alone
+    // Find the matching closing tag (handle nesting by counting opens/closes)
+    let closeIdx = -1;
+    let searchFrom = openEndIdx + 1;
+    let depth = 1;
+
+    while (searchFrom < lowerResult.length) {
+      const nextOpen = lowerResult.indexOf(openTag, searchFrom);
+      const nextClose = lowerResult.indexOf(closeTag, searchFrom);
+
+      if (nextClose === -1) break; // No more closing tags
+
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        // Found another opening tag before closing - increase depth
+        depth++;
+        // Move past this opening tag
+        const nextOpenEnd = lowerResult.indexOf('>', nextOpen);
+        if (nextOpenEnd === -1) break;
+        searchFrom = nextOpenEnd + 1;
+      } else {
+        // Found a closing tag
+        depth--;
+        if (depth === 0) {
+          closeIdx = nextClose;
+          break;
+        }
+        // Move past this closing tag and continue searching
+        searchFrom = nextClose + closeTag.length;
+      }
+    }
+
+    if (closeIdx === -1) break; // Unclosed or malformed, leave it alone
 
     const closeEndIdx = closeIdx + closeTag.length;
 
-    // Keep content BEFORE opening tag + content BETWEEN tags + content AFTER closing tag
-    result =
-      result.slice(0, startIdx) +
-      result.slice(openEndIdx + 1, closeIdx) +
-      result.slice(closeEndIdx);
+    // Remove from opening tag start to closing tag end (including content)
+    result = result.slice(0, startIdx) + result.slice(closeEndIdx);
 
     // Re-sync the lowercase version for the next iteration
     lowerResult = result.toLowerCase();
@@ -73,26 +99,32 @@ export function stripBracketTag(text: string, tagName: string): string {
  * Strip thinking/reasoning tags from LLM response.
  * Handles XML tags, bracket tags, asterisk thinking, parenthesized thinking,
  * and orphaned closing tags (from assistant prefill).
+ *
+ * Uses index-based extraction (not regex) for paired tags to prevent
+ * catastrophic backtracking on malicious/malformed input.
  */
 export function stripThinkingTags(text: string): string {
   if (typeof text !== 'string') return text;
-  return (
-    text
-      // Paired XML tags: <think>...</think>, <tool_call name="x">...</tool_call>, etc.
-      .replace(
-        /<(think|thinking|thought|reasoning|reflection|tool_call|search)(?:\s+[^>]*)?>\s*[\s\S]*?<\/\1>/gi,
-        '',
-      )
-      // Paired bracket tags: [THINK]...[/THINK], [TOOL_CALL]...[/TOOL_CALL]
-      .replace(/\[(THINK|THOUGHT|REASONING|TOOL_CALL)\][\s\S]*?\[\/\1\]/gi, '')
-      // Asterisk-wrapped thinking: *thinks: ...*
-      .replace(/\*thinks?:[\s\S]*?\*/gi, '')
-      // Parenthesized thinking: (thinking: ...)
-      .replace(/\(thinking:[\s\S]*?\)/gi, '')
-      // Orphaned closing tags (opening tag was in assistant prefill)
-      .replace(/^[\s\S]*?<\/(think|thinking|thought|reasoning|tool_call|search)>\s*/i, '')
-      .trim()
-  );
+  let cleaned = text;
+
+  // Use non-regex extraction for paired tags (case-insensitive, attribute-aware)
+  cleaned = stripPairedTag(cleaned, 'think');
+  cleaned = stripPairedTag(cleaned, 'thinking');
+  cleaned = stripPairedTag(cleaned, 'thought');
+  cleaned = stripPairedTag(cleaned, 'reasoning');
+  cleaned = stripPairedTag(cleaned, 'tool_call');
+  cleaned = stripPairedTag(cleaned, 'search');
+  cleaned = stripBracketTag(cleaned, 'THINK');
+  cleaned = stripBracketTag(cleaned, 'THOUGHT');
+  cleaned = stripBracketTag(cleaned, 'REASONING');
+  cleaned = stripBracketTag(cleaned, 'TOOL_CALL');
+
+  // Safe regex patterns (bounded, no [\s\S]*?)
+  cleaned = cleaned.replace(/\*thinks?:[^*]*\*/gi, '');           // Asterisk thinking
+  cleaned = cleaned.replace(/\(thinking:[^)]*\)/gi, '');          // Parenthesized
+  cleaned = cleaned.replace(/^[\s\S]*?<\/(think|thinking)>/i, '');     // Orphaned close
+
+  return cleaned.trim();
 }
 
 /**
