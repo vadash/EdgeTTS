@@ -506,6 +506,7 @@ export async function runConversion(
         maxConcurrentRequests: input.llmThreads,
         directoryHandle: input.directoryHandle,
         logger,
+        detectedLanguage: input.detectedLanguage,
         mergeConfig: {
           apiKey: input.mergeConfig.apiKey,
           apiUrl: input.mergeConfig.apiUrl,
@@ -576,6 +577,7 @@ export async function runConversion(
         maxConcurrentRequests: input.llmThreads,
         directoryHandle: input.directoryHandle,
         logger,
+        detectedLanguage: input.detectedLanguage,
       };
 
       const assignBlocks = textBlockSplitter.createAssignBlocks(text);
