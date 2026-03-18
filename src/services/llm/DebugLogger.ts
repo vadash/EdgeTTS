@@ -1,12 +1,10 @@
 import type { Logger } from '../Logger';
-import type { PassType } from './LLMApiClient';
 
 /**
  * Handles debug log file persistence to the user's file system.
  * Extracted from LLMApiClient to respect SRP.
  */
 export class DebugLogger {
-  private logged = new Set<string>();
   private errorCounter: number = 0;
 
   constructor(
@@ -44,19 +42,8 @@ export class DebugLogger {
     await this.saveLog(respFile, { content: responseContent });
   }
 
-  /** Check if this pass type has been logged already */
-  shouldLog(pass: PassType): boolean {
-    return !this.logged.has(pass);
-  }
-
-  /** Mark a pass type as logged */
-  markLogged(pass: PassType): void {
-    this.logged.add(pass);
-  }
-
-  /** Reset logging flags and error counter for a new conversion */
+  /** Reset error counter for a new conversion */
   resetLogging(): void {
-    this.logged.clear();
     this.errorCounter = 0;
   }
 }

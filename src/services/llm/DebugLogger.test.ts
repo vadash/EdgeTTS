@@ -53,17 +53,6 @@ describe('DebugLogger', () => {
     );
   });
 
-  it('tracks first-call-per-pass via shouldLog/markLogged', () => {
-    const logger = new DebugLogger(null);
-    expect(logger.shouldLog('extract')).toBe(true);
-    logger.markLogged('extract');
-    expect(logger.shouldLog('extract')).toBe(false);
-
-    // Reset
-    logger.resetLogging();
-    expect(logger.shouldLog('extract')).toBe(true);
-  });
-
   it('saveErrorLog writes sequential rN.json and aN.json files', async () => {
     const { mockDirHandle, mockLogsFolder, mockWritable } = createMockDirectoryHandle();
     const logger = new DebugLogger(mockDirHandle);
