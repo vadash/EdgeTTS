@@ -1,6 +1,7 @@
 import type OpenAIType from 'openai';
 import OpenAI from 'openai';
 import type { z } from 'zod';
+import { ZodError } from 'zod';
 import { RetriableError } from '@/errors';
 import { safeParseJSON } from '@/utils/text';
 import type { Logger } from '../Logger';
@@ -282,10 +283,6 @@ export class LLMApiClient {
 
     applyProviderFixes(requestBody, this.provider);
 
-    if (this.debugLogger?.shouldLog('structured')) {
-      this.debugLogger.saveLog('structured_request.json', requestBody);
-    }
-
     this.logger?.info(`[structured] API call starting (streaming: ${useStreaming})...`);
 
     let content: string;
@@ -363,14 +360,35 @@ export class LLMApiClient {
 
     this.logger?.info(`[structured] API call completed (${content.length} chars)`);
 
-    if (this.debugLogger?.shouldLog('structured')) {
-      this.debugLogger.saveLog('structured_response.json', {
-        choices: [{ message: { content } }],
-        model: this.options.model,
-      });
-      this.debugLogger.markLogged('structured');
+    // Try to parse and validate the response
+    try {
+      return safeParseJSON(content, schema);
+    } catch (error) {
+      // Save debug logs only for data-quality errors
+      if (this.isDataQualityError(error)) {
+        await this.debugLogger?.saveErrorLog(requestBody, content);
+      }
+      throw error;
     }
+  }
 
-    return safeParseJSON(content, schema);
+  /**
+   * Check if an error is a data-quality error that should trigger debug logging.
+   * Data-quality errors: Zod validation errors, JSON parse errors, empty responses.
+   * Infrastructure errors (network, timeout, rate limit) return false.
+   */
+  private isDataQualityError(error: unknown): boolean {
+    // Zod validation errors indicate schema mismatch
+    if (error instanceof ZodError) {
+      return true;
+    }
+    // RetriableError with JSON/Empty response indicates data quality issue
+    if (error instanceof RetriableError) {
+      return (
+        error.message.includes('JSON') ||
+        error.message.includes('Empty response')
+      );
+    }
+    return false;
   }
 }

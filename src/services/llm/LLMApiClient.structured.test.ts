@@ -342,4 +342,124 @@ describe('LLMApiClient.callStructured', () => {
     const callArgs = mockCreate.mock.calls[0][0];
     expect(callArgs).toMatchObject({ stream: false });
   });
+
+  it('saves debug logs on Zod validation error', async () => {
+    const TestSchema = z.object({
+      requiredField: z.string(),
+    });
+
+    const mockResponse = {
+      choices: [
+        {
+          message: {
+            content: '{"missing": "field"}', // Missing requiredField
+            refusal: null,
+          },
+        },
+      ],
+    };
+
+    mockCreate.mockResolvedValue(mockResponse);
+
+    const mockSaveErrorLog = vi.fn();
+    const mockDebugLogger = {
+      saveErrorLog: mockSaveErrorLog,
+      resetLogging: vi.fn(),
+    };
+
+    const client = new LLMApiClient({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      logger: mockLogger,
+      debugLogger: mockDebugLogger as any,
+    });
+
+    await expect(
+      (client as any).callStructured({
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      }),
+    ).rejects.toThrow();
+
+    // Should have saved error logs
+    expect(mockSaveErrorLog).toHaveBeenCalledTimes(1);
+    const [requestBody, responseContent] = mockSaveErrorLog.mock.calls[0];
+    expect(requestBody).toHaveProperty('model', 'gpt-4o-mini');
+    expect(responseContent).toBe('{"missing": "field"}');
+  });
+
+  it('does NOT save debug logs on infrastructure errors', async () => {
+    const TestSchema = z.object({ value: z.string() });
+
+    // Simulate network error
+    mockCreate.mockRejectedValue(new Error('Network Error'));
+
+    const mockSaveErrorLog = vi.fn();
+    const mockDebugLogger = {
+      saveErrorLog: mockSaveErrorLog,
+      resetLogging: vi.fn(),
+    };
+
+    const client = new LLMApiClient({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      logger: mockLogger,
+      debugLogger: mockDebugLogger as any,
+    });
+
+    await expect(
+      (client as any).callStructured({
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      }),
+    ).rejects.toThrow('Network Error');
+
+    // Should NOT have saved error logs for infrastructure errors
+    expect(mockSaveErrorLog).not.toHaveBeenCalled();
+  });
+
+  it('does NOT save debug logs on successful parse', async () => {
+    const TestSchema = z.object({ value: z.string() });
+
+    const mockResponse = {
+      choices: [
+        {
+          message: {
+            content: '{"value": "success"}',
+            refusal: null,
+          },
+        },
+      ],
+    };
+
+    mockCreate.mockResolvedValue(mockResponse);
+
+    const mockSaveErrorLog = vi.fn();
+    const mockDebugLogger = {
+      saveErrorLog: mockSaveErrorLog,
+      resetLogging: vi.fn(),
+    };
+
+    const client = new LLMApiClient({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      logger: mockLogger,
+      debugLogger: mockDebugLogger as any,
+    });
+
+    const result = await (client as any).callStructured({
+      messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
+      schema: TestSchema,
+      schemaName: 'TestSchema',
+    });
+
+    expect(result).toEqual({ value: 'success' });
+    // Should NOT have saved error logs on success
+    expect(mockSaveErrorLog).not.toHaveBeenCalled();
+  });
 });
