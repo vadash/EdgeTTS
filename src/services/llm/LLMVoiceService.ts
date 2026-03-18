@@ -128,6 +128,7 @@ export class LLMVoiceService {
   public mergeApiClient: LLMApiClient;
   private abortController: AbortController | null = null;
   private logger: Logger;
+  private isFirstAssignBlock: boolean = true; // track first assign block
 
   constructor(options: LLMVoiceServiceOptions) {
     if (!options.logger) {
@@ -262,6 +263,7 @@ export class LLMVoiceService {
     let completed = 0;
 
     this.abortController = new AbortController();
+    this.isFirstAssignBlock = true; // reset for new conversion
 
     // Build code mapping from characters (including variations)
     const { nameToCode, codeToName } = buildCodeMapping(characters);
@@ -392,6 +394,13 @@ export class LLMVoiceService {
 
       // Check if all voting attempts failed - fall back to narrator
       const validResponses = responses.filter((r): r is object => r !== null);
+
+      // Save first assign phase log (voting path)
+      if (this.isFirstAssignBlock && validResponses.length > 0) {
+        await this.apiClient.debugLogger?.savePhaseLog('assign', { messages: assignMessages }, validResponses[0]);
+        this.isFirstAssignBlock = false;
+      }
+
       if (validResponses.length === 0) {
         this.logger?.warn(
           `[assign] Block at ${block.sentenceStartIndex} failed (all voting attempts), using default voice for ${block.sentences.length} sentences`,
@@ -453,6 +462,12 @@ export class LLMVoiceService {
           if (context.codeToName.has(code)) {
             relativeMap.set(index, code);
           }
+        }
+
+        // Save first assign phase log (non-voting path)
+        if (this.isFirstAssignBlock) {
+          await this.apiClient.debugLogger?.savePhaseLog('assign', { messages: assignMessages }, response);
+          this.isFirstAssignBlock = false;
         }
       } catch (_e) {
         this.logger?.warn(
