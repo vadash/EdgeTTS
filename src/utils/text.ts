@@ -40,6 +40,36 @@ export function stripPairedTag(text: string, tagName: string): string {
 }
 
 /**
+ * Case-insensitive bracket tag stripping: [THINK]...[/THINK]
+ * Removes the entire tag including its content.
+ * Syncs lowercase index positions with original case string.
+ */
+export function stripBracketTag(text: string, tagName: string): string {
+  let result = text;
+  let lowerResult = result.toLowerCase();
+  const openTag = `[${tagName.toLowerCase()}`;
+  const closeTag = `[/${tagName.toLowerCase()}]`;
+
+  while (true) {
+    const startIdx = lowerResult.indexOf(openTag);
+    if (startIdx === -1) break; // No more tags
+
+    const closeIdx = lowerResult.indexOf(closeTag, startIdx);
+    if (closeIdx === -1) break; // Unclosed tag, leave it alone
+
+    const closeEndIdx = closeIdx + closeTag.length;
+
+    // Remove from opening tag start to closing tag end (including content)
+    result = result.slice(0, startIdx) + result.slice(closeEndIdx);
+
+    // Re-sync the lowercase version for the next iteration
+    lowerResult = result.toLowerCase();
+  }
+
+  return result;
+}
+
+/**
  * Strip thinking/reasoning tags from LLM response.
  * Handles XML tags, bracket tags, asterisk thinking, parenthesized thinking,
  * and orphaned closing tags (from assistant prefill).
