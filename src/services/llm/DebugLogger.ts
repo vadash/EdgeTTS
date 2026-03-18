@@ -7,6 +7,7 @@ import type { PassType } from './LLMApiClient';
  */
 export class DebugLogger {
   private logged = new Set<string>();
+  private errorCounter: number = 0;
 
   constructor(
     private directoryHandle: FileSystemDirectoryHandle | null | undefined,
@@ -29,6 +30,20 @@ export class DebugLogger {
     }
   }
 
+  /** Save request and response when an error occurs. Uses sequential naming: r1.json/a1.json, r2.json/a2.json */
+  async saveErrorLog(requestBody: object, responseContent: string): Promise<void> {
+    if (!this.directoryHandle) return;
+
+    this.errorCounter++;
+    const reqFile = `r${this.errorCounter}.json`;
+    const respFile = `a${this.errorCounter}.json`;
+
+    // Save request
+    await this.saveLog(reqFile, requestBody);
+    // Save response (wrap in object for consistent structure)
+    await this.saveLog(respFile, { content: responseContent });
+  }
+
   /** Check if this pass type has been logged already */
   shouldLog(pass: PassType): boolean {
     return !this.logged.has(pass);
@@ -39,8 +54,9 @@ export class DebugLogger {
     this.logged.add(pass);
   }
 
-  /** Reset logging flags for a new conversion */
+  /** Reset logging flags and error counter for a new conversion */
   resetLogging(): void {
     this.logged.clear();
+    this.errorCounter = 0;
   }
 }

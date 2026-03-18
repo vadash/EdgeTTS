@@ -63,4 +63,57 @@ describe('DebugLogger', () => {
     logger.resetLogging();
     expect(logger.shouldLog('extract')).toBe(true);
   });
+
+  it('saveErrorLog writes sequential rN.json and aN.json files', async () => {
+    const { mockDirHandle, mockLogsFolder, mockWritable } = createMockDirectoryHandle();
+    const logger = new DebugLogger(mockDirHandle);
+
+    await logger.saveErrorLog({ model: 'gpt-4', messages: [] }, '{"invalid": json}');
+
+    // First error should be r1.json and a1.json
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('r1.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('a1.json', { create: true });
+
+    // Verify content was written
+    const writeCalls = mockWritable.write.mock.calls;
+    expect(writeCalls[0][0]).toContain('gpt-4'); // request content
+    expect(writeCalls[1][0]).toContain('"content"'); // response has wrapped content
+    expect(writeCalls[1][0]).toContain('invalid'); // contains the response content
+  });
+
+  it('saveErrorLog increments counter for each call', async () => {
+    const { mockDirHandle, mockLogsFolder } = createMockDirectoryHandle();
+    const logger = new DebugLogger(mockDirHandle);
+
+    await logger.saveErrorLog({ req: 1 }, 'response 1');
+    await logger.saveErrorLog({ req: 2 }, 'response 2');
+
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('r1.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('a1.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('r2.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('a2.json', { create: true });
+  });
+
+  it('resetLogging resets error counter', async () => {
+    const { mockDirHandle, mockLogsFolder } = createMockDirectoryHandle();
+    const logger = new DebugLogger(mockDirHandle);
+
+    await logger.saveErrorLog({ req: 1 }, 'response 1');
+    logger.resetLogging();
+    await logger.saveErrorLog({ req: 2 }, 'response 2');
+
+    // After reset, should start at 1 again
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('r1.json', { create: true });
+    // Should NOT have r2.json
+    const r2Calls = mockLogsFolder.getFileHandle.mock.calls.filter(
+      (call: any[]) => call[0] === 'r2.json',
+    );
+    expect(r2Calls).toHaveLength(0);
+  });
+
+  it('saveErrorLog does nothing when no directory handle', async () => {
+    const logger = new DebugLogger(null);
+    // Should not throw
+    await logger.saveErrorLog({ req: 1 }, 'response');
+  });
 });
