@@ -152,6 +152,25 @@ describe('Zod Schemas', () => {
     });
   });
 
+  describe('MergeSchema strict mode', () => {
+    it('rejects extra keys at root level', () => {
+      const result = MergeSchema.safeParse({
+        reasoning: null,
+        merges: [[0, 1]],
+        extraField: 'should be rejected',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts valid object without extra keys', () => {
+      const result = MergeSchema.safeParse({
+        reasoning: null,
+        merges: [[0, 1]],
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
   describe('AssignSchema', () => {
     it('accepts valid sparse assignments', () => {
       const result = AssignSchema.safeParse({

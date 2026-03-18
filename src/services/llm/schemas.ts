@@ -26,7 +26,7 @@ export const MergeSchema = baseSchema.extend({
   merges: z.array(
     z.array(z.number().int().min(0)).min(2), // Each group has 2+ indices
   ),
-});
+}).strict();
 
 // Assign stage schema
 // NOTE: z.record() requires 2 args in Zod 4 (single-arg form removed)
