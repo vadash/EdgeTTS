@@ -36,15 +36,15 @@ export interface AssignResult {
 // Prompt Building
 // ============================================================================
 
-export function buildExtractPrompt(textBlock: string): LLMMessage[] {
+export function buildExtractPrompt(textBlock: string, detectedLanguage: string = 'en'): LLMMessage[] {
   const p = LLM_PROMPTS.extract;
   const sys = assembleSystemPrompt(p.role, p.examples);
   const constraints = assembleUserConstraints(p.rules, p.schemaText);
   const user = p.userTemplate.replace('{{text}}', textBlock);
-  return buildMessages(sys, `${user}\n\n${constraints}`);
+  return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage);
 }
 
-export function buildMergePrompt(characters: LLMCharacter[]): LLMMessage[] {
+export function buildMergePrompt(characters: LLMCharacter[], detectedLanguage: string = 'en'): LLMMessage[] {
   const p = LLM_PROMPTS.merge;
   const characterList = characters
     .map(
@@ -56,13 +56,14 @@ export function buildMergePrompt(characters: LLMCharacter[]): LLMMessage[] {
   const sys = assembleSystemPrompt(p.role, p.examples);
   const constraints = assembleUserConstraints(p.rules, p.schemaText);
   const user = p.userTemplate.replace('{{characters}}', characterList);
-  return buildMessages(sys, `${user}\n\n${constraints}`);
+  return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage);
 }
 
 export function buildAssignPrompt(
   characters: LLMCharacter[],
   nameToCode: Map<string, string>,
   numberedParagraphs: string,
+  detectedLanguage: string = 'en',
 ): LLMMessage[] {
   const p = LLM_PROMPTS.assign;
 
@@ -90,7 +91,7 @@ export function buildAssignPrompt(
     .replace('{{characterLines}}', characterLinesStr)
     .replace('{{unnamedEntries}}', unnamedEntriesStr);
 
-  return buildMessages(sys, `${user}\n\n${constraints}`);
+  return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage);
 }
 
 // ============================================================================
