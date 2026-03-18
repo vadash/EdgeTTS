@@ -94,6 +94,35 @@ describe('Zod Schemas', () => {
     });
   });
 
+  describe('ExtractSchema strict mode', () => {
+    it('rejects extra keys at root level', () => {
+      const result = ExtractSchema.safeParse({
+        reasoning: null,
+        characters: [{ canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }],
+        extraField: 'should be rejected',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts valid object without extra keys', () => {
+      const result = ExtractSchema.safeParse({
+        reasoning: 'test',
+        characters: [{ canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('handles omitted reasoning field correctly', () => {
+      const result = ExtractSchema.safeParse({
+        characters: [{ canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.reasoning).toBeNull();
+      }
+    });
+  });
+
   describe('MergeSchema', () => {
     it('accepts valid merge groups', () => {
       const result = MergeSchema.safeParse({

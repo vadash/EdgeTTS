@@ -19,7 +19,7 @@ export const ExtractCharacterSchema = z.object({
 
 export const ExtractSchema = baseSchema.extend({
   characters: z.array(ExtractCharacterSchema).min(1),
-});
+}).strict();
 
 // Merge stage schema
 export const MergeSchema = baseSchema.extend({
