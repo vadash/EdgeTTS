@@ -4,6 +4,19 @@
 **WHY**: To provide a free, high-quality audiobook generation pipeline optimized for LitRPG, Web Novels, and multi-character stories.
 **HOW**: Built with TypeScript, Preact, Tailwind CSS, `@preact/signals`, and Webpack. Runs entirely in the browser (uses FFmpeg.wasm for audio processing and File System Access API for local file management).
 
+## Tech Stack & Libraries
+- **UI:** Preact + Tailwind CSS
+- **State:** `@preact/signals` (global singletons in `/src/stores`)
+- **Audio:** `@ffmpeg/ffmpeg` (WASM, bundled locally via CopyWebpackPlugin)
+- **LLM:** `openai` SDK + Zod 4 (Strict Structured Outputs via `toJSONSchema`)
+- **Resilience:** `p-retry` wrapped in `withRetry` utilities
+- **Files:** `jszip`, DOMParser (EPUB/FB2 extraction)
+
+## Key Design Decisions
+- **Memory:** Never hold audio in RAM. Write chunks to disk via File System Access API to prevent browser OOM.
+- **Structured Outputs:** LLM responses use Zod schemas with `.strict()` mode. Pass through `safeParseJSON()` (in `src/utils/text.ts`) which handles markdown fences, thinking tags, and `jsonrepair`.
+- **Consensus Voting:** Assign stage uses 3-way voting at [0.3, 0.7, 1.0] temperatures; Merge uses 5-way with random temps.
+
 ## Core Commands
 - `npm run dev`: Start Webpack dev server
 - `npm run build`: Production build
