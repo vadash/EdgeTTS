@@ -39,17 +39,25 @@ Stages: `extract.ts` → `merge.ts` → `assign.ts`
 
 **Location**: `src/utils/text.ts`
 
-`safeParseJSON<T>(input, schema)` applies multi-stage repair:
-1. Strip thinking/reasoning tags using **index-based extraction** (not regex) to prevent catastrophic backtracking
-   - Paired tags: `stripPairedTag()` handles `<think>`, `[THINK]`, `*thinks*`, etc.)
-2. Strip markdown code fences
-3. Extract last balanced JSON block (dodges `<tool_call>` hallucinations)
-4. Sanitize LLM syntax hallucinations (string concatenation `+`, dangling plus)
-5. Pad truncated outputs (odd quote count detection)
-6. `jsonrepair` library for structural fixes
-7. Zod schema validation
+`safeParseJSON<T>(input, options)` applies 5-tier waterfall repair:
 
-Used by `LLMApiClient.callStructured()` instead of native parsing.
+| Tier | Strategy |
+|------|----------|
+| 0 | Input validation (null, empty, already object) |
+| 1 | Native `JSON.parse` |
+| 2 | `extractJsonBlocks` + `jsonrepair` |
+| 3 | `normalizeText` + `extractJsonBlocks` + `jsonrepair` |
+| 4 | Aggressive `scrubConcatenation` + `jsonrepair` |
+| 5 | Failure (return error result) |
+
+Returns `{success, data?, error?}` result object. Caller throws `RetriableError` on failure.
+
+**Key functions:**
+- `normalizeText` — Fix smart quotes, control characters
+- `extractJsonBlocks` — Extract ALL balanced blocks (not just last)
+- `scrubConcatenation` — Fix LLM string `+` hallucinations
+- `stripThinkingTags` — Strip `<think>`, `[THINK]`, etc. (regex-based)
+- `stripMarkdownFences` — Strip ``` and ~~~ fences
 
 ## Clients
 
