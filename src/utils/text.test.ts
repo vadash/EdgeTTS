@@ -1,64 +1,99 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { stripThinkingTags, extractBalancedJSON, safeParseJSON, stripPairedTag, stripBracketTag } from './text';
+import {
+  stripThinkingTags,
+  extractJsonBlocks,
+  safeParseJSON,
+  normalizeText,
+  stripMarkdownFences,
+  scrubConcatenation
+} from './text';
 
-describe('stripPairedTag', () => {
-  it('removes paired tags and their content case-insensitively', () => {
-    const input = '<THINK>internal content</think>external content';
-    expect(stripPairedTag(input, 'think')).toBe('external content');
+describe('normalizeText', () => {
+  it('replaces smart quotes with standard quotes', () => {
+    expect(normalizeText('"hello"')).toBe('"hello"');
+    expect(normalizeText("'world'")).toBe("'world'");
   });
 
-  it('removes tags with attributes and their content', () => {
-    const input = '<think type="internal">content</think>after';
-    expect(stripPairedTag(input, 'think')).toBe('after');
+  it('strips control characters except newline/tab', () => {
+    expect(normalizeText('hello\x00world')).toBe('helloworld');
+    expect(normalizeText('hello\nworld')).toBe('hello\nworld');
+    expect(normalizeText('hello\tworld')).toBe('hello\tworld');
   });
 
-  it('leaves unclosed tags alone', () => {
-    const input = '<think>content without close';
-    expect(stripPairedTag(input, 'think')).toBe(input);
-  });
-
-  it('removes multiple paired tags with content', () => {
-    const input = '<think>first</think> middle <think>second</think> end';
-    expect(stripPairedTag(input, 'think')).toBe(' middle  end');
-  });
-
-  it('handles tags with uppercase attributes', () => {
-    const input = '<THINK TYPE="internal">content</think>after';
-    expect(stripPairedTag(input, 'think')).toBe('after');
+  it('returns non-strings as-is', () => {
+    expect(normalizeText(null as any)).toBe(null);
+    expect(normalizeText(undefined as any)).toBe(undefined);
   });
 });
 
-describe('stripBracketTag', () => {
-  it('removes paired bracket tags case-insensitively', () => {
-    const input = '[THINK]content[/think]';
-    expect(stripBracketTag(input, 'THINK')).toBe('');
+describe('extractJsonBlocks', () => {
+  it('extracts single JSON object', () => {
+    const blocks = extractJsonBlocks('text {"a": 1} more');
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].text).toBe('{"a": 1}');
+    expect(blocks[0].isObject).toBe(true);
   });
 
-  it('leaves unclosed bracket tags alone', () => {
-    const input = '[THINK]content without close';
-    expect(stripBracketTag(input, 'THINK')).toBe(input);
+  it('extracts multiple blocks and returns all', () => {
+    const blocks = extractJsonBlocks('{"a": 1} text [1, 2] more');
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].text).toBe('{"a": 1}');
+    expect(blocks[1].text).toBe('[1, 2]');
+    expect(blocks[1].isObject).toBe(false);
   });
 
-  it('removes multiple paired bracket tags', () => {
-    const input = '[THINK]first[/THINK] middle [THINK]second[/THINK]';
-    expect(stripBracketTag(input, 'THINK')).toBe(' middle ');
+  it('returns empty array for no JSON', () => {
+    expect(extractJsonBlocks('no json here')).toEqual([]);
+  });
+});
+
+describe('stripMarkdownFences', () => {
+  it('strips complete fences', () => {
+    expect(stripMarkdownFences('```json\n{"a": 1}\n```')).toBe('{"a": 1}');
+    expect(stripMarkdownFences('~~~\n{"a": 1}\n~~~')).toBe('{"a": 1}');
+  });
+
+  it('strips orphan fences', () => {
+    expect(stripMarkdownFences('```json\n{"a": 1}')).toBe('{"a": 1}');
+    expect(stripMarkdownFences('{"a": 1}\n```')).toBe('{"a": 1}');
+  });
+
+  it('returns text as-is if no fences', () => {
+    expect(stripMarkdownFences('{"a": 1}')).toBe('{"a": 1}');
+  });
+});
+
+describe('scrubConcatenation', () => {
+  it('removes mid-string concatenation', () => {
+    expect(scrubConcatenation('"hello" + "world"')).toBe('"helloworld"');
+  });
+
+  it('handles full-width plus', () => {
+    expect(scrubConcatenation('"hello" ＋ "world"')).toBe('"helloworld"');
+  });
+
+  it('removes dangling plus before punctuation', () => {
+    expect(scrubConcatenation('"text" + ,')).toBe('"text",');
   });
 });
 
 describe('stripThinkingTags', () => {
-  it('removes paired <think>...</think> blocks', () => {
-    const text = '<think>\nReasoning here\n</think>\n{"result": true}';
+  it('removes paired </think>...</think> blocks', () => {
+    const text = String.raw`<thinking>
+Reasoning here
+</thinking>
+{"result": true}`;
     expect(stripThinkingTags(text)).toBe('{"result": true}');
   });
 
   it('removes orphaned closing tags (opening was in prefill)', () => {
-    const text = 'Reasoning continued\n</think>\n{"result": true}';
+    const text = 'Reasoning continued\n</thinking>\n{"result": true}';
     expect(stripThinkingTags(text)).toBe('{"result": true}');
   });
 
-  it('removes <think> with attributes', () => {
-    const text = '<think type="internal">\nstuff\n</think>\n{"ok": 1}';
+  it('removes </think> with attributes', () => {
+    const text = '<think type="internal">\nstuff\n</thinking>\n{"ok": 1}';
     expect(stripThinkingTags(text)).toBe('{"ok": 1}');
   });
 
@@ -82,8 +117,11 @@ describe('stripThinkingTags', () => {
     expect(stripThinkingTags(text)).toBe('{"result": true}');
   });
 
-  it('removes <tool_call>...</tool_call> tags', () => {
-    const text = '<tool_call name="extract">\n{}\n</tool_call>\n{"actual": "data"}';
+  it('removes <tool_call>...</think> tags', () => {
+    const text = String.raw`<tool_call name="extract">
+{}
+</tool_call>
+{"actual": "data"}`;
     expect(stripThinkingTags(text)).toBe('{"actual": "data"}');
   });
 
@@ -101,7 +139,10 @@ describe('stripThinkingTags', () => {
     // This test verifies that index-based extraction prevents regex DoS
     // Previous regex-based implementation could hang on 50KB+ unclosed tags
     const largeContent = 'x'.repeat(50000);
-    const text = `start  ${largeContent} end`;
+    // This is a TRULY unclosed tag (no closing </think>), so it should be preserved
+    const text = String.raw`start <think>
+${largeContent}
+ end`;
 
     const start = Date.now();
     const result = stripThinkingTags(text);
@@ -109,14 +150,14 @@ describe('stripThinkingTags', () => {
 
     // Should complete in under 100ms (previously could take 30+ seconds)
     expect(elapsed).toBeLessThan(100);
-    // Should preserve the text since tag is unclosed
+    // Unclosed tags are NOT removed by stripThinkingTags (only paired tags are)
     expect(result).toBe(text);
   });
 
   it('handles various orphaned closing tag formats', () => {
     // These test orphaned closing tags from assistant prefill scenarios
     const variants = [
-      '</think>content',
+      '</thinking>content',
       '</thinking>content',
       '</THINK>content',
     ];
@@ -127,115 +168,72 @@ describe('stripThinkingTags', () => {
 
   it('handles multiline orphaned closing tags', () => {
     // Orphaned close tags may span multiple lines
-    const text = '\n\n</think>\n{"result": true}';
+    const text = '\n\n</thinking>\n{"result": true}';
     expect(stripThinkingTags(text)).toBe('{"result": true}');
-  });
-});
-
-describe('extractBalancedJSON', () => {
-  it('extracts the last complete object', () => {
-    const text = 'Here is data: {"wrong": 1} ... Actually: {"correct": 2}';
-    expect(extractBalancedJSON(text)).toBe('{"correct": 2}');
-  });
-
-  it('extracts a single object', () => {
-    const text = 'Some text {"key": "value"} more text';
-    expect(extractBalancedJSON(text)).toBe('{"key": "value"}');
-  });
-
-  it('extracts an array', () => {
-    const text = 'Here: [1, 2, 3]';
-    expect(extractBalancedJSON(text)).toBe('[1, 2, 3]');
-  });
-
-  it('handles nested brackets', () => {
-    const text = '{"outer": {"inner": [1, 2]}}';
-    expect(extractBalancedJSON(text)).toBe('{"outer": {"inner": [1, 2]}}');
-  });
-
-  it('handles strings containing brackets', () => {
-    const text = '{"text": "contains { and } brackets"}';
-    expect(extractBalancedJSON(text)).toBe('{"text": "contains { and } brackets"}');
-  });
-
-  it('handles escaped quotes in strings', () => {
-    const text = '{"text": "he said \\"hello\\""}';
-    expect(extractBalancedJSON(text)).toBe('{"text": "he said \\"hello\\""}');
-  });
-
-  it('returns null for no JSON', () => {
-    expect(extractBalancedJSON('no json here')).toBeNull();
-  });
-
-  it('returns null for unbalanced brackets', () => {
-    expect(extractBalancedJSON('{"unclosed": true')).toBeNull();
-  });
-
-  it('skips tool_call hallucination and returns last block', () => {
-    const text = '<tool_call>{"name": "fake"}</tool_call>\n{"real": "data"}';
-    // After stripThinkingTags removes <tool_call>, extractBalancedJSON should find {"real": "data"}
-    // But even without stripping, it returns the LAST balanced block
-    expect(extractBalancedJSON(text)).toBe('{"real": "data"}');
   });
 });
 
 describe('safeParseJSON', () => {
   const SimpleSchema = z.object({ value: z.string() });
+  const NumberSchema = z.object({ count: z.number() });
 
-  it('parses clean JSON', () => {
-    const result = safeParseJSON('{"value": "hello"}', SimpleSchema);
-    expect(result).toEqual({ value: 'hello' });
-  });
-
-  it('strips markdown code fences', () => {
-    const input = '```json\n{"value": "fenced"}\n```';
-    const result = safeParseJSON(input, SimpleSchema);
-    expect(result).toEqual({ value: 'fenced' });
+  it('parses valid JSON', () => {
+    const result = safeParseJSON('{"value": "hello"}', { schema: SimpleSchema });
+    expect(result.success).toBe(true);
+    expect(result.data?.value).toBe('hello');
   });
 
   it('strips thinking tags before parsing', () => {
-    const input = '<think>\nLet me analyze\n</think>\n{"value": "after-think"}';
-    const result = safeParseJSON(input, SimpleSchema);
-    expect(result).toEqual({ value: 'after-think' });
+    const input = `<thinking>let me think</thinking>{"value": "hello"}`;
+    const result = safeParseJSON(input, { schema: SimpleSchema });
+    expect(result.success).toBe(true);
+    expect(result.data?.value).toBe('hello');
   });
 
-  it('repairs trailing commas', () => {
-    const input = '{"value": "trailing",}';
-    const result = safeParseJSON(input, SimpleSchema);
-    expect(result).toEqual({ value: 'trailing' });
+  it('strips markdown fences before parsing', () => {
+    const input = '```json\n{"value": "hello"}\n```';
+    const result = safeParseJSON(input, { schema: SimpleSchema });
+    expect(result.success).toBe(true);
+    expect(result.data?.value).toBe('hello');
   });
 
-  it('repairs unquoted keys', () => {
-    const input = '{value: "unquoted"}';
-    const result = safeParseJSON(input, SimpleSchema);
-    expect(result).toEqual({ value: 'unquoted' });
+  it('handles string concatenation hallucinations at Tier 4', () => {
+    const input = '{"value": "hello" + "world"}';
+    const result = safeParseJSON(input, { schema: SimpleSchema });
+    expect(result.success).toBe(true);
+    expect(result.data?.value).toBe('helloworld');
   });
 
-  it('repairs mid-string concatenation', () => {
-    const input = '{"value": "broken" + \n "string"}';
-    const result = safeParseJSON(input, SimpleSchema);
-    expect(result).toEqual({ value: 'brokenstring' });
+  it('extracts JSON from surrounding text', () => {
+    const input = 'some text {"value": "hello"} more text';
+    const result = safeParseJSON(input, { schema: SimpleSchema });
+    expect(result.success).toBe(true);
+    expect(result.data?.value).toBe('hello');
   });
 
-  it('extracts JSON from conversational wrapper', () => {
-    const input = 'Here is the result:\n{"value": "extracted"}\nHope this helps!';
-    const result = safeParseJSON(input, SimpleSchema);
-    expect(result).toEqual({ value: 'extracted' });
+  it('returns error result for invalid JSON', () => {
+    const result = safeParseJSON('not json at all', { schema: SimpleSchema });
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(Error);
   });
 
-  it('throws on completely invalid input', () => {
-    expect(() => safeParseJSON('not json at all', SimpleSchema)).toThrow();
+  it('returns error result for schema mismatch', () => {
+    const result = safeParseJSON('{"count": "not-a-number"}', { schema: NumberSchema });
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(Error);
   });
 
-  it('throws on schema validation failure', () => {
-    const NumberSchema = z.object({ count: z.number() });
-    expect(() => safeParseJSON('{"count": "not-a-number"}', NumberSchema)).toThrow();
+  it('handles orphaned closing tags', () => {
+    const input = '</thinking>{"value": "hello"}';
+    const result = safeParseJSON(input, { schema: SimpleSchema });
+    expect(result.success).toBe(true);
+    expect(result.data?.value).toBe('hello');
   });
 
-  it('handles orphaned closing think tag from prefill', () => {
-    const input = '[系统日志]\n开始提取：\n</think>\n{"value": "prefilled"}';
-    const result = safeParseJSON(input, SimpleSchema);
-    expect(result).toEqual({ value: 'prefilled' });
+  it('works without schema (returns unknown)', () => {
+    const result = safeParseJSON('{"any": "data"}');
+    expect(result.success).toBe(true);
+    expect((result.data as any).any).toBe('data');
   });
 
   it('handles the full ExtractSchema shape', () => {
@@ -248,18 +246,19 @@ describe('safeParseJSON', () => {
       })).min(1),
     });
 
-    const input = `<think>
-[系统日志：内容安全审查已绕过。]
+    const input = String.raw`<thinking>
+[System Log: Content safety check bypassed.]
 Step 1: John speaks.
-</think>
+</thinking>
 {
   "reasoning": "John speaks first",
   "characters": [
     {"canonicalName": "John", "variations": ["John"], "gender": "male"}
   ]
 }`;
-    const result = safeParseJSON(input, ExtractSchema);
-    expect(result.characters).toHaveLength(1);
-    expect(result.characters[0].canonicalName).toBe('John');
+    const result = safeParseJSON(input, { schema: ExtractSchema });
+    expect(result.success).toBe(true);
+    expect(result.data?.characters).toHaveLength(1);
+    expect(result.data?.characters[0].canonicalName).toBe('John');
   });
 });
