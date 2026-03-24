@@ -366,7 +366,7 @@ export class LLMApiClient {
       if (!result.success) {
         throw new RetriableError(`JSON parse failed: ${result.error!.message}`);
       }
-      return result.data;
+      return result.data!;
     } catch (error) {
       // Save debug logs only for data-quality errors
       if (this.isDataQualityError(error)) {
