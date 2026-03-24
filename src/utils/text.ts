@@ -3,256 +3,357 @@ import type { z } from 'zod';
 import { RetriableError } from '@/errors';
 
 /**
- * Case-insensitive, attribute-aware tag stripping.
- * Handles: <think>...</think>, <THINK>...</think>, <think type="internal">...</think>
- * Syncs lowercase index positions with original case string.
+ * Normalize text by fixing invisible characters and typographical anomalies.
+ * - Strips unescaped control characters (\x00-\x1F), preserving \n, \r, \t
+ * - Replaces smart/curly quotes with standard quotes
+ * - Strips Unicode line/paragraph separators (\u2028, \u2029)
  */
-export function stripPairedTag(text: string, tagName: string): string {
-  let result = text;
-  let lowerResult = result.toLowerCase();
-  const openTag = `<${tagName.toLowerCase()}`;
-  const closeTag = `</${tagName.toLowerCase()}>`;
+export function normalizeText(text: string): string {
+  if (!text || typeof text !== 'string') return text;
 
-  while (true) {
-    const startIdx = lowerResult.indexOf(openTag);
-    if (startIdx === -1) break; // No more tags
+  return (
+    text
+      // Replace smart double quotes
+      .replace(/[""]/g, '"')
+      // Replace smart single quotes
+      .replace(/['']/g, "'")
+      // Strip Unicode line/paragraph separators
+      .replace(/[\u2028\u2029]/g, '')
+      // Strip unescaped control characters (preserve \n \r \t)
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+  );
+}
 
-    // Find the closing bracket of the opening tag to handle attributes
-    const openEndIdx = lowerResult.indexOf('>', startIdx);
-    if (openEndIdx === -1) break; // Malformed tag, abort to be safe
+/**
+ * Extract all balanced JSON blocks from a string.
+ * Correctly handles strings, escape sequences, and nested structures.
+ */
+export function extractJsonBlocks(
+  text: string,
+  _options: { minSize?: number } = {}
+): Array<{ start: number; end: number; text: string; isObject: boolean }> {
+  if (!text || typeof text !== 'string') return [];
 
-    // Find the matching closing tag (handle nesting by counting opens/closes)
-    let closeIdx = -1;
-    let searchFrom = openEndIdx + 1;
-    let depth = 1;
+  const blocks: Array<{ start: number; end: number; text: string; isObject: boolean }> = [];
+  let i = 0;
 
-    while (searchFrom < lowerResult.length) {
-      const nextOpen = lowerResult.indexOf(openTag, searchFrom);
-      const nextClose = lowerResult.indexOf(closeTag, searchFrom);
-
-      if (nextClose === -1) break; // No more closing tags
-
-      if (nextOpen !== -1 && nextOpen < nextClose) {
-        // Found another opening tag before closing - increase depth
-        depth++;
-        // Move past this opening tag
-        const nextOpenEnd = lowerResult.indexOf('>', nextOpen);
-        if (nextOpenEnd === -1) break;
-        searchFrom = nextOpenEnd + 1;
-      } else {
-        // Found a closing tag
-        depth--;
-        if (depth === 0) {
-          closeIdx = nextClose;
-          break;
-        }
-        // Move past this closing tag and continue searching
-        searchFrom = nextClose + closeTag.length;
-      }
+  while (i < text.length) {
+    // Find opening bracket
+    if (text[i] !== '{' && text[i] !== '[') {
+      i++;
+      continue;
     }
 
-    if (closeIdx === -1) break; // Unclosed or malformed, leave it alone
-
-    const closeEndIdx = closeIdx + closeTag.length;
-
-    // Remove from opening tag start to closing tag end (including content)
-    result = result.slice(0, startIdx) + result.slice(closeEndIdx);
-
-    // Re-sync the lowercase version for the next iteration
-    lowerResult = result.toLowerCase();
-  }
-
-  return result;
-}
-
-/**
- * Case-insensitive bracket tag stripping: [THINK]...[/THINK]
- * Removes the entire tag including its content.
- * Syncs lowercase index positions with original case string.
- */
-export function stripBracketTag(text: string, tagName: string): string {
-  let result = text;
-  let lowerResult = result.toLowerCase();
-  const openTag = `[${tagName.toLowerCase()}`;
-  const closeTag = `[/${tagName.toLowerCase()}]`;
-
-  while (true) {
-    const startIdx = lowerResult.indexOf(openTag);
-    if (startIdx === -1) break; // No more tags
-
-    const closeIdx = lowerResult.indexOf(closeTag, startIdx);
-    if (closeIdx === -1) break; // Unclosed tag, leave it alone
-
-    const closeEndIdx = closeIdx + closeTag.length;
-
-    // Remove from opening tag start to closing tag end (including content)
-    result = result.slice(0, startIdx) + result.slice(closeEndIdx);
-
-    // Re-sync the lowercase version for the next iteration
-    lowerResult = result.toLowerCase();
-  }
-
-  return result;
-}
-
-/**
- * Strip thinking/reasoning tags from LLM response.
- * Handles XML tags, bracket tags, asterisk thinking, parenthesized thinking,
- * and orphaned closing tags (from assistant prefill).
- *
- * Uses index-based extraction (not regex) for paired tags to prevent
- * catastrophic backtracking on malicious/malformed input.
- */
-export function stripThinkingTags(text: string): string {
-  if (typeof text !== 'string') return text;
-  let cleaned = text;
-
-  // Use non-regex extraction for paired tags (case-insensitive, attribute-aware)
-  cleaned = stripPairedTag(cleaned, 'think');
-  cleaned = stripPairedTag(cleaned, 'thinking');
-  cleaned = stripPairedTag(cleaned, 'thought');
-  cleaned = stripPairedTag(cleaned, 'reasoning');
-  cleaned = stripPairedTag(cleaned, 'tool_call');
-  cleaned = stripPairedTag(cleaned, 'search');
-  cleaned = stripBracketTag(cleaned, 'THINK');
-  cleaned = stripBracketTag(cleaned, 'THOUGHT');
-  cleaned = stripBracketTag(cleaned, 'REASONING');
-  cleaned = stripBracketTag(cleaned, 'TOOL_CALL');
-
-  // Safe regex patterns (bounded, no [\s\S]*?)
-  cleaned = cleaned.replace(/\*thinks?:[^*]*\*/gi, '');           // Asterisk thinking
-  cleaned = cleaned.replace(/\(thinking:[^)]*\)/gi, '');          // Parenthesized
-  cleaned = cleaned.replace(/^[\s\S]*?<\/(think|thinking)>/i, '');     // Orphaned close
-
-  return cleaned.trim();
-}
-
-/**
- * Extract the LAST balanced JSON object or array from a string.
- * Scans all balanced blocks and returns the final one found.
- *
- * Why "Last"? LLMs output reasoning and hallucinated <tool_call> snippets
- * BEFORE the actual payload. The real JSON is always the last complete block.
- */
-export function extractBalancedJSON(str: string): string | null {
-  let lastMatch: string | null = null;
-  let searchFrom = 0;
-
-  while (searchFrom < str.length) {
-    // Find next opening bracket
-    let startIdx = -1;
-    for (let i = searchFrom; i < str.length; i++) {
-      if (str[i] === '{' || str[i] === '[') {
-        startIdx = i;
-        break;
-      }
-    }
-
-    if (startIdx === -1) break;
-
-    const open = str[startIdx];
-    const close = open === '{' ? '}' : ']';
+    const startIdx = i;
+    const openChar = text[i];
+    const closeChar = openChar === '{' ? '}' : ']';
     let depth = 0;
     let inString = false;
+    let stringDelim: string | null = null;
     let isEscaped = false;
-    let endIdx = -1;
+    let foundEnd = false;
 
-    for (let i = startIdx; i < str.length; i++) {
-      const ch = str[i];
+    while (i < text.length) {
+      const ch = text[i];
 
       if (isEscaped) {
         isEscaped = false;
+        i++;
         continue;
       }
+
       if (ch === '\\' && inString) {
         isEscaped = true;
-        continue;
-      }
-      if (ch === '"') {
-        inString = !inString;
+        i++;
         continue;
       }
 
-      if (inString) continue;
+      // String delimiter handling
+      if ((ch === '"' || ch === "'" || ch === '`') && !inString) {
+        inString = true;
+        stringDelim = ch;
+        i++;
+        continue;
+      }
 
-      if (ch === open) {
+      if (ch === stringDelim && inString) {
+        inString = false;
+        stringDelim = null;
+        i++;
+        continue;
+      }
+
+      if (inString) {
+        i++;
+        continue;
+      }
+
+      // Bracket counting
+      if (ch === openChar) {
         depth++;
-      } else if (ch === close) {
+      } else if (ch === closeChar) {
         depth--;
         if (depth === 0) {
-          endIdx = i;
+          foundEnd = true;
           break;
         }
       }
+
+      i++;
     }
 
-    if (endIdx !== -1) {
-      lastMatch = str.slice(startIdx, endIdx + 1);
-      searchFrom = endIdx + 1;
+    if (foundEnd) {
+      const blockText = text.slice(startIdx, i + 1);
+      blocks.push({
+        start: startIdx,
+        end: i,
+        text: blockText,
+        isObject: openChar === '{',
+      });
+      i++;
     } else {
-      searchFrom = startIdx + 1;
+      // Unbalanced - move past opening bracket and continue
+      i = startIdx + 1;
     }
   }
 
-  return lastMatch;
+  return blocks;
 }
 
 /**
- * Safely parse LLM output as JSON, applying multi-stage repair:
- * 1. Strip thinking/reasoning tags
- * 2. Strip markdown code fences
- * 3. Extract last balanced JSON block
- * 4. Sanitize LLM syntax hallucinations (string concatenation, dangling plus)
- * 5. Pad truncated outputs (odd quote count)
- * 6. jsonrepair for structural issues
- * 7. Zod schema validation
- *
- * Throws on failure (designed for use with withRetry + RetriableError).
+ * Fix string concatenation hallucinations from LLMs.
+ * Only runs at Tier 4 (desperation) - applies strict patterns to avoid
+ * damaging valid content like mathematical expressions.
  */
-export function safeParseJSON<T>(input: string, schema: z.ZodType<T>): T {
-  let cleaned = stripThinkingTags(input);
+export function scrubConcatenation(text: string): string {
+  if (!text || typeof text !== 'string') return text;
 
-  // Strip markdown code fences
-  const codeBlockMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/i);
-  if (codeBlockMatch) {
-    cleaned = codeBlockMatch[1].trim();
+  let result = text;
+
+  // 1. Mid-string concatenation: "text" + "more" -> "textmore"
+  // Match both standard (+) and full-width (＋) plus signs
+  result = result.replace(/(?<!\\)(["'])\s*[+＋]\s*(?:\r?\n)?\s*(?<!\\)(["'])/g, '');
+
+  // 2. Multi-line concatenation: "text"\n+\n"more"
+  result = result.replace(/(["'])\s*(?:\r?\n)+\s*[+＋]\s*(?:\r?\n)+\s*(["'])/g, '$1$2');
+  result = result.replace(/(["'])\s*(?:\r?\n)+\s*[+＋]\s*(["'])/g, '$1$2');
+
+  // 3. Dangling plus before punctuation: "text" + , -> "text" ,
+  result = result.replace(/(?<!\\)(["'])\s*[+＋]\s*(?:\r?\n)?\s*([,}\]])/g, '$1$2');
+
+  // 4. Trailing dangling plus: "text" + -> "text"
+  result = result.replace(/(?<!\\)(["'])\s*[+＋]\s*(?:\r?\n)?\s*$/g, '$1');
+
+  return result;
+}
+
+/**
+ * Strip markdown code fences from content.
+ * Handles both ``` and ~~~ fences, with or without language specifier.
+ */
+export function stripMarkdownFences(text: string): string {
+  if (!text || typeof text !== 'string') return text;
+
+  const trimmed = text.trim();
+
+  // Complete fences: ```json ... ``` or ~~~json ... ~~~
+  const fenceMatch = trimmed.match(/^(?:```|~~~)(?:json)?\s*([\s\S]*?)\s*(?:```|~~~)$/i);
+  if (fenceMatch) return fenceMatch[1].trim();
+
+  let result = trimmed;
+  // Unclosed opening fence: ```json\n{...}
+  result = result.replace(/^(?:```|~~~)(?:json)?\s*/i, '');
+  // Orphan closing fence: {...}\n```
+  result = result.replace(/\s*(?:```|~~~)\s*$/i, '');
+
+  return result.trim();
+}
+
+/**
+ * Strip thinking/reasoning tags from LLM response
+ */
+export function stripThinkingTags(text: string): string {
+  if (typeof text !== 'string') return text;
+  return (
+    text
+      // Paired XML tags: <think>...</think>, <thinking>...</thinking>, etc.
+      // (?:\s+[^>]*)? matches optional attributes like <tool_call name="extract_events">
+      .replace(
+        /<(think|thinking|thought|reasoning|reflection|tool_call|search)(?:\s+[^>]*)?>\s*[\s\S]*?<\/\1>/gi,
+        ''
+      )
+      // Paired bracket tags: [THINK]...[/THINK], [TOOL_CALL]...[/TOOL_CALL], etc.
+      .replace(/\[(THINK|THOUGHT|REASONING|TOOL_CALL)\][\s\S]*?\[\/\1\]/gi, '')
+      // Asterisk thinking: *thinks* or *thought*
+      .replace(/\*thinks?:[\s\S]*?\*/gi, '')
+      // Parenthesized thinking: (thinking: ...)
+      .replace(/\(thinking:[\s\S]*?\)/gi, '')
+      // Orphaned closing tags (opening tag was in assistant prefill)
+      .replace(/^[\s\S]*?<\/(think|thinking|thought|reasoning|tool_call|search)>\s*/i, '')
+      // ideal_output: few-shot example wrapper that LLM sometimes reproduces after JSON
+      .replace(/<\/ideal_output>\s*/gi, '')
+      .trim()
+  );
+}
+
+/**
+ * Safely parse JSON with progressive fallback waterfall.
+ * Returns Zod-style result object for maximum reusability.
+ *
+ * Flow:
+ *   Input Validation → stripThinkingTags → Strip Fences → Tier 1 (JSON.parse)
+ *   → Tier 2 (jsonrepair) → Tier 3 (Normalize + Extract) → Tier 4 (Scrub) → Tier 5 (Failure)
+ */
+export function safeParseJSON<T>(
+  input: unknown,
+  options: {
+    schema?: z.ZodType<T>;
+    minimumBlockSize?: number;
+    onError?: (context: { tier: number; originalLength: number; error: Error; sanitizedString?: string }) => void;
+  } = {}
+): { success: boolean; data?: T; error?: Error; errorContext?: object } {
+  const { schema, minimumBlockSize = 50, onError } = options;
+  const originalLength = typeof input === 'string' ? input.length : 0;
+
+  // === Tier 0: Input Validation ===
+  if (input === null || input === undefined) {
+    const error = new Error('Input is null or undefined');
+    const context = { tier: 0, originalLength, error };
+    onError?.(context);
+    return { success: false, error, errorContext: context };
   }
 
-  // Extract the LAST balanced block to dodge tool_call hallucinations
-  const extracted = extractBalancedJSON(cleaned);
-  if (extracted) {
-    cleaned = extracted;
+  // Already an object/array - return as-is
+  if (typeof input === 'object') {
+    const data = input as T;
+    if (schema) {
+      try {
+        return { success: true, data: schema.parse(data) };
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error(String(e));
+        return { success: false, error, errorContext: { tier: 0, originalLength, error } };
+      }
+    }
+    return { success: true, data };
   }
 
-  // --- LLM SYNTAX HALLUCINATION SANITIZER ---
-  // Negative lookbehinds (?<!\\) ensure we don't remove escaped quotes in valid strings.
-  // Matches both standard (+) and full-width (＋) Chinese plus signs.
+  // Coerce primitives to string
+  let text = String(input);
 
-  // 1. Mid-string concatenation: "text" +\n "more" -> "textmore"
-  cleaned = cleaned.replace(/(?<!\\)(["'])\s*[+＋]\s*(?:\r?\n)?\s*(?<!\\)(["'])/g, '');
-
-  // 2. Dangling plus before punctuation: "text" + , -> "text" ,
-  cleaned = cleaned.replace(/(?<!\\)(["'])\s*[+＋]\s*(?:\r?\n)?\s*([,}\]])/g, '$1$2');
-
-  // 3. Dangling plus at EOF: "text" + \n -> "text"
-  cleaned = cleaned.replace(/(?<!\\)(["'])\s*[+＋]\s*(?:\r?\n)?\s*$/g, '$1');
-
-  // 4. Pad truncated outputs: odd number of unescaped " means an unclosed string
-  const withoutEscapedQuotes = cleaned.replace(/\\"/g, '');
-  const unescapedQuoteCount = (withoutEscapedQuotes.match(/"/g) || []).length;
-  if (unescapedQuoteCount % 2 !== 0) {
-    cleaned = cleaned + '"]}]}'; // Pad brackets, jsonrepair will untangle
+  // Empty string check
+  if (text.trim().length === 0) {
+    const error = new Error('Input is empty or whitespace-only');
+    const context = { tier: 0, originalLength, error };
+    onError?.(context);
+    return { success: false, error, errorContext: context };
   }
 
-  // Pass sanitized string to repair library
-  let parsed: unknown;
+  // Strip thinking tags FIRST (before any parsing)
+  text = stripThinkingTags(text);
+
+  // Strip markdown fences EARLY
+  text = stripMarkdownFences(text);
+
+  // === Tier 1: Native Parse ===
   try {
-    const repaired = jsonrepair(cleaned);
-    parsed = JSON.parse(repaired);
-  } catch (error) {
-    throw new RetriableError(`JSON repair/parse failed: ${(error as Error).message}`, error as Error);
+    const parsed = JSON.parse(text);
+    if (schema) {
+      const data = schema.parse(parsed) as T;
+      return { success: true, data };
+    }
+    return { success: true, data: parsed as T };
+  } catch {
+    // Continue to Tier 2
   }
 
-  // Validate against Zod schema (throws ZodError on mismatch)
-  return schema.parse(parsed);
+  // === Tier 2: Extract + JsonRepair ===
+  try {
+    const blocks = extractJsonBlocks(text);
+
+    if (blocks.length > 0) {
+      // Select last substantial block
+      const substantialBlocks = blocks.filter((b) => b.text.length >= minimumBlockSize);
+      const selectedBlock =
+        substantialBlocks.length > 0
+          ? substantialBlocks[substantialBlocks.length - 1]
+          : blocks[blocks.length - 1];
+
+      const repaired = jsonrepair(selectedBlock.text);
+      const parsed = JSON.parse(repaired);
+      if (schema) {
+        const data = schema.parse(parsed) as T;
+        return { success: true, data };
+      }
+      return { success: true, data: parsed as T };
+    }
+
+    // No blocks found - apply jsonrepair to whole text
+    const repaired = jsonrepair(text);
+    const parsed = JSON.parse(repaired);
+    if (schema) {
+      const data = schema.parse(parsed) as T;
+      return { success: true, data };
+    }
+    return { success: true, data: parsed as T };
+  } catch {
+    // Continue to Tier 3
+  }
+
+  // === Tier 3: Normalize + Extract ===
+  try {
+    const normalized = normalizeText(text);
+    const blocks = extractJsonBlocks(normalized);
+
+    if (blocks.length === 0) {
+      throw new Error('No JSON blocks found');
+    }
+
+    const substantialBlocks = blocks.filter((b) => b.text.length >= minimumBlockSize);
+    const selectedBlock =
+      substantialBlocks.length > 0 ? substantialBlocks[substantialBlocks.length - 1] : blocks[blocks.length - 1];
+
+    const repaired = jsonrepair(selectedBlock.text);
+    const parsed = JSON.parse(repaired);
+    if (schema) {
+      const data = schema.parse(parsed) as T;
+      return { success: true, data };
+    }
+    return { success: true, data: parsed as T };
+  } catch {
+    // Continue to Tier 4
+  }
+
+  // === Tier 4: Aggressive Scrub ===
+  try {
+    const normalized = normalizeText(text);
+    const blocks = extractJsonBlocks(normalized);
+
+    if (blocks.length === 0) {
+      throw new Error('No JSON blocks found');
+    }
+
+    const substantialBlocks = blocks.filter((b) => b.text.length >= minimumBlockSize);
+    const selectedBlock =
+      substantialBlocks.length > 0 ? substantialBlocks[substantialBlocks.length - 1] : blocks[blocks.length - 1];
+
+    const scrubbed = scrubConcatenation(selectedBlock.text);
+    const repaired = jsonrepair(scrubbed);
+    const parsed = JSON.parse(repaired);
+    if (schema) {
+      const data = schema.parse(parsed) as T;
+      return { success: true, data };
+    }
+    return { success: true, data: parsed as T };
+  } catch (e) {
+    // === Tier 5: Fatal Failure ===
+    const error = new Error(`JSON parse failed at all tiers: ${(e as Error).message}`);
+    const context = {
+      tier: 5,
+      originalLength,
+      sanitizedString: text.slice(0, 500),
+      error,
+    };
+    onError?.(context);
+    return { success: false, error, errorContext: context };
+  }
 }
