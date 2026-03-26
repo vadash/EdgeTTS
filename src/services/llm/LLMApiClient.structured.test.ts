@@ -462,4 +462,115 @@ describe('LLMApiClient.callStructured', () => {
     // Should NOT have saved error logs on success
     expect(mockSaveErrorLog).not.toHaveBeenCalled();
   });
+
+  describe('reasoning mode', () => {
+    const TestSchema = z.object({ value: z.string() });
+    const mockResponse = {
+      choices: [{ message: { content: '{"value":"ok"}', refusal: null } }],
+    };
+
+    beforeEach(() => {
+      mockCreate.mockResolvedValue(mockResponse);
+    });
+
+    it('omits thinking parameters when reasoning is null (OFF)', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        reasoning: null, // OFF
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs).not.toHaveProperty('enable_thinking');
+      expect(callArgs).not.toHaveProperty('reasoning_effort');
+    });
+
+    it('sends enable_thinking=true without reasoning_effort when reasoning is auto', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        reasoning: 'auto',
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.enable_thinking).toBe(true);
+      expect(callArgs).not.toHaveProperty('reasoning_effort');
+    });
+
+    it('sends enable_thinking=true and reasoning_effort=low', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        reasoning: 'low',
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.enable_thinking).toBe(true);
+      expect(callArgs.reasoning_effort).toBe('low');
+    });
+
+    it('sends enable_thinking=true and reasoning_effort=medium', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        reasoning: 'medium',
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.enable_thinking).toBe(true);
+      expect(callArgs.reasoning_effort).toBe('medium');
+    });
+
+    it('sends enable_thinking=true and reasoning_effort=high', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        reasoning: 'high',
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [{ role: 'system' as const, content: 'test' }, { role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.enable_thinking).toBe(true);
+      expect(callArgs.reasoning_effort).toBe('high');
+    });
+  });
 });

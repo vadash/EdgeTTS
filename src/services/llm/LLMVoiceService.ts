@@ -98,7 +98,7 @@ export interface LLMVoiceServiceOptions {
   model: string;
   narratorVoice: string;
   streaming?: boolean;
-  reasoning?: 'auto' | 'high' | 'medium' | 'low';
+  reasoning?: 'auto' | 'high' | 'medium' | 'low' | null;
   temperature?: number;
   topP?: number;
   useVoting?: boolean;
@@ -113,7 +113,7 @@ export interface LLMVoiceServiceOptions {
     apiUrl: string;
     model: string;
     streaming?: boolean;
-    reasoning?: 'auto' | 'high' | 'medium' | 'low';
+    reasoning?: 'auto' | 'high' | 'medium' | 'low' | null;
     temperature?: number;
     topP?: number;
     repeatPrompt?: boolean;

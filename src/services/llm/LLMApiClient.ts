@@ -29,7 +29,7 @@ export interface LLMApiClientOptions {
   apiUrl: string;
   model: string;
   streaming?: boolean;
-  reasoning?: 'auto' | 'high' | 'medium' | 'low';
+  reasoning?: 'auto' | 'high' | 'medium' | 'low' | null;
   temperature?: number;
   topP?: number;
   debugLogger?: DebugLogger;
@@ -278,8 +278,17 @@ export class LLMApiClient {
       messages,
       stream: useStreaming,
       response_format: zodToJsonSchema(schema, schemaName),
-      enable_thinking: this.options.reasoning !== null,
     };
+
+    // Only add thinking/reasoning parameters when explicitly enabled
+    // When reasoning is null (OFF), omit the parameters entirely for OpenAI-compatible APIs
+    if (this.options.reasoning !== null) {
+      (requestBody as Record<string, unknown>).enable_thinking = true;
+      // OpenAI-compatible APIs use reasoning_effort for level specification
+      if (this.options.reasoning !== 'auto') {
+        (requestBody as Record<string, unknown>).reasoning_effort = this.options.reasoning;
+      }
+    }
 
     applyProviderFixes(requestBody, this.provider);
 
