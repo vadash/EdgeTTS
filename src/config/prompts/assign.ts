@@ -70,7 +70,10 @@ Your job is to read numbered sentences and assign a "Speaker Code" (A, B, C...) 
    Example: "John, run!" -> John is NOT speaking. The other person in the scene is speaking.
 
 6. FIRST PERSON:
-   If the text says "I said", assign it to the "Protagonist" code.`,
+   If the text says "I said", assign it to the "Protagonist" code.
+
+7. NEGATIVE INDICES ARE READ-ONLY:
+   Paragraphs labeled with negative indices inside the previous context block are from the previous section for context only. Do NOT assign speaker codes to them.`,
 
   schemaText: `{
   "reasoning": "Short explanation (or null)",
@@ -90,6 +93,8 @@ CRITICAL FORMAT RULES:
 {{unnamedEntries}}
 </speaker_codes>
 
+{{previousContext}}
+
 <numbered_paragraphs>
 {{paragraphs}}
 </numbered_paragraphs>
@@ -97,5 +102,6 @@ CRITICAL FORMAT RULES:
 Assign the correct speaker code (A, B, C...) to each paragraph number.
 - ONLY use the codes provided above. DO NOT use names.
 - SKIP any paragraphs that do not contain dialogue, thoughts, or system brackets.
-- Watch out for names inside quotes (they are listeners, not speakers).`,
+- Watch out for names inside quotes (they are listeners, not speakers).
+- Only assign speaker codes to paragraphs [0] and above.`,
 };

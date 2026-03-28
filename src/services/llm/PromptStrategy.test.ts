@@ -167,3 +167,56 @@ describe('Prompt builders accept detectedLanguage', () => {
     expect(result).toHaveLength(3);
   });
 });
+
+describe('buildAssignPrompt with overlap', () => {
+  const characters: LLMCharacter[] = [
+    { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
+  ];
+  const nameToCode = new Map([['Alice', 'A']]);
+  const numberedParagraphs = '[0] Some text';
+
+  it('injects overlap sentences with negative indices when provided', () => {
+    const overlapSentences = ['Fifth to last.', 'Fourth to last.', 'Third to last.', 'Second to last.', 'Last sentence.'];
+    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en', overlapSentences);
+    const userMessage = result[1].content as string;
+    expect(userMessage).toContain('<previous_context_do_not_assign>');
+    expect(userMessage).toContain('[-5] Fifth to last.');
+    expect(userMessage).toContain('[-4] Fourth to last.');
+    expect(userMessage).toContain('[-3] Third to last.');
+    expect(userMessage).toContain('[-2] Second to last.');
+    expect(userMessage).toContain('[-1] Last sentence.');
+    expect(userMessage).toContain('</previous_context_do_not_assign>');
+  });
+
+  it('omits overlap section when overlapSentences is empty array', () => {
+    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en', []);
+    const userMessage = result[1].content as string;
+    expect(userMessage).not.toContain('<previous_context_do_not_assign>');
+    expect(userMessage).not.toContain('[-1]');
+  });
+
+  it('omits overlap section when overlapSentences is not provided (undefined)', () => {
+    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en');
+    const userMessage = result[1].content as string;
+    expect(userMessage).not.toContain('<previous_context_do_not_assign>');
+    expect(userMessage).not.toContain('[-1]');
+  });
+
+  it('handles fewer than 5 overlap sentences', () => {
+    const overlapSentences = ['Second to last.', 'Last sentence.'];
+    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en', overlapSentences);
+    const userMessage = result[1].content as string;
+    expect(userMessage).toContain('<previous_context_do_not_assign>');
+    expect(userMessage).toContain('[-2] Second to last.');
+    expect(userMessage).toContain('[-1] Last sentence.');
+    expect(userMessage).not.toContain('[-3]');
+  });
+
+  it('includes recency-bias note after numbered paragraphs', () => {
+    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en', ['Some overlap.']);
+    const userMessage = result[1].content as string;
+    const paragraphsPos = userMessage.indexOf('<numbered_paragraphs>');
+    const notePos = userMessage.indexOf('[0] and above');
+    expect(notePos).toBeGreaterThan(paragraphsPos);
+  });
+});

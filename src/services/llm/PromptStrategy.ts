@@ -64,6 +64,7 @@ export function buildAssignPrompt(
   nameToCode: Map<string, string>,
   numberedParagraphs: string,
   detectedLanguage: string = 'en',
+  overlapSentences?: string[],
 ): LLMMessage[] {
   const p = LLM_PROMPTS.assign;
 
@@ -84,12 +85,21 @@ export function buildAssignPrompt(
   const characterLinesStr = characterLines.join('\n');
   const unnamedEntriesStr = unnamedEntries.join('\n');
 
+  // Build overlap context with negative indices
+  let previousContext = '';
+  if (overlapSentences && overlapSentences.length > 0) {
+    const count = overlapSentences.length;
+    const lines = overlapSentences.map((text, i) => `[${i - count}] ${text}`);
+    previousContext = `<previous_context_do_not_assign>\n${lines.join('\n')}\n</previous_context_do_not_assign>`;
+  }
+
   const sys = assembleSystemPrompt(p.role, p.examples);
   const constraints = assembleUserConstraints(p.rules, p.schemaText);
   const user = p.userTemplate
     .replace('{{paragraphs}}', numberedParagraphs)
     .replace('{{characterLines}}', characterLinesStr)
-    .replace('{{unnamedEntries}}', unnamedEntriesStr);
+    .replace('{{unnamedEntries}}', unnamedEntriesStr)
+    .replace('{{previousContext}}', previousContext);
 
   return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage);
 }
