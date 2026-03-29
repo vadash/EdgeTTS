@@ -147,4 +147,47 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       expect(blocks[0].sentences).toContain(filler);
     });
   });
+
+  describe('Priority 3: Long Narration', () => {
+    it('ends current block at long narration sentence (no dialogue symbols)', () => {
+      const maxTokens = 100;
+      const filler = tokenFill(86);
+      // 200 chars, no quotes — pure narration
+      const narration = 'a'.repeat(200);
+      const nextContent = 'The dialogue resumes here.';
+
+      const blocks = splitter.splitIntoBlocks([filler, narration, nextContent], maxTokens);
+
+      expect(blocks).toHaveLength(2);
+      // Narration ends block 0
+      expect(blocks[0].sentences).toEqual([filler, narration]);
+      // Next content starts block 1
+      expect(blocks[1].sentences).toEqual([nextContent]);
+    });
+
+    it('does NOT break on narration that contains dialogue', () => {
+      const maxTokens = 100;
+      const filler = tokenFill(86);
+      // Long text but has quotes — it's dialogue, not narration
+      const dialogue = `She looked at him and said "I don't know what you mean" and then walked away`.padEnd(200, '.');
+
+      const blocks = splitter.splitIntoBlocks([filler, dialogue], maxTokens);
+
+      // Should NOT split at this sentence — it has dialogue symbols
+      // Falls through to hard token limit
+      expect(blocks[0].sentences).toContain(filler);
+    });
+
+    it('does NOT break on short narration (< 150 chars)', () => {
+      const maxTokens = 100;
+      const filler = tokenFill(86);
+      // 100 chars, no quotes — but too short
+      const shortNarration = 'a'.repeat(100);
+
+      const blocks = splitter.splitIntoBlocks([filler, shortNarration], maxTokens);
+
+      // Should NOT split — narration too short (< 150 chars)
+      expect(blocks[0].sentences).toContain(filler);
+    });
+  });
 });

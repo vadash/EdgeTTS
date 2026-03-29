@@ -141,7 +141,10 @@ export class TextBlockSplitter {
       }
     }
 
-    // Priority 3: Long narration — TODO in Task 3
+    // Priority 3: Long narration (no dialogue symbols, >150 chars)
+    if (trimmed.length > 150 && !this.hasDialogueSymbols(trimmed)) {
+      return 3;
+    }
 
     return 0;
   }
@@ -222,8 +225,18 @@ export class TextBlockSplitter {
         }
 
         if (priority === 3) {
-          // Long narration: add to current block, then push
-          // Will be handled in Task 3
+          // Long narration: include in current block, then push
+          currentBlock.push(sentence);
+          currentTokens += tokens;
+          blocks.push({
+            blockIndex: blockIndex++,
+            sentences: currentBlock,
+            sentenceStartIndex,
+          });
+          currentBlock = [];
+          currentTokens = 0;
+          sentenceStartIndex = i + 1;
+          continue;
         }
       }
 
