@@ -70,6 +70,11 @@ export const hasSpeechSymbols = (text: string): boolean => {
 };
 
 /**
+ * Number of sentences from the previous block to pass as overlap context
+ */
+const OVERLAP_SIZE = 5;
+
+/**
  * Voting temperatures for 3-way voting (assign step)
  */
 const VOTING_TEMPERATURES = [0.1, 0.4, 0.7] as const;
@@ -281,8 +286,12 @@ export class LLMVoiceService {
       this.logger?.info(`[Assign] Processing batch of ${batch.length} blocks`);
       const batchPromises = batch.map((block, batchIndex) => {
         const blockNum = i + batchIndex + 1;
+        const globalIndex = i + batchIndex;
+        const overlapSentences = globalIndex > 0
+          ? blocks[globalIndex - 1].sentences.slice(-OVERLAP_SIZE)
+          : undefined;
         this.logger?.info(`[assign] Starting block ${blockNum}/${blocks.length}`);
-        return this.processAssignBlock(block, characterVoiceMap, characters, nameToCode, codeToName)
+        return this.processAssignBlock(block, characterVoiceMap, characters, nameToCode, codeToName, overlapSentences)
           .then((result) => {
             this.logger?.info(`[assign] Completed block ${blockNum}/${blocks.length}`);
             return result;
@@ -325,6 +334,7 @@ export class LLMVoiceService {
     characters: LLMCharacter[],
     nameToCode: Map<string, string>,
     codeToName: Map<string, string>,
+    overlapSentences?: string[],
   ): Promise<SpeakerAssignment[]> {
     this.logger?.debug(
       `[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`,
@@ -350,6 +360,7 @@ export class LLMVoiceService {
       context.nameToCode,
       context.numberedParagraphs,
       this.detectedLanguage,
+      overlapSentences,
     );
 
     let relativeMap: Map<number, string>;

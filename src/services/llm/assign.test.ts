@@ -140,6 +140,77 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
     expect(result[1].speaker).toBe('narrator'); // Unassigned gets narrator
   });
 
+  it('passes overlap sentences from previous block to processAssignBlock', async () => {
+    const mockResponse = {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              reasoning: null,
+              assignments: { '0': 'A' },
+            }),
+            refusal: null,
+          },
+        },
+      ],
+      model: 'gpt-4o-mini',
+    };
+
+    const openai = await import('openai');
+    const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
+    vi.mocked(openai.default).mockImplementation(
+      () =>
+        ({
+          chat: {
+            completions: {
+              create: mockCreate,
+            },
+          },
+        }) as any,
+    );
+
+    // Spy on buildAssignPrompt to capture the overlapSentences argument
+    const PromptStrategy = await import('./PromptStrategy');
+    const spy = vi.spyOn(PromptStrategy, 'buildAssignPrompt');
+
+    service = new LLMVoiceService({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      narratorVoice: 'narrator-voice',
+      logger: mockLogger,
+    });
+
+    const blocks: TextBlock[] = [
+      {
+        sentenceStartIndex: 0,
+        sentences: ['"Hello," said Alice.', '"Hi," replied Bob.'],
+      },
+      {
+        sentenceStartIndex: 2,
+        sentences: ['"How are you?" asked Alice.'],
+      },
+    ];
+
+    const voiceMap = new Map<string, string>([
+      ['Alice', 'voice-a'],
+      ['Bob', 'voice-b'],
+    ]);
+
+    await service.assignSpeakers(blocks, voiceMap, characters);
+
+    // buildAssignPrompt should have been called twice
+    expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2);
+
+    // First call (block 0) — no overlap
+    expect(spy.mock.calls[0][4]).toBeUndefined();
+
+    // Second call (block 1) — overlap from block 0's last 5 sentences (block 0 only has 2)
+    expect(spy.mock.calls[1][4]).toEqual(['"Hello," said Alice.', '"Hi," replied Bob.']);
+
+    spy.mockRestore();
+  });
+
   it('validates AssignSchema structure', () => {
     const validResult = AssignSchema.safeParse({
       reasoning: 'test',
