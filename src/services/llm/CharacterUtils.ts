@@ -143,3 +143,36 @@ export function countSpeakingFrequency(assignments: SpeakerAssignment[]): Map<st
   }
   return frequency;
 }
+
+/**
+ * Cull characters whose name variations appear fewer than threshold times in the text.
+ * Removes hallucinated and ultra-minor characters before the expensive LLM merge step.
+ */
+export function cullByFrequency(
+  characters: LLMCharacter[],
+  fullText: string,
+  threshold: number = 3,
+): LLMCharacter[] {
+  return characters.filter((char) => {
+    let totalMentions = 0;
+
+    for (const variation of char.variations) {
+      if (variation.length < 3) continue;
+
+      const needle = variation.toLowerCase();
+      let pos = 0;
+
+      while (true) {
+        pos = fullText.indexOf(needle, pos);
+        if (pos >= 0) {
+          totalMentions++;
+          pos += needle.length;
+        } else {
+          break;
+        }
+      }
+    }
+
+    return totalMentions >= threshold;
+  });
+}
