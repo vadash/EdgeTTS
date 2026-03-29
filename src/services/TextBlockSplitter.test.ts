@@ -300,4 +300,56 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       }
     });
   });
+
+  describe('Integration: createAssignBlocks and createExtractBlocks', () => {
+    it('createAssignBlocks (8k) splits at scene divider in full text', () => {
+      // 8k maxTokens, 85% threshold = 6800 tokens.
+      // Each paragraph "Normal story text." = 19 chars = 5 tokens.
+      // Block 0 fills to 1600 paragraphs (8000 tokens). Block 1 needs >1360 paragraphs.
+      const beforeDivider = 'Normal story text.\n'.repeat(3000);
+      const text = beforeDivider + '\n***\n' + 'New scene after the break.';
+
+      const blocks = splitter.createAssignBlocks(text);
+
+      // Should produce multiple blocks, with a clean split at the divider
+      expect(blocks.length).toBeGreaterThan(1);
+      // No block should contain the raw '***' divider
+      const allSentences = blocks.flatMap((b) => b.sentences);
+      expect(allSentences).not.toContain('***');
+      // Last block should contain the new scene text
+      const lastBlock = blocks[blocks.length - 1];
+      expect(lastBlock.sentences).toContain('New scene after the break.');
+    });
+
+    it('createExtractBlocks (16k) splits at scene divider in full text', () => {
+      // 16k maxTokens, 85% threshold = 13600 tokens.
+      // Block 0 fills to 3200 paragraphs (16000 tokens). Block 1 needs >2720 paragraphs.
+      const beforeDivider = 'Normal story text.\n'.repeat(6200);
+      const text = beforeDivider + '\n***\n' + 'New scene after the break.';
+
+      const blocks = splitter.createExtractBlocks(text);
+
+      expect(blocks.length).toBeGreaterThan(1);
+      const allSentences = blocks.flatMap((b) => b.sentences);
+      expect(allSentences).not.toContain('***');
+      const lastBlock = blocks[blocks.length - 1];
+      expect(lastBlock.sentences).toContain('New scene after the break.');
+    });
+
+    it('createAssignBlocks respects chapter headers as block boundaries', () => {
+      // 8k maxTokens, 85% threshold = 6800 tokens.
+      // "Story text here." = 16 chars = 4 tokens. Block 0 = 2000 paragraphs.
+      // Block 1 needs >1700 paragraphs (>6800 tokens) before "Chapter 10".
+      const beforeChapter = 'Story text here.\n'.repeat(3800);
+      const text = beforeChapter + '\nChapter 10\n' + 'The tenth chapter content.';
+
+      const blocks = splitter.createAssignBlocks(text);
+
+      // Find the block containing "Chapter 10"
+      const chapterBlock = blocks.find((b) => b.sentences.includes('Chapter 10'));
+      expect(chapterBlock).toBeDefined();
+      // Chapter 10 should be the first sentence in its block
+      expect(chapterBlock!.sentences[0]).toBe('Chapter 10');
+    });
+  });
 });
