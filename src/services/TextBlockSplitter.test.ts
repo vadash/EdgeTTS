@@ -69,4 +69,82 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       expect(blocks[1].sentences).toEqual(['After divider.']);
     });
   });
+
+  describe('Priority 2: Chapter/Section Headers', () => {
+    it('places Chapter header as first sentence of next block', () => {
+      const maxTokens = 100;
+      const filler = tokenFill(86);
+      const header = 'Chapter 5';
+      const content = 'The next chapter begins here.';
+
+      const blocks = splitter.splitIntoBlocks([filler, header, content], maxTokens);
+
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0].sentences).toEqual([filler]);
+      expect(blocks[1].sentences).toEqual([header, content]);
+    });
+
+    it('recognizes Russian chapter header (Глава)', () => {
+      const maxTokens = 100;
+      const filler = tokenFill(86);
+
+      const blocks = splitter.splitIntoBlocks([filler, 'Глава 3', 'Текст новой главы.'], maxTokens);
+
+      expect(blocks).toHaveLength(2);
+      expect(blocks[1].sentences[0]).toBe('Глава 3');
+    });
+
+    it('recognizes Prologue as chapter header', () => {
+      const maxTokens = 100;
+      const filler = tokenFill(86);
+
+      const blocks = splitter.splitIntoBlocks([filler, 'Prologue', 'The story begins.'], maxTokens);
+
+      expect(blocks).toHaveLength(2);
+      expect(blocks[1].sentences[0]).toBe('Prologue');
+    });
+
+    it('recognizes Epilogue as chapter header', () => {
+      const maxTokens = 100;
+      const filler = tokenFill(86);
+
+      const blocks = splitter.splitIntoBlocks([filler, 'Epilogue', 'The end.'], maxTokens);
+
+      expect(blocks).toHaveLength(2);
+      expect(blocks[1].sentences[0]).toBe('Epilogue');
+    });
+
+    it('recognizes Russian Пролог and Эпилог', () => {
+      const maxTokens = 100;
+      const filler = tokenFill(86);
+
+      const blocks1 = splitter.splitIntoBlocks([filler, 'Пролог', 'Начало.'], maxTokens);
+      expect(blocks1[1].sentences[0]).toBe('Пролог');
+
+      const blocks2 = splitter.splitIntoBlocks([filler, 'Эпилог', 'Конец.'], maxTokens);
+      expect(blocks2[1].sentences[0]).toBe('Эпилог');
+    });
+
+    it('recognizes Book N as chapter header', () => {
+      const maxTokens = 100;
+      const filler = tokenFill(86);
+
+      const blocks = splitter.splitIntoBlocks([filler, 'Book 2', 'The second book.'], maxTokens);
+
+      expect(blocks).toHaveLength(2);
+      expect(blocks[1].sentences[0]).toBe('Book 2');
+    });
+
+    it('does NOT treat long text starting with Chapter as header', () => {
+      const maxTokens = 100;
+      const filler = tokenFill(86);
+      // 60 chars — too long for a header (< 50 chars)
+      const longChapter = 'Chapter 1 was about the time he went to the store';
+
+      const blocks = splitter.splitIntoBlocks([filler, longChapter], maxTokens);
+
+      // Should NOT split — not recognized as header, hard cut applies
+      expect(blocks[0].sentences).toContain(filler);
+    });
+  });
 });

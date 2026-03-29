@@ -134,7 +134,13 @@ export class TextBlockSplitter {
       return 1;
     }
 
-    // Priority 2: Chapter/section headers — TODO in Task 2
+    // Priority 2: Chapter/section headers (short lines, <50 chars)
+    if (trimmed.length < 50 && trimmed.length > 0) {
+      if (/^(Chapter|Глава|Book|Prologue|Epilogue|Пролог|Эпилог)\s*\d*\s*$/i.test(trimmed)) {
+        return 2;
+      }
+    }
+
     // Priority 3: Long narration — TODO in Task 3
 
     return 0;
@@ -202,7 +208,17 @@ export class TextBlockSplitter {
 
         if (priority === 2) {
           // Chapter header: push current block, this sentence starts next block
-          // Will be handled in Task 2
+          if (currentBlock.length > 0) {
+            blocks.push({
+              blockIndex: blockIndex++,
+              sentences: currentBlock,
+              sentenceStartIndex,
+            });
+          }
+          currentBlock = [];
+          currentTokens = 0;
+          sentenceStartIndex = i;
+          // Fall through: sentence will be added to the new block
         }
 
         if (priority === 3) {
