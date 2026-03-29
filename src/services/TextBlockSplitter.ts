@@ -114,7 +114,35 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Split sentences into blocks for LLM processing
+   * Check if sentence contains dialogue symbols (simplified check for narration detection).
+   * Avoids importing hasSpeechSymbols from LLMVoiceService (wrong dependency direction).
+   */
+  private hasDialogueSymbols(text: string): boolean {
+    // Straight quotes, guillemets, curly quotes, em dash (Russian dialogue)
+    return /["\u00AB\u00BB\u2014\u201C\u201D\u201E\u2039\u203A\u2018]/.test(text);
+  }
+
+  /**
+   * Rank a sentence as a scene break candidate.
+   * Returns: 1 = explicit divider, 2 = chapter header, 3 = long narration, 0 = not a break.
+   */
+  private getBreakPriority(sentence: string): number {
+    const trimmed = sentence.trim();
+
+    // Priority 1: Explicit scene dividers (entire line is separator characters)
+    if (/^[-*_~=]{3,}$/.test(trimmed) || trimmed === '* * *' || trimmed === '<--->') {
+      return 1;
+    }
+
+    // Priority 2: Chapter/section headers — TODO in Task 2
+    // Priority 3: Long narration — TODO in Task 3
+
+    return 0;
+  }
+
+  /**
+   * Split sentences into blocks for LLM processing.
+   * Prefers semantic scene breaks over arbitrary token-limit cuts.
    */
   splitIntoBlocks(sentences: string[], maxTokens: number = 16000): TextBlock[] {
     const blocks: TextBlock[] = [];
@@ -122,6 +150,7 @@ export class TextBlockSplitter {
     let currentTokens = 0;
     let sentenceStartIndex = 0;
     let blockIndex = 0;
+    const WARNING_THRESHOLD = maxTokens * 0.85;
 
     for (let i = 0; i < sentences.length; i++) {
       const sentence = sentences[i];
@@ -152,7 +181,37 @@ export class TextBlockSplitter {
         continue;
       }
 
-      // Start new block if would exceed limit
+      // Semantic break: check when past warning threshold
+      if (currentTokens > WARNING_THRESHOLD) {
+        const priority = this.getBreakPriority(sentence);
+
+        if (priority === 1) {
+          // Divider: push current block, drop this sentence
+          if (currentBlock.length > 0) {
+            blocks.push({
+              blockIndex: blockIndex++,
+              sentences: currentBlock,
+              sentenceStartIndex,
+            });
+          }
+          currentBlock = [];
+          currentTokens = 0;
+          sentenceStartIndex = i + 1;
+          continue;
+        }
+
+        if (priority === 2) {
+          // Chapter header: push current block, this sentence starts next block
+          // Will be handled in Task 2
+        }
+
+        if (priority === 3) {
+          // Long narration: add to current block, then push
+          // Will be handled in Task 3
+        }
+      }
+
+      // Hard cut: token limit (original behavior)
       if (currentTokens + tokens > maxTokens && currentBlock.length > 0) {
         blocks.push({
           blockIndex: blockIndex++,
