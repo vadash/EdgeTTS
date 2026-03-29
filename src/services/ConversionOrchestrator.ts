@@ -51,7 +51,7 @@ export interface StageLLMConfig {
   apiUrl: string;
   model: string;
   streaming?: boolean;
-  reasoning?: 'auto' | 'high' | 'medium' | 'low';
+  reasoning?: 'auto' | 'high' | 'medium' | 'low' | null;
   temperature?: number;
   topP?: number;
   repeatPrompt?: boolean;

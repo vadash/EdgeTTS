@@ -280,8 +280,8 @@ export class LLMApiClient {
     };
 
     // Only add thinking/reasoning parameters when explicitly enabled
-    // When reasoning is null (OFF), omit the parameters entirely for OpenAI-compatible APIs
-    if (this.options.reasoning !== null) {
+    // When reasoning is null or undefined (OFF), omit the parameters entirely for OpenAI-compatible APIs
+    if (this.options.reasoning != null) {
       (requestBody as Record<string, unknown>).enable_thinking = true;
       // OpenAI-compatible APIs use reasoning_effort for level specification
       if (this.options.reasoning !== 'auto') {

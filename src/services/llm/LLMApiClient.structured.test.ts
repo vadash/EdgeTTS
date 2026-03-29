@@ -532,6 +532,29 @@ describe('LLMApiClient.callStructured', () => {
       expect(callArgs).not.toHaveProperty('reasoning_effort');
     });
 
+    it('omits thinking parameters when reasoning is undefined', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        reasoning: undefined, // not set
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [
+          { role: 'system' as const, content: 'test' },
+          { role: 'user' as const, content: 'test' },
+        ],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs).not.toHaveProperty('enable_thinking');
+      expect(callArgs).not.toHaveProperty('reasoning_effort');
+    });
+
     it('sends enable_thinking=true without reasoning_effort when reasoning is auto', async () => {
       const client = new LLMApiClient({
         apiKey: 'test-key',
