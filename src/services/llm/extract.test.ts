@@ -70,7 +70,14 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
     const blocks: TextBlock[] = [
       {
         sentenceStartIndex: 0,
-        sentences: ['"Hello," said Alice.', '"Hi," replied Bob.'],
+        sentences: [
+          '"Hello," said Alice.',
+          'Alice looked at the sky.',
+          'Alice smiled.',
+          '"Hi," replied Bob.',
+          'Bob nodded slowly.',
+          'Bob turned away.',
+        ],
       },
     ];
 
@@ -123,7 +130,12 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
     const blocks: TextBlock[] = [
       {
         sentenceStartIndex: 0,
-        sentences: ['The story begins.'],
+        sentences: [
+          'The story begins.',
+          'Narrator spoke softly.',
+          'Narrator paused.',
+          'Narrator continued.',
+        ],
       },
     ];
 

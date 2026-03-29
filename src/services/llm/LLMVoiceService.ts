@@ -6,7 +6,7 @@ export type ProgressCallback = (current: number, total: number, message?: string
 import { defaultConfig } from '@/config';
 import { getErrorMessage } from '@/errors';
 import { withRetry } from '@/utils/retry';
-import { applyMergeGroups, buildCodeMapping, mergeCharacters } from './CharacterUtils';
+import { applyMergeGroups, buildCodeMapping, cullByFrequency, mergeCharacters } from './CharacterUtils';
 import { DebugLogger } from './DebugLogger';
 import { LLMApiClient } from './LLMApiClient';
 import {
@@ -242,6 +242,17 @@ export class LLMVoiceService {
 
     // Simple merge by canonicalName
     let merged = mergeCharacters(allCharacters);
+
+    // Pre-merge frequency culling (remove hallucinated/noise characters)
+    const fullText = blocks
+      .map(b => b.sentences.join('\n'))
+      .join('\n')
+      .toLowerCase();
+    const beforeCull = merged.length;
+    merged = cullByFrequency(merged, fullText);
+    this.logger?.info(
+      `[Extract] Culled ${beforeCull - merged.length}/${beforeCull} characters by frequency. Remaining: ${merged.length}`,
+    );
 
     // LLM merge if multiple blocks and characters
     if (blocks.length > 1 && merged.length > 1) {
