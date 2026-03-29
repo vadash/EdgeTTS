@@ -9,8 +9,8 @@ import {
   EXECUTION_TRIGGER,
   MIRROR_LANGUAGE_RULES,
   PREFILL_PRESETS,
-  SYSTEM_PREAMBLE_CN,
   type PrefillPreset,
+  SYSTEM_PREAMBLE_CN,
 } from '@/config/prompts/shared';
 
 export interface LLMMessage {

@@ -113,8 +113,12 @@ describe('DebugLogger', () => {
     await logger.savePhaseLog('extract', { model: 'gpt-4', messages: [] }, { characters: [] });
 
     // Should save extract_request.json and extract_response.json
-    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', { create: true });
-    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_response.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', {
+      create: true,
+    });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_response.json', {
+      create: true,
+    });
 
     // Verify content was written
     const writeCalls = mockWritable.write.mock.calls;
@@ -128,8 +132,12 @@ describe('DebugLogger', () => {
 
     // First call should save
     await logger.savePhaseLog('extract', { req: 1 }, { res: 1 });
-    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', { create: true });
-    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_response.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', {
+      create: true,
+    });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_response.json', {
+      create: true,
+    });
 
     // Reset the mock to check second call
     mockLogsFolder.getFileHandle.mockClear();
@@ -145,18 +153,30 @@ describe('DebugLogger', () => {
 
     // Log extract phase
     await logger.savePhaseLog('extract', { phase: 'extract' }, { result: 'extract' });
-    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', { create: true });
-    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_response.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', {
+      create: true,
+    });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_response.json', {
+      create: true,
+    });
 
     // Log merge phase - should also save
     await logger.savePhaseLog('merge', { phase: 'merge' }, { result: 'merge' });
-    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('merge_request.json', { create: true });
-    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('merge_response.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('merge_request.json', {
+      create: true,
+    });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('merge_response.json', {
+      create: true,
+    });
 
     // Log assign phase - should also save
     await logger.savePhaseLog('assign', { phase: 'assign' }, { result: 'assign' });
-    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('assign_request.json', { create: true });
-    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('assign_response.json', { create: true });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('assign_request.json', {
+      create: true,
+    });
+    expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('assign_response.json', {
+      create: true,
+    });
   });
 
   it('resetLogging clears phase tracking', async () => {

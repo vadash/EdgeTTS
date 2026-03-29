@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { VoicePool, VoiceOption, LLMCharacter } from '@/state/types';
-import { VoicePoolTracker, buildPriorityPool, randomizeBelow, assignUnmatchedFromPool } from './VoiceAllocator';
+import type { LLMCharacter, VoiceOption, VoicePool } from '@/state/types';
+import {
+  assignUnmatchedFromPool,
+  buildPriorityPool,
+  randomizeBelow,
+  VoicePoolTracker,
+} from './VoiceAllocator';
 
 describe('VoicePoolTracker', () => {
   const pool: VoicePool = {
@@ -99,10 +104,7 @@ describe('buildPriorityPool', () => {
   });
 
   it('excludes reserved voices', () => {
-    const voices = [
-      vo('en-US, AndrewNeural', 'male'),
-      vo('en-US, BrianNeural', 'male'),
-    ];
+    const voices = [vo('en-US, AndrewNeural', 'male'), vo('en-US, BrianNeural', 'male')];
     const reserved = new Set(['en-US, AndrewNeural']);
     const result = buildPriorityPool(voices, 'en', reserved);
 
@@ -152,7 +154,14 @@ describe('randomizeBelow', () => {
       vo('en-US, JennyNeural', 'female'),
     ];
 
-    const result = randomizeBelow(chars, currentMap, 0, enabledVoices, 'en-US, NarratorNeural', 'en');
+    const result = randomizeBelow(
+      chars,
+      currentMap,
+      0,
+      enabledVoices,
+      'en-US, NarratorNeural',
+      'en',
+    );
 
     // Bob (index 1) should get a native voice, not a Multilingual one
     const bobVoice = result.get('Bob')!;
@@ -171,10 +180,7 @@ describe('randomizeBelow', () => {
   });
 
   it('deduplicates variant pairs — never assigns both Andrew and AndrewMultilingual', () => {
-    const chars = [
-      mkChar('Bob', 'male'),
-      mkChar('Charlie', 'male'),
-    ];
+    const chars = [mkChar('Bob', 'male'), mkChar('Charlie', 'male')];
     const currentMap = new Map<string, string>();
     const enabledVoices = [
       vo('en-US, AndrewNeural', 'male'),
@@ -182,7 +188,14 @@ describe('randomizeBelow', () => {
       vo('en-US, BrianNeural', 'male'),
     ];
 
-    const result = randomizeBelow(chars, currentMap, -1, enabledVoices, 'en-US, NarratorNeural', 'en');
+    const result = randomizeBelow(
+      chars,
+      currentMap,
+      -1,
+      enabledVoices,
+      'en-US, NarratorNeural',
+      'en',
+    );
 
     const assignedVoices = [...result.values()];
     const hasAndrew = assignedVoices.includes('en-US, AndrewNeural');
@@ -205,11 +218,7 @@ describe('assignUnmatchedFromPool', () => {
   });
 
   it('assigns unmatched characters from priority pool sequentially', () => {
-    const chars = [
-      mkChar('Alice', 'female'),
-      mkChar('Bob', 'male'),
-      mkChar('Charlie', 'male'),
-    ];
+    const chars = [mkChar('Alice', 'female'), mkChar('Bob', 'male'), mkChar('Charlie', 'male')];
     const importedMap = new Map([
       ['Alice', 'en-US, JennyNeural'],
       // Bob and Charlie are unmatched
@@ -234,16 +243,11 @@ describe('assignUnmatchedFromPool', () => {
   });
 
   it('replaces imported voices not in enabled list', () => {
-    const chars = [
-      mkChar('Alice', 'female'),
-    ];
+    const chars = [mkChar('Alice', 'female')];
     const importedMap = new Map([
       ['Alice', 'de-DE, KatjaNeural'], // not in enabled list
     ]);
-    const enabledVoices = [
-      vo('en-US, JennyNeural', 'female'),
-      vo('en-US, AriaNeural', 'female'),
-    ];
+    const enabledVoices = [vo('en-US, JennyNeural', 'female'), vo('en-US, AriaNeural', 'female')];
 
     const result = assignUnmatchedFromPool(
       chars,
@@ -258,10 +262,7 @@ describe('assignUnmatchedFromPool', () => {
   });
 
   it('deduplicates Multilingual pairs in assignment', () => {
-    const chars = [
-      mkChar('Bob', 'male'),
-      mkChar('Charlie', 'male'),
-    ];
+    const chars = [mkChar('Bob', 'male'), mkChar('Charlie', 'male')];
     const importedMap = new Map<string, string>(); // all unmatched
     const enabledVoices = [
       vo('en-US, AndrewNeural', 'male'),

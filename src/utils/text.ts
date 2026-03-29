@@ -1,6 +1,5 @@
 import { jsonrepair } from 'jsonrepair';
 import type { z } from 'zod';
-import { RetriableError } from '@/errors';
 
 /**
  * Normalize text by fixing invisible characters and typographical anomalies.
@@ -30,7 +29,7 @@ export function normalizeText(text: string): string {
  */
 export function extractJsonBlocks(
   text: string,
-  _options: { minSize?: number } = {}
+  _options: { minSize?: number } = {},
 ): Array<{ start: number; end: number; text: string; isObject: boolean }> {
   if (!text || typeof text !== 'string') return [];
 
@@ -180,7 +179,7 @@ export function stripThinkingTags(text: string): string {
       // (?:\s+[^>]*)? matches optional attributes like <tool_call name="extract_events">
       .replace(
         /<(think|thinking|thought|reasoning|reflection|tool_call|search)(?:\s+[^>]*)?>\s*[\s\S]*?<\/\1>/gi,
-        ''
+        '',
       )
       // Paired bracket tags: [THINK]...[/THINK], [TOOL_CALL]...[/TOOL_CALL], etc.
       .replace(/\[(THINK|THOUGHT|REASONING|TOOL_CALL)\][\s\S]*?\[\/\1\]/gi, '')
@@ -209,8 +208,13 @@ export function safeParseJSON<T>(
   options: {
     schema?: z.ZodType<T>;
     minimumBlockSize?: number;
-    onError?: (context: { tier: number; originalLength: number; error: Error; sanitizedString?: string }) => void;
-  } = {}
+    onError?: (context: {
+      tier: number;
+      originalLength: number;
+      error: Error;
+      sanitizedString?: string;
+    }) => void;
+  } = {},
 ): { success: boolean; data?: T; error?: Error; errorContext?: object } {
   const { schema, minimumBlockSize = 50, onError } = options;
   const originalLength = typeof input === 'string' ? input.length : 0;
@@ -310,7 +314,9 @@ export function safeParseJSON<T>(
 
     const substantialBlocks = blocks.filter((b) => b.text.length >= minimumBlockSize);
     const selectedBlock =
-      substantialBlocks.length > 0 ? substantialBlocks[substantialBlocks.length - 1] : blocks[blocks.length - 1];
+      substantialBlocks.length > 0
+        ? substantialBlocks[substantialBlocks.length - 1]
+        : blocks[blocks.length - 1];
 
     const repaired = jsonrepair(selectedBlock.text);
     const parsed = JSON.parse(repaired);
@@ -334,7 +340,9 @@ export function safeParseJSON<T>(
 
     const substantialBlocks = blocks.filter((b) => b.text.length >= minimumBlockSize);
     const selectedBlock =
-      substantialBlocks.length > 0 ? substantialBlocks[substantialBlocks.length - 1] : blocks[blocks.length - 1];
+      substantialBlocks.length > 0
+        ? substantialBlocks[substantialBlocks.length - 1]
+        : blocks[blocks.length - 1];
 
     const scrubbed = scrubConcatenation(selectedBlock.text);
     const repaired = jsonrepair(scrubbed);

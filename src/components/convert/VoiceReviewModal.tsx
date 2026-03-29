@@ -7,8 +7,8 @@ import { Text } from 'preact-i18n';
 import { Button } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
-import { assignUnmatchedFromPool } from '@/services/VoiceAllocator';
 import { importProfile, randomizeBelowVoices, readJSONFile } from '@/services/llm/VoiceProfile';
+import { assignUnmatchedFromPool } from '@/services/VoiceAllocator';
 import type { VoiceProfileFile } from '@/state/types';
 import { useData, useLLM, useLogs, useSettings } from '@/stores';
 
@@ -131,9 +131,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
 
       // Count how many imported voices were not in enabled list
       const enabledSet = new Set(enabledVoices);
-      const replacedCount = [...importedMap.values()].filter(
-        (v) => !enabledSet.has(v),
-      ).length;
+      const replacedCount = [...importedMap.values()].filter((v) => !enabledSet.has(v)).length;
       const matchCount = matchedCharacters.size - replacedCount;
       const unmatchCount = unmatchedCharacters.length + replacedCount;
       logs.info(

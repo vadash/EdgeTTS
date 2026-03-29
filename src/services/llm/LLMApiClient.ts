@@ -1,6 +1,5 @@
 import type OpenAIType from 'openai';
 import OpenAI from 'openai';
-import type { z } from 'zod';
 import { ZodError } from 'zod';
 import { RetriableError } from '@/errors';
 import { safeParseJSON } from '@/utils/text';
@@ -397,10 +396,7 @@ export class LLMApiClient {
     }
     // RetriableError with JSON/Empty response indicates data quality issue
     if (error instanceof RetriableError) {
-      return (
-        error.message.includes('JSON') ||
-        error.message.includes('Empty response')
-      );
+      return error.message.includes('JSON') || error.message.includes('Empty response');
     }
     return false;
   }

@@ -6,7 +6,12 @@ export type ProgressCallback = (current: number, total: number, message?: string
 import { defaultConfig } from '@/config';
 import { getErrorMessage } from '@/errors';
 import { withRetry } from '@/utils/retry';
-import { applyMergeGroups, buildCodeMapping, cullByFrequency, mergeCharacters } from './CharacterUtils';
+import {
+  applyMergeGroups,
+  buildCodeMapping,
+  cullByFrequency,
+  mergeCharacters,
+} from './CharacterUtils';
 import { DebugLogger } from './DebugLogger';
 import { LLMApiClient } from './LLMApiClient';
 import {
@@ -231,7 +236,11 @@ export class LLMVoiceService {
 
       // Save first extract phase log
       if (i === 0) {
-        await this.apiClient.debugLogger?.savePhaseLog('extract', { messages: extractMessages }, response);
+        await this.apiClient.debugLogger?.savePhaseLog(
+          'extract',
+          { messages: extractMessages },
+          response,
+        );
       }
 
       // Small delay between requests
@@ -245,7 +254,7 @@ export class LLMVoiceService {
 
     // Pre-merge frequency culling (remove hallucinated/noise characters)
     const fullText = blocks
-      .map(b => b.sentences.join('\n'))
+      .map((b) => b.sentences.join('\n'))
       .join('\n')
       .toLowerCase();
     const beforeCull = merged.length;
@@ -298,11 +307,17 @@ export class LLMVoiceService {
       const batchPromises = batch.map((block, batchIndex) => {
         const blockNum = i + batchIndex + 1;
         const globalIndex = i + batchIndex;
-        const overlapSentences = globalIndex > 0
-          ? blocks[globalIndex - 1].sentences.slice(-OVERLAP_SIZE)
-          : undefined;
+        const overlapSentences =
+          globalIndex > 0 ? blocks[globalIndex - 1].sentences.slice(-OVERLAP_SIZE) : undefined;
         this.logger?.info(`[assign] Starting block ${blockNum}/${blocks.length}`);
-        return this.processAssignBlock(block, characterVoiceMap, characters, nameToCode, codeToName, overlapSentences)
+        return this.processAssignBlock(
+          block,
+          characterVoiceMap,
+          characters,
+          nameToCode,
+          codeToName,
+          overlapSentences,
+        )
           .then((result) => {
             this.logger?.info(`[assign] Completed block ${blockNum}/${blocks.length}`);
             return result;
@@ -423,7 +438,11 @@ export class LLMVoiceService {
 
       // Save first assign phase log (voting path)
       if (this.isFirstAssignBlock && validResponses.length > 0) {
-        await this.apiClient.debugLogger?.savePhaseLog('assign', { messages: assignMessages }, validResponses[0]);
+        await this.apiClient.debugLogger?.savePhaseLog(
+          'assign',
+          { messages: assignMessages },
+          validResponses[0],
+        );
         this.isFirstAssignBlock = false;
       }
 
@@ -492,7 +511,11 @@ export class LLMVoiceService {
 
         // Save first assign phase log (non-voting path)
         if (this.isFirstAssignBlock) {
-          await this.apiClient.debugLogger?.savePhaseLog('assign', { messages: assignMessages }, response);
+          await this.apiClient.debugLogger?.savePhaseLog(
+            'assign',
+            { messages: assignMessages },
+            response,
+          );
           this.isFirstAssignBlock = false;
         }
       } catch (_e) {
@@ -650,7 +673,11 @@ export class LLMVoiceService {
 
       // Save first merge phase log
       if (voteIndex === 0) {
-        await this.apiClient.debugLogger?.savePhaseLog('merge', { messages: mergeMessages }, response);
+        await this.apiClient.debugLogger?.savePhaseLog(
+          'merge',
+          { messages: mergeMessages },
+          response,
+        );
       }
 
       return response.merges;

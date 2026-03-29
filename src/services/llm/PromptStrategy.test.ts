@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import type { LLMCharacter } from '@/state/types';
 import {
+  buildAssignPrompt,
+  buildExtractPrompt,
+  buildMergePrompt,
   parseAssignResponse,
   parseExtractResponse,
   parseMergeResponse,
-  buildExtractPrompt,
-  buildMergePrompt,
-  buildAssignPrompt,
 } from './PromptStrategy';
-import type { LLMCharacter } from '@/state/types';
 
 describe('parseExtractResponse', () => {
   it('passes through valid responses unchanged', () => {
@@ -176,8 +176,20 @@ describe('buildAssignPrompt with overlap', () => {
   const numberedParagraphs = '[0] Some text';
 
   it('injects overlap sentences with negative indices when provided', () => {
-    const overlapSentences = ['Fifth to last.', 'Fourth to last.', 'Third to last.', 'Second to last.', 'Last sentence.'];
-    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en', overlapSentences);
+    const overlapSentences = [
+      'Fifth to last.',
+      'Fourth to last.',
+      'Third to last.',
+      'Second to last.',
+      'Last sentence.',
+    ];
+    const result = buildAssignPrompt(
+      characters,
+      nameToCode,
+      numberedParagraphs,
+      'en',
+      overlapSentences,
+    );
     const userMessage = result[1].content as string;
     expect(userMessage).toContain('<previous_context_do_not_assign>');
     expect(userMessage).toContain('[-5] Fifth to last.');
@@ -204,7 +216,13 @@ describe('buildAssignPrompt with overlap', () => {
 
   it('handles fewer than 5 overlap sentences', () => {
     const overlapSentences = ['Second to last.', 'Last sentence.'];
-    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en', overlapSentences);
+    const result = buildAssignPrompt(
+      characters,
+      nameToCode,
+      numberedParagraphs,
+      'en',
+      overlapSentences,
+    );
     const userMessage = result[1].content as string;
     expect(userMessage).toContain('<previous_context_do_not_assign>');
     expect(userMessage).toContain('[-2] Second to last.');
@@ -213,7 +231,9 @@ describe('buildAssignPrompt with overlap', () => {
   });
 
   it('includes recency-bias note after numbered paragraphs', () => {
-    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en', ['Some overlap.']);
+    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en', [
+      'Some overlap.',
+    ]);
     const userMessage = result[1].content as string;
     const paragraphsPos = userMessage.indexOf('<numbered_paragraphs>');
     const notePos = userMessage.indexOf('[0] and above');

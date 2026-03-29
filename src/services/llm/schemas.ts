@@ -11,28 +11,36 @@ const baseSchema = z.object({
 });
 
 // Extract stage schemas
-export const ExtractCharacterSchema = z.object({
-  canonicalName: z.string().min(1),
-  variations: z.array(z.string().min(1)),
-  gender: z.enum(['male', 'female', 'unknown']),
-}).strict();
+export const ExtractCharacterSchema = z
+  .object({
+    canonicalName: z.string().min(1),
+    variations: z.array(z.string().min(1)),
+    gender: z.enum(['male', 'female', 'unknown']),
+  })
+  .strict();
 
-export const ExtractSchema = baseSchema.extend({
-  characters: z.array(ExtractCharacterSchema).min(1),
-}).strict();
+export const ExtractSchema = baseSchema
+  .extend({
+    characters: z.array(ExtractCharacterSchema).min(1),
+  })
+  .strict();
 
 // Merge stage schema
-export const MergeSchema = baseSchema.extend({
-  merges: z.array(
-    z.array(z.number().int().min(0)).min(2), // Each group has 2+ indices
-  ),
-}).strict();
+export const MergeSchema = baseSchema
+  .extend({
+    merges: z.array(
+      z.array(z.number().int().min(0)).min(2), // Each group has 2+ indices
+    ),
+  })
+  .strict();
 
 // Assign stage schema
 // NOTE: z.record() requires 2 args in Zod 4 (single-arg form removed)
-export const AssignSchema = baseSchema.extend({
-  assignments: z.record(z.string(), z.string()), // Sparse: {"0": "A", "5": "B"}
-}).strict();
+export const AssignSchema = baseSchema
+  .extend({
+    assignments: z.record(z.string(), z.string()), // Sparse: {"0": "A", "5": "B"}
+  })
+  .strict();
 
 // Type exports (nullable reasoning stays nullable in type)
 export type ExtractResponse = z.infer<typeof ExtractSchema>;

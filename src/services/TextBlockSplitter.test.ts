@@ -169,7 +169,11 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       const maxTokens = 100;
       const filler = tokenFill(86);
       // Long text but has quotes — it's dialogue, not narration
-      const dialogue = `She looked at him and said "I don't know what you mean" and then walked away`.padEnd(200, '.');
+      const dialogue =
+        `She looked at him and said "I don't know what you mean" and then walked away`.padEnd(
+          200,
+          '.',
+        );
 
       const blocks = splitter.splitIntoBlocks([filler, dialogue], maxTokens);
 
@@ -229,7 +233,10 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       const maxTokens = 100;
       const filler = tokenFill(86);
 
-      const blocks = splitter.splitIntoBlocks([filler, '***', '---', 'Content after dividers.'], maxTokens);
+      const blocks = splitter.splitIntoBlocks(
+        [filler, '***', '---', 'Content after dividers.'],
+        maxTokens,
+      );
 
       expect(blocks).toHaveLength(2);
       expect(blocks[0].sentences).toEqual([filler]);
@@ -307,7 +314,7 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       // Each paragraph "Normal story text." = 19 chars = 5 tokens.
       // Block 0 fills to 1600 paragraphs (8000 tokens). Block 1 needs >1360 paragraphs.
       const beforeDivider = 'Normal story text.\n'.repeat(3000);
-      const text = beforeDivider + '\n***\n' + 'New scene after the break.';
+      const text = `${beforeDivider}\n***\nNew scene after the break.`;
 
       const blocks = splitter.createAssignBlocks(text);
 
@@ -325,7 +332,7 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       // 16k maxTokens, 85% threshold = 13600 tokens.
       // Block 0 fills to 3200 paragraphs (16000 tokens). Block 1 needs >2720 paragraphs.
       const beforeDivider = 'Normal story text.\n'.repeat(6200);
-      const text = beforeDivider + '\n***\n' + 'New scene after the break.';
+      const text = `${beforeDivider}\n***\nNew scene after the break.`;
 
       const blocks = splitter.createExtractBlocks(text);
 
@@ -341,7 +348,7 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       // "Story text here." = 16 chars = 4 tokens. Block 0 = 2000 paragraphs.
       // Block 1 needs >1700 paragraphs (>6800 tokens) before "Chapter 10".
       const beforeChapter = 'Story text here.\n'.repeat(3800);
-      const text = beforeChapter + '\nChapter 10\n' + 'The tenth chapter content.';
+      const text = `${beforeChapter}\nChapter 10\nThe tenth chapter content.`;
 
       const blocks = splitter.createAssignBlocks(text);
 

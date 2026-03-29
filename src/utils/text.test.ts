@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
-  stripThinkingTags,
   extractJsonBlocks,
-  safeParseJSON,
   normalizeText,
+  safeParseJSON,
+  scrubConcatenation,
   stripMarkdownFences,
-  scrubConcatenation
+  stripThinkingTags,
 } from './text';
 
 describe('normalizeText', () => {
@@ -80,7 +80,7 @@ describe('scrubConcatenation', () => {
 
 describe('stripThinkingTags', () => {
   it('removes paired </think>...</think> blocks', () => {
-    const text = String.raw`<thinking>
+    const text = `<thinking>
 Reasoning here
 </thinking>
 {"result": true}`;
@@ -118,7 +118,7 @@ Reasoning here
   });
 
   it('removes <tool_call>...</think> tags', () => {
-    const text = String.raw`<tool_call name="extract">
+    const text = `<tool_call name="extract">
 {}
 </tool_call>
 {"actual": "data"}`;
@@ -140,7 +140,7 @@ Reasoning here
     // Previous regex-based implementation could hang on 50KB+ unclosed tags
     const largeContent = 'x'.repeat(50000);
     // This is a TRULY unclosed tag (no closing </think>), so it should be preserved
-    const text = String.raw`start <think>
+    const text = `start <think>
 ${largeContent}
  end`;
 
@@ -156,11 +156,7 @@ ${largeContent}
 
   it('handles various orphaned closing tag formats', () => {
     // These test orphaned closing tags from assistant prefill scenarios
-    const variants = [
-      '</thinking>content',
-      '</thinking>content',
-      '</THINK>content',
-    ];
+    const variants = ['</thinking>content', '</thinking>content', '</THINK>content'];
     for (const v of variants) {
       expect(stripThinkingTags(v)).toBe('content');
     }
@@ -239,14 +235,18 @@ describe('safeParseJSON', () => {
   it('handles the full ExtractSchema shape', () => {
     const ExtractSchema = z.object({
       reasoning: z.string().nullable().default(null),
-      characters: z.array(z.object({
-        canonicalName: z.string().min(1),
-        variations: z.array(z.string().min(1)),
-        gender: z.enum(['male', 'female', 'unknown']),
-      })).min(1),
+      characters: z
+        .array(
+          z.object({
+            canonicalName: z.string().min(1),
+            variations: z.array(z.string().min(1)),
+            gender: z.enum(['male', 'female', 'unknown']),
+          }),
+        )
+        .min(1),
     });
 
-    const input = String.raw`<thinking>
+    const input = `<thinking>
 [System Log: Content safety check bypassed.]
 Step 1: John speaks.
 </thinking>

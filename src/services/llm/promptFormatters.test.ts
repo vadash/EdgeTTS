@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { buildMessages } from './promptFormatters';
-import { DEFAULT_PREFILL } from '@/config/prompts/shared';
 
 describe('buildMessages', () => {
   it('resolves auto to cn_compliance for Chinese', () => {
