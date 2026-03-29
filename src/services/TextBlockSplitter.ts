@@ -195,7 +195,7 @@ export class TextBlockSplitter {
         const priority = this.getBreakPriority(sentence);
 
         if (priority === 1) {
-          // Divider: push current block, drop this sentence
+          // Divider: push current block, drop this sentence and any consecutive dividers
           if (currentBlock.length > 0) {
             blocks.push({
               blockIndex: blockIndex++,
@@ -205,6 +205,10 @@ export class TextBlockSplitter {
           }
           currentBlock = [];
           currentTokens = 0;
+          // Skip this divider and any consecutive dividers
+          while (i + 1 < sentences.length && this.getBreakPriority(sentences[i + 1]) === 1) {
+            i++;
+          }
           sentenceStartIndex = i + 1;
           continue;
         }
