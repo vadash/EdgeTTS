@@ -99,9 +99,11 @@ CRITICAL FORMAT RULES:
 {{paragraphs}}
 </numbered_paragraphs>
 
-Assign the correct speaker code (A, B, C...) to each paragraph number.
-- ONLY use the codes provided above. DO NOT use names.
-- SKIP any paragraphs that do not contain dialogue, thoughts, or system brackets.
-- Watch out for names inside quotes (they are listeners, not speakers).
-- Only assign speaker codes to paragraphs [0] and above.`,
+[FINAL INSTRUCTION]:
+1. Assign Speaker Codes (A, B, C...) to the paragraphs above.
+2. SKIP paragraphs that are purely narration (no dialogue, thoughts, or system brackets).
+3. Be careful of names inside quotes — they are listeners, not speakers (Vocative trap).
+4. ONLY use the codes provided in <speaker_codes>. DO NOT use names.
+5. Only assign speaker codes to paragraphs [0] and above.
+Output the raw JSON now.`,
 };
