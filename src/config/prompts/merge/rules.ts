@@ -23,12 +23,11 @@ export const MERGE_RULES = `1. CHECK VARIATIONS:
    Example: 0 is "Bob". 1 is "Robert Smith". The group should be [1, 0] because "Robert Smith" is better.
    Example: 3 is "System". 5 is "Interface". The group should be [3, 5] because "System" is the best name for game menus.
 
-<thinking_process>
-Follow these steps IN ORDER. Write your work inside <think> tags BEFORE outputting the JSON:
+Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
+Follow these steps IN ORDER:
 
 Step 1: Variation cross-check — Compare variations arrays between all character pairs. Flag any shared names.
 Step 2: System entity match — Link System, Interface, Blue Box, Notification into one group.
 Step 3: Protagonist match — If Protagonist exists, check if another character is the same person (main character).
 Step 4: Conflict check — Reject any proposed merges with gender mismatches or insufficient confidence.
-Step 5: Output — Build merge groups. First number = best/longest canonicalName. Empty array if no merges.
-</thinking_process>`;
+Step 5: Output — Build merge groups. First number = best/longest canonicalName. Empty array if no merges.`;
