@@ -20,6 +20,10 @@ export const EXTRACT_RULES = `1. HOW TO FIND SPEECH:
    - Do NOT extract sound effects like [Bang!] or [Sigh].
    - DO extract characters who make non-verbal vocalizations (e.g., grunts, screams, sighs, "eep", "hmm") IF it serves as a response or communication.
    - Do NOT extract purely environmental sound effects (e.g., [Bang!], *Crash*).
+   - THOUGHTS: When a character has thoughts (e.g., *I must run*), extract them as speaking and assign to that character. Thoughts use the SAME voice profile as spoken dialogue.
+     Example: "John pondered. *I should leave.*" -> Extract John, assign the thought to John.
+   - GROUPS: If a group of people speak in unison (e.g., "the crowd", "the guards"), extract them as a single entity with gender "unknown".
+     Example: "Kill the monster!" the crowd chanted. -> Extract "The Crowd", gender "unknown".
 
 4. HOW TO FORMAT NAMES AND GENDER:
    - "canonicalName": The best, most complete name you can find (e.g., "Queen Elizabeth", "John Smith", "System", "Protagonist").
