@@ -26,12 +26,11 @@ export const ASSIGN_RULES = `1. SKIP NON-DIALOGUE:
 7. NEGATIVE INDICES ARE READ-ONLY:
    Paragraphs labeled with negative indices inside the previous context block are from the previous section for context only. Do NOT assign speaker codes to them.
 
-<thinking_process>
-Follow these steps IN ORDER. Write your work inside <think> tags BEFORE outputting the JSON:
+Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
+Follow these steps IN ORDER:
 
 Step 1: Dialogue scan — Identify every paragraph with quotes, thoughts, or system bracket messages.
 Step 2: Speaker match — Use speech verbs ("said X"), action beats, pronouns, and first-person narration to identify speakers.
 Step 3: Vocative check — Names inside quotes are listeners, not speakers. Cross them off.
 Step 4: Context check — Use paragraph sequence and previous context (negative indices) for ambiguous cases.
-Step 5: Output — Map paragraph numbers to speaker codes. Skip pure narration. Only assign non-negative indices.
-</thinking_process>`;
+Step 5: Output — Map paragraph numbers to speaker codes. Skip pure narration. Only assign non-negative indices.`;
