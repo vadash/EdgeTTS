@@ -4,21 +4,94 @@ on:
   push:
     branches: [master]
 
+# Minimum permissions needed: write for Pages deployment, id-token for OIDC.
 permissions:
   contents: write
   pages: write
   id-token: write
 
+# Allow only one concurrent deployment. New pushes queue rather than
+# cancelling a running deployment mid-flight.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+
+  # ---------------------------------------------------------------------------
+  # Enumerate all v* semver tags so the matrix below can be generated
+  # dynamically. Produces a JSON array like ["v1.0.0","v1.1.0"].
+  # ---------------------------------------------------------------------------
+  list-tags:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      tags: ${{ steps.tags.outputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history is required to see all tags
+
+      - name: Collect v* tags as a sorted JSON array
+        id: tags
+        # `git tag -l` may return nothing; `jq -s` always produces at least '[]'.
+        # `sort -V` ensures natural version ordering (v1.9 < v1.10).
+        run: |
+          LIST=$(git tag -l 'v*' | sort -V | jq -R . | jq -s -c .)
+          echo "list=$LIST" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # Build the current master branch into the "latest" deployment slot.
+  # ---------------------------------------------------------------------------
+  build-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for git-based version stamps, if any
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and stage latest
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          npm run build
+
+          # Guard: fail loudly if the build didn't produce the expected output.
+          [[ -d dist/latest ]] || { echo "::error::dist/latest not found after build"; exit 1; }
+          [[ -f dist/404.html ]] || { echo "::error::dist/404.html not found after build"; exit 1; }
+
+          mkdir -p deploy
+          # Clean-replace so stale files from a previous cached run don't bleed in.
+          rm -rf deploy/latest
+          cp -r dist/latest deploy/latest
+          cp dist/404.html deploy/404.html
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deploy-latest
+          path: deploy/
+
+  # ---------------------------------------------------------------------------
+  # Build each tagged release into its own versioned deployment slot.
+  # Each tag is cached so repeated deployments are cheap.
+  # Skipped entirely when there are no v* tags.
+  # ---------------------------------------------------------------------------
+  build-tags:
+    needs: list-tags
+    if: needs.list-tags.outputs.tags != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        tag: ${{ fromJSON(needs.list-tags.outputs.tags) }}
+      fail-fast: false  # one bad tag should not block all others
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,36 +102,74 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - run: npm ci
+      - name: Restore cached build for ${{ matrix.tag }}
+        id: tag-cache
+        uses: actions/cache@v4
+        with:
+          path: deploy/${{ matrix.tag }}
+          key: tag-build-${{ matrix.tag }}
 
-      - run: mkdir -p deploy
-
-      # Build latest from master
-      - name: Build latest
+      # Only rebuild if the cache was cold. The cached directory is uploaded
+      # as-is in the next step regardless.
+      - name: Build ${{ matrix.tag }}
+        if: steps.tag-cache.outputs.cache-hit != 'true'
+        shell: bash
         run: |
-          git checkout master
+          set -euo pipefail
+
+          git checkout "${{ matrix.tag }}"
+
+          # Re-install deps for this tag's lockfile (may differ from master).
+          npm ci
           npm run build
-          rm -rf deploy/latest && cp -r dist/latest deploy/
-          cp dist/404.html deploy/
 
-      # Build all tagged versions
-      - name: Build all tagged versions
-        run: |
-          for TAG in $(git tag -l 'v*'); do
-            echo "Building $TAG"
-            git checkout "$TAG"
-            npm run build
-            rm -rf "deploy/$TAG"
-            cp -r dist/latest "deploy/$TAG"
-          done
+          [[ -d dist/latest ]] || {
+            echo "::error::dist/latest not found after building ${{ matrix.tag }}"
+            exit 1
+          }
 
-      # Generate index
-      - run: node scripts/generate-index.js deploy
+          mkdir -p "deploy/${{ matrix.tag }}"
+          rm -rf "deploy/${{ matrix.tag }}"
+          cp -r dist/latest "deploy/${{ matrix.tag }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deploy-${{ matrix.tag }}
+          path: deploy/
+
+  # ---------------------------------------------------------------------------
+  # Merge all per-job artifacts and publish to GitHub Pages.
+  # Runs even when build-tags was skipped (no tags exist yet);
+  # fails only when build-latest itself failed.
+  # ---------------------------------------------------------------------------
+  deploy:
+    needs: [build-latest, build-tags]
+    if: always() && needs.build-latest.result == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # `merge-multiple: true` flattens all deploy-* artifacts directly into
+      # `deploy/` without nesting, eliminating the need for a manual move loop.
+      - name: Download and merge all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deploy-*
+          path: deploy/
+          merge-multiple: true
+
+      - name: Generate version index page
+        run: node scripts/generate-index.js deploy
 
       - uses: actions/configure-pages@v4
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: deploy
+          path: deploy/
 
-      - id: deployment
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
