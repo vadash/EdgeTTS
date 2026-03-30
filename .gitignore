@@ -32,4 +32,8 @@ test.config.local.ts
 /repomix-*
 /tmp/
 
+# Auto-exe skill
 /logs/
+nul
+
+# Unsorted
