@@ -554,7 +554,7 @@ export class LLMVoiceService {
         throw new Error('Operation cancelled');
       }
 
-      const temp = Math.round(Math.random() * 10) / 10; // Random temperature 0.0-1.0, rounded to 0.1
+      const temp = 0.1 + Math.round(Math.random() * 6) / 10; // Random temperature 0.1-0.7, rounded to 0.1
       onProgress?.(
         i + 1,
         mergeVoteCount,
