@@ -4,29 +4,77 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const deployDir = process.argv[2] || resolve(__dirname, '..', 'dist');
+const currentSha = process.argv[3] || null;
 
-// Get all version directories
-const dirs = readdirSync(deployDir).filter((name) => {
-  const path = resolve(deployDir, name);
-  return statSync(path).isDirectory();
-});
+// Collect sha/ directories
+let shaDirs = [];
+const shaDir = resolve(deployDir, 'sha');
+try {
+  shaDirs = readdirSync(shaDir)
+    .filter((name) => statSync(resolve(shaDir, name)).isDirectory())
+    .sort()
+    .reverse(); // most recent first
+} catch {
+  // sha/ directory doesn't exist yet
+}
 
-// Sort: latest first, then versions descending
-const versions = dirs.sort((a, b) => {
-  if (a === 'latest') return -1;
-  if (b === 'latest') return 1;
-  return b.localeCompare(a, undefined, { numeric: true });
-});
+// Collect v* tag directories (top-level)
+const tagDirs = readdirSync(deployDir)
+  .filter((name) => /^v/.test(name) && statSync(resolve(deployDir, name)).isDirectory())
+  .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 
-const versionList = versions.map((v) => `      <li><a href="./${v}/">${v}</a></li>`).join('\n');
+// Split sha dirs into current vs previous
+const currentEntry = currentSha ? shaDirs.find((d) => d === currentSha || d.startsWith(currentSha)) : null;
+const previousEntries = shaDirs.filter((d) => d !== currentEntry);
+
+function renderList(items, prefix = './') {
+  return items
+    .map((name) => {
+      const href = prefix.startsWith('sha') ? `${prefix}/${name}/` : `${prefix}${name}/`;
+      const label = prefix.startsWith('sha') ? name.slice(0, 9) : name;
+      return `      <li><a href="${href}">${label}</a></li>`;
+    })
+    .join('\n');
+}
+
+function renderSection(title, items, prefix) {
+  if (items.length === 0) return '';
+  return `
+    <div class="versions">
+      <h2>${title}</h2>
+      <ul>
+${renderList(items, prefix)}
+      </ul>
+    </div>`;
+}
+
+// Favicon: prefer current SHA, else first sha dir, else fallback
+const faviconSha = currentEntry || shaDirs[0] || 'latest';
+const faviconPath = `./sha/${faviconSha}/logo.png`;
+
+// Meta refresh (only when we have a current SHA)
+const metaRefresh = currentEntry
+  ? `  <meta http-equiv="refresh" content="2;url=./sha/${currentEntry}/index.html">\n`
+  : '';
+
+// Current build section with Latest badge
+const currentSection = currentEntry
+  ? `
+    <div class="versions current">
+      <h2>Current Build <span class="badge">Latest</span></h2>
+      <ul>
+      <li><a href="./sha/${currentEntry}/">${currentEntry.slice(0, 9)}</a></li>
+      </ul>
+    </div>`
+  : '';
 
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EdgeTTS - Builds</title>
-  <link rel="icon" href="./latest/logo.png">
+${metaRefresh}  <title>EdgeTTS - Builds</title>
+  <link rel="icon" href="${faviconPath}">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -47,6 +95,19 @@ const html = `<!DOCTYPE html>
       border-radius: 12px;
       padding: 24px 32px;
       min-width: 300px;
+      margin-bottom: 16px;
+    }
+    .versions.current {
+      border-color: #0d6efd;
+    }
+    .badge {
+      background: #0d6efd;
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      vertical-align: middle;
+      margin-left: 8px;
     }
     .versions h2 {
       font-size: 1rem;
@@ -54,6 +115,9 @@ const html = `<!DOCTYPE html>
       text-transform: uppercase;
       letter-spacing: 0.05em;
       margin-bottom: 16px;
+    }
+    .versions.current h2 {
+      color: #e0e0e0;
     }
     ul { list-style: none; }
     li { padding: 12px 0; border-bottom: 1px solid #333; }
@@ -77,12 +141,7 @@ const html = `<!DOCTYPE html>
 <body>
   <h1>EdgeTTS</h1>
   <p class="subtitle">Text to Speech Converter</p>
-  <div class="versions">
-    <h2>Available Builds</h2>
-    <ul>
-${versionList}
-    </ul>
-  </div>
+${currentSection}${renderSection('Previous Builds', previousEntries, './sha/')}${renderSection('Releases', tagDirs, './')}
   <footer>
     <a href="https://github.com/Vadash/EdgeTTS">GitHub</a>
   </footer>
@@ -90,4 +149,6 @@ ${versionList}
 </html>`;
 
 writeFileSync(resolve(deployDir, 'index.html'), html);
-console.log(`Generated index.html with ${versions.length} versions: ${versions.join(', ')}`);
+
+const total = (currentEntry ? 1 : 0) + previousEntries.length + tagDirs.length;
+console.log(`Generated index.html with ${total} versions (current: ${currentEntry ? currentEntry.slice(0, 9) : 'none'}, previous: ${previousEntries.length}, releases: ${tagDirs.length})`);

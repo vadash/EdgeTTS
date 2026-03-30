@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.ts'],
     exclude: ['node_modules', 'dist', 'src/test/llm-real.test.ts'],
     globals: true,
     coverage: {
