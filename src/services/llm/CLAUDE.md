@@ -20,7 +20,7 @@ Prompts in `src/config/prompts/` are split into per-concern files:
 - **`rules.ts`**: Task-specific constraints + in-JSON `reasoning` field reasoning steps
 - **`schema.ts`**: JSON schema example
 - **`builder.ts`**: Assembles full message array, moved from PromptStrategy.ts
-- **`examples/en.ts`**: Structured `{ input, thinking?, output, label? }` few-shot examples
+- **`examples/en.ts`**: Structured `{ input, output, label? }` few-shot examples (reasoning is inside the JSON output)
 - **`examples/index.ts`**: `getExamples(language)` — returns filtered examples
 
 Stages: `extract/` → `merge/` → `assign/`

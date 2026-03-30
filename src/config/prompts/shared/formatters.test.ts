@@ -21,17 +21,6 @@ describe('formatExamples', () => {
     expect(result).toContain('</example_1>');
   });
 
-  it('formats example with thinking — wraps thinking in  tags', () => {
-    const examples: PromptExample[] = [
-      { input: 'Test', thinking: 'Step 1: analyze', output: '{"done": true}' },
-    ];
-    const result = formatExamples(examples);
-    expect(result).toContain('<ideal_output>');
-    expect(result).toContain('tep 1: analyze\n');
-    expect(result).toContain('{"done": true}');
-    expect(result).toContain('</ideal_output>');
-  });
-
   it('filters examples by language label', () => {
     const examples: PromptExample[] = [
       { input: 'EN input', output: '{}', label: '(EN/SFW)' },
@@ -105,23 +94,10 @@ describe('assembleUserConstraints', () => {
 });
 
 describe('buildMessages', () => {
-  it('resolves auto to cn_compliance for Chinese', () => {
+  it('resolves auto to no prefill since compliance presets removed', () => {
     const result = buildMessages('system body', 'user body', 'zh', 'auto');
-    expect(result).toHaveLength(3);
-    expect(result[2].role).toBe('assistant');
-    expect(result[2].content).toContain('系统日志');
-  });
-
-  it('resolves auto to en_compliance for non-Chinese', () => {
-    const result = buildMessages('system body', 'user body', 'en', 'auto');
-    expect(result).toHaveLength(3);
-    expect(result[2].role).toBe('assistant');
-    expect(result[2].content).toContain('System Status');
-  });
-
-  it('uses explicit prefill when provided', () => {
-    const result = buildMessages('system body', 'user body', 'zh', 'pure_think');
-    expect(result).toHaveLength(3);
+    // auto resolves to cn_compliance which no longer exists, so no assistant message
+    expect(result).toHaveLength(2);
   });
 
   it('defaults to none prefill when not specified', () => {

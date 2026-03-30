@@ -13,7 +13,7 @@ Three extraction stages + shared utilities. Each stage follows a fixed file conv
 | `rules.ts` | Task-specific rules with `reasoning` reasoning steps |
 | `schema.ts` | Output JSON schema description |
 | `builder.ts` | Assembles messages via `buildMessages()` |
-| `examples/{en}.ts` | Few-shot examples with `thinking` + `output` properties |
+| `examples/{en}.ts` | Few-shot examples with `output` property (JSON with embedded reasoning) |
 | `examples/index.ts` | `getExamples(language)` — returns examples for the stage |
 
 Stages: `extract/` (Stage 1), `merge/` (Stage 2), `assign/` (Stage 3).
@@ -32,7 +32,6 @@ Schema and rules are in the **user** prompt (end of context window) to defeat re
 
 ## Few-Shot Examples
 
-Each example object has: `{ input, thinking?, output, label? }`.
-- `thinking`: Plain reasoning text — `formatExamples` places it before JSON in `<ideal_output>`
+Each example object has: `{ input, output, label? }`.
 - `label`: Language tag like `(EN/Simple)` — used for filtering when language-specific sets are added
 - Currently EN only. Add `cn.ts` and update `examples/index.ts` to support more languages.

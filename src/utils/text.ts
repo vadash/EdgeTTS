@@ -196,7 +196,9 @@ export function stripThinkingTags(text: string): string {
       .replace(/\*thinks?:[\s\S]*?\*/gi, '')
       // 5. Parenthesized thinking: (thinking: ...)
       .replace(/\(thinking:[\s\S]*?\)/gi, '')
-      // 6. Orphaned closing tags (opening tag was in assistant prefill; tool_call removed)
+      // 6. Orphaned opening  tag (no closing tag — model output after prefill)
+      .replace(/^\s*/i, '')
+      // 7. Orphaned closing tags (opening tag was in assistant prefill; tool_call removed)
       .replace(/^[\s\S]*?<\/(think|thinking|thought|reasoning|search)>\s*/i, '')
       // 7. ideal_output: few-shot example wrapper that LLM sometimes reproduces after JSON
       .replace(/<\/ideal_output>\s*/gi, '')

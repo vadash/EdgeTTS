@@ -23,7 +23,6 @@ export interface LLMMessage {
 
 export interface PromptExample {
   input: string;
-  thinking?: string;
   output: string;
   label?: string;
 }
@@ -49,11 +48,7 @@ export function formatExamples(examples: PromptExample[], language = 'auto'): st
     .map((ex, i) => {
       const parts = [`<example_${i + 1}>`];
       parts.push(`<input>\n${ex.input}\n</input>`);
-      if (ex.thinking) {
-        parts.push(`<ideal_output>\n${ex.thinking}\n\n${ex.output}\n</ideal_output>`);
-      } else {
-        parts.push(`<ideal_output>\n${ex.output}\n</ideal_output>`);
-      }
+      parts.push(`<ideal_output>\n${ex.output}\n</ideal_output>`);
       parts.push(`</example_${i + 1}>`);
       return parts.join('\n');
     })
@@ -114,10 +109,10 @@ export function buildMessages(
     { role: 'user', content: userBody },
   ];
 
-  // Resolve 'auto' based on detected language
+  // Resolve 'auto' - both zh and non-zh result in no prefill since compliance presets were removed
   let actualPrefill = prefill;
   if (prefill === 'auto') {
-    actualPrefill = detectedLanguage === 'zh' ? 'cn_compliance' : 'en_compliance';
+    actualPrefill = 'none';
   }
 
   const prefillContent = PREFILL_PRESETS[actualPrefill];
