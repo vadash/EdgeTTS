@@ -419,15 +419,19 @@ git add -A && git commit -m "fix: reduce assignBlockTokens to 3000 and extractBl
 
 ---
 
-### Task 6: Add Tool Call Hallucination Scrubbing
+### Task 6: Add Tool Call Hallucination Scrubbing (CRITICAL FIX)
 
 **Files:**
 - Modify: `src/utils/text.ts`
 - Create: `src/utils/__tests__/text.toolcall.test.ts`
 
-**Common Pitfalls:**
-- The regex must handle both closed and unclosed `<tool_call>` tags
-- Must not damage valid JSON that happens to contain similar patterns
+**⚠️ CRITICAL:** The naive regex approach would delete valid JSON inside `<tool_call>` tags. Instead, we must UNWRAP them so `extractJsonBlocks` can find the `{}` inside.
+
+**Why this matters:** In `a20.json`, the model hallucinated:
+```xml
+<tool_call>...<arg_value>{"0": "A"}</arg_value></tool_call>
+```
+Blindly deleting would remove the valid JSON payload causing Tier 5 parse failures!
 
 - [ ] Step 1: Write the failing test
 
@@ -437,19 +441,19 @@ import { describe, it, expect } from 'vitest';
 import { stripThinkingTags } from '../text';
 
 describe('stripThinkingTags - tool call hallucinations', () => {
-  it('should strip complete tool_call tags', () => {
-    const input = 'Before <tool_call>json_tool_call<arg_key>value</arg_key></tool_call> After';
-    expect(stripThinkingTags(input)).toBe('Before After');
+  it('should unwrap tool_call containing JSON payload', () => {
+    const input = 'Before <tool_call><arg_value>{"0": "A"}</arg_value></tool_call> After';
+    expect(stripThinkingTags(input)).toBe('Before {"0": "A"} After');
   });
 
-  it('should strip tool_call with attributes', () => {
-    const input = 'Before <tool_call name="extract">content</tool_call> After';
-    expect(stripThinkingTags(input)).toBe('Before After');
+  it('should unwrap tool_call with namespaced tags', () => {
+    const input = '<tool_call><json>{"key": "value"}</json></tool_call>';
+    expect(stripThinkingTags(input)).toBe('{"key": "value"}');
   });
 
   it('should handle multiple tool_call blocks', () => {
-    const input = 'Start <tool_call>first</tool_call> Middle <tool_call>second</tool_call> End';
-    expect(stripThinkingTags(input)).toBe('Start  Middle  End');
+    const input = 'Start <tool_call>{"a": 1}</tool_call> Middle <tool_call>{"b": 2}</tool_call> End';
+    expect(stripThinkingTags(input)).toBe('Start {"a": 1} Middle {"b": 2} End');
   });
 
   it('should not affect valid JSON with tool_call-like strings', () => {
@@ -462,7 +466,7 @@ describe('stripThinkingTags - tool call hallucinations', () => {
 - [ ] Step 2: Run test to verify it fails
 
 Run: `npm test -- src/utils/__tests__/text.toolcall.test.ts -v`
-Expected: FAIL - tool_call tags not stripped
+Expected: FAIL - tool_call tags not unwrapped
 
 - [ ] Step 3: Write minimal implementation
 
@@ -474,21 +478,24 @@ export function stripThinkingTags(text: string): string {
   if (typeof text !== 'string') return text;
   return (
     text
-      // Paired XML tags: <thinking>...</thinking>, <tool_call>...</tool_call>, etc.
-      // (?:\s+[^>]*)? matches optional attributes like <tool_call name="extract_events">
+      // 1. Unwrap rogue tool_call arguments that contain the JSON (CRITICAL: before stripping other tags!)
+      .replace(/<tool_call>[\s\S]*?<arg_value>(\s*\{)/gi, '$1')
+      .replace(/(\}\s*)<\/arg_value>[\s\S]*?<\/tool_call>/gi, '$1')
+
+      // 2. NOW strip the standard paired XML tags (Removed 'tool_call' from this list!)
       .replace(
-        /<(think|thinking|thought|reasoning|reflection|tool_call|search)(?:\s+[^>]*)?>\s*[\s\S]*?<\/\1>/gi,
+        /<(think|thinking|thought|reasoning|reflection|search)(?:\s+[^>]*)?>\s*[\s\S]*?<\/\1>/gi,
         '',
       )
-      // Paired bracket tags: [THINK]...[/THINK], [TOOL_CALL]...[/TOOL_CALL], etc.
+      // 3. Paired bracket tags
       .replace(/\[(THINK|THOUGHT|REASONING|TOOL_CALL)\][\s\S]*?\[\/\1\]/gi, '')
-      // Asterisk thinking: *thinks* or *thought*
+      // 4. Asterisk thinking
       .replace(/\*thinks?:[\s\S]*?\*/gi, '')
-      // Parenthesized thinking: (thinking: ...)
+      // 5. Parenthesized thinking
       .replace(/\(thinking:[\s\S]*?\)/gi, '')
-      // Orphaned closing tags (opening tag was in assistant prefill)
-      .replace(/^[\s\S]*?<\/(think|thinking|thought|reasoning|tool_call|search)>\s*/i, '')
-      // ideal_output: few-shot example wrapper that LLM sometimes reproduces after JSON
+      // 6. Orphaned closing tags (tool_call removed - we unwrapped it instead!)
+      .replace(/^[\s\S]*?<\/(think|thinking|thought|reasoning|search)>\s*/i, '')
+      // 7. ideal_output wrapper
       .replace(/<\/ideal_output>\s*/gi, '')
       .trim()
   );
@@ -503,7 +510,7 @@ Expected: PASS
 - [ ] Step 5: Commit
 
 ```bash
-git add -A && git commit -m "fix: add tool_call hallucination scrubbing to stripThinkingTags"
+git add -A && git commit -m "fix: unwrap tool_call hallucinations instead of deleting to preserve JSON"
 ```
 
 ---
@@ -608,10 +615,7 @@ git add -A && git commit -m "fix: add fallback to UNKNOWN_UNNAMED for hallucinat
 - Modify: `src/services/llm/LLMApiClient.ts`
 - Test: `src/services/llm/__tests__/LLMApiClient.headers.test.ts`
 
-**Common Pitfalls:**
-- Must preserve Authorization header
-- Must not break existing browser fingerprinting for test mode
-- Headers must be properly initialized from init.headers
+**⚠️ Note:** The `new Headers(init?.headers)` call already copies ALL headers including `Authorization`. The manual check and copy is redundant and has been removed. Also removed hardcoded User-Agent spoofing.
 
 - [ ] Step 1: Write the failing test
 
@@ -662,23 +666,35 @@ Expected: FAIL - headers not properly initialized
 
 ```typescript
 // src/services/llm/LLMApiClient.ts
-// Update customFetch in constructor (around line 65-75):
+// Update customFetch in constructor (around line 65-90):
 
     const customFetch: typeof fetch = async (url, init) => {
-      const headers = new Headers(init?.headers); // Better initialization - copy existing
+      // Safely initialize and copy all existing headers (including Authorization)
+      const headers = new Headers(init?.headers);
 
       if (!headers.has('Content-Type')) {
         headers.set('Content-Type', 'application/json');
       }
 
-      // Ensure Authorization is preserved
-      if (!headers.has('Authorization') && init?.headers) {
-        const existingHeaders = new Headers(init.headers);
-        const auth = existingHeaders.get('Authorization');
-        if (auth) headers.set('Authorization', auth);
+      // Detect test mode
+      const isTestMode = typeof window === 'undefined' || typeof navigator === 'undefined';
+      const origin = new URL(url.toString()).origin;
+
+      if (!isTestMode) {
+        // Browser mode - copy headers from current browser context
+        headers.set('Accept', 'application/json, text/event-stream');
+        if (navigator.userAgent) {
+          headers.set('User-Agent', navigator.userAgent);
+        }
+        if (navigator.language) {
+          headers.set('Accept-Language', navigator.language);
+        }
+        headers.set('Origin', origin);
+        headers.set('Referer', `${origin}/`);
       }
 
-      // ... rest of existing logic
+      return fetch(url, { ...init, headers });
+    };
 ```
 
 - [ ] Step 4: Run test to verify it passes
@@ -689,7 +705,7 @@ Expected: PASS
 - [ ] Step 5: Commit
 
 ```bash
-git add -A && git commit -m "fix: safer header initialization in LLMApiClient custom fetch"
+git add -A && git commit -m "fix: simplify header initialization in LLMApiClient (redundant Authorization copy removed)"
 ```
 
 ---
@@ -719,14 +735,14 @@ git add -A && git commit -m "test: verify all fixes pass test suite and type che
 
 ## Summary
 
-This plan addresses all 5 issues from the design document:
+This plan addresses all 5 issues from the design document with the critical fixes from review:
 
 1. **XML/JSON Conflict**: Changed `DEFAULT_PREFILL` to `'none'` and updated Extract, Assign, and Merge rules to use JSON reasoning field
 2. **Cognitive Overload**: Reduced `assignBlockTokens` from 8000 to 3000 and `extractBlockTokens` from 16000 to 8000
 3. **Missing Character**: Added aggressive extraction rules and fallback to UNKNOWN_UNNAMED
-4. **Tool Call Hallucinations**: Enhanced `stripThinkingTags` with `<tool_call>` regex
-5. **Header Safety**: Improved header initialization in `LLMApiClient`
+4. **Tool Call Hallucinations**: **CRITICAL FIX** - Unwrap `<tool_call>` tags to preserve JSON payload inside instead of blindly deleting
+5. **Header Safety**: Simplified header initialization (redundant Authorization copy removed)
 
 ---
 
-**Plan written to `docs/plans/2025-03-30-fix-llm-pipeline-errors-v2.md`. Please review and let me know if you want changes.**
+**Plan written to `docs/plans/2025-03-30-fix-llm-pipeline-errors-v3.md`.** This version includes critical logic fixes for Task 6 (tool call unwrapping) and Task 8 (header simplification).
