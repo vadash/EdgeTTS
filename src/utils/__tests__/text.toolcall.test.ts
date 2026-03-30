@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { stripThinkingTags } from '../text';
 
 describe('stripThinkingTags - tool call hallucinations', () => {
@@ -13,7 +13,8 @@ describe('stripThinkingTags - tool call hallucinations', () => {
   });
 
   it('should handle multiple tool_call blocks', () => {
-    const input = 'Start <tool_call>{"a": 1}</tool_call> Middle <tool_call>{"b": 2}</tool_call> End';
+    const input =
+      'Start <tool_call>{"a": 1}</tool_call> Middle <tool_call>{"b": 2}</tool_call> End';
     expect(stripThinkingTags(input)).toBe('Start {"a": 1} Middle {"b": 2} End');
   });
 

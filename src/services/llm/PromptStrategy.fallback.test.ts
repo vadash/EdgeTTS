@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { parseAssignResponse } from './PromptStrategy';
+import { describe, expect, it } from 'vitest';
 import type { AssignContext } from './PromptStrategy';
+import { parseAssignResponse } from './PromptStrategy';
 
 describe('parseAssignResponse - unknown code fallback', () => {
   const createContext = (codes: Record<string, string>): AssignContext => ({

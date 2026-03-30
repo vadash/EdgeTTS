@@ -305,7 +305,8 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
             <Text id="common.cancel">Cancel</Text>
           </Button>
           <Button variant="primary" onClick={onConfirm}>
-            <Text id="voiceReview.continue">Continue</Text>{' ->'}
+            <Text id="voiceReview.continue">Continue</Text>
+            {' ->'}
           </Button>
         </div>
       </div>

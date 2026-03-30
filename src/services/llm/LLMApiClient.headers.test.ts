@@ -13,7 +13,10 @@ describe('LLMApiClient header handling', () => {
     // Mock global.fetch at the lowest level — customFetch calls this
     globalThis.fetch = vi.fn(async (url, init) => {
       capturedCalls.push({ url: url as string, init });
-      return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }) as any;
 
     try {
@@ -50,8 +53,11 @@ describe('LLMApiClient header handling', () => {
 
   it('should not hardcode User-Agent in test mode', async () => {
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn(async (_url, init) => {
-      return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    globalThis.fetch = vi.fn(async (_url, _init) => {
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }) as any;
 
     try {

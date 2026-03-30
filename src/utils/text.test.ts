@@ -118,8 +118,7 @@ Reasoning here
   });
 
   it('unwraps tool_call tags preserving inner JSON', () => {
-    const text =
-      '<tool_call name="extract">\n{}\n</tool_call>\n{"actual": "data"}';
+    const text = '<tool_call name="extract">\n{}\n</tool_call>\n{"actual": "data"}';
     expect(stripThinkingTags(text)).toBe('{}\n{"actual": "data"}');
   });
 

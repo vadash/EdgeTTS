@@ -100,7 +100,7 @@ export function assembleUserConstraints(rules: string, schemaText: string): stri
 export function buildMessages(
   systemBody: string,
   userBody: string,
-  detectedLanguage: string = 'en',
+  _detectedLanguage: string = 'en',
   prefill: PrefillPreset = DEFAULT_PREFILL,
   preamble: string = SYSTEM_PREAMBLE_CN,
 ): LLMMessage[] {

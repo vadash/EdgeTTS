@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { MERGE_RULES } from '../merge/rules';
 
 describe('MERGE_RULES', () => {

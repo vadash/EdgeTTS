@@ -4,6 +4,7 @@ import type { Logger } from '../Logger';
 export type ProgressCallback = (current: number, total: number, message?: string) => void;
 
 import { defaultConfig } from '@/config';
+import { buildQAPrompt } from '@/config/prompts/qa/builder';
 import { getErrorMessage } from '@/errors';
 import { withRetry } from '@/utils/retry';
 import {
@@ -22,7 +23,6 @@ import {
 } from './PromptStrategy';
 import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
 import { buildMergeConsensus } from './votingConsensus';
-import { buildQAPrompt } from '@/config/prompts/qa/builder';
 
 /**
  * Unambiguous speech/dialogue symbols (no contraction risk):
