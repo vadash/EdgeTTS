@@ -6,13 +6,15 @@ import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from './TTSWorke
 // Mock the ReusableEdgeTTSService
 vi.mock('./ReusableEdgeTTSService', () => {
   return {
-    ReusableEdgeTTSService: vi.fn().mockImplementation(() => ({
-      connect: vi.fn().mockResolvedValue(undefined),
-      send: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-      disconnect: vi.fn(),
-      isReady: vi.fn().mockReturnValue(true),
-      getState: vi.fn().mockReturnValue('READY'),
-    })),
+    ReusableEdgeTTSService: vi.fn().mockImplementation(function () {
+      return {
+        connect: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+        disconnect: vi.fn(),
+        isReady: vi.fn().mockReturnValue(true),
+        getState: vi.fn().mockReturnValue('READY'),
+      };
+    }),
   };
 });
 
@@ -44,13 +46,15 @@ describe('TTSWorkerPool', () => {
     mockDisconnect = vi.fn();
     mockIsReady = vi.fn().mockReturnValue(true);
 
-    MockedReusableEdgeTTSService.mockImplementation(() => ({
-      connect: mockConnect,
-      send: mockSend,
-      disconnect: mockDisconnect,
-      isReady: mockIsReady,
-      getState: vi.fn().mockReturnValue('READY'),
-    }));
+    MockedReusableEdgeTTSService.mockImplementation(function () {
+      return {
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('READY'),
+      };
+    });
 
     defaultVoiceConfig = {
       voice: 'Microsoft Server Speech Text to Speech Voice (en-US, JennyNeural)',
@@ -192,13 +196,15 @@ describe('TTSWorkerPool', () => {
         return Promise.resolve(new Uint8Array([1]));
       });
 
-      MockedReusableEdgeTTSService.mockImplementation(() => ({
-        connect: mockConnect,
-        send: mockSend,
-        disconnect: mockDisconnect,
-        isReady: mockIsReady,
-        getState: vi.fn().mockReturnValue('READY'),
-      }));
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
 
       pool = createPool();
       pool.addTask(createTask(0));
@@ -233,13 +239,15 @@ describe('TTSWorkerPool', () => {
       // Make send always fail with non-retriable error
       mockSend = vi.fn().mockRejectedValue(new Error('Permanent failure'));
 
-      MockedReusableEdgeTTSService.mockImplementation(() => ({
-        connect: mockConnect,
-        send: mockSend,
-        disconnect: mockDisconnect,
-        isReady: mockIsReady,
-        getState: vi.fn().mockReturnValue('READY'),
-      }));
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
 
       pool = createPool({ onTaskError });
       pool.addTask(createTask(0));
@@ -407,13 +415,15 @@ describe('TTSWorkerPool', () => {
     it('ignores connection errors during warmup', async () => {
       mockConnect = vi.fn().mockRejectedValue(new Error('Connection failed'));
 
-      MockedReusableEdgeTTSService.mockImplementation(() => ({
-        connect: mockConnect,
-        send: mockSend,
-        disconnect: mockDisconnect,
-        isReady: mockIsReady,
-        getState: vi.fn().mockReturnValue('DISCONNECTED'),
-      }));
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('DISCONNECTED'),
+        };
+      });
 
       pool = createPool({ maxWorkers: 10 });
 
@@ -424,13 +434,15 @@ describe('TTSWorkerPool', () => {
 
   describe('getPoolStats', () => {
     it('returns worker statistics', () => {
-      MockedReusableEdgeTTSService.mockImplementation(() => ({
-        connect: mockConnect,
-        send: mockSend,
-        disconnect: mockDisconnect,
-        isReady: mockIsReady,
-        getState: vi.fn().mockReturnValue('READY'),
-      }));
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
 
       pool = createPool({ maxWorkers: 3 });
 
@@ -447,13 +459,15 @@ describe('TTSWorkerPool', () => {
     });
 
     it('shows connections after warmup', async () => {
-      MockedReusableEdgeTTSService.mockImplementation(() => ({
-        connect: mockConnect,
-        send: mockSend,
-        disconnect: mockDisconnect,
-        isReady: mockIsReady,
-        getState: vi.fn().mockReturnValue('READY'),
-      }));
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
 
       pool = createPool({ maxWorkers: 3 });
       await pool.warmup();
@@ -470,13 +484,15 @@ describe('TTSWorkerPool', () => {
     it('connects worker if not ready before sending', async () => {
       mockIsReady = vi.fn().mockReturnValue(false);
 
-      MockedReusableEdgeTTSService.mockImplementation(() => ({
-        connect: mockConnect,
-        send: mockSend,
-        disconnect: mockDisconnect,
-        isReady: mockIsReady,
-        getState: vi.fn().mockReturnValue('DISCONNECTED'),
-      }));
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('DISCONNECTED'),
+        };
+      });
 
       pool = createPool();
       pool.addTask(createTask(0));
@@ -492,13 +508,15 @@ describe('TTSWorkerPool', () => {
       // which always calls connect()
       mockIsReady = vi.fn().mockReturnValue(true);
 
-      MockedReusableEdgeTTSService.mockImplementation(() => ({
-        connect: mockConnect,
-        send: mockSend,
-        disconnect: mockDisconnect,
-        isReady: mockIsReady,
-        getState: vi.fn().mockReturnValue('READY'),
-      }));
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
 
       pool = createPool();
       pool.addTask(createTask(0));

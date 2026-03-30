@@ -3,13 +3,15 @@ import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from '../TTSWorkerPool';
 
 vi.mock('../ReusableEdgeTTSService', () => ({
-  ReusableEdgeTTSService: vi.fn().mockImplementation(() => ({
-    connect: vi.fn().mockResolvedValue(undefined),
-    send: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-    disconnect: vi.fn(),
-    isReady: vi.fn().mockReturnValue(true),
-    getState: vi.fn().mockReturnValue('READY'),
-  })),
+  ReusableEdgeTTSService: vi.fn().mockImplementation(function () {
+    return {
+      connect: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+      disconnect: vi.fn(),
+      isReady: vi.fn().mockReturnValue(true),
+      getState: vi.fn().mockReturnValue('READY'),
+    };
+  }),
 }));
 
 describe('Ladder Integration - E2E', () => {
@@ -74,13 +76,15 @@ describe('Ladder Integration - E2E', () => {
 
     // Mock to fail on task 161
     const { ReusableEdgeTTSService } = await import('../ReusableEdgeTTSService');
-    vi.mocked(ReusableEdgeTTSService).mockImplementation(() => ({
-      connect: vi.fn().mockResolvedValue(undefined),
-      send: vi.fn().mockImplementationOnce(() => Promise.reject(new Error('Rate limited'))),
-      disconnect: vi.fn(),
-      isReady: vi.fn().mockReturnValue(true),
-      getState: vi.fn().mockReturnValue('READY'),
-    }));
+    vi.mocked(ReusableEdgeTTSService).mockImplementation(function () {
+      return {
+        connect: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn().mockImplementationOnce(() => Promise.reject(new Error('Rate limited'))),
+        disconnect: vi.fn(),
+        isReady: vi.fn().mockReturnValue(true),
+        getState: vi.fn().mockReturnValue('READY'),
+      };
+    });
 
     pool.addTasks(successTasks);
 

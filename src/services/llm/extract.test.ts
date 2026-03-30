@@ -4,13 +4,15 @@ import { LLMVoiceService } from './LLMVoiceService';
 
 // Mock OpenAI client
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: vi.fn(),
+  default: vi.fn().mockImplementation(function () {
+    return {
+      chat: {
+        completions: {
+          create: vi.fn(),
+        },
       },
-    },
-  })),
+    };
+  }),
 }));
 
 describe('LLMVoiceService - Extract with Structured Outputs', () => {
@@ -49,14 +51,15 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
     const openai = await import('openai');
     const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
     vi.mocked(openai.default).mockImplementation(
-      () =>
-        ({
+      function () {
+        return {
           chat: {
             completions: {
               create: mockCreate,
             },
           },
-        }) as any,
+        } as any;
+      },
     );
 
     service = new LLMVoiceService({
@@ -109,14 +112,15 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
     const openai = await import('openai');
     const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
     vi.mocked(openai.default).mockImplementation(
-      () =>
-        ({
+      function () {
+        return {
           chat: {
             completions: {
               create: mockCreate,
             },
           },
-        }) as any,
+        } as any;
+      },
     );
 
     service = new LLMVoiceService({
@@ -160,14 +164,15 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
     const openai = await import('openai');
     const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
     vi.mocked(openai.default).mockImplementation(
-      () =>
-        ({
+      function () {
+        return {
           chat: {
             completions: {
               create: mockCreate,
             },
           },
-        }) as any,
+        } as any;
+      },
     );
 
     service = new LLMVoiceService({
