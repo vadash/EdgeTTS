@@ -24,7 +24,9 @@ const tagDirs = readdirSync(deployDir)
   .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 
 // Split sha dirs into current vs previous
-const currentEntry = currentSha ? shaDirs.find((d) => d === currentSha || d.startsWith(currentSha)) : null;
+const currentEntry = currentSha
+  ? shaDirs.find((d) => d === currentSha || d.startsWith(currentSha))
+  : null;
 const previousEntries = shaDirs.filter((d) => d !== currentEntry);
 
 function renderList(items, prefix = './') {
@@ -151,4 +153,6 @@ ${currentSection}${renderSection('Previous Builds', previousEntries, './sha/')}$
 writeFileSync(resolve(deployDir, 'index.html'), html);
 
 const total = (currentEntry ? 1 : 0) + previousEntries.length + tagDirs.length;
-console.log(`Generated index.html with ${total} versions (current: ${currentEntry ? currentEntry.slice(0, 9) : 'none'}, previous: ${previousEntries.length}, releases: ${tagDirs.length})`);
+console.log(
+  `Generated index.html with ${total} versions (current: ${currentEntry ? currentEntry.slice(0, 9) : 'none'}, previous: ${previousEntries.length}, releases: ${tagDirs.length})`,
+);

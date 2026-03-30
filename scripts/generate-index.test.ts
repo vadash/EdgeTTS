@@ -1,8 +1,8 @@
-import { readdirSync, mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
-import { describe, it, beforeEach, afterEach, expect } from 'vitest';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 function createFakeDeployDir(): string {
   const dir = resolve(tmpdir(), `deploy-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
