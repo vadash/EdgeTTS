@@ -79,7 +79,7 @@ describe('scrubConcatenation', () => {
 });
 
 describe('stripThinkingTags', () => {
-  it('removes paired </think>...</think> blocks', () => {
+  it('removes paired thinking blocks', () => {
     const text = `<thinking>
 Reasoning here
 </thinking>
@@ -92,7 +92,7 @@ Reasoning here
     expect(stripThinkingTags(text)).toBe('{"result": true}');
   });
 
-  it('removes </think> with attributes', () => {
+  it('removes tags with attributes', () => {
     const text = '<think type="internal">\nstuff\n</thinking>\n{"ok": 1}';
     expect(stripThinkingTags(text)).toBe('{"ok": 1}');
   });
@@ -117,12 +117,10 @@ Reasoning here
     expect(stripThinkingTags(text)).toBe('{"result": true}');
   });
 
-  it('removes <tool_call>...</think> tags', () => {
-    const text = `<tool_call name="extract">
-{}
-</tool_call>
-{"actual": "data"}`;
-    expect(stripThinkingTags(text)).toBe('{"actual": "data"}');
+  it('unwraps tool_call tags preserving inner JSON', () => {
+    const text =
+      '<tool_call name="extract">\n{}\n</tool_call>\n{"actual": "data"}';
+    expect(stripThinkingTags(text)).toBe('{}\n{"actual": "data"}');
   });
 
   it('returns non-string input unchanged', () => {
@@ -139,10 +137,8 @@ Reasoning here
     // This test verifies that index-based extraction prevents regex DoS
     // Previous regex-based implementation could hang on 50KB+ unclosed tags
     const largeContent = 'x'.repeat(50000);
-    // This is a TRULY unclosed tag (no closing </think>), so it should be preserved
-    const text = `start <think>
-${largeContent}
- end`;
+    // This is a TRULY unclosed tag (no closing tag), so it should be preserved
+    const text = `start <think>\n${largeContent}\n end`;
 
     const start = Date.now();
     const result = stripThinkingTags(text);

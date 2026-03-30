@@ -175,21 +175,30 @@ export function stripThinkingTags(text: string): string {
   if (typeof text !== 'string') return text;
   return (
     text
-      // Paired XML tags: <think>...</think>, <thinking>...</thinking>, etc.
-      // (?:\s+[^>]*)? matches optional attributes like <tool_call name="extract_events">
+      // 1. Unwrap rogue tool_call tags to preserve inner JSON (CRITICAL: before stripping other tags!)
+      // Pattern: <tool_call ...>content</tool_call> -> content
+      .replace(/<tool_call(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/tool_call>/gi, '$1')
+      // Strip orphaned tool_call opening tags
+      .replace(/<tool_call(?:\s+[^>]*)?>\s*/gi, '')
+      // Strip orphaned tool_call closing tags
+      .replace(/\s*<\/tool_call>\s*/gi, ' ')
+      // Strip inner XML wrappers left behind after tool_call unwrapping (e.g. <json>...</json>)
+      .replace(/<(json|arg_value|arguments|content)(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/\1>/gi, '$2')
+
+      // 2. Strip standard paired XML tags (tool_call removed - we unwrap it instead!)
       .replace(
-        /<(think|thinking|thought|reasoning|reflection|tool_call|search)(?:\s+[^>]*)?>\s*[\s\S]*?<\/\1>/gi,
+        /<(think|thinking|thought|reasoning|reflection|search)(?:\s+[^>]*)?>\s*[\s\S]*?<\/\1>/gi,
         '',
       )
-      // Paired bracket tags: [THINK]...[/THINK], [TOOL_CALL]...[/TOOL_CALL], etc.
-      .replace(/\[(THINK|THOUGHT|REASONING|TOOL_CALL)\][\s\S]*?\[\/\1\]/gi, '')
-      // Asterisk thinking: *thinks* or *thought*
+      // 3. Paired bracket tags (TOOL_CALL removed - we unwrap it instead!)
+      .replace(/\[(THINK|THOUGHT|REASONING)\][\s\S]*?\[\/\1\]/gi, '')
+      // 4. Asterisk thinking: *thinks* or *thought*
       .replace(/\*thinks?:[\s\S]*?\*/gi, '')
-      // Parenthesized thinking: (thinking: ...)
+      // 5. Parenthesized thinking: (thinking: ...)
       .replace(/\(thinking:[\s\S]*?\)/gi, '')
-      // Orphaned closing tags (opening tag was in assistant prefill)
-      .replace(/^[\s\S]*?<\/(think|thinking|thought|reasoning|tool_call|search)>\s*/i, '')
-      // ideal_output: few-shot example wrapper that LLM sometimes reproduces after JSON
+      // 6. Orphaned closing tags (opening tag was in assistant prefill; tool_call removed)
+      .replace(/^[\s\S]*?<\/(think|thinking|thought|reasoning|search)>\s*/i, '')
+      // 7. ideal_output: few-shot example wrapper that LLM sometimes reproduces after JSON
       .replace(/<\/ideal_output>\s*/gi, '')
       .trim()
   );
