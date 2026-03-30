@@ -2,12 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { buildExtractPrompt } from './builder';
 
 describe('buildExtractPrompt', () => {
-  it('returns 3 messages (system, user, assistant)', () => {
+  it('returns 2 messages (system, user) with no prefill', () => {
     const result = buildExtractPrompt('Hello world');
-    expect(result).toHaveLength(3);
+    expect(result).toHaveLength(2);
     expect(result[0].role).toBe('system');
     expect(result[1].role).toBe('user');
-    expect(result[2].role).toBe('assistant');
   });
 
   it('injects text into user message', () => {
@@ -46,8 +45,7 @@ describe('buildExtractPrompt', () => {
 
   it('accepts detectedLanguage parameter', () => {
     const result = buildExtractPrompt('text', 'zh');
-    expect(result).toHaveLength(3);
-    // Chinese → cn_compliance prefill
-    expect(result[2].content).toContain('系统日志');
+    // DEFAULT_PREFILL is 'none', so no assistant message is added
+    expect(result).toHaveLength(2);
   });
 });

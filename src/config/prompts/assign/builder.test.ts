@@ -9,12 +9,11 @@ describe('buildAssignPrompt', () => {
   const nameToCode = new Map([['Alice', 'A']]);
   const numberedParagraphs = '[0] Some text';
 
-  it('returns 3 messages (system, user, assistant)', () => {
+  it('returns 2 messages (system, user) with no prefill', () => {
     const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs);
-    expect(result).toHaveLength(3);
+    expect(result).toHaveLength(2);
     expect(result[0].role).toBe('system');
     expect(result[1].role).toBe('user');
-    expect(result[2].role).toBe('assistant');
   });
 
   it('includes speaker codes and numbered paragraphs in user message', () => {
@@ -70,7 +69,7 @@ describe('buildAssignPrompt', () => {
 
   it('accepts detectedLanguage parameter', () => {
     const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'zh');
-    expect(result).toHaveLength(3);
-    expect(result[2].content).toContain('系统日志');
+    // DEFAULT_PREFILL is 'none', so no assistant message is added
+    expect(result).toHaveLength(2);
   });
 });

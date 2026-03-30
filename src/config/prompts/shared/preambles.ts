@@ -54,4 +54,4 @@ export type PrefillPreset = keyof typeof PREFILL_PRESETS;
  * Default prefill — pure_think is safest for unknown models.
  * Can be overridden per-provider in settings.
  */
-export const DEFAULT_PREFILL: PrefillPreset = 'auto';
+export const DEFAULT_PREFILL: PrefillPreset = 'none';

@@ -143,10 +143,10 @@ describe('parseAssignResponse', () => {
 describe('Prompt builders accept detectedLanguage', () => {
   it('buildExtractPrompt accepts detectedLanguage', () => {
     const result = buildExtractPrompt('Some text', 'zh');
-    expect(result).toHaveLength(3);
+    // DEFAULT_PREFILL is 'none', so no assistant message
+    expect(result).toHaveLength(2);
     expect(result[0].role).toBe('system');
     expect(result[1].role).toBe('user');
-    expect(result[2].role).toBe('assistant');
   });
 
   it('buildMergePrompt accepts detectedLanguage', () => {
@@ -154,7 +154,8 @@ describe('Prompt builders accept detectedLanguage', () => {
       { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
     ];
     const result = buildMergePrompt(characters, 'en');
-    expect(result).toHaveLength(3);
+    // DEFAULT_PREFILL is 'none', so no assistant message
+    expect(result).toHaveLength(2);
   });
 
   it('buildAssignPrompt accepts detectedLanguage', () => {
@@ -164,7 +165,8 @@ describe('Prompt builders accept detectedLanguage', () => {
     const nameToCode = new Map([['Alice', 'A']]);
     const numberedParagraphs = '[0] Some text';
     const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en');
-    expect(result).toHaveLength(3);
+    // DEFAULT_PREFILL is 'none', so no assistant message
+    expect(result).toHaveLength(2);
   });
 });
 
