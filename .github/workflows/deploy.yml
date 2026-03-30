@@ -159,8 +159,23 @@ jobs:
           path: deploy/
           merge-multiple: true
 
+      - name: Cleanup old SHA builds (keep newest 10)
+        env:
+          SHA_KEEP_COUNT: 10
+        shell: bash
+        run: |
+          if [[ -d deploy/sha ]]; then
+            cd deploy/sha
+            # List directories, sort (most recent = highest SHA first), skip the newest 10
+            ls -1d */ 2>/dev/null \
+              | sort -r \
+              | tail -n +$((SHA_KEEP_COUNT + 1)) \
+              | xargs -r rm -rf
+            echo "Cleaned up old SHA builds"
+          fi
+
       - name: Generate version index page
-        run: node scripts/generate-index.js deploy
+        run: node scripts/generate-index.js deploy ${{ github.sha }}
 
       - uses: actions/configure-pages@v4
 
