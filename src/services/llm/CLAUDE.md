@@ -15,25 +15,22 @@ We use a 3-message structure to defeat recency bias and improve compliance:
 See `promptFormatters.ts` for message assembly functions.
 
 ### Prompt Structure
-Prompts in `src/config/prompts/` are split into components:
-- **`role`**: Task description and identity
-- **`examples`**: Input/output examples
-- **`rules`**: Task-specific constraints
-- **`schemaText`**: JSON schema example
-- **`userTemplate`**: Template with `{{placeholders}}`
+Prompts in `src/config/prompts/` are split into per-concern files:
+- **`role.ts`**: Task description and identity
+- **`rules.ts`**: Task-specific constraints + `<thinking_process>` reasoning steps
+- **`schema.ts`**: JSON schema example
+- **`builder.ts`**: Assembles full message array, moved from PromptStrategy.ts
+- **`examples/en.ts`**: Structured `{ input, thinking?, output, label? }` few-shot examples
+- **`examples/index.ts`**: `getExamples(language)` — returns filtered examples
 
-Stages: `extract.ts` → `merge.ts` → `assign.ts`
+Stages: `extract/` → `merge/` → `assign/`
 
-### Shared Prompt Constants (`src/config/prompts/shared.ts`)
-- **`SYSTEM_PREAMBLE_CN`**: Frames task as production pipeline with pre-authorization
-- **`MIRROR_LANGUAGE_RULES`**: Ensures output values match source text language
-- **`EXECUTION_TRIGGER`**: Final instruction defeating recency bias
-- **`PREFILL_PRESETS`**: Assistant prefills including `'auto'` for language-aware selection
-  - `auto`: Resolves to `cn_compliance` for Chinese (`zh`), `en_compliance` otherwise
-  - `cn_compliance`: Best for Kimi/Qwen (Chinese compliance framing)
-  - `en_compliance`: English compliance framing
-  - `pure_think`: Minimal prefill — safest default for most models
-  - `json_only`: Skip reasoning, start JSON directly
+See `src/config/prompts/CLAUDE.md` for the full prompt module documentation.
+
+### Shared Prompt Utilities (`src/config/prompts/shared/`)
+- **`preambles.ts`**: `SYSTEM_PREAMBLE_CN` (anti-refusal framing), `PREFILL_PRESETS` (assistant prefills including `'auto'` for language-aware selection)
+- **`rules.ts`**: `MIRROR_LANGUAGE_RULES` (output language mirroring), `EXECUTION_TRIGGER` (defeats recency bias)
+- **`formatters.ts`**: `assembleSystemPrompt`, `assembleUserConstraints`, `buildMessages`, `formatExamples`
 
 ## JSON Repair Pipeline
 
