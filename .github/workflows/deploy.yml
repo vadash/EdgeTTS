@@ -68,15 +68,13 @@ jobs:
           [[ -d dist/latest ]] || { echo "::error::dist/latest not found after build"; exit 1; }
           [[ -f dist/404.html ]] || { echo "::error::dist/404.html not found after build"; exit 1; }
 
-          mkdir -p deploy
-          # Clean-replace so stale files from a previous cached run don't bleed in.
-          rm -rf deploy/latest
-          cp -r dist/latest deploy/latest
+          mkdir -p "deploy/sha"
+          cp -r dist/latest "deploy/sha/${GITHUB_SHA}"
           cp dist/404.html deploy/404.html
 
       - uses: actions/upload-artifact@v4
         with:
-          name: deploy-latest
+          name: deploy-sha-${{ github.sha }}
           path: deploy/
 
   # ---------------------------------------------------------------------------
