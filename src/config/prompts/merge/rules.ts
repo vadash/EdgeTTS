@@ -24,6 +24,7 @@ export const MERGE_RULES = `1. CHECK VARIATIONS:
    Example: 3 is "System". 5 is "Interface". The group should be [3, 5] because "System" is the best name for game menus.
 
 Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
+CRITICAL: Keep reasoning extremely concise. Only list characters that have potential merges; skip obviously unrelated pairs.
 Follow these steps IN ORDER:
 
 Step 1: Variation cross-check — Compare variations arrays between all character pairs. Flag any shared names.

@@ -31,6 +31,7 @@ export interface LLMApiClientOptions {
   reasoning?: 'auto' | 'high' | 'medium' | 'low' | null;
   temperature?: number;
   topP?: number;
+  maxTokens?: number;
   debugLogger?: DebugLogger;
   logger?: Logger;
 }
@@ -254,6 +255,10 @@ export class LLMApiClient {
       stream: useStreaming,
       response_format: zodToJsonSchema(schema, schemaName),
     };
+
+    if (this.options.maxTokens) {
+      requestBody.max_tokens = this.options.maxTokens;
+    }
 
     // Only add thinking/reasoning parameters when explicitly enabled
     // When reasoning is null or undefined (OFF), omit the parameters entirely for OpenAI-compatible APIs

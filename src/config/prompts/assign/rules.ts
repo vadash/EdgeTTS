@@ -27,6 +27,7 @@ export const ASSIGN_RULES = `1. SKIP NON-DIALOGUE:
    Paragraphs labeled with negative indices inside the previous context block are from the previous section for context only. Do NOT assign speaker codes to them.
 
 Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
+CRITICAL: Keep reasoning extremely concise. Do not quote full sentences. Do not analyze every paragraph individually. Only briefly note ambiguous cases.
 Follow these steps IN ORDER:
 
 Step 1: Dialogue scan — Identify every paragraph with quotes, thoughts, or system bracket messages.

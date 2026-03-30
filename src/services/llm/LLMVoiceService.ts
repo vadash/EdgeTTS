@@ -158,6 +158,7 @@ export class LLMVoiceService {
       reasoning: options.reasoning,
       temperature: options.temperature,
       topP: options.topP,
+      maxTokens: defaultConfig.llm.maxTokens,
       debugLogger,
       logger: options.logger,
     });
@@ -173,6 +174,7 @@ export class LLMVoiceService {
           reasoning: mergeConfig.reasoning ?? options.reasoning,
           temperature: mergeConfig.temperature ?? options.temperature,
           topP: mergeConfig.topP ?? options.topP,
+          maxTokens: defaultConfig.llm.maxTokens,
           debugLogger,
           logger: options.logger,
         })
@@ -398,6 +400,7 @@ export class LLMVoiceService {
         const client = new LLMApiClient({
           ...this.options,
           temperature: VOTING_TEMPERATURES[i],
+          maxTokens: defaultConfig.llm.maxTokens,
           logger: this.logger,
         });
 
@@ -647,6 +650,7 @@ export class LLMVoiceService {
       reasoning: this.options.mergeConfig?.reasoning ?? this.options.reasoning,
       temperature: temperature,
       topP: this.options.mergeConfig?.topP ?? this.options.topP,
+      maxTokens: defaultConfig.llm.maxTokens,
       debugLogger: this.apiClient.debugLogger, // share debugLogger
       logger: this.logger,
     });

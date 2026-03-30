@@ -39,6 +39,7 @@ export const EXTRACT_RULES = `1. HOW TO FIND SPEECH:
    - CRITICAL: Extract EVERY named character who speaks, even mentors, shopkeepers, or background characters. If they have dialogue, they MUST be extracted.
 
 Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
+CRITICAL: Keep reasoning extremely concise. Do not quote full sentences or list every quote in the text. Only briefly note ambiguous cases.
 Follow these steps IN ORDER:
 
 Step 1: Speaker scan — Find every quote, bracket message, telepathy, or thought in the text.
