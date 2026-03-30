@@ -13,6 +13,7 @@
 - **Modify:** `src/config/prompts/shared/preambles.ts` - Change default prefill from 'auto' to 'none'
 - **Modify:** `src/config/prompts/extract/rules.ts` - Update thinking instructions to use JSON reasoning field
 - **Modify:** `src/config/prompts/assign/rules.ts` - Update thinking instructions to use JSON reasoning field
+- **Modify:** `src/config/prompts/merge/rules.ts` - Update thinking instructions to use JSON reasoning field
 - **Modify:** `src/config/index.ts` - Reduce `assignBlockTokens` from 8000 to 3000
 - **Modify:** `src/utils/text.ts` - Add aggressive `<tool_call>` regex scrubbing
 - **Modify:** `src/services/llm/PromptStrategy.ts` - Add fallback for unknown speaker codes to UNKNOWN_UNNAMED
@@ -269,7 +270,93 @@ git add -A && git commit -m "fix: update assign rules to use JSON reasoning fiel
 
 ---
 
-### Task 4: Reduce Assign Block Tokens for Cognitive Load
+### Task 4: Update Merge Rules Thinking Instructions
+
+**Files:**
+- Modify: `src/config/prompts/merge/rules.ts`
+- Test: `src/config/prompts/__tests__/merge.rules.test.ts`
+
+**Common Pitfalls:**
+- The Merge stage was missed in the initial design document but also uses `<thinking_process>` tags
+- Must update to use JSON reasoning field like Extract and Assign stages
+
+- [ ] Step 1: Write the failing test
+
+```typescript
+// src/config/prompts/__tests__/merge.rules.test.ts
+import { describe, it, expect } from 'vitest';
+import { MERGE_RULES } from '../merge/rules';
+
+describe('MERGE_RULES', () => {
+  it('should instruct model to write reasoning inside JSON field, not XML tags', () => {
+    expect(MERGE_RULES).toContain('Write your step-by-step work inside the JSON "reasoning" field');
+    expect(MERGE_RULES).not.toContain('<thinking_process>');
+    expect(MERGE_RULES).not.toContain('</thinking_process>');
+    expect(MERGE_RULES).not.toContain('Write your work inside <thinking> tags');
+  });
+});
+```
+
+- [ ] Step 2: Run test to verify it fails
+
+Run: `npm test -- src/config/prompts/__tests__/merge.rules.test.ts -v`
+Expected: FAIL with "expected string to contain 'Write your step-by-step work inside the JSON'"
+
+- [ ] Step 3: Write minimal implementation
+
+```typescript
+// src/config/prompts/merge/rules.ts
+// Replace the entire file content:
+
+// src/config/prompts/merge/rules.ts
+// Pipeline stage 2 of 3: Extract → Merge → Assign
+
+export const MERGE_RULES = `1. CHECK VARIATIONS:
+   Look at the "variations" arrays. If Character A and Character B share a name in their variations, they are the same person.
+   Example: 0 has ["Marcus", "Marc"], 1 has ["Marcus Stone", "Marcus"]. They both have "Marcus". -> MERGE [1, 0].
+
+2. PROTAGONIST LINKING:
+   If one character is "Protagonist" and another is clearly the main character of the story (same gender/context), MERGE them.
+
+3. SYSTEM LINKING:
+   "System", "Interface", "Blue Box", "Notification" are all the same game system. -> MERGE them.
+
+4. DIFFERENT PEOPLE (DO NOT MERGE):
+   - If one is "male" and the other is "female", DO NOT MERGE. They are different people.
+   - "The King" and "The Prince" are different roles. DO NOT MERGE.
+   - "John" and "John's Father" are different people. DO NOT MERGE.
+   - If you are not 100% sure, DO NOT MERGE.
+
+5. HOW TO ORDER THE MERGE GROUP:
+   A merge group must have AT LEAST 2 numbers.
+   The FIRST number in the group must be the character with the longest, most complete, or best "canonicalName".
+   Example: 0 is "Bob". 1 is "Robert Smith". The group should be [1, 0] because "Robert Smith" is better.
+   Example: 3 is "System". 5 is "Interface". The group should be [3, 5] because "System" is the best name for game menus.
+
+Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
+Follow these steps IN ORDER:
+
+Step 1: Variation cross-check — Compare variations arrays between all character pairs. Flag any shared names.
+Step 2: System entity match — Link System, Interface, Blue Box, Notification into one group.
+Step 3: Protagonist match — If Protagonist exists, check if another character is the same person (main character).
+Step 4: Conflict check — Reject any proposed merges with gender mismatches or insufficient confidence.
+Step 5: Output — Build merge groups. First number = best/longest canonicalName. Empty array if no merges.`;
+```
+
+- [ ] Step 4: Run test to verify it passes
+
+Run: `npm test -- src/config/prompts/__tests__/merge.rules.test.ts -v`
+Expected: PASS
+
+- [ ] Step 5: Commit
+
+```bash
+git add -A && git commit -m "fix: update merge rules to use JSON reasoning field instead of XML tags"
+```
+
+---
+
+### Task 5: Reduce Assign Block Tokens for Cognitive Load
 
 **Files:**
 - Modify: `src/config/index.ts`
@@ -332,7 +419,7 @@ git add -A && git commit -m "fix: reduce assignBlockTokens to 3000 and extractBl
 
 ---
 
-### Task 5: Add Tool Call Hallucination Scrubbing
+### Task 6: Add Tool Call Hallucination Scrubbing
 
 **Files:**
 - Modify: `src/utils/text.ts`
@@ -421,7 +508,7 @@ git add -A && git commit -m "fix: add tool_call hallucination scrubbing to strip
 
 ---
 
-### Task 6: Add Unknown Speaker Code Fallback
+### Task 7: Add Unknown Speaker Code Fallback
 
 **Files:**
 - Modify: `src/services/llm/PromptStrategy.ts`
@@ -515,7 +602,7 @@ git add -A && git commit -m "fix: add fallback to UNKNOWN_UNNAMED for hallucinat
 
 ---
 
-### Task 7: Safer Header Handling in LLMApiClient
+### Task 8: Safer Header Handling in LLMApiClient
 
 **Files:**
 - Modify: `src/services/llm/LLMApiClient.ts`
@@ -607,7 +694,7 @@ git add -A && git commit -m "fix: safer header initialization in LLMApiClient cu
 
 ---
 
-### Task 8: Run Full Test Suite
+### Task 9: Run Full Test Suite
 
 **Files:**
 - All modified files
@@ -634,7 +721,7 @@ git add -A && git commit -m "test: verify all fixes pass test suite and type che
 
 This plan addresses all 5 issues from the design document:
 
-1. **XML/JSON Conflict**: Changed `DEFAULT_PREFILL` to `'none'` and updated rules to use JSON reasoning field
+1. **XML/JSON Conflict**: Changed `DEFAULT_PREFILL` to `'none'` and updated Extract, Assign, and Merge rules to use JSON reasoning field
 2. **Cognitive Overload**: Reduced `assignBlockTokens` from 8000 to 3000 and `extractBlockTokens` from 16000 to 8000
 3. **Missing Character**: Added aggressive extraction rules and fallback to UNKNOWN_UNNAMED
 4. **Tool Call Hallucinations**: Enhanced `stripThinkingTags` with `<tool_call>` regex
@@ -642,4 +729,4 @@ This plan addresses all 5 issues from the design document:
 
 ---
 
-**Plan written to `docs/plans/2025-03-30-fix-llm-pipeline-errors.md`. Please review and let me know if you want changes.**
+**Plan written to `docs/plans/2025-03-30-fix-llm-pipeline-errors-v2.md`. Please review and let me know if you want changes.**
