@@ -209,8 +209,8 @@ export function stripThinkingTags(text: string): string {
  * Returns Zod-style result object for maximum reusability.
  *
  * Flow:
- *   Input Validation → stripThinkingTags → Strip Fences → Tier 1 (JSON.parse)
- *   → Tier 2 (jsonrepair) → Tier 3 (Normalize + Extract) → Tier 4 (Scrub) → Tier 5 (Failure)
+ *   Input Validation -> stripThinkingTags -> Strip Fences -> Tier 1 (JSON.parse)
+ *   -> Tier 2 (jsonrepair) -> Tier 3 (Normalize + Extract) -> Tier 4 (Scrub) -> Tier 5 (Failure)
  */
 export function safeParseJSON<T>(
   input: unknown,

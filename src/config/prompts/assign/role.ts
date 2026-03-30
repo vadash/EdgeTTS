@@ -1,5 +1,5 @@
 // src/config/prompts/assign/role.ts
-// Pipeline stage 3 of 3: Extract → Merge → Assign
+// Pipeline stage 3 of 3: Extract -> Merge -> Assign
 
 export const ASSIGN_ROLE = `You are a dialogue matching bot.
 Your job is to read numbered sentences and assign a "Speaker Code" (A, B, C...) to the sentences that contain dialogue.

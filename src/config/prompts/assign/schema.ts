@@ -1,5 +1,5 @@
 // src/config/prompts/assign/schema.ts
-// Pipeline stage 3 of 3: Extract → Merge → Assign
+// Pipeline stage 3 of 3: Extract -> Merge -> Assign
 
 export const ASSIGN_SCHEMA_TEXT = `{
   "reasoning": "Short explanation (or null)",

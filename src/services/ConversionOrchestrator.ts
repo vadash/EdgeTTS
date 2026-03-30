@@ -58,7 +58,7 @@ export interface StageLLMConfig {
 }
 
 /**
- * Input configuration snapshot — read once at the start of run().
+ * Input configuration snapshot -- read once at the start of run().
  * Replaces all signal .value reads.
  */
 export interface OrchestratorInput {
@@ -124,7 +124,7 @@ export interface ConversionOrchestratorServices {
 function sanitizeText(text: string): string {
   let result = text;
 
-  // 1. Horizontal rules → pause marker
+  // 1. Horizontal rules -> pause marker
   result = result.replace(/^[-*_]{3,}$/gm, '...');
 
   // 2. Markdown headers

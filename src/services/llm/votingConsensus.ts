@@ -20,14 +20,14 @@ export function majorityVote(
 
   // No majority - log debug and use 0.0 as tiebreaker
   console.debug(
-    `[Voting] No majority for paragraph ${paragraphIndex}: ${votes.join(', ')} → using ${votes[0]}`,
+    `[Voting] No majority for paragraph ${paragraphIndex}: ${votes.join(', ')} -> using ${votes[0]}`,
   );
   return votes[0];
 }
 
 /**
  * Build consensus merge groups from multiple votes using Union-Find.
- * Pairs appearing in ≥2 of 5 votes get merged.
+ * Pairs appearing in >=2 of 5 votes get merged.
  * Returns 0-based index groups.
  */
 export function buildMergeConsensus(votes: number[][][], logger?: Logger): number[][] {
@@ -55,7 +55,7 @@ export function buildMergeConsensus(votes: number[][][], logger?: Logger): numbe
     }
   }
 
-  // Build edges from pairs with ≥2 votes (2 out of 5 is enough)
+  // Build edges from pairs with >=2 votes (2 out of 5 is enough)
   const edges: [number, number][] = [];
   let pairsWithConsensus = 0;
   for (const [key, count] of pairCounts) {
@@ -67,7 +67,7 @@ export function buildMergeConsensus(votes: number[][][], logger?: Logger): numbe
   }
 
   logger?.info(
-    `[Merge] Consensus: ${pairCounts.size} unique pairs, ${pairsWithConsensus} with ≥2 votes`,
+    `[Merge] Consensus: ${pairCounts.size} unique pairs, ${pairsWithConsensus} with >=2 votes`,
   );
 
   // Union-Find to build connected components

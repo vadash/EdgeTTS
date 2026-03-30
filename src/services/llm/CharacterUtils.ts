@@ -132,7 +132,7 @@ export function applyMergeGroups(
 
 /**
  * Count speaking frequency per character from speaker assignments
- * Returns a map of speaker name → sentence count (excludes narrator)
+ * Returns a map of speaker name -> sentence count (excludes narrator)
  */
 export function countSpeakingFrequency(assignments: SpeakerAssignment[]): Map<string, number> {
   const frequency = new Map<string, number>();

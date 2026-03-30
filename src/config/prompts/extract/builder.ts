@@ -1,5 +1,5 @@
 // src/config/prompts/extract/builder.ts
-// Pipeline stage 1 of 3: Extract → Merge → Assign
+// Pipeline stage 1 of 3: Extract -> Merge -> Assign
 // Builds the complete message array for character extraction prompts.
 
 import {

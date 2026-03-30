@@ -3,13 +3,13 @@ import type { AudioProcessingConfig } from '../FFmpegService';
 
 /**
  * Build FFmpeg audio filter chain string from config flags.
- * Pure function — no side effects.
+ * Pure function -- no side effects.
  */
 export function buildFilterChain(config: AudioProcessingConfig): string {
   const filters: string[] = [];
   const audio = defaultConfig.audio;
 
-  // 1. EQ — Broadcast Voice warmth & clarity
+  // 1. EQ -- Broadcast Voice warmth & clarity
   if (config.eq) {
     filters.push('highpass=f=60', 'lowshelf=f=120:g=2', 'equalizer=f=3000:t=q:w=1:g=-2');
   }
@@ -33,7 +33,7 @@ export function buildFilterChain(config: AudioProcessingConfig): string {
     );
   }
 
-  // 4. Compressor — gentle vocal compression
+  // 4. Compressor -- gentle vocal compression
   if (config.compressor) {
     filters.push(
       'compand=attacks=0.1:decays=0.8:points=-90/-90|-50/-50|-30/-30|-20/-20:soft-knee=6:gain=0',

@@ -1,5 +1,5 @@
 // src/config/prompts/merge/rules.ts
-// Pipeline stage 2 of 3: Extract → Merge → Assign
+// Pipeline stage 2 of 3: Extract -> Merge -> Assign
 
 export const MERGE_RULES = `1. CHECK VARIATIONS:
    Look at the "variations" arrays. If Character A and Character B share a name in their variations, they are the same person.
@@ -27,8 +27,8 @@ Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting
 CRITICAL: Keep reasoning extremely concise. Only list characters that have potential merges; skip obviously unrelated pairs.
 Follow these steps IN ORDER:
 
-Step 1: Variation cross-check — Compare variations arrays between all character pairs. Flag any shared names.
-Step 2: System entity match — Link System, Interface, Blue Box, Notification into one group.
-Step 3: Protagonist match — If Protagonist exists, check if another character is the same person (main character).
-Step 4: Conflict check — Reject any proposed merges with gender mismatches or insufficient confidence.
-Step 5: Output — Build merge groups. First number = best/longest canonicalName. Empty array if no merges.`;
+Step 1: Variation cross-check -- Compare variations arrays between all character pairs. Flag any shared names.
+Step 2: System entity match -- Link System, Interface, Blue Box, Notification into one group.
+Step 3: Protagonist match -- If Protagonist exists, check if another character is the same person (main character).
+Step 4: Conflict check -- Reject any proposed merges with gender mismatches or insufficient confidence.
+Step 5: Output -- Build merge groups. First number = best/longest canonicalName. Empty array if no merges.`;

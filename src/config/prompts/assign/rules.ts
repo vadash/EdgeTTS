@@ -1,5 +1,5 @@
 // src/config/prompts/assign/rules.ts
-// Pipeline stage 3 of 3: Extract → Merge → Assign
+// Pipeline stage 3 of 3: Extract -> Merge -> Assign
 
 export const ASSIGN_RULES = `1. SKIP NON-DIALOGUE:
    If a paragraph is just narration and NO ONE is speaking or thinking, IGNORE IT. Do not put its number in the JSON.
@@ -30,8 +30,8 @@ Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting
 CRITICAL: Keep reasoning extremely concise. Do not quote full sentences. Do not analyze every paragraph individually. Only briefly note ambiguous cases.
 Follow these steps IN ORDER:
 
-Step 1: Dialogue scan — Identify every paragraph with quotes, thoughts, or system bracket messages.
-Step 2: Speaker match — Use speech verbs ("said X"), action beats, pronouns, and first-person narration to identify speakers.
-Step 3: Vocative check — Names inside quotes are listeners, not speakers. Cross them off.
-Step 4: Context check — Use paragraph sequence and previous context (negative indices) for ambiguous cases.
-Step 5: Output — Map paragraph numbers to speaker codes. Skip pure narration. Only assign non-negative indices.`;
+Step 1: Dialogue scan -- Identify every paragraph with quotes, thoughts, or system bracket messages.
+Step 2: Speaker match -- Use speech verbs ("said X"), action beats, pronouns, and first-person narration to identify speakers.
+Step 3: Vocative check -- Names inside quotes are listeners, not speakers. Cross them off.
+Step 4: Context check -- Use paragraph sequence and previous context (negative indices) for ambiguous cases.
+Step 5: Output -- Map paragraph numbers to speaker codes. Skip pure narration. Only assign non-negative indices.`;

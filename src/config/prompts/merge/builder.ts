@@ -1,5 +1,5 @@
 // src/config/prompts/merge/builder.ts
-// Pipeline stage 2 of 3: Extract → Merge → Assign
+// Pipeline stage 2 of 3: Extract -> Merge -> Assign
 // Builds the complete message array for character deduplication prompts.
 
 import type { LLMCharacter } from '@/state/types';

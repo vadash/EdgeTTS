@@ -1,8 +1,8 @@
 // src/config/prompts/extract/rules.ts
-// Pipeline stage 1 of 3: Extract → Merge → Assign
+// Pipeline stage 1 of 3: Extract -> Merge -> Assign
 
 export const EXTRACT_RULES = `1. HOW TO FIND SPEECH:
-   - Look for quotes: "Hello", 'Hi', «Привет», „Hallo"
+   - Look for quotes: "Hello", 'Hi', <<Привет>>, „Hallo"
    - Look for game system messages in brackets: [Level Up!], [Quest]
    - Look for telepathy in angle brackets: <Can you hear me?>
    - Look for thoughts in asterisks: *I must run*
@@ -42,9 +42,9 @@ Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting
 CRITICAL: Keep reasoning extremely concise. Do not quote full sentences or list every quote in the text. Only briefly note ambiguous cases.
 Follow these steps IN ORDER:
 
-Step 1: Speaker scan — Find every quote, bracket message, telepathy, or thought in the text.
-Step 2: Speaker identify — Match each to a speaker via speech verbs, action beats, pronouns, or first-person narration.
-Step 3: Vocative check — Verify names inside quotes are listeners, not speakers. Exclude them.
-Step 4: Gender inference — Extract gender from pronouns (he/she) or context. Default to "unknown".
-Step 5: Variation merge — If the same person appears with different names, consolidate into one entry with all variations.
-Step 6: Output — Compile the final character list with canonical names, variations, and genders.`;
+Step 1: Speaker scan -- Find every quote, bracket message, telepathy, or thought in the text.
+Step 2: Speaker identify -- Match each to a speaker via speech verbs, action beats, pronouns, or first-person narration.
+Step 3: Vocative check -- Verify names inside quotes are listeners, not speakers. Exclude them.
+Step 4: Gender inference -- Extract gender from pronouns (he/she) or context. Default to "unknown".
+Step 5: Variation merge -- If the same person appears with different names, consolidate into one entry with all variations.
+Step 6: Output -- Compile the final character list with canonical names, variations, and genders.`;

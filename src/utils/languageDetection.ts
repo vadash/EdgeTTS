@@ -26,8 +26,8 @@ interface ScriptRange {
 interface ScriptDef {
   name: string;
   ranges: ScriptRange[];
-  directLanguage?: string; // unique script → language
-  candidateLanguages?: string[]; // shared script → needs stopwords
+  directLanguage?: string; // unique script -> language
+  candidateLanguages?: string[]; // shared script -> needs stopwords
   fallbackLanguage?: string; // default if stopwords fail
 }
 

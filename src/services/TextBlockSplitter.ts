@@ -37,7 +37,7 @@ export class TextBlockSplitter {
 
   /**
    * Split a large paragraph into sentences (used for paragraphs >3000 chars)
-   * Handles: .!?… and preserves abbreviations
+   * Handles: .!?... and preserves abbreviations
    * Quote-aware: doesn't split inside quoted text
    */
   private splitParagraphIntoSentences(paragraph: string): string[] {
@@ -54,11 +54,11 @@ export class TextBlockSplitter {
       const next2 = text[i + 2] || '';
 
       // Track quote state (handle various quote characters)
-      if (char === '"' || char === '"' || char === '«') {
+      if (char === '"' || char === '"' || char === '<<') {
         if (!inQuotes) {
           inQuotes = true;
         }
-      } else if (char === '"' || char === '"' || char === '»') {
+      } else if (char === '"' || char === '"' || char === '>>') {
         if (inQuotes) {
           inQuotes = false;
         }
@@ -74,7 +74,7 @@ export class TextBlockSplitter {
       current += char;
 
       // Split on sentence-ending punctuation ONLY if not inside quotes
-      if (/[.!?…]/.test(char) && !inQuotes) {
+      if (/[.!?...]/.test(char) && !inQuotes) {
         const atEnd = i === text.length - 1;
         const beforeSpace = /\s/.test(next);
 
@@ -278,7 +278,7 @@ export class TextBlockSplitter {
   private splitLongSentence(sentence: string, maxTokens: number): string[] {
     const chunks: string[] = [];
     const maxChars = maxTokens * 4;
-    const separators = ['; ', ', ', ' — ', ' - ', ' '];
+    const separators = ['; ', ', ', ' -- ', ' - ', ' '];
     let remaining = sentence;
 
     while (remaining.length > maxChars) {

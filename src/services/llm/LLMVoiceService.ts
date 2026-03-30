@@ -26,9 +26,9 @@ import { buildMergeConsensus, majorityVote } from './votingConsensus';
 /**
  * Unambiguous speech/dialogue symbols (no contraction risk):
  * " - Double quote
- * « » - Guillemets (U+00AB, U+00BB)
- * ‹ › - Single guillemets (U+2039, U+203A)
- * — - Em dash (U+2014)
+ * << >> - Guillemets (U+00AB, U+00BB)
+ * < > - Single guillemets (U+2039, U+203A)
+ * -- - Em dash (U+2014)
  * " " - Curly double quotes (U+201C, U+201D)
  * „ - Low double quote (U+201E)
  * ' - Left single quote (U+2018) - opening quote, not used in contractions
@@ -41,7 +41,7 @@ const UNAMBIGUOUS_SPEECH_REGEX = /["\u00AB\u00BB\u2014\u201C\u201D\u201E\u2039\u
  * ' (U+2019) - right single quote (smart quote, also used as apostrophe)
  * ` (U+0060) - backtick/grave accent
  * ʼ (U+02BC) - modifier letter apostrophe
- * ′ (U+2032) - prime
+ * ' (U+2032) - prime
  * ＇ (U+FF07) - fullwidth apostrophe
  */
 const APOSTROPHE_LIKE_REGEX = /['\u2019`\u02BC\u2032\uFF07]/g;
@@ -556,7 +556,7 @@ export class LLMVoiceService {
   /**
    * LLM-based character merge using 5-way voting with consensus
    * 1. Run merge 5x with random temperatures (0.0-1.0)
-   * 2. Build consensus from all votes (pairs with ≥2 votes)
+   * 2. Build consensus from all votes (pairs with >=2 votes)
    */
   private async mergeCharactersWithLLM(
     characters: LLMCharacter[],

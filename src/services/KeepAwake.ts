@@ -88,7 +88,7 @@ export class KeepAwake {
   private async startScreenWakeLock(): Promise<void> {
     if (!('wakeLock' in navigator)) return;
 
-    // Register visibility listener regardless — it will acquire lock
+    // Register visibility listener regardless -- it will acquire lock
     // when tab becomes visible
     document.addEventListener('visibilitychange', this.handleVisibilityChange);
 

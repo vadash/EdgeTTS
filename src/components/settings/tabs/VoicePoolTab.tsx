@@ -339,7 +339,7 @@ export function VoicePoolTab() {
             <div className="flex-1 min-w-0">
               <div className="font-medium truncate">{voice.name}</div>
               <div className="text-xs text-gray-500">
-                {voice.locale} • {voice.gender}
+                {voice.locale} - {voice.gender}
               </div>
             </div>
             <button

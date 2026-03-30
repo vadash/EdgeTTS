@@ -84,7 +84,7 @@ function loadFromStorage(): AppSettings {
     const saved = localStorage.getItem(StorageKeys.settings);
     if (saved) {
       const parsed: Partial<AppSettings> = JSON.parse(saved);
-      // Migration: [] used to mean "default enabled" — convert to explicit list
+      // Migration: [] used to mean "default enabled" -- convert to explicit list
       if (parsed.enabledVoices && parsed.enabledVoices.length === 0) {
         parsed.enabledVoices = [...DEFAULT_ENABLED_VOICES];
       }

@@ -36,7 +36,7 @@ export interface VoiceAllocationOptions {
  * Build a priority-ordered, deduplicated voice pool.
  * Used by all voice assignment paths (initial, randomize, JSON import).
  *
- * Order: native non-Multilingual → native Multilingual → foreign Multilingual
+ * Order: native non-Multilingual -> native Multilingual -> foreign Multilingual
  * Dedup: variant pairs resolved (only one of Andrew/AndrewMultilingual survives)
  */
 export function buildPriorityPool(

@@ -1,6 +1,6 @@
 // src/config/prompts/index.ts
-// LLM Prompts Configuration — OpenVault-style architecture
-// Pipeline: Extract → Merge → Assign
+// LLM Prompts Configuration -- OpenVault-style architecture
+// Pipeline: Extract -> Merge -> Assign
 
 export { buildAssignPrompt } from './assign/builder';
 export { buildExtractPrompt } from './extract/builder';

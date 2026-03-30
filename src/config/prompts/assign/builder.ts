@@ -1,5 +1,5 @@
 // src/config/prompts/assign/builder.ts
-// Pipeline stage 3 of 3: Extract → Merge → Assign
+// Pipeline stage 3 of 3: Extract -> Merge -> Assign
 // Builds the complete message array for speaker attribution prompts.
 
 import type { LLMCharacter } from '@/state/types';
@@ -63,7 +63,7 @@ ${numberedParagraphs}
 [FINAL INSTRUCTION]:
 1. Assign Speaker Codes (A, B, C...) to the paragraphs above.
 2. SKIP paragraphs that are purely narration (no dialogue, thoughts, or system brackets).
-3. Be careful of names inside quotes — they are listeners, not speakers (Vocative trap).
+3. Be careful of names inside quotes -- they are listeners, not speakers (Vocative trap).
 4. ONLY use the codes provided in <speaker_codes>. DO NOT use names.
 5. Only assign speaker codes to paragraphs [0] and above.
 Output the raw JSON now.`;

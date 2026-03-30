@@ -119,21 +119,21 @@ export function AboutView() {
         </h2>
         <ol class="list-decimal list-inside space-y-2">
           <li>
-            <Text id="about.quickStart.step1">Upload — Drop a file or paste text</Text>
+            <Text id="about.quickStart.step1">Upload -- Drop a file or paste text</Text>
           </li>
           <li>
             <Text id="about.quickStart.step2">
-              Configure — Pick voice, speed, pitch in Settings
+              Configure -- Pick voice, speed, pitch in Settings
             </Text>
           </li>
           <li>
             <Text id="about.quickStart.step3">
-              Enable LLM (optional) — For multi-voice books, add an API key in Settings → LLM
+              Enable LLM (optional) -- For multi-voice books, add an API key in Settings {'->'} LLM
             </Text>
           </li>
           <li>
             <Text id="about.quickStart.step4">
-              Convert — Click "Save to MP3" and pick an output folder
+              Convert -- Click "Save to MP3" and pick an output folder
             </Text>
           </li>
         </ol>
@@ -150,10 +150,10 @@ export function AboutView() {
         </p>
         <ul class="list-disc list-inside space-y-1 mb-4">
           <li>
-            <Text id="about.llmSetup.gemini">Google Gemini — free tier available</Text>
+            <Text id="about.llmSetup.gemini">Google Gemini -- free tier available</Text>
           </li>
           <li>
-            <Text id="about.llmSetup.openRouter">OpenRouter — many free models</Text>
+            <Text id="about.llmSetup.openRouter">OpenRouter -- many free models</Text>
           </li>
           <li>
             <Text id="about.llmSetup.anyProvider">Any OpenAI-compatible provider</Text>
@@ -236,7 +236,7 @@ function StepItem({ title, desc }: StepItemProps) {
   return (
     <li class="pl-2">
       <span class="font-semibold">{title}</span>
-      {' — '}
+      {' -- '}
       <span class="text-muted-foreground">{desc}</span>
     </li>
   );

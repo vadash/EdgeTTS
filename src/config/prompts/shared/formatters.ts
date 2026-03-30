@@ -79,7 +79,7 @@ export function assembleSystemPrompt(role: string, examples: string): string {
 /**
  * Assemble user-prompt constraint block.
  * Placed AFTER the content, before the execution trigger.
- * Order: language_rules → task_rules → output_schema → execution_trigger
+ * Order: language_rules -> task_rules -> output_schema -> execution_trigger
  */
 export function assembleUserConstraints(rules: string, schemaText: string): string {
   const parts = [MIRROR_LANGUAGE_RULES];

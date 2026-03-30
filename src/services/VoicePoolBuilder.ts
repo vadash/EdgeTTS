@@ -17,8 +17,8 @@ export interface VoicePoolOptions {
  * Deduplicate Multilingual variant pairs and sort by priority.
  *
  * For pairs (e.g., AndrewNeural + AndrewMultilingualNeural in same locale):
- *   - If the voice's locale matches book language → keep non-Multilingual
- *   - Otherwise → keep Multilingual
+ *   - If the voice's locale matches book language -> keep non-Multilingual
+ *   - Otherwise -> keep Multilingual
  *
  * Returns voices sorted: non-Multilingual first, Multilingual last.
  */
@@ -29,7 +29,7 @@ export function deduplicateVariants(
   const langPrefix = bookLanguage.split('-')[0];
 
   // Group by locale + baseName to find pairs
-  // baseName: strip "Multilingual" → "AndrewMultilingualNeural" becomes "AndrewNeural"
+  // baseName: strip "Multilingual" -> "AndrewMultilingualNeural" becomes "AndrewNeural"
   const groups = new Map<string, { native?: VoiceOption; multilingual?: VoiceOption }>();
 
   for (const voice of candidates) {
@@ -51,11 +51,11 @@ export function deduplicateVariants(
   const result: VoiceOption[] = [];
   for (const group of groups.values()) {
     if (group.native && group.multilingual) {
-      // Pair exists — pick based on book language
+      // Pair exists -- pick based on book language
       const isNativeLocale = group.native.locale.startsWith(langPrefix);
       result.push(isNativeLocale ? group.native : group.multilingual);
     } else {
-      // No pair — keep whichever exists
+      // No pair -- keep whichever exists
       result.push((group.native ?? group.multilingual)!);
     }
   }

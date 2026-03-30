@@ -308,12 +308,12 @@ export function logDialogueChecks(results: DialogueCheckResult[]): void {
       notFound++;
     } else if (r.matched) {
       console.log(
-        `  ${status} ${marker} "${r.expected.textContains.substring(0, 30)}..." → ${r.actualSpeaker} (expected: ${r.expected.speaker})`,
+        `  ${status} ${marker} "${r.expected.textContains.substring(0, 30)}..." -> ${r.actualSpeaker} (expected: ${r.expected.speaker})`,
       );
       passed++;
     } else {
       console.log(
-        `  ${status} ${marker} "${r.expected.textContains.substring(0, 30)}..." → ${r.actualSpeaker} (expected: ${r.expected.speaker})`,
+        `  ${status} ${marker} "${r.expected.textContains.substring(0, 30)}..." -> ${r.actualSpeaker} (expected: ${r.expected.speaker})`,
       );
       failed++;
     }

@@ -1,5 +1,5 @@
 // src/config/prompts/merge/schema.ts
-// Pipeline stage 2 of 3: Extract → Merge → Assign
+// Pipeline stage 2 of 3: Extract -> Merge -> Assign
 
 export const MERGE_SCHEMA_TEXT = `{
   "reasoning": "Short thinking about who is the same person (or null)",
