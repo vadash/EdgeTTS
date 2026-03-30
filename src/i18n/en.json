@@ -104,6 +104,9 @@
     "extractDesc": "Detects characters from text",
     "mergeDesc": "Deduplicates detected characters",
     "assignDesc": "Assigns speakers to sentences",
+    "useVoting": "Enable QA Pass",
+    "useVotingDesc": "Review and correct speaker assignments with a second LLM pass",
+    "useVotingHint": "Runs a QA pass to catch vocative traps, missed action beats, and narration errors (2x API cost)",
     "promptRepetition": "Prompt Repetition",
     "promptRepetitionDesc": "Duplicates user prompt for improved LLM accuracy. Adds ~20-30% processing time."
   },

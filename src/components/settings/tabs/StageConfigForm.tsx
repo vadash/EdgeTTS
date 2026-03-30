@@ -145,13 +145,13 @@ export function StageConfigForm({
           disabled={isReasoningEnabled}
         />
 
-        {/* Voting - only for Assign stage */}
+        {/* QA Pass - only for Assign stage */}
         {showVoting && onVotingChange && (
           <Toggle
             checked={useVoting ?? false}
             onChange={onVotingChange}
-            label="3-Way Voting"
-            title="Calls LLM 3x with different temperatures and uses majority vote for speaker assignment"
+            label="Enable QA Pass"
+            title="Runs a QA pass to catch vocative traps, missed action beats, and narration errors (2x API cost)"
             disabled={isReasoningEnabled}
           />
         )}
