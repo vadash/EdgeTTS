@@ -5,6 +5,7 @@
 export { buildAssignPrompt } from './assign/builder';
 export { buildExtractPrompt } from './extract/builder';
 export { buildMergePrompt } from './merge/builder';
+export { buildQAPrompt } from './qa/builder';
 export { formatExamples, type PromptExample } from './shared/formatters';
 export {
   DEFAULT_PREFILL,
