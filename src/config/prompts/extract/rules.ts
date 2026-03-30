@@ -18,6 +18,8 @@ export const EXTRACT_RULES = `1. HOW TO FIND SPEECH:
    - Do NOT extract a character if their name is inside the quotes (Vocative).
      Example: "John, come here!" said Mary. -> Mary is the speaker. John is just listening. Do NOT extract John based on this sentence.
    - Do NOT extract sound effects like [Bang!] or [Sigh].
+   - DO extract characters who make non-verbal vocalizations (e.g., grunts, screams, sighs, "eep", "hmm") IF it serves as a response or communication.
+   - Do NOT extract purely environmental sound effects (e.g., [Bang!], *Crash*).
 
 4. HOW TO FORMAT NAMES AND GENDER:
    - "canonicalName": The best, most complete name you can find (e.g., "Queen Elizabeth", "John Smith", "System", "Protagonist").
