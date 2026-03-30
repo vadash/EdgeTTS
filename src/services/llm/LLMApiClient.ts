@@ -81,53 +81,29 @@ export class LLMApiClient {
     this.debugLogger = options.debugLogger;
     this.provider = detectProvider(options.apiUrl, options.model);
 
-    // Custom fetch that strips SDK headers (some proxies block them)
-    // In test mode (Node.js), add browser-like headers to bypass CF
+    // Custom fetch that adds missing headers for browser->API requests.
+    // new Headers(init?.headers) copies ALL existing headers (including Authorization
+    // set by the OpenAI SDK), so no manual per-header copy is needed.
     const customFetch: typeof fetch = async (url, init) => {
-      const headers = new Headers();
-      headers.set('Content-Type', 'application/json');
+      const headers = new Headers(init?.headers);
 
-      // Copy Authorization from original headers
-      if (init?.headers) {
-        const h = new Headers(init.headers);
-        const auth = h.get('Authorization');
-        if (auth) headers.set('Authorization', auth);
+      if (!headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
       }
 
       // Detect test mode (Node.js environment)
       const isTestMode = typeof window === 'undefined' || typeof navigator === 'undefined';
       const origin = new URL(url.toString()).origin;
 
-      // Full browser fingerprint
-      headers.set(
-        'User-Agent',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      );
-      headers.set('Accept', 'application/json, text/event-stream');
-      headers.set('Accept-Language', 'en-US,en;q=0.9');
-      headers.set('Accept-Encoding', 'gzip, deflate, br');
-      headers.set('Origin', origin);
-      headers.set('Referer', `${origin}/`);
-      headers.set('Connection', 'keep-alive');
-      headers.set('Sec-Fetch-Dest', 'empty');
-      headers.set('Sec-Fetch-Mode', 'cors');
-      headers.set('Sec-Fetch-Site', 'same-origin');
-      headers.set('sec-ch-ua', '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"');
-      headers.set('sec-ch-ua-mobile', '?0');
-      headers.set('sec-ch-ua-platform', '"Windows"');
-
       if (!isTestMode) {
-        // Browser mode - copy headers from current browser context
+        // Browser mode - add browser fingerprint headers
         headers.set('Accept', 'application/json, text/event-stream');
-        // navigator.userAgent gives us the real browser UA
         if (navigator.userAgent) {
           headers.set('User-Agent', navigator.userAgent);
         }
-        // navigator.language for Accept-Language
         if (navigator.language) {
           headers.set('Accept-Language', navigator.language);
         }
-        // Set origin/referer to API endpoint (not our app origin)
         headers.set('Origin', origin);
         headers.set('Referer', `${origin}/`);
       }
