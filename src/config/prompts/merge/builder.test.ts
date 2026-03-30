@@ -28,10 +28,10 @@ describe('buildMergePrompt', () => {
     expect(sysContent).toContain('<examples>');
   });
 
-  it('includes thinking_process in user constraints', () => {
+  it('includes reasoning field instructions in user constraints', () => {
     const result = buildMergePrompt(characters);
     const userContent = result[1].content as string;
-    expect(userContent).toContain('<thinking_process>');
+    expect(userContent).toContain('reasoning');
     expect(userContent).toContain('Step 1: Variation cross-check');
   });
 
