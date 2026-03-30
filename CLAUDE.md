@@ -15,6 +15,7 @@
 ## Key Design Decisions
 - **Memory:** Never hold audio in RAM. Write chunks to disk via File System Access API to prevent browser OOM.
 - **Structured Outputs:** LLM responses use Zod schemas with `.strict()` mode. Pass through `safeParseJSON()` (in `src/utils/text.ts`) which handles markdown fences, thinking tags, and `jsonrepair`.
+- **Prompt Examples:** Few-shot examples use `output` field only (JSON with embedded `reasoning`). The separate `thinking` property was removed — reasoning now lives inside the JSON output only.
 - **Consensus Voting:** Assign stage uses 3-way voting at [0.3, 0.7, 1.0] temperatures; Merge uses 5-way with random temps.
 
 ## Core Commands

@@ -10,7 +10,7 @@ We use a 3-message structure to defeat recency bias and improve compliance:
 2. **User**: Content + Constraints (language rules + task rules + schema + execution trigger)
 3. **Assistant**: Prefill (biases model into correct reasoning track)
 
-**Language-Aware Prefill Selection**: `detectedLanguage` parameter propagates from `ConversionOrchestrator` → `LLMVoiceService` → `PromptStrategy` → `buildMessages`. When `prefill='auto'`, resolves to `cn_compliance` for `zh`, `en_compliance` otherwise.
+**Prefill Behavior**: `PREFILL_PRESETS` currently only supports `none` and `auto` (which resolves to `none`). The compliance presets (`cn_compliance`, `en_compliance`) were removed as they are no longer needed with the simplified 3-message topology.
 
 See `promptFormatters.ts` for message assembly functions.
 
@@ -79,5 +79,5 @@ All schemas include `reasoning` field (nullable) for chain-of-thought extraction
 - **RetriableError REQUIRED**: ALL errors in `LLMApiClient` MUST be `RetriableError`. Plain `Error` breaks `withRetry()`.
 - **Safe error logging**: Use `getErrorMessage(e)` from `@/errors`, never `(e as Error).message`
 - **p-retry 7.x**: Callbacks receive context object `{error, attemptNumber, retriesLeft}`, NOT error directly. Use `context.error`.
-- **Prefill Strategy**: `pure_think` is safest default. Use `cn_compliance` for Kimi/Qwen.
+- **Prefill Strategy**: Currently only `none` and `auto` are supported. Both result in no assistant prefill message.
 - **Language Mirroring**: Non-English stories must preserve original script in values (JSON keys remain English).
