@@ -49,9 +49,9 @@ export class DebugLogger {
     this.loggedPhases.clear();
   }
 
-  /** Save first request/response for a phase (extract, merge, assign) */
+  /** Save first request/response for a phase (extract, merge, assign, assign_draft, assign_qa) */
   async savePhaseLog(
-    phase: 'extract' | 'merge' | 'assign',
+    phase: 'extract' | 'merge' | 'assign' | 'assign_draft' | 'assign_qa',
     requestBody: object,
     responseContent: object,
   ): Promise<void> {
