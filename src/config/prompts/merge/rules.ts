@@ -1,8 +1,9 @@
 // src/config/prompts/merge/rules.ts
 // Pipeline stage 2 of 3: Extract -> Merge -> Assign
 
-export const MERGE_RULES = `1. CHECK VARIATIONS:
-   Look at the "variations" arrays. If Character A and Character B share a name in their variations, they are the same person.
+export const MERGE_RULES = `1. CHECK VARIATIONS AND CONTEXT:
+   If Character A and Character B share a name in their variations, MERGE them.
+   If they do not share an exact name, but context clearly proves they are the same entity (e.g., "The Purple Man" and "The Registrar" in the same scene), MERGE them.
    Example: 0 has ["Marcus", "Marc"], 1 has ["Marcus Stone", "Marcus"]. They both have "Marcus". -> MERGE [1, 0].
 
 2. PROTAGONIST LINKING:
