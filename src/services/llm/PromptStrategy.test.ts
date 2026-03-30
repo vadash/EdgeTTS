@@ -107,14 +107,14 @@ describe('parseAssignResponse', () => {
     expect(result.speakerMap.get(3)).toBe('C');
   });
 
-  it('filters out invalid character codes', () => {
+  it('falls back to UNKNOWN_UNNAMED for invalid character codes', () => {
     const response = {
       reasoning: null,
       assignments: { '0': 'A', '1': 'INVALID', '2': 'C' },
     };
     const result = parseAssignResponse(response, context);
     expect(result.speakerMap.get(0)).toBe('A');
-    expect(result.speakerMap.get(1)).toBeUndefined(); // Invalid code filtered
+    expect(result.speakerMap.get(1)).toBe('3'); // Invalid code falls back to hardcoded '3'
     expect(result.speakerMap.get(2)).toBe('C');
   });
 
