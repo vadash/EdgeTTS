@@ -17,6 +17,9 @@
 - **Structured Outputs:** LLM responses use Zod schemas with `.strict()` mode. Pass through `safeParseJSON()` (in `src/utils/text.ts`) which handles markdown fences, thinking tags, and `jsonrepair`.
 - **Prompt Examples:** Few-shot examples use `output` field only (JSON with embedded `reasoning`). The separate `thinking` property was removed — reasoning now lives inside the JSON output only.
 - **Consensus Voting:** Assign stage uses 3-way voting at [0.3, 0.7, 1.0] temperatures; Merge uses 5-way with random temps.
+- **Semantic Chunking:** `TextBlockSplitter` prefers natural scene boundaries (dividers like `***`, chapter headers, long narration passages) over arbitrary token-limit cuts.
+- **Frequency Culling:** Characters with fewer than 3 name mentions are filtered before the LLM merge step to reduce hallucinations.
+- **Overlap Context:** Assign stage passes the last 5 sentences from the previous block as read-only context with negative indices `[-5]` through `[-1]` to improve speaker continuity.
 
 ## Core Commands
 - `npm run dev`: Start Webpack dev server

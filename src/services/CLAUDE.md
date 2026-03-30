@@ -5,6 +5,8 @@
 
 ## Pipeline Architecture
 1. **Split**: `TextBlockSplitter` parses text into LLM-friendly blocks.
+    - Prefers natural scene breaks: explicit dividers (`***`, `---`), chapter headers (Chapter/Глава/Book/Prologue/Epilogue), and long narration (>150 chars without dialogue)
+    - Threshold-triggered at 85% of `maxTokens` to avoid mid-scene cuts
 2. **LLM Passes**: Extract Characters -> Merge/Dedupe -> Assign Speakers.
 3. **TTS**: `TTSWorkerPool` manages WebSocket connections to Edge TTS using a `LadderController` to scale concurrency based on rate limits.
 4. **Merge**: `AudioMerger` streams downloaded chunks through `FFmpegService` (WASM) to concatenate, apply filters (EQ, compression), and encode to Opus/MP3.

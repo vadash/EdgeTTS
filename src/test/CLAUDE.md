@@ -7,6 +7,10 @@
    - Run via `npm test`.
    - MUST mock all external network calls, File System API (`createMockDirectoryHandle`), and WebSockets.
    - Fast and deterministic.
+   - **Key test files:**
+     - `CharacterUtils.test.ts` - Frequency culling logic (`cullByFrequency`)
+     - `TextBlockSplitter.test.ts` - Semantic chunking (scene breaks, dividers, chapter headers)
+     - `PromptStrategy.test.ts` - Overlap context injection with negative indices
 
 2. **Real LLM Tests** (`llm-real.test.ts`)
    - Run via `npm run test:real`.

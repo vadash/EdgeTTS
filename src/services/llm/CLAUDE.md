@@ -73,6 +73,11 @@ All schemas include `reasoning` field (nullable) for chain-of-thought extraction
 
 - **Merge**: `MERGE_VOTE_COUNT` (5-way) Union-Find consensus with random temperatures
 - **Assign**: `ASSIGN_VOTE_COUNT` (3-way) majority vote with fixed temperatures [0.3, 0.7, 1.0]
+  - **Overlap Context**: Last 5 sentences from previous block passed as `overlapSentences` with negative indices `[-5]` through `[-1]`. These are read-only (inside `<previous_context_do_not_assign>` tags) and excluded from voting.
+
+## Pre-Merge Frequency Culling
+
+Before LLM merge, `cullByFrequency()` filters characters with fewer than 3 total name-variation mentions in the raw text. This removes hallucinated characters and reduces API costs.
 
 ## Gotchas & Rules
 
