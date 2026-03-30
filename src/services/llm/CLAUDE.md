@@ -23,7 +23,7 @@ Prompts in `src/config/prompts/` are split into per-concern files:
 - **`examples/en.ts`**: Structured `{ input, output, label? }` few-shot examples (reasoning is inside the JSON output)
 - **`examples/index.ts`**: `getExamples(language)` — returns filtered examples
 
-Stages: `extract/` → `merge/` → `assign/`
+Stages: `extract/` → `merge/` → `assign/` → `qa/`
 
 See `src/config/prompts/CLAUDE.md` for the full prompt module documentation.
 
@@ -71,9 +71,18 @@ All schemas include `reasoning` field (nullable) for chain-of-thought extraction
 
 ## Consensus Voting
 
-- **Merge**: `MERGE_VOTE_COUNT` (5-way) Union-Find consensus with random temperatures
-- **Assign**: `ASSIGN_VOTE_COUNT` (3-way) majority vote with fixed temperatures [0.3, 0.7, 1.0]
-  - **Overlap Context**: Last 5 sentences from previous block passed as `overlapSentences` with negative indices `[-5]` through `[-1]`. These are read-only (inside `<previous_context_do_not_assign>` tags) and excluded from voting.
+### Merge: 5-Way Voting
+- `MERGE_VOTE_COUNT` (5) votes with random temperatures (0.0-1.0)
+- Union-Find consensus via `buildMergeConsensus()` in `votingConsensus.ts`
+- Pairs in >=2 of 5 votes get merged
+
+### Assign: QA Pass (Sequential)
+- When `useVoting` is enabled, runs Assign (draft) -> QA (correction) sequentially
+- 2 API calls instead of the old 3-way voting
+- QA prompt (`src/config/prompts/qa/`) reviews draft for: vocative traps, missed action beats, misassigned narration, missing dialogue
+- Falls back to draft results if QA call fails
+- Uses same `AssignSchema` for both passes
+- **Overlap Context**: Last 5 sentences from previous block passed as `overlapSentences` with negative indices `[-5]` through `[-1]`. Read-only (inside `<previous_context_do_not_assign>` tags).
 
 ## Pre-Merge Frequency Culling
 

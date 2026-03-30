@@ -16,7 +16,13 @@ Three extraction stages + shared utilities. Each stage follows a fixed file conv
 | `examples/{en}.ts` | Few-shot examples with `output` property (JSON with embedded reasoning) |
 | `examples/index.ts` | `getExamples(language)` — returns examples for the stage |
 
-Stages: `extract/` (Stage 1), `merge/` (Stage 2), `assign/` (Stage 3).
+Stages: `extract/` (Stage 1), `merge/` (Stage 2), `assign/` (Stage 3), `qa/` (Stage 4 — review & correct Assign output).
+
+### QA Stage (`qa/`)
+- Reuses Assign's schema (`ASSIGN_SCHEMA_TEXT`)
+- Builder injects draft assignments as `<draft_assignments>` XML block
+- Examples show flawed drafts being corrected (vocative traps, action beats, narration)
+- Called only when `useVoting` is enabled in `LLMVoiceService`
 
 ## Prompt Topology
 

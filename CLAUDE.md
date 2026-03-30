@@ -16,7 +16,8 @@
 - **Memory:** Never hold audio in RAM. Write chunks to disk via File System Access API to prevent browser OOM.
 - **Structured Outputs:** LLM responses use Zod schemas with `.strict()` mode. Pass through `safeParseJSON()` (in `src/utils/text.ts`) which handles markdown fences, thinking tags, and `jsonrepair`.
 - **Prompt Examples:** Few-shot examples use `output` field only (JSON with embedded `reasoning`). The separate `thinking` property was removed — reasoning now lives inside the JSON output only.
-- **Consensus Voting:** Assign stage uses 3-way voting at [0.3, 0.7, 1.0] temperatures; Merge uses 5-way with random temps.
+- **QA Pass (Assign):** When enabled (`useVoting`), Assign runs a sequential draft -> QA correction pass (2 API calls). QA catches vocative traps, missed action beats, and narration errors. Falls back to draft if QA fails.
+- **Consensus Voting (Merge):** Merge stage uses 5-way voting with random temperatures and Union-Find consensus.
 - **Semantic Chunking:** `TextBlockSplitter` prefers natural scene boundaries (dividers like `***`, chapter headers, long narration passages) over arbitrary token-limit cuts.
 - **Frequency Culling:** Characters with fewer than 3 name mentions are filtered before the LLM merge step to reduce hallucinations.
 - **Overlap Context:** Assign stage passes the last 5 sentences from the previous block as read-only context with negative indices `[-5]` through `[-1]` to improve speaker continuity.
@@ -31,6 +32,7 @@
 Claude, if you are working in specific domains, rely on the local `CLAUDE.md` files in those directories:
 - `src/services/` - Core processing pipeline (Orchestrator, TTS Workers, FFmpeg).
 - `src/services/llm/` - LLM interaction, prompting, and parsing logic.
+- `src/config/prompts/` - Prompt modules for extract, merge, assign, and QA stages.
 - `src/stores/` - Global state management with `@preact/signals`.
 - `src/test/` - Testing conventions (mocked vs real API tests).
 
