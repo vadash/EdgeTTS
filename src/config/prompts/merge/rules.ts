@@ -20,9 +20,10 @@ export const MERGE_RULES = `1. CHECK VARIATIONS AND CONTEXT:
 
 5. HOW TO ORDER THE MERGE GROUP:
    A merge group must have AT LEAST 2 numbers.
-   The FIRST number in the group must be the character with the longest, most complete, or best "canonicalName".
-   Example: 0 is "Bob". 1 is "Robert Smith". The group should be [1, 0] because "Robert Smith" is better.
-   Example: 3 is "System". 5 is "Interface". The group should be [3, 5] because "System" is the best name for game menus.
+   The FIRST number in the group must be the character's ACTUAL PROPER NAME (e.g., "Irogh", "Bacci").
+   Proper nouns ALWAYS beat descriptive titles (e.g., "The Purple Man", "The Most Handsome Man"), even if the descriptor is longer.
+   If no proper name exists, use the most descriptive title.
+   Example: 0 is "Irogh". 1 is "The Most Handsome Man". The group should be [0, 1] because "Irogh" is the proper name.
 
 Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
 CRITICAL: Keep reasoning extremely concise. Only list characters that have potential merges; skip obviously unrelated pairs.
