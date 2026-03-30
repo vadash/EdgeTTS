@@ -78,7 +78,7 @@ export const hasSpeechSymbols = (text: string): boolean => {
 /**
  * Number of sentences from the previous block to pass as overlap context
  */
-const OVERLAP_SIZE = 5;
+const OVERLAP_SIZE = 10;
 
 /**
  * Delay between LLM API calls (ms)
