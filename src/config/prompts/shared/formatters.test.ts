@@ -120,7 +120,7 @@ describe('buildMessages', () => {
   it('uses explicit prefill when provided', () => {
     const result = buildMessages('system body', 'user body', 'zh', 'pure_think');
     expect(result).toHaveLength(3);
-    expect(result[2].content).toBe('💭\n');
+    expect(result[2].content).toBe('<think>\n');
   });
 
   it('defaults to auto prefill when not specified', () => {

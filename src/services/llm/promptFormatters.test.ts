@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMessages } from './promptFormatters';
+import { buildMessages } from '@/config/prompts/shared/formatters';
 
 describe('buildMessages', () => {
   it('resolves auto to cn_compliance for Chinese', () => {
