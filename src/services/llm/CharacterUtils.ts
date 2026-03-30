@@ -1,17 +1,12 @@
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 
 /**
- * Normalize canonicalNames to use the longest variation.
- * This prevents merge validation failures when LLM picks a longer variation as "keep".
+ * Normalize canonicalNames - now a pass-through.
+ * The LLM's merge step handles proper noun prioritization via prompt instructions.
  */
 export function normalizeCanonicalNames(characters: LLMCharacter[]): LLMCharacter[] {
-  return characters.map((c) => {
-    const longest = c.variations.reduce((a, b) => (a.length >= b.length ? a : b), c.canonicalName);
-    return {
-      ...c,
-      canonicalName: longest,
-    };
-  });
+  // Trust the LLM's ordering from merge step - proper nouns prioritized via prompt
+  return characters;
 }
 
 export interface CodeMapping {
