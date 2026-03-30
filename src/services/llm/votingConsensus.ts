@@ -1,31 +1,6 @@
 import type { Logger } from '../Logger';
 
 /**
- * Majority vote helper for 3-way voting.
- * Returns the code that appears at least 2 times, or first vote (temp 0.0) as tiebreaker.
- */
-export function majorityVote(
-  votes: (string | undefined)[],
-  paragraphIndex: number,
-): string | undefined {
-  const counts = new Map<string, number>();
-  for (const v of votes) {
-    if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
-  }
-
-  // Find majority (>=2 of 3)
-  for (const [code, count] of counts) {
-    if (count >= 2) return code;
-  }
-
-  // No majority - log debug and use 0.0 as tiebreaker
-  console.debug(
-    `[Voting] No majority for paragraph ${paragraphIndex}: ${votes.join(', ')} -> using ${votes[0]}`,
-  );
-  return votes[0];
-}
-
-/**
  * Build consensus merge groups from multiple votes using Union-Find.
  * Pairs appearing in >=2 of 5 votes get merged.
  * Returns 0-based index groups.
