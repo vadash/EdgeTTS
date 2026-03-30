@@ -27,7 +27,7 @@ export const ASSIGN_RULES = `1. SKIP NON-DIALOGUE:
    Paragraphs labeled with negative indices inside the previous context block are from the previous section for context only. Do NOT assign speaker codes to them.
 
 <thinking_process>
-Follow these steps IN ORDER. Write your work inside 💭 tags BEFORE outputting the JSON:
+Follow these steps IN ORDER. Write your work inside <think> tags BEFORE outputting the JSON:
 
 Step 1: Dialogue scan — Identify every paragraph with quotes, thoughts, or system bracket messages.
 Step 2: Speaker match — Use speech verbs ("said X"), action beats, pronouns, and first-person narration to identify speakers.

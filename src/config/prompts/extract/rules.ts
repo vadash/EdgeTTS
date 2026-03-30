@@ -33,7 +33,7 @@ export const EXTRACT_RULES = `1. HOW TO FIND SPEECH:
    - If "The Dark Lord" and "Azaroth" are clearly the exact same person speaking, put both in the "variations" array of one character.
 
 <thinking_process>
-Follow these steps IN ORDER. Write your work inside 💭 tags BEFORE outputting the JSON:
+Follow these steps IN ORDER. Write your work inside <think> tags BEFORE outputting the JSON:
 
 Step 1: Speaker scan — Find every quote, bracket message, telepathy, or thought in the text.
 Step 2: Speaker identify — Match each to a speaker via speech verbs, action beats, pronouns, or first-person narration.

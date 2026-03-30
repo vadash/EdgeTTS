@@ -90,7 +90,7 @@ Adapted from OpenVault's `format-examples.js`. Filters by label tag, wraps each 
 ...text...
 </input>
 <ideal_output>
-💭
+<think>
 Step 1: ...reasoning...
 
 {...json output...}

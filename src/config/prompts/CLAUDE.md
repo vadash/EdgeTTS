@@ -33,6 +33,6 @@ Schema and rules are in the **user** prompt (end of context window) to defeat re
 ## Few-Shot Examples
 
 Each example object has: `{ input, thinking?, output, label? }`.
-- `thinking`: Plain reasoning text — `formatExamples` wraps it in `💭` tags
+- `thinking`: Plain reasoning text — `formatExamples` wraps it in `<think>` tags
 - `label`: Language tag like `(EN/Simple)` — used for filtering when language-specific sets are added
 - Currently EN only. Add `cn.ts` and update `examples/index.ts` to support more languages.

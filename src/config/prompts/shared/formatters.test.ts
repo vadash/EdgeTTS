@@ -16,16 +16,16 @@ describe('formatExamples', () => {
     expect(result).toContain('{"result": true}');
     expect(result).toContain('</ideal_output>');
     expect(result).toContain('</example_1>');
-    expect(result).not.toContain('💭');
+    expect(result).not.toContain('<think>');
   });
 
-  it('formats example with thinking — wraps thinking in 💭 tags', () => {
+  it('formats example with thinking — wraps thinking in <think> tags', () => {
     const examples: PromptExample[] = [
       { input: 'Test', thinking: 'Step 1: analyze', output: '{"done": true}' },
     ];
     const result = formatExamples(examples);
     expect(result).toContain('<ideal_output>');
-    expect(result).toContain('💭\nStep 1: analyze\n');
+    expect(result).toContain('<think>\nStep 1: analyze\n');
     expect(result).toContain('{"done": true}');
     expect(result).toContain('</ideal_output>');
   });

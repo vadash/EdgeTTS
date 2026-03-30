@@ -24,7 +24,7 @@ export const MERGE_RULES = `1. CHECK VARIATIONS:
    Example: 3 is "System". 5 is "Interface". The group should be [3, 5] because "System" is the best name for game menus.
 
 <thinking_process>
-Follow these steps IN ORDER. Write your work inside 💭 tags BEFORE outputting the JSON:
+Follow these steps IN ORDER. Write your work inside <think> tags BEFORE outputting the JSON:
 
 Step 1: Variation cross-check — Compare variations arrays between all character pairs. Flag any shared names.
 Step 2: System entity match — Link System, Interface, Blue Box, Notification into one group.
