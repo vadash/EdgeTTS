@@ -17,7 +17,7 @@ See `promptFormatters.ts` for message assembly functions.
 ### Prompt Structure
 Prompts in `src/config/prompts/` are split into per-concern files:
 - **`role.ts`**: Task description and identity
-- **`rules.ts`**: Task-specific constraints + `<thinking_process>` reasoning steps
+- **`rules.ts`**: Task-specific constraints + in-JSON `reasoning` field reasoning steps
 - **`schema.ts`**: JSON schema example
 - **`builder.ts`**: Assembles full message array, moved from PromptStrategy.ts
 - **`examples/en.ts`**: Structured `{ input, thinking?, output, label? }` few-shot examples

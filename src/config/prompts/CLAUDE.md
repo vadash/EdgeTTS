@@ -10,7 +10,7 @@ Three extraction stages + shared utilities. Each stage follows a fixed file conv
 | File | Purpose |
 |------|---------|
 | `role.ts` | System role definition (who the model is) |
-| `rules.ts` | Task-specific rules with `<thinking_process>` reasoning steps |
+| `rules.ts` | Task-specific rules with `reasoning` reasoning steps |
 | `schema.ts` | Output JSON schema description |
 | `builder.ts` | Assembles messages via `buildMessages()` |
 | `examples/{en}.ts` | Few-shot examples with `thinking` + `output` properties |
@@ -33,6 +33,6 @@ Schema and rules are in the **user** prompt (end of context window) to defeat re
 ## Few-Shot Examples
 
 Each example object has: `{ input, thinking?, output, label? }`.
-- `thinking`: Plain reasoning text — `formatExamples` wraps it in `<think>` tags
+- `thinking`: Plain reasoning text — `formatExamples` places it before JSON in `<ideal_output>`
 - `label`: Language tag like `(EN/Simple)` — used for filtering when language-specific sets are added
 - Currently EN only. Add `cn.ts` and update `examples/index.ts` to support more languages.

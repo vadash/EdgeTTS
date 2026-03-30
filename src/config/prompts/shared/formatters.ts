@@ -50,7 +50,7 @@ export function formatExamples(examples: PromptExample[], language = 'auto'): st
       const parts = [`<example_${i + 1}>`];
       parts.push(`<input>\n${ex.input}\n</input>`);
       if (ex.thinking) {
-        parts.push(`<ideal_output>\n<think>\n${ex.thinking}\n\n${ex.output}\n</ideal_output>`);
+        parts.push(`<ideal_output>\n${ex.thinking}\n\n${ex.output}\n</ideal_output>`);
       } else {
         parts.push(`<ideal_output>\n${ex.output}\n</ideal_output>`);
       }

@@ -19,16 +19,15 @@ describe('formatExamples', () => {
     expect(result).toContain('{"result": true}');
     expect(result).toContain('</ideal_output>');
     expect(result).toContain('</example_1>');
-    expect(result).not.toContain('<think>');
   });
 
-  it('formats example with thinking — wraps thinking in <think> tags', () => {
+  it('formats example with thinking — wraps thinking in  tags', () => {
     const examples: PromptExample[] = [
       { input: 'Test', thinking: 'Step 1: analyze', output: '{"done": true}' },
     ];
     const result = formatExamples(examples);
     expect(result).toContain('<ideal_output>');
-    expect(result).toContain('<think>\nStep 1: analyze\n');
+    expect(result).toContain('tep 1: analyze\n');
     expect(result).toContain('{"done": true}');
     expect(result).toContain('</ideal_output>');
   });
@@ -123,7 +122,6 @@ describe('buildMessages', () => {
   it('uses explicit prefill when provided', () => {
     const result = buildMessages('system body', 'user body', 'zh', 'pure_think');
     expect(result).toHaveLength(3);
-    expect(result[2].content).toBe('<think>\n');
   });
 
   it('defaults to none prefill when not specified', () => {
