@@ -21,7 +21,8 @@ import {
   buildMergePrompt,
 } from './PromptStrategy';
 import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
-import { buildMergeConsensus, majorityVote } from './votingConsensus';
+import { buildMergeConsensus } from './votingConsensus';
+import { buildQAPrompt } from '@/config/prompts/qa/builder';
 
 /**
  * Unambiguous speech/dialogue symbols (no contraction risk):
@@ -78,11 +79,6 @@ export const hasSpeechSymbols = (text: string): boolean => {
  * Number of sentences from the previous block to pass as overlap context
  */
 const OVERLAP_SIZE = 5;
-
-/**
- * Voting temperatures for 3-way voting (assign step)
- */
-const VOTING_TEMPERATURES = [0.1, 0.4, 0.7] as const;
 
 /**
  * Delay between LLM API calls (ms)
@@ -355,6 +351,7 @@ export class LLMVoiceService {
   /**
    * Process a single block for Assign using structured outputs
    * New format: sparse JSON object {"0": "A", "5": "B"}
+   * When useVoting is enabled: runs Assign -> QA sequential flow
    */
   private async processAssignBlock(
     block: TextBlock,
@@ -368,10 +365,7 @@ export class LLMVoiceService {
       `[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`,
     );
 
-    // Always send blocks to LLM so it has full context for speaker assignment
-    // (even blocks without obvious speech symbols may contain thoughts, telepathy, etc.)
-
-    // Use 0-based indexing for LLM (most models prefer this)
+    // Use 0-based indexing for LLM
     const numberedParagraphs = block.sentences.map((s, i) => `[${i}] ${s}`).join('\n');
 
     // Build context
@@ -393,22 +387,61 @@ export class LLMVoiceService {
 
     let relativeMap: Map<number, string>;
 
-    if (this.options.useVoting) {
-      // 3-way voting with different temperatures (sequential with delays)
-      const responses: (object | null)[] = [];
-      for (let i = 0; i < VOTING_TEMPERATURES.length; i++) {
-        const client = new LLMApiClient({
-          ...this.options,
-          temperature: VOTING_TEMPERATURES[i],
-          maxTokens: defaultConfig.llm.maxTokens,
-          logger: this.logger,
-        });
+    try {
+      // Step 1: Always run the initial Assign call
+      const draftResponse = await withRetry(
+        () =>
+          this.apiClient.callStructured({
+            messages: assignMessages,
+            schema: AssignSchema,
+            schemaName: 'AssignSchema',
+            signal: this.abortController?.signal,
+          }),
+        {
+          maxRetries: RETRY_CONFIG.assign,
+          signal: this.abortController?.signal,
+          onRetry: (attempt, error) => {
+            this.logger?.warn(
+              `[assign] Block at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`,
+            );
+          },
+        },
+      );
+
+      // Convert draft response to Map
+      const draftMap = new Map<number, string>();
+      for (const [key, code] of Object.entries(draftResponse.assignments)) {
+        const index = parseInt(key, 10);
+        if (context.codeToName.has(code)) {
+          draftMap.set(index, code);
+        }
+      }
+
+      // Save first assign phase log (draft)
+      if (this.isFirstAssignBlock) {
+        await this.apiClient.debugLogger?.savePhaseLog(
+          'assign_draft',
+          { messages: assignMessages },
+          draftResponse,
+        );
+      }
+
+      // Step 2: If useVoting is enabled, run QA pass
+      if (this.options.useVoting) {
+        const qaMessages = buildQAPrompt(
+          context.characters,
+          context.nameToCode,
+          context.numberedParagraphs,
+          draftResponse.assignments,
+          this.detectedLanguage,
+          overlapSentences,
+        );
 
         try {
-          const response = await withRetry(
+          const qaResponse = await withRetry(
             () =>
-              client.callStructured({
-                messages: assignMessages,
+              this.apiClient.callStructured({
+                messages: qaMessages,
                 schema: AssignSchema,
                 schemaName: 'AssignSchema',
                 signal: this.abortController?.signal,
@@ -418,128 +451,69 @@ export class LLMVoiceService {
               signal: this.abortController?.signal,
               onRetry: (attempt, error) => {
                 this.logger?.warn(
-                  `[assign] Vote ${i + 1} at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`,
+                  `[assign] QA pass at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`,
                 );
               },
             },
           );
-          responses.push(response);
-        } catch (e) {
+
+          // Convert QA response to Map
+          relativeMap = new Map<number, string>();
+          for (const [key, code] of Object.entries(qaResponse.assignments)) {
+            const index = parseInt(key, 10);
+            if (context.codeToName.has(code)) {
+              relativeMap.set(index, code);
+            }
+          }
+
+          // Save QA phase log
+          if (this.isFirstAssignBlock) {
+            await this.apiClient.debugLogger?.savePhaseLog(
+              'assign_qa',
+              { messages: qaMessages },
+              qaResponse,
+            );
+            this.isFirstAssignBlock = false;
+          }
+
+          this.logger?.info(
+            `[assign] Block at ${block.sentenceStartIndex} completed with QA correction`,
+          );
+        } catch (qaError) {
+          // QA failed - fall back to draft results
           this.logger?.warn(
-            `[assign] Vote ${i + 1} at ${block.sentenceStartIndex} failed after ${RETRY_CONFIG.assign} retries: ${getErrorMessage(e)}`,
+            `[assign] QA pass failed at ${block.sentenceStartIndex}, using draft: ${getErrorMessage(qaError)}`,
           );
-          responses.push(null);
-        }
+          relativeMap = draftMap;
 
-        if (i < VOTING_TEMPERATURES.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, LLM_DELAY_MS));
-        }
-      }
-
-      // Check if all voting attempts failed - fall back to narrator
-      const validResponses = responses.filter((r): r is object => r !== null);
-
-      // Save first assign phase log (voting path)
-      if (this.isFirstAssignBlock && validResponses.length > 0) {
-        await this.apiClient.debugLogger?.savePhaseLog(
-          'assign',
-          { messages: assignMessages },
-          validResponses[0],
-        );
-        this.isFirstAssignBlock = false;
-      }
-
-      if (validResponses.length === 0) {
-        this.logger?.warn(
-          `[assign] Block at ${block.sentenceStartIndex} failed (all voting attempts), using default voice for ${block.sentences.length} sentences`,
-        );
-        return block.sentences.map((text, i) => ({
-          sentenceIndex: block.sentenceStartIndex + i,
-          text,
-          speaker: 'narrator',
-          voiceId: this.options.narratorVoice,
-        }));
-      }
-
-      // Parse valid responses: convert sparse assignments to Map<number, string>
-      const parsedMaps = validResponses.map((r) => {
-        const map = new Map<number, string>();
-        const assignments = r as unknown as { assignments: Record<string, unknown> };
-        for (const [key, code] of Object.entries(assignments.assignments)) {
-          const idx = parseInt(key, 10);
-          if (codeToName.has(code as string)) {
-            map.set(idx, code as string);
+          if (this.isFirstAssignBlock) {
+            this.isFirstAssignBlock = false;
           }
         }
-        return map;
-      });
+      } else {
+        // No QA pass - use draft directly
+        relativeMap = draftMap;
 
-      // Majority vote for each paragraph (use available responses)
-      relativeMap = new Map();
-      for (let i = 0; i < block.sentences.length; i++) {
-        const votes = parsedMaps.map((m) => m.get(i));
-        const winner = majorityVote(votes, block.sentenceStartIndex + i);
-        if (winner) relativeMap.set(i, winner);
-      }
-    } else {
-      // Single call with retry (original behavior)
-      try {
-        const response = await withRetry(
-          () =>
-            this.apiClient.callStructured({
-              messages: assignMessages,
-              schema: AssignSchema,
-              schemaName: 'AssignSchema',
-              signal: this.abortController?.signal,
-            }),
-          {
-            maxRetries: RETRY_CONFIG.assign,
-            signal: this.abortController?.signal,
-            onRetry: (attempt, error) => {
-              this.logger?.warn(
-                `[assign] Block at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`,
-              );
-            },
-          },
-        );
-
-        // Convert sparse object to Map
-        relativeMap = new Map();
-        for (const [key, code] of Object.entries(response.assignments)) {
-          const index = parseInt(key, 10);
-          if (context.codeToName.has(code)) {
-            relativeMap.set(index, code);
-          }
-        }
-
-        // Save first assign phase log (non-voting path)
         if (this.isFirstAssignBlock) {
-          await this.apiClient.debugLogger?.savePhaseLog(
-            'assign',
-            { messages: assignMessages },
-            response,
-          );
           this.isFirstAssignBlock = false;
         }
-      } catch (_e) {
-        this.logger?.warn(
-          `[assign] Block at ${block.sentenceStartIndex} failed after ${RETRY_CONFIG.assign} retries, using default voice for ${block.sentences.length} sentences`,
-        );
-        return block.sentences.map((text, i) => ({
-          sentenceIndex: block.sentenceStartIndex + i,
-          text,
-          speaker: 'narrator',
-          voiceId: this.options.narratorVoice,
-        }));
       }
+    } catch (_e) {
+      this.logger?.warn(
+        `[assign] Block at ${block.sentenceStartIndex} failed after ${RETRY_CONFIG.assign} retries, using default voice for ${block.sentences.length} sentences`,
+      );
+      return block.sentences.map((text, i) => ({
+        sentenceIndex: block.sentenceStartIndex + i,
+        text,
+        speaker: 'narrator',
+        voiceId: this.options.narratorVoice,
+      }));
     }
 
     return block.sentences.map((text, i) => {
       const absoluteIndex = block.sentenceStartIndex + i;
-      const relativeIndex = i; // 0-based
-      // Trust the LLM's assignment regardless of speech symbols
+      const relativeIndex = i;
       const speakerCode = relativeMap.get(relativeIndex);
-      // Convert code back to canonical name
       const speaker = speakerCode ? (codeToName.get(speakerCode) ?? 'narrator') : 'narrator';
       return {
         sentenceIndex: absoluteIndex,
