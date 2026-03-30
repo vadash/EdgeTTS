@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { formatExamples, assembleSystemPrompt, assembleUserConstraints, buildMessages } from './formatters';
 import type { PromptExample } from './formatters';
+import {
+  assembleSystemPrompt,
+  assembleUserConstraints,
+  buildMessages,
+  formatExamples,
+} from './formatters';
 
 describe('formatExamples', () => {
   it('formats a single example without thinking into XML', () => {
-    const examples: PromptExample[] = [
-      { input: 'Hello world', output: '{"result": true}' },
-    ];
+    const examples: PromptExample[] = [{ input: 'Hello world', output: '{"result": true}' }];
     const result = formatExamples(examples);
     expect(result).toContain('<example_1>');
     expect(result).toContain('<input>');

@@ -13,10 +13,7 @@ import { EXTRACT_ROLE } from './role';
 import { EXTRACT_RULES } from './rules';
 import { EXTRACT_SCHEMA_TEXT } from './schema';
 
-export function buildExtractPrompt(
-  textBlock: string,
-  detectedLanguage: string = 'en',
-) {
+export function buildExtractPrompt(textBlock: string, detectedLanguage: string = 'en') {
   const examples = getExtractExamples();
   const sys = assembleSystemPrompt(EXTRACT_ROLE, formatExamples(examples));
   const constraints = assembleUserConstraints(EXTRACT_RULES, EXTRACT_SCHEMA_TEXT);

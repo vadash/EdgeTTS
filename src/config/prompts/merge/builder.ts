@@ -14,10 +14,7 @@ import { MERGE_ROLE } from './role';
 import { MERGE_RULES } from './rules';
 import { MERGE_SCHEMA_TEXT } from './schema';
 
-export function buildMergePrompt(
-  characters: LLMCharacter[],
-  detectedLanguage: string = 'en',
-) {
+export function buildMergePrompt(characters: LLMCharacter[], detectedLanguage: string = 'en') {
   const examples = getMergeExamples();
   const characterList = characters
     .map(

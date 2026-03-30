@@ -10,9 +10,9 @@ import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
 // Re-exports from domain builders
 // ============================================================================
 
+export { buildAssignPrompt } from '@/config/prompts/assign/builder';
 export { buildExtractPrompt } from '@/config/prompts/extract/builder';
 export { buildMergePrompt } from '@/config/prompts/merge/builder';
-export { buildAssignPrompt } from '@/config/prompts/assign/builder';
 
 // ============================================================================
 // Context Types (kept here for backward compatibility)

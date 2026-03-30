@@ -2,6 +2,6 @@
 
 import { mergeExamplesEN } from './en';
 
-export function getMergeExamples(language: 'auto' | string = 'auto') {
+export function getMergeExamples(_language: 'auto' | string = 'auto') {
   return mergeExamplesEN;
 }

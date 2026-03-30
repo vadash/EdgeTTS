@@ -2,6 +2,6 @@
 
 import { assignExamplesEN } from './en';
 
-export function getAssignExamples(language: 'auto' | string = 'auto') {
+export function getAssignExamples(_language: 'auto' | string = 'auto') {
   return assignExamplesEN;
 }
