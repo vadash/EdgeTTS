@@ -178,8 +178,8 @@ export function stripThinkingTags(text: string): string {
 
   // 1. Regex for small/orphaned tags that don't span massive text blocks
   let result = text
-      // Unwrap rogue tool_call tags to preserve inner JSON (CRITICAL: before stripping other tags!)
-      // Pattern: <tool_call ...>content</tool_call> -> content
+    // Unwrap rogue tool_call tags to preserve inner JSON (CRITICAL: before stripping other tags!)
+    // Pattern: <tool_call ...>content</tool_call> -> content
     .replace(/<tool_call(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/tool_call>/gi, '$1')
     // Strip orphaned tool_call opening tags
     .replace(/<tool_call(?:\s+[^>]*)?>\s*/gi, '')

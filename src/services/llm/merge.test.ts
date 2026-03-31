@@ -54,17 +54,15 @@ describe('LLMVoiceService - Merge with Structured Outputs', () => {
     // Setup mock before creating service
     const openai = await import('openai');
     const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(
-      function () {
-        return {
-          chat: {
-            completions: {
-              create: mockCreate,
-            },
+    vi.mocked(openai.default).mockImplementation(function () {
+      return {
+        chat: {
+          completions: {
+            create: mockCreate,
           },
-        } as any;
-      },
-    );
+        },
+      } as any;
+    });
 
     service = new LLMVoiceService({
       apiKey: 'test-key',
@@ -99,17 +97,15 @@ describe('LLMVoiceService - Merge with Structured Outputs', () => {
     // Setup mock before creating service
     const openai = await import('openai');
     const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(
-      function () {
-        return {
-          chat: {
-            completions: {
-              create: mockCreate,
-            },
+    vi.mocked(openai.default).mockImplementation(function () {
+      return {
+        chat: {
+          completions: {
+            create: mockCreate,
           },
-        } as any;
-      },
-    );
+        },
+      } as any;
+    });
 
     service = new LLMVoiceService({
       apiKey: 'test-key',

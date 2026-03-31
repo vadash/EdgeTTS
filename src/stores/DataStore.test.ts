@@ -239,7 +239,11 @@ describe('DataStore', () => {
       });
 
       it('detects from book when no text content', () => {
-        store.setBook({ allSentences: ['Русский текст.'], fileNames: [], fullText: 'Русский текст.' });
+        store.setBook({
+          allSentences: ['Русский текст.'],
+          fileNames: [],
+          fullText: 'Русский текст.',
+        });
         store.detectLanguageFromContent();
         expect(store.detectedLanguage.value).toBe('ru');
       });
@@ -289,7 +293,14 @@ describe('DataStore', () => {
       store.setDictionary([{ type: 'word', pattern: 'a', replacement: 'b' }]);
       store.setDictionaryRaw(['a=b']);
       store.setDirectoryHandle({} as FileSystemDirectoryHandle);
-      store.addWorker({ id: 1, status: 'processing', filenum: '0', filename: 'test', audioData: null, mp3Saved: false });
+      store.addWorker({
+        id: 1,
+        status: 'processing',
+        filenum: '0',
+        filename: 'test',
+        audioData: null,
+        mp3Saved: false,
+      });
       store.setFileNameIndex(5);
       store.setNumBook(3);
       store.setNumText(7);
@@ -313,7 +324,14 @@ describe('DataStore', () => {
     it('resets conversion-specific state but keeps directory handle', () => {
       const mockHandle = {} as FileSystemDirectoryHandle;
       store.setDirectoryHandle(mockHandle);
-      store.addWorker({ id: 1, status: 'processing', filenum: '0', filename: 'test', audioData: null, mp3Saved: false });
+      store.addWorker({
+        id: 1,
+        status: 'processing',
+        filenum: '0',
+        filename: 'test',
+        audioData: null,
+        mp3Saved: false,
+      });
       store.setFileNameIndex(5);
 
       store.resetForConversion();
