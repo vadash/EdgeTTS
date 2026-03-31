@@ -110,33 +110,18 @@ export interface StatusUpdate {
   isComplete: boolean;
 }
 
-// File System Access API types
-interface FileSystemHandlePermissionDescriptor {
-  mode?: 'read' | 'readwrite';
-}
-
-interface ShowDirectoryPickerOptions {
-  id?: string;
-  mode?: 'read' | 'readwrite';
-  startIn?:
-    | FileSystemHandle
-    | 'desktop'
-    | 'documents'
-    | 'downloads'
-    | 'music'
-    | 'pictures'
-    | 'videos';
-}
-
+// File System Access API — partial augmentation for missing DOM lib members
 declare global {
-  interface FileSystemDirectoryHandle {
-    requestPermission(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>;
-    queryPermission(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>;
-    entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
+  interface FileSystemHandle {
+    requestPermission(descriptor?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>;
+    queryPermission(descriptor?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>;
   }
-
   interface Window {
-    showDirectoryPicker?(options?: ShowDirectoryPickerOptions): Promise<FileSystemDirectoryHandle>;
+    showDirectoryPicker?(options?: {
+      id?: string;
+      mode?: 'read' | 'readwrite';
+      startIn?: FileSystemHandle | 'desktop' | 'documents' | 'downloads' | 'music' | 'pictures' | 'videos';
+    }): Promise<FileSystemDirectoryHandle>;
   }
 }
 
