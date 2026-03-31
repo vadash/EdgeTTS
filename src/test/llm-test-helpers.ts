@@ -71,6 +71,18 @@ export function getRepeatPrompt(): boolean {
 }
 
 /**
+ * Get useVoting (QA pass) setting from environment variable
+ * @returns boolean value from USE_QA env var (default: testConfig.useVoting)
+ */
+export function getUseQA(): boolean {
+  const envVal = process.env.USE_QA;
+  if (envVal === undefined || envVal === '') {
+    return testConfig.useVoting;
+  }
+  return envVal === 'true' || envVal === '1';
+}
+
+/**
  * Create LLMVoiceService instance
  * @param repeatPrompt - Optional override for repeatPrompt (defaults to REPEAT_PROMPT env var)
  */
@@ -84,7 +96,7 @@ export function createService(repeatPrompt?: boolean): LLMVoiceService {
     reasoning: testConfig.reasoning ? 'auto' : null,
     streaming: testConfig.streaming ?? true,
     temperature: testConfig.temperature,
-    useVoting: testConfig.useVoting,
+    useVoting: getUseQA(),
     repeatPrompt: repeatPrompt ?? getRepeatPrompt(),
     logger: testLogger,
   });
