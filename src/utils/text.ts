@@ -169,41 +169,71 @@ export function stripMarkdownFences(text: string): string {
 }
 
 /**
- * Strip thinking/reasoning tags from LLM response
+ * Strip thinking/reasoning tags from LLM response.
+ * Uses index-based extraction for potentially massive blocks (think/thinking/reasoning)
+ * to avoid regex performance issues on unclosed tags.
  */
 export function stripThinkingTags(text: string): string {
   if (typeof text !== 'string') return text;
-  return (
-    text
-      // 1. Unwrap rogue tool_call tags to preserve inner JSON (CRITICAL: before stripping other tags!)
-      // Pattern: <tool_call ...>content</tool_call> -> content
-      .replace(/<tool_call(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/tool_call>/gi, '$1')
-      // Strip orphaned tool_call opening tags
-      .replace(/<tool_call(?:\s+[^>]*)?>\s*/gi, '')
-      // Strip orphaned tool_call closing tags
-      .replace(/\s*<\/tool_call>\s*/gi, ' ')
-      // Strip inner XML wrappers left behind after tool_call unwrapping (e.g. <json>...</json>)
-      .replace(/<(json|arg_value|arguments|content)(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/\1>/gi, '$2')
 
-      // 2. Strip standard paired XML tags (tool_call removed - we unwrap it instead!)
-      .replace(
-        /<(think|thinking|thought|reasoning|reflection|search)(?:\s+[^>]*)?>\s*[\s\S]*?<\/\1>/gi,
-        '',
-      )
-      // 3. Paired bracket tags (TOOL_CALL removed - we unwrap it instead!)
-      .replace(/\[(THINK|THOUGHT|REASONING)\][\s\S]*?\[\/\1\]/gi, '')
-      // 4. Asterisk thinking: *thinks* or *thought*
-      .replace(/\*thinks?:[\s\S]*?\*/gi, '')
-      // 5. Parenthesized thinking: (thinking: ...)
-      .replace(/\(thinking:[\s\S]*?\)/gi, '')
-      // 6. Orphaned opening  tag (no closing tag — model output after prefill)
-      .replace(/^\s*/i, '')
-      // 7. Orphaned closing tags (opening tag was in assistant prefill; tool_call removed)
-      .replace(/^[\s\S]*?<\/(think|thinking|thought|reasoning|search)>\s*/i, '')
-      // 7. ideal_output: few-shot example wrapper that LLM sometimes reproduces after JSON
-      .replace(/<\/ideal_output>\s*/gi, '')
-      .trim()
-  );
+  // 1. Regex for small/orphaned tags that don't span massive text blocks
+  let result = text
+      // Unwrap rogue tool_call tags to preserve inner JSON (CRITICAL: before stripping other tags!)
+      // Pattern: <tool_call ...>content</tool_call> -> content
+    .replace(/<tool_call(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/tool_call>/gi, '$1')
+    // Strip orphaned tool_call opening tags
+    .replace(/<tool_call(?:\s+[^>]*)?>\s*/gi, '')
+    // Strip orphaned tool_call closing tags
+    .replace(/\s*<\/tool_call>\s*/gi, ' ')
+    // Strip inner XML wrappers left behind after tool_call unwrapping (e.g. <json>...</json>)
+    .replace(/<(json|arg_value|arguments|content)(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/\1>/gi, '$2')
+    // Paired bracket tags
+    .replace(/\[(THINK|THOUGHT|REASONING)\][\s\S]*?\[\/\1\]/gi, '')
+    // Asterisk thinking: *thinks* or *thought*
+    .replace(/\*thinks?:[\s\S]*?\*/gi, '')
+    // Parenthesized thinking: (thinking: ...)
+    .replace(/\(thinking:[\s\S]*?\)/gi, '')
+    // ideal_output: few-shot example wrapper that LLM sometimes reproduces after JSON
+    .replace(/<\/ideal_output>\s*/gi, '');
+
+  // 2. Index-based extraction for potentially massive thinking/reasoning blocks.
+  //    Avoids regex [\s\S]*? which can be slow on unclosed tags.
+  //    Unclosed tags are preserved (no closing tag = no removal).
+  const tagsToStrip = ['think', 'thinking', 'thought', 'reasoning', 'reflection', 'search'];
+
+  for (const tag of tagsToStrip) {
+    const openTag = `<${tag}`;
+    const closeTag = `</${tag}>`;
+    const openLen = openTag.length;
+
+    let searchStart = 0;
+    while (searchStart < result.length) {
+      const lower = result.toLowerCase();
+      const openIdx = lower.indexOf(openTag, searchStart);
+
+      if (openIdx === -1) break;
+
+      // Advance past the tag name and any attributes (find closing '>')
+      const gtIdx = result.indexOf('>', openIdx + openLen);
+      if (gtIdx === -1) break; // Malformed tag, leave as-is
+
+      const closeIdx = lower.indexOf(closeTag, gtIdx);
+      if (closeIdx !== -1) {
+        // Remove the entire block: from '<tag...' to '</tag>'
+        result = result.slice(0, openIdx) + result.slice(closeIdx + closeTag.length);
+        // Don't advance searchStart - the slice shifted content, re-scan from same position
+      } else {
+        // Unclosed tag - preserve text per test design, move past this tag
+        searchStart = gtIdx + 1;
+      }
+    }
+  }
+
+  // 3. Orphaned closing tags (opening tag was in assistant prefill)
+  //    Strip everything before the first orphaned closing tag at the start
+  result = result.replace(/^[\s\S]*?<\/(think|thinking|thought|reasoning|search)>\s*/i, '');
+
+  return result.trim();
 }
 
 /**
