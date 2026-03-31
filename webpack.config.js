@@ -34,8 +34,13 @@ export default (_env, argv) => {
       rules: [
         {
           test: /\.tsx?$/,
-          use: 'ts-loader',
-          exclude: /node_modules|src[\\/]test/,
+          use: {
+            loader: 'ts-loader',
+            options: {
+              configFile: path.resolve(__dirname, 'tsconfig.webpack.json'),
+            },
+          },
+          exclude: /node_modules/,
         },
         {
           test: /\.css$/,
