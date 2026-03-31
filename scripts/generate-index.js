@@ -60,9 +60,13 @@ ${renderList(items, prefix)}
 const faviconSha = currentEntry || shaDirs[0] || 'latest';
 const faviconPath = `./sha/${faviconSha}/logo.png`;
 
-// Meta refresh (only when we have a current SHA)
-const metaRefresh = currentEntry
-  ? `  <meta http-equiv="refresh" content="4;url=./sha/${currentEntry}/index.html">\n`
+// Auto-redirect script: redirect after 4s unless user interacts
+const redirectScript = currentEntry
+  ? `  <script>
+    var t = setTimeout(function(){ window.location.replace('./sha/${currentEntry}/index.html'); }, 4000);
+    function cancel(e){ clearTimeout(t); ['click','scroll','keydown','touchstart','mousemove'].forEach(function(n){ document.removeEventListener(n, cancel); }); }
+    ['click','scroll','keydown','touchstart','mousemove'].forEach(function(n){ document.addEventListener(n, cancel); });
+  </script>\n`
   : '';
 
 // Current build section with Latest badge
@@ -84,8 +88,8 @@ const html = `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-${metaRefresh}  <title>EdgeTTS - Builds</title>
-  <link rel="icon" href="${faviconPath}">
+  <title>EdgeTTS - Builds</title>
+${redirectScript}  <link rel="icon" href="${faviconPath}">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {

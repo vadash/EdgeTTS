@@ -88,11 +88,14 @@ describe('generate-index.js', () => {
     expect(existsSync(join(deployDir, 'index.html'))).toBe(true);
   });
 
-  it('includes meta refresh redirect to current SHA with 4s delay', () => {
+  it('includes JS redirect that cancels on user interaction', () => {
     runScript(deployDir, 'ccc3333333333333333333333333333333333333');
     const html = readFileSync(join(deployDir, 'index.html'), 'utf-8');
-    expect(html).toContain('http-equiv="refresh"');
-    expect(html).toContain('content="4;url=./sha/ccc3333333333333333333333333333333333333/index.html"');
+    expect(html).not.toContain('http-equiv="refresh"');
+    expect(html).toContain('setTimeout');
+    expect(html).toContain('clearTimeout');
+    expect(html).toContain('./sha/ccc3333333333333333333333333333333333333/index.html');
+    expect(html).toContain('mousemove');
   });
 
   it('includes build timestamp for current SHA', () => {
