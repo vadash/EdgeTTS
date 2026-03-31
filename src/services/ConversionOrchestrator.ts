@@ -15,7 +15,7 @@ import { withPermissionRetry } from '@/utils/retry';
 import type { AudioMerger } from './AudioMerger';
 import type { FFmpegService } from './FFmpegService';
 // Import concrete service classes
-import type { Logger } from './Logger';
+import type { ILogger } from './Logger';
 import type { LLMServiceFactoryOptions, LLMVoiceService } from './llm/LLMVoiceService';
 import { exportToProfile } from './llm/VoiceProfile';
 import { checkResumeState, loadPipelineState } from './ResumeCheck';
@@ -102,7 +102,7 @@ export interface OrchestratorInput {
 // ============================================================================
 
 export interface ConversionOrchestratorServices {
-  logger: Logger;
+  logger: ILogger;
   textBlockSplitter: TextBlockSplitter;
   llmServiceFactory: {
     create(options: LLMServiceFactoryOptions): LLMVoiceService;

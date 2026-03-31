@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
 import { LLMVoiceService } from './LLMVoiceService';
 import { AssignSchema } from './schemas';
@@ -18,7 +19,7 @@ vi.mock('openai', () => ({
 
 describe('LLMVoiceService - Assign with Structured Outputs', () => {
   let service: LLMVoiceService;
-  const mockLogger = {
+  const mockLogger: ILogger = {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -78,6 +79,7 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
 
     const blocks: TextBlock[] = [
       {
+        blockIndex: 0,
         sentenceStartIndex: 0,
         sentences: ['"Hello," said Alice.', '"Hi," replied Bob.'],
       },
@@ -132,6 +134,7 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
 
     const blocks: TextBlock[] = [
       {
+        blockIndex: 0,
         sentenceStartIndex: 0,
         sentences: ['"Hello," said Alice.', 'This is narration.'],
       },
@@ -188,10 +191,12 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
 
     const blocks: TextBlock[] = [
       {
+        blockIndex: 0,
         sentenceStartIndex: 0,
         sentences: ['"Hello," said Alice.', '"Hi," replied Bob.'],
       },
       {
+        blockIndex: 1,
         sentenceStartIndex: 2,
         sentences: ['"How are you?" asked Alice.'],
       },

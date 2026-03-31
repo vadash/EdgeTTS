@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ILogger } from '@/services/Logger';
 import type { TextBlock } from '@/state/types';
 import { LLMVoiceService } from './LLMVoiceService';
 
@@ -17,7 +18,7 @@ vi.mock('openai', () => ({
 
 describe('LLMVoiceService - Extract with Structured Outputs', () => {
   let service: LLMVoiceService;
-  const mockLogger = {
+  const mockLogger: ILogger = {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -72,6 +73,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
 
     const blocks: TextBlock[] = [
       {
+        blockIndex: 0,
         sentenceStartIndex: 0,
         sentences: [
           '"Hello," said Alice.',

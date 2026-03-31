@@ -1,4 +1,4 @@
-import type { Logger } from '../Logger';
+import type { ILogger } from '../Logger';
 
 /**
  * Handles debug log file persistence to the user's file system.
@@ -10,7 +10,7 @@ export class DebugLogger {
 
   constructor(
     private directoryHandle: FileSystemDirectoryHandle | null | undefined,
-    private logger?: Logger,
+    private logger?: ILogger,
   ) {}
 
   /** Save a JSON object to the logs/ subfolder */

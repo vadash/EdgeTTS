@@ -1,5 +1,5 @@
 import type { LLMCharacter, SpeakerAssignment, TextBlock } from '@/state/types';
-import type { Logger } from '../Logger';
+import type { ILogger } from '../Logger';
 
 export type ProgressCallback = (current: number, total: number, message?: string) => void;
 
@@ -111,7 +111,7 @@ export interface LLMVoiceServiceOptions {
   repeatPrompt?: boolean;
   maxConcurrentRequests?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
-  logger: Logger; // Required - prevents silent failures
+  logger: ILogger; // Required - prevents silent failures
   detectedLanguage?: string; // NEW - for auto prefill selection
   // Optional separate config for merge stage
   mergeConfig?: {
@@ -134,7 +134,7 @@ export class LLMVoiceService {
   private apiClient: LLMApiClient;
   public mergeApiClient: LLMApiClient;
   private abortController: AbortController | null = null;
-  private logger: Logger;
+  private logger: ILogger;
   private isFirstAssignBlock: boolean = true; // track first assign block
   private detectedLanguage: string; // NEW - store for prompt building
 
