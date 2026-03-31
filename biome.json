@@ -74,6 +74,9 @@
       "includes": ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**", "**/test/**"],
       "linter": {
         "rules": {
+          "complexity": {
+            "useArrowFunction": "off"
+          },
           "suspicious": {
             "noExplicitAny": "off",
             "noImplicitAnyLet": "off"
