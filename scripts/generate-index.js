@@ -2,10 +2,8 @@ import { readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-function formatTimestamp(dirPath) {
-  const mtime = statSync(dirPath).mtime;
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${mtime.getFullYear()}-${pad(mtime.getMonth() + 1)}-${pad(mtime.getDate())} ${pad(mtime.getHours())}:${pad(mtime.getMinutes())} UTC`;
+function getTimestampEpoch(dirPath) {
+  return statSync(dirPath).mtime.getTime();
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -40,7 +38,8 @@ function renderList(items, prefix = './') {
     .map((name) => {
       const href = prefix.startsWith('sha') ? `${prefix}/${name}/` : `${prefix}${name}/`;
       const label = prefix.startsWith('sha') ? name.slice(0, 9) : name;
-      return `      <li><a href="${href}">${label}</a></li>`;
+      const epoch = getTimestampEpoch(resolve(deployDir, prefix, name));
+      return `      <li><a href="${href}">${label}</a> <span class="timestamp" data-t="${epoch}"></span></li>`;
     })
     .join('\n');
 }
@@ -71,14 +70,14 @@ const redirectScript = currentEntry
 
 // Current build section with Latest badge
 const buildTimestamp = currentEntry
-  ? formatTimestamp(resolve(shaDir, currentEntry))
+  ? getTimestampEpoch(resolve(shaDir, currentEntry))
   : '';
 const currentSection = currentEntry
   ? `
     <div class="versions current">
       <h2>Current Build <span class="badge">Latest</span></h2>
       <ul>
-      <li><a href="./sha/${currentEntry}/">${currentEntry.slice(0, 9)}</a> <span class="timestamp">${buildTimestamp}</span></li>
+      <li><a href="./sha/${currentEntry}/">${currentEntry.slice(0, 9)}</a> <span class="timestamp" data-t="${buildTimestamp}"></span></li>
       </ul>
     </div>`
   : '';
@@ -165,6 +164,18 @@ ${currentSection}${renderSection('Previous Builds', previousEntries, './sha/')}$
   <footer>
     <a href="https://github.com/Vadash/EdgeTTS">GitHub</a>
   </footer>
+  <script>
+    function timeAgo(el) {
+      var s = Math.floor((Date.now() - el.getAttribute('data-t')) / 1000);
+      var v;
+      if (s < 60) v = s + 's ago';
+      else if (s < 3600) v = Math.round(s / 60) + 'min ago';
+      else if (s < 86400) v = Math.round(s / 3600) + 'h ago';
+      else v = Math.round(s / 86400) + 'd ago';
+      el.textContent = v;
+    }
+    document.querySelectorAll('.timestamp[data-t]').forEach(timeAgo);
+  </script>
 </body>
 </html>`;
 
