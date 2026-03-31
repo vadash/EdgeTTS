@@ -2,6 +2,12 @@ import { readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+function formatTimestamp(dirPath) {
+  const mtime = statSync(dirPath).mtime;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${mtime.getFullYear()}-${pad(mtime.getMonth() + 1)}-${pad(mtime.getDate())} ${pad(mtime.getHours())}:${pad(mtime.getMinutes())} UTC`;
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const deployDir = process.argv[2] || resolve(__dirname, '..', 'dist');
 const currentSha = process.argv[3] || null;
@@ -56,16 +62,19 @@ const faviconPath = `./sha/${faviconSha}/logo.png`;
 
 // Meta refresh (only when we have a current SHA)
 const metaRefresh = currentEntry
-  ? `  <meta http-equiv="refresh" content="2;url=./sha/${currentEntry}/index.html">\n`
+  ? `  <meta http-equiv="refresh" content="4;url=./sha/${currentEntry}/index.html">\n`
   : '';
 
 // Current build section with Latest badge
+const buildTimestamp = currentEntry
+  ? formatTimestamp(resolve(shaDir, currentEntry))
+  : '';
 const currentSection = currentEntry
   ? `
     <div class="versions current">
       <h2>Current Build <span class="badge">Latest</span></h2>
       <ul>
-      <li><a href="./sha/${currentEntry}/">${currentEntry.slice(0, 9)}</a></li>
+      <li><a href="./sha/${currentEntry}/">${currentEntry.slice(0, 9)}</a> <span class="timestamp">${buildTimestamp}</span></li>
       </ul>
     </div>`
   : '';
@@ -131,6 +140,11 @@ ${metaRefresh}  <title>EdgeTTS - Builds</title>
       font-weight: 500;
     }
     a:hover { color: #0b5ed7; text-decoration: underline; }
+    .timestamp {
+      color: #666;
+      font-size: 0.85rem;
+      margin-left: 12px;
+    }
     footer {
       margin-top: auto;
       padding-top: 40px;
