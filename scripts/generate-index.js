@@ -38,8 +38,7 @@ function renderList(items, prefix = './') {
     .map((name) => {
       const href = prefix.startsWith('sha') ? `${prefix}/${name}/` : `${prefix}${name}/`;
       const label = prefix.startsWith('sha') ? name.slice(0, 9) : name;
-      const epoch = getTimestampEpoch(resolve(deployDir, prefix, name));
-      return `      <li><a href="${href}">${label}</a> <span class="timestamp" data-t="${epoch}"></span></li>`;
+      return `      <li><a href="${href}">${label}</a></li>`;
     })
     .join('\n');
 }
