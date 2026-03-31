@@ -21,7 +21,7 @@
     "lint:fix": "biome lint --write .",
     "check": "biome check --write .",
     "repomix": "npm run repomix:source && npm run repomix:tests",
-    "repomix:source": "npx repomix --include \"**/*.ts,**/*.tsx,**/*.js,**/*.md,.github/**,.claude/**,docs/**,package.json,biome.json,tsconfig*.json\" --ignore \"**/*.test.ts,**/*.spec.ts,**/*.test.tsx,**/*.spec.tsx,src/test/**,scripts/*.test.ts,vitest.config.ts,vitest.real.config.ts,test.config.local.ts,dist/**,node_modules/**,tmp/**,logs/**,repomix-*.md,package-lock.json\" --style markdown --output repomix-source.md",
+    "repomix:source": "npx repomix --include \"**/*.ts,**/*.tsx,**/*.js,**/*.md,.github/**,.claude/**,package.json,biome.json,tsconfig*.json\" --ignore \"**/*.test.ts,docs/**,**/*.spec.ts,**/*.test.tsx,**/*.spec.tsx,src/test/**,scripts/*.test.ts,vitest.config.ts,vitest.real.config.ts,test.config.local.ts,dist/**,node_modules/**,tmp/**,logs/**,repomix-*.md,package-lock.json\" --style markdown --output repomix-source.md",
     "repomix:tests": "npx repomix --include \"**/*.test.ts,**/*.spec.ts,**/*.test.tsx,**/*.spec.tsx,src/test/**,scripts/*.test.ts,vitest.config.ts,vitest.real.config.ts,test.config.local.ts,test.config.local.ts.example\" --style markdown --output repomix-tests.md"
   },
   "dependencies": {
