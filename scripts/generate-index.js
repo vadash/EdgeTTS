@@ -62,8 +62,8 @@ const faviconPath = `./sha/${faviconSha}/logo.png`;
 const redirectScript = currentEntry
   ? `  <script>
     var t = setTimeout(function(){ window.location.replace('./sha/${currentEntry}/index.html'); }, 4000);
-    function cancel(e){ clearTimeout(t); ['click','scroll','keydown','touchstart','mousemove'].forEach(function(n){ document.removeEventListener(n, cancel); }); }
-    ['click','scroll','keydown','touchstart','mousemove'].forEach(function(n){ document.addEventListener(n, cancel); });
+    function cancel(e){ clearTimeout(t); ['click','scroll','keydown','touchstart'].forEach(function(n){ document.removeEventListener(n, cancel); }); }
+    ['click','scroll','keydown','touchstart'].forEach(function(n){ document.addEventListener(n, cancel); });
   </script>\n`
   : '';
 
