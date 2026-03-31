@@ -2,10 +2,27 @@
 // Provides Opus encoding, silence removal, and normalization
 
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL } from '@ffmpeg/util';
 import { defaultConfig } from '@/config';
 import { buildFilterChain } from './audio/buildFilterChain';
 import type { ILogger } from './Logger';
+
+/**
+ * Fetches a URL and converts it to a Blob URL.
+ * Unlike `toBlobURL` from `@ffmpeg/util`, this checks `resp.ok` so that
+ * a 404 (e.g. from a stale GitHub Pages deployment) throws immediately
+ * instead of feeding HTML garbage to the FFmpeg Web Worker.
+ */
+async function safeToBlobURL(url: string, mimeType: string): Promise<string> {
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    throw new Error(
+      `Failed to fetch ${url} (HTTP ${resp.status}). The app version may be stale — please navigate to the root URL to reload the latest version.`,
+    );
+  }
+  const body = await resp.blob();
+  const blob = new Blob([body], { type: mimeType });
+  return URL.createObjectURL(blob);
+}
 
 export type FFmpegProgressCallback = (message: string) => void;
 
@@ -105,8 +122,8 @@ export class FFmpegService {
     try {
       // Use relative paths to the files copied by Webpack CopyWebpackPlugin
       const baseURL = '.';
-      const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript');
-      const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm');
+      const coreURL = await safeToBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript');
+      const wasmURL = await safeToBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm');
 
       await ffmpeg.load({ coreURL, wasmURL });
 
