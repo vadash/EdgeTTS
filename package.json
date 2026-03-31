@@ -39,6 +39,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.10",
+    "@tailwindcss/postcss": "^4.2.2",
     "@testing-library/preact": "^3.2.4",
     "@types/generic-pool": "^3.8.3",
     "@types/node": "^25.5.0",

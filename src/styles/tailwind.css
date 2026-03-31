@@ -1,6 +1,22 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #1a1a1a;
+  --color-primary-secondary: #252525;
+  --color-primary-tertiary: #333;
+  --color-accent: #0d6efd;
+  --color-accent-hover: #0b5ed7;
+  --color-accent-glow: rgba(13, 110, 253, 0.3);
+  --color-border: #404040;
+
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: Consolas, Monaco, "Courier New", monospace;
+
+  --radius: 8px;
+  --radius-lg: 12px;
+
+  --duration: 200ms;
+}
 
 @layer base {
   html {
