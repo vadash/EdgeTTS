@@ -161,7 +161,7 @@ jobs:
 
       - name: Cleanup old SHA builds (keep newest 10)
         env:
-          SHA_KEEP_COUNT: 10
+          SHA_KEEP_COUNT: 50
         shell: bash
         run: |
           if [[ -d deploy/sha ]]; then
