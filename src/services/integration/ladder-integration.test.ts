@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from '../TTSWorkerPool';
 
@@ -30,6 +30,7 @@ describe('Ladder Integration - E2E', () => {
         voice: 'Microsoft Server Speech Text to Speech Voice (en-US, JennyNeural)',
         rate: '+0%',
         pitch: '+0Hz',
+        volume: '100',
       },
       directoryHandle: mockDir,
     };

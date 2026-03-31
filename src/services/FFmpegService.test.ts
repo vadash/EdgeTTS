@@ -49,7 +49,6 @@ describe('AudioProcessingConfig', () => {
       fadeIn: false,
       stereoWidth: false,
     };
-    // @ts-expect-error - opusMinBitrate should be optional but undefined
     const minBitrate = config.opusMinBitrate;
     expect(minBitrate).toBeUndefined();
   });

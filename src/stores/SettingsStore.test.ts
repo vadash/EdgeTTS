@@ -2,6 +2,7 @@
 // Test the SettingsStore signal-based API
 
 import { beforeEach, describe, expect, it } from 'vitest';
+import { AudioPreset } from '@/state/types';
 import {
   applyOpusPreset,
   patchSettings,
@@ -42,7 +43,7 @@ describe('SettingsStore', () => {
     });
 
     it('should have Opus encoding defaults', () => {
-      expect(settings.value.opusPreset).toBe('pc');
+      expect(settings.value.opusPreset).toBe(AudioPreset.PC);
       expect(settings.value.opusMinBitrate).toBe(32);
       expect(settings.value.opusMaxBitrate).toBe(64);
       expect(settings.value.opusCompressionLevel).toBe(10);
@@ -56,39 +57,39 @@ describe('SettingsStore', () => {
     });
 
     it('applyOpusPreset should update all values to preset config', () => {
-      applyOpusPreset('pc');
-      expect(settings.value.opusPreset).toBe('pc');
+      applyOpusPreset(AudioPreset.PC);
+      expect(settings.value.opusPreset).toBe(AudioPreset.PC);
       expect(settings.value.opusMinBitrate).toBe(32);
       expect(settings.value.opusMaxBitrate).toBe(64);
       expect(settings.value.opusCompressionLevel).toBe(10);
     });
 
     it('applyOpusPreset(MOBILE) should use mobile config', () => {
-      applyOpusPreset('mobile');
-      expect(settings.value.opusPreset).toBe('mobile');
+      applyOpusPreset(AudioPreset.MOBILE);
+      expect(settings.value.opusPreset).toBe(AudioPreset.MOBILE);
       expect(settings.value.opusMinBitrate).toBe(32);
       expect(settings.value.opusMaxBitrate).toBe(96);
       expect(settings.value.opusCompressionLevel).toBe(3);
     });
 
     it('setOpusMinBitrate should switch preset to CUSTOM', () => {
-      applyOpusPreset('pc');
+      applyOpusPreset(AudioPreset.PC);
       setOpusMinBitrate(48);
-      expect(settings.value.opusPreset).toBe('custom');
+      expect(settings.value.opusPreset).toBe(AudioPreset.CUSTOM);
       expect(settings.value.opusMinBitrate).toBe(48);
     });
 
     it('setOpusMaxBitrate should switch preset to CUSTOM', () => {
-      applyOpusPreset('mobile');
+      applyOpusPreset(AudioPreset.MOBILE);
       setOpusMaxBitrate(128);
-      expect(settings.value.opusPreset).toBe('custom');
+      expect(settings.value.opusPreset).toBe(AudioPreset.CUSTOM);
       expect(settings.value.opusMaxBitrate).toBe(128);
     });
 
     it('setOpusCompressionLevel should switch preset to CUSTOM', () => {
-      applyOpusPreset('mobile');
+      applyOpusPreset(AudioPreset.MOBILE);
       setOpusCompressionLevel(5);
-      expect(settings.value.opusPreset).toBe('custom');
+      expect(settings.value.opusPreset).toBe(AudioPreset.CUSTOM);
       expect(settings.value.opusCompressionLevel).toBe(5);
     });
   });
@@ -134,11 +135,11 @@ describe('SettingsStore', () => {
     });
 
     it('reset should restore Opus defaults', () => {
-      applyOpusPreset('custom');
+      applyOpusPreset(AudioPreset.CUSTOM);
       setOpusMinBitrate(100);
       resetSettings();
 
-      expect(settings.value.opusPreset).toBe('pc');
+      expect(settings.value.opusPreset).toBe(AudioPreset.PC);
       expect(settings.value.opusMinBitrate).toBe(32);
     });
   });

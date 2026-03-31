@@ -17,12 +17,15 @@ function createMockFile(name: string, files: Map<string, Uint8Array>): FileSyste
         name,
         type: 'application/octet-stream',
         size: data.length,
+        lastModified: Date.now(),
+        webkitRelativePath: '',
+        bytes: async () => data,
         arrayBuffer: async () =>
           data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
         text: async () => new TextDecoder().decode(data),
         slice: () => file,
         stream: () => new ReadableStream(),
-      } as File;
+      } as unknown as File;
       return file;
     },
     createWritable: async () => {

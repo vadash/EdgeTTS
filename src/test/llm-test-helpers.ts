@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Logger } from '@/services/Logger';
+import type { ILogger } from '@/services/Logger';
 import { LLMVoiceService } from '@/services/llm';
 import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
@@ -11,7 +11,7 @@ import { speakerMatchesCharacter } from './fixtures';
 /**
  * Console logger for tests
  */
-const testLogger: Logger = {
+const testLogger: ILogger = {
   debug: (message: string, data?: Record<string, unknown>) =>
     console.log(`[DEBUG] ${message}`, data || ''),
   info: (message: string, data?: Record<string, unknown>) =>
@@ -81,10 +81,9 @@ export function createService(repeatPrompt?: boolean): LLMVoiceService {
     apiUrl: testConfig.apiUrl,
     model: testConfig.model,
     narratorVoice: 'en-US-AriaNeural',
-    reasoning: testConfig.reasoning ?? undefined,
+    reasoning: testConfig.reasoning ? 'auto' : null,
     streaming: testConfig.streaming ?? true,
     temperature: testConfig.temperature,
-    topP: testConfig.topP,
     useVoting: testConfig.useVoting,
     repeatPrompt: repeatPrompt ?? getRepeatPrompt(),
     logger: testLogger,

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ILogger } from '@/services/Logger';
 import type { Stores } from '@/stores';
 import {
   type ConversionOrchestratorServices,
@@ -15,7 +16,6 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
     textContent: 'Hello world',
     dictionaryRaw: [],
     narratorVoice: 'narrator',
-    voice: 'default',
     pitch: 0,
     rate: 0,
     ttsThreads: 2,
@@ -144,26 +144,26 @@ function createMockServices(): ConversionOrchestratorServices {
       warn: vi.fn(),
       error: vi.fn(),
       debug: vi.fn(),
-    },
+    } as ILogger,
     textBlockSplitter: {
       createExtractBlocks: vi.fn(),
       createAssignBlocks: vi.fn(),
-    },
+    } as any,
     llmServiceFactory: {
       create: vi.fn(),
-    },
+    } as any,
     workerPoolFactory: {
       create: vi.fn(),
-    },
+    } as any,
     audioMergerFactory: {
       create: vi.fn(),
-    },
+    } as any,
     voicePoolBuilder: {
       buildPool: vi.fn().mockReturnValue({ male: ['m1', 'm2'], female: ['f1', 'f2', 'f3'] }),
-    },
+    } as any,
     ffmpegService: {
       load: vi.fn().mockResolvedValue(true),
-    },
+    } as any,
   };
 }
 

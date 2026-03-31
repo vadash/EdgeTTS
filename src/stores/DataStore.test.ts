@@ -104,9 +104,11 @@ describe('DataStore', () => {
   describe('workers management', () => {
     const mockWorker: TTSWorker = {
       id: 1,
-      status: 'working',
-      partIndex: 0,
+      status: 'processing',
+      filenum: 0,
       filename: 'test.mp3',
+      audioData: null,
+      mp3Saved: false,
     };
 
     it('adds worker', () => {
@@ -135,7 +137,7 @@ describe('DataStore', () => {
     it('does not update non-existent worker', () => {
       store.addWorker(mockWorker);
       store.updateWorker(999, { status: 'complete' });
-      expect(store.activeWorkers.value[0].status).toBe('working');
+      expect(store.activeWorkers.value[0].status).toBe('processing');
     });
   });
 
@@ -160,7 +162,7 @@ describe('DataStore', () => {
       });
 
       it('returns true when has book', () => {
-        store.setBook({ allSentences: ['Test'], fileNames: [] });
+        store.setBook({ allSentences: ['Test'], fileNames: [], fullText: 'Test' });
         expect(store.hasContent.value).toBe(true);
       });
     });
@@ -171,7 +173,7 @@ describe('DataStore', () => {
       });
 
       it('returns sentence count from book', () => {
-        store.setBook({ allSentences: ['A.', 'B.', 'C.'], fileNames: [] });
+        store.setBook({ allSentences: ['A.', 'B.', 'C.'], fileNames: [], fullText: 'A. B. C.' });
         expect(store.sentenceCount.value).toBe(3);
       });
     });
@@ -186,7 +188,7 @@ describe('DataStore', () => {
           ['ch1', 0],
           ['ch2', 5],
         ];
-        store.setBook({ allSentences: ['A.'], fileNames });
+        store.setBook({ allSentences: ['A.'], fileNames, fullText: 'A.' });
         expect(store.fileNames.value).toEqual(fileNames);
       });
     });
@@ -236,7 +238,7 @@ describe('DataStore', () => {
       });
 
       it('detects from book when no text content', () => {
-        store.setBook({ allSentences: ['Русский текст.'], fileNames: [] });
+        store.setBook({ allSentences: ['Русский текст.'], fileNames: [], fullText: 'Русский текст.' });
         store.detectLanguageFromContent();
         expect(store.detectedLanguage.value).toBe('ru');
       });
@@ -282,11 +284,11 @@ describe('DataStore', () => {
   describe('clear', () => {
     it('clears all data', () => {
       store.setTextContent('text');
-      store.setBook({ allSentences: ['A.'], fileNames: [] });
+      store.setBook({ allSentences: ['A.'], fileNames: [], fullText: 'A.' });
       store.setDictionary([{ type: 'word', pattern: 'a', replacement: 'b' }]);
       store.setDictionaryRaw(['a=b']);
       store.setDirectoryHandle({} as FileSystemDirectoryHandle);
-      store.addWorker({ id: 1, status: 'working', partIndex: 0, filename: 'test' });
+      store.addWorker({ id: 1, status: 'processing', filenum: 0, filename: 'test', audioData: null, mp3Saved: false });
       store.setFileNameIndex(5);
       store.setNumBook(3);
       store.setNumText(7);
@@ -310,7 +312,7 @@ describe('DataStore', () => {
     it('resets conversion-specific state but keeps directory handle', () => {
       const mockHandle = {} as FileSystemDirectoryHandle;
       store.setDirectoryHandle(mockHandle);
-      store.addWorker({ id: 1, status: 'working', partIndex: 0, filename: 'test' });
+      store.addWorker({ id: 1, status: 'processing', filenum: 0, filename: 'test', audioData: null, mp3Saved: false });
       store.setFileNameIndex(5);
 
       store.resetForConversion();

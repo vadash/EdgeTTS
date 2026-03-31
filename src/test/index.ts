@@ -9,13 +9,6 @@ export { createMockSecureStorage, MockSecureStorage } from './mocks/MockSecureSt
 export { createMockTTSService, MockTTSService } from './mocks/MockTTSService';
 export { createMockWorkerPool, MockWorkerPool } from './mocks/MockWorkerPool';
 
-// Test container
-export {
-  createTestContainer,
-  type MockServices,
-  type TestContainerOptions,
-} from './TestServiceContainer';
-
 // Utilities
 export {
   createMockAudio,

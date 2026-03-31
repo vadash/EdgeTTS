@@ -152,8 +152,8 @@ describe('LLMStore', () => {
 
       it('returns character names', () => {
         const characters: LLMCharacter[] = [
-          { code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] },
-          { code: 'B', canonicalName: 'Bob', gender: 'male', aliases: [] },
+          { canonicalName: 'Alice', gender: 'female', variations: [] },
+          { canonicalName: 'Bob', gender: 'male', variations: [] },
         ];
         setCharacters(characters);
         expect(characterNames.value).toEqual(['Alice', 'Bob']);
@@ -171,6 +171,7 @@ describe('LLMStore', () => {
         reasoning: null,
         temperature: 0.5,
         topP: 0.9,
+        repeatPrompt: false,
       };
       setStageConfig('extract', config);
       expect(llm.value.extract).toEqual(config);
@@ -205,10 +206,9 @@ describe('LLMStore', () => {
 
   describe('character data actions', () => {
     const mockCharacter: LLMCharacter = {
-      code: 'A',
       canonicalName: 'Alice',
       gender: 'female',
-      aliases: ['Алиса'],
+      variations: ['Алиса'],
     };
 
     it('sets characters', () => {
@@ -342,7 +342,7 @@ describe('LLMStore', () => {
       setProcessingStatus('extracting');
       setBlockProgress(5, 10);
       setError('Error');
-      setCharacters([{ code: 'A', canonicalName: 'Alice', gender: 'female', aliases: [] }]);
+      setCharacters([{ canonicalName: 'Alice', gender: 'female', variations: [] }]);
       updateVoiceMapping('Alice', 'voice-1');
 
       resetProcessingState();

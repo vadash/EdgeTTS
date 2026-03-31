@@ -103,6 +103,7 @@ describe('LLMVoiceService - Assign with QA Pass', () => {
 
     const blocks: TextBlock[] = [
       {
+        blockIndex: 0,
         sentenceStartIndex: 0,
         sentences: ['"Hello Bob," said Alice.', '"Hi Alice," replied Bob.'],
       },
@@ -170,6 +171,7 @@ describe('LLMVoiceService - Assign with QA Pass', () => {
 
     const blocks: TextBlock[] = [
       {
+        blockIndex: 0,
         sentenceStartIndex: 0,
         sentences: ['"Hello," said Alice.', '"Hi," replied Bob.'],
       },
@@ -230,6 +232,7 @@ describe('LLMVoiceService - Assign with QA Pass', () => {
 
     const blocks: TextBlock[] = [
       {
+        blockIndex: 0,
         sentenceStartIndex: 0,
         sentences: ['"Hello," said Alice.', '"Hi," replied Bob.'],
       },
