@@ -60,6 +60,7 @@ describe('TTSWorkerPool', () => {
       voice: 'Microsoft Server Speech Text to Speech Voice (en-US, JennyNeural)',
       rate: '+0%',
       pitch: '+0Hz',
+      volume: '100%',
     };
 
     defaultOptions = {

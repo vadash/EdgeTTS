@@ -135,6 +135,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
 
     const blocks: TextBlock[] = [
       {
+        blockIndex: 0,
         sentenceStartIndex: 0,
         sentences: [
           'The story begins.',
@@ -187,6 +188,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
 
     const blocks: TextBlock[] = [
       {
+        blockIndex: 0,
         sentenceStartIndex: 0,
         sentences: ['Test content.'],
       },

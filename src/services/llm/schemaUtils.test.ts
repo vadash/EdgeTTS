@@ -49,7 +49,7 @@ describe('schemaUtils', () => {
     });
 
     const result = zodToJsonSchema(schema, 'NullableTest');
-    const props = result.json_schema.schema.properties;
+    const props = result.json_schema.schema.properties as Record<string, unknown>;
 
     // Both fields should be in properties
     expect(props.reasoning).toBeDefined();
@@ -63,7 +63,7 @@ describe('schemaUtils', () => {
     });
 
     const result = zodToJsonSchema(schema, 'RecordTest');
-    const props = result.json_schema.schema.properties;
+    const props = result.json_schema.schema.properties as Record<string, unknown>;
 
     expect(props.assignments).toBeDefined();
   });

@@ -271,13 +271,13 @@ function checkCancelled(signal: AbortSignal): void {
 
 async function cleanupTemp(
   directoryHandle: FileSystemDirectoryHandle,
-  logger: Logger,
+  logger: ILogger,
 ): Promise<void> {
   try {
     await directoryHandle.removeEntry('_temp_work', { recursive: true });
-    logger.debug('Cleaned up temp directory');
+    logger.debug?.('Cleaned up temp directory');
   } catch (err) {
-    logger.debug(`Cleanup skipped: ${(err as Error).message}`);
+    logger.debug?.(`Cleanup skipped: ${(err as Error).message}`);
   }
 }
 
@@ -289,7 +289,7 @@ function logVoiceSummary(
   _uniqueCount: number,
   pool: VoicePool,
   narratorVoice: string,
-  logger: Logger,
+  logger: ILogger,
 ): void {
   const frequency = new Map<string, number>();
   for (const a of assignments) {
@@ -356,7 +356,7 @@ async function saveVoiceProfile(
   assignments: SpeakerAssignment[],
   narratorVoice: string,
   existingProfile: VoiceProfileFile | null,
-  logger: Logger,
+  logger: ILogger,
 ): Promise<void> {
   try {
     const bookName = extractBookName(fileNames);

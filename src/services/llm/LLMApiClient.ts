@@ -3,7 +3,7 @@ import OpenAI from 'openai';
 import { ZodError } from 'zod';
 import { RetriableError } from '@/errors';
 import { safeParseJSON } from '@/utils/text';
-import type { Logger } from '../Logger';
+import type { ILogger } from '../Logger';
 import type { DebugLogger } from './DebugLogger';
 import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
 
@@ -33,7 +33,7 @@ export interface LLMApiClientOptions {
   topP?: number;
   maxTokens?: number;
   debugLogger?: DebugLogger;
-  logger?: Logger;
+  logger?: ILogger;
 }
 
 export type PassType = 'extract' | 'merge' | 'assign' | 'structured';
@@ -71,7 +71,7 @@ function applyProviderFixes(requestBody: Record<string, unknown>, provider: stri
  */
 export class LLMApiClient {
   private options: LLMApiClientOptions;
-  private logger?: Logger;
+  private logger?: ILogger;
   private client: OpenAI;
   public debugLogger?: DebugLogger;
   private provider: string;

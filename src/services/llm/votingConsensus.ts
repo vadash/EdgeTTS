@@ -1,11 +1,11 @@
-import type { Logger } from '../Logger';
+import type { ILogger } from '../Logger';
 
 /**
  * Build consensus merge groups from multiple votes using Union-Find.
  * Pairs appearing in >=2 of 5 votes get merged.
  * Returns 0-based index groups.
  */
-export function buildMergeConsensus(votes: number[][][], logger?: Logger): number[][] {
+export function buildMergeConsensus(votes: number[][][], logger?: ILogger): number[][] {
   // Count how many votes have each pair in same group
   const pairCounts = new Map<string, number>();
   // Track which index was "keep" (first in group) for each pair

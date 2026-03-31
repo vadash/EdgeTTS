@@ -78,18 +78,18 @@ export class FFmpegService {
     const ffmpeg = new FFmpeg();
 
     ffmpeg.on('log', ({ message }) => {
-      this.logger?.debug(`[FFmpeg] ${message}`);
+      this.logger?.debug?.(`[FFmpeg] ${message}`);
     });
 
     // Reuse cached blob URLs if available (avoids re-fetch on proactive refresh)
     if (this.cachedCoreURL && this.cachedWasmURL) {
       try {
-        onProgress?.('Reloading FFmpeg from cache...');
+        if (onProgress) onProgress('Reloading FFmpeg from cache...');
         await ffmpeg.load({ coreURL: this.cachedCoreURL, wasmURL: this.cachedWasmURL });
         this.ffmpeg = ffmpeg;
         this.loaded = true;
         this.loadError = null;
-        onProgress?.('FFmpeg reloaded from cache');
+        if (onProgress) onProgress('FFmpeg reloaded from cache');
         return true;
       } catch (err) {
         this.logger?.warn('FFmpeg reload from cached blob URLs failed, refetching locally', {
@@ -100,7 +100,7 @@ export class FFmpegService {
       }
     }
 
-    onProgress?.('Loading local FFmpeg WebAssembly...');
+    if (onProgress) onProgress('Loading local FFmpeg WebAssembly...');
 
     try {
       // Use relative paths to the files copied by Webpack CopyWebpackPlugin
@@ -115,12 +115,12 @@ export class FFmpegService {
       this.loadError = null;
       this.cachedCoreURL = coreURL;
       this.cachedWasmURL = wasmURL;
-      onProgress?.('FFmpeg loaded successfully from local bundle');
+      if (onProgress) onProgress('FFmpeg loaded successfully from local bundle');
       return true;
     } catch (err) {
       this.loadError = `Failed to load local FFmpeg: ${err instanceof Error ? err.message : String(err)}`;
       this.logger?.error(this.loadError);
-      onProgress?.(this.loadError);
+      if (onProgress) onProgress(this.loadError);
       return false;
     }
   }
@@ -144,7 +144,7 @@ export class FFmpegService {
   ): Promise<Uint8Array> {
     // Proactively refresh FFmpeg to prevent WASM memory exhaustion after many operations
     if (this.operationCount >= this.MAX_OPERATIONS_BEFORE_REFRESH) {
-      this.logger?.debug(`FFmpeg: Proactive refresh after ${this.operationCount} operations`);
+      this.logger?.debug?.(`FFmpeg: Proactive refresh after ${this.operationCount} operations`);
       this.terminate();
     }
 
@@ -170,7 +170,7 @@ export class FFmpegService {
       const needsGaps = silenceGapMs > 0 && chunks.filter((c) => c !== null).length > 1;
 
       if (hasMissingChunks || needsGaps) {
-        onProgress?.(`Generating ${silenceGapMs}ms silence...`);
+        if (onProgress) onProgress(`Generating ${silenceGapMs}ms silence...`);
         await ffmpeg.exec([
           '-f',
           'lavfi',
@@ -187,7 +187,7 @@ export class FFmpegService {
       }
 
       // Write all input chunks to virtual filesystem
-      onProgress?.('Writing audio chunks to FFmpeg...');
+      if (onProgress) onProgress('Writing audio chunks to FFmpeg...');
       let actualFileIndex = 0;
 
       for (let i = 0; i < chunks.length; i++) {
@@ -255,7 +255,7 @@ export class FFmpegService {
         'output.opus',
       );
 
-      onProgress?.('Processing audio with FFmpeg...');
+      if (onProgress) onProgress('Processing audio with FFmpeg...');
       await ffmpeg.exec(args);
 
       // Read output

@@ -361,7 +361,7 @@ export class LLMVoiceService {
     codeToName: Map<string, string>,
     overlapSentences?: string[],
   ): Promise<SpeakerAssignment[]> {
-    this.logger?.debug(
+    this.logger.debug?.(
       `[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`,
     );
 

@@ -30,6 +30,7 @@ describe('TTSWorkerPool - Ladder Integration', () => {
         voice: 'Microsoft Server Speech Text to Speech Voice (en-US, JennyNeural)',
         rate: '+0%',
         pitch: '+0Hz',
+        volume: '100%',
       },
       directoryHandle: mockDir,
     };
@@ -43,7 +44,7 @@ describe('TTSWorkerPool - Ladder Integration', () => {
     pool = new TTSWorkerPool(options);
 
     // Spy on connectionPool.acquire
-    const acquireSpy = vi.spyOn(pool.connectionPool, 'acquire');
+    const acquireSpy = vi.spyOn((pool as unknown as Record<string, unknown>)['connectionPool'] as { acquire: () => Promise<unknown> }, 'acquire');
 
     await pool.warmup();
 
@@ -55,8 +56,8 @@ describe('TTSWorkerPool - Ladder Integration', () => {
     pool = new TTSWorkerPool(options);
 
     // Check that ladder exists internally
-    expect(pool.ladder).toBeDefined();
-    expect(pool.ladder.getCurrentWorkers()).toBe(2);
+    expect((pool as unknown as Record<string, unknown>)['ladder']).toBeDefined();
+    expect(((pool as unknown as Record<string, unknown>)['ladder'] as { getCurrentWorkers: () => number }).getCurrentWorkers()).toBe(2);
   });
 
   it('records successful task for ladder evaluation', async () => {

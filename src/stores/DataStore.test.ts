@@ -54,6 +54,7 @@ describe('DataStore', () => {
         ['chapter1', 0],
         ['chapter2', 1],
       ],
+      fullText: 'test content',
     };
 
     it('sets book', () => {
@@ -105,7 +106,7 @@ describe('DataStore', () => {
     const mockWorker: TTSWorker = {
       id: 1,
       status: 'processing',
-      filenum: 0,
+      filenum: '0',
       filename: 'test.mp3',
       audioData: null,
       mp3Saved: false,
@@ -118,8 +119,8 @@ describe('DataStore', () => {
 
     it('updates worker', () => {
       store.addWorker(mockWorker);
-      store.updateWorker(1, { status: 'complete' });
-      expect(store.activeWorkers.value[0].status).toBe('complete');
+      store.updateWorker(1, { status: 'completed' });
+      expect(store.activeWorkers.value[0].status).toBe('completed');
     });
 
     it('removes worker', () => {
@@ -136,7 +137,7 @@ describe('DataStore', () => {
 
     it('does not update non-existent worker', () => {
       store.addWorker(mockWorker);
-      store.updateWorker(999, { status: 'complete' });
+      store.updateWorker(999, { status: 'completed' });
       expect(store.activeWorkers.value[0].status).toBe('processing');
     });
   });
@@ -288,7 +289,7 @@ describe('DataStore', () => {
       store.setDictionary([{ type: 'word', pattern: 'a', replacement: 'b' }]);
       store.setDictionaryRaw(['a=b']);
       store.setDirectoryHandle({} as FileSystemDirectoryHandle);
-      store.addWorker({ id: 1, status: 'processing', filenum: 0, filename: 'test', audioData: null, mp3Saved: false });
+      store.addWorker({ id: 1, status: 'processing', filenum: '0', filename: 'test', audioData: null, mp3Saved: false });
       store.setFileNameIndex(5);
       store.setNumBook(3);
       store.setNumText(7);
@@ -312,7 +313,7 @@ describe('DataStore', () => {
     it('resets conversion-specific state but keeps directory handle', () => {
       const mockHandle = {} as FileSystemDirectoryHandle;
       store.setDirectoryHandle(mockHandle);
-      store.addWorker({ id: 1, status: 'processing', filenum: 0, filename: 'test', audioData: null, mp3Saved: false });
+      store.addWorker({ id: 1, status: 'processing', filenum: '0', filename: 'test', audioData: null, mp3Saved: false });
       store.setFileNameIndex(5);
 
       store.resetForConversion();
