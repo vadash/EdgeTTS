@@ -119,3 +119,54 @@ describe("stripThinkingTags expanded patterns", () => {
     expect(result).toBe('');
   });
 });
+
+import { ExtractSchema, MergeSchema, AssignSchema } from "../../../services/llm/schemas";
+
+describe("safeParseJSON with real schemas", () => {
+  it("should recover ExtractSchema from naked array", () => {
+    const json = '[{"canonicalName": "John", "variations": ["Johnny"], "gender": "male"}]';
+    const result = safeParseJSON(json, { schema: ExtractSchema });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.reasoning).toBeNull();
+      expect(result.data.characters).toHaveLength(1);
+      expect(result.data.characters[0].canonicalName).toBe("John");
+    }
+  });
+
+  it("should recover MergeSchema from naked array", () => {
+    const json = '[[0, 1], [2, 3]]';
+    const result = safeParseJSON(json, { schema: MergeSchema });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.reasoning).toBeNull();
+      expect(result.data.merges).toHaveLength(2);
+      expect(result.data.merges[0]).toEqual([0, 1]);
+    }
+  });
+
+  it("should recover AssignSchema from flattened assignments", () => {
+    const json = '{"0": "Narrator", "1": "Alice", "2": "Bob"}';
+    const result = safeParseJSON(json, { schema: AssignSchema });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.reasoning).toBeNull();
+      expect(result.data.assignments).toEqual({
+        "0": "Narrator",
+        "1": "Alice",
+        "2": "Bob"
+      });
+    }
+  });
+
+  it("should accept key typo and default reasoning to null", () => {
+    // Schema no longer has .strict(), so "reasonin" typo is ignored
+    const json = '{"reasonin": "some thought", "characters": [{"canonicalName": "Test", "variations": [], "gender": "unknown"}]}';
+    const result = safeParseJSON(json, { schema: ExtractSchema });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.reasoning).toBeNull(); // defaulted
+      expect(result.data.characters).toHaveLength(1);
+    }
+  });
+});
