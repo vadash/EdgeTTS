@@ -20,7 +20,7 @@ The engine that drives the conversion from Text -> LLM -> TTS -> Audio File. Man
 ## Gotchas
 
 - **Memory Management**: Do NOT load entire audio files into memory. `TTSWorkerPool` writes chunks to a local `_temp_work` folder immediately. `AudioMerger` reads them sequentially.
-- **File System**: The app writes directly to the user's hard drive to prevent OOM errors. All file operations MUST use `withPermissionRetry` to handle browser security drops.
+- **File System**: All file operations use `withPermissionRetry` (see root CLAUDE.md).
 - **WASM Memory Leaks**: FFmpeg WASM memory leaks are a risk. `FFmpegService` proactively terminates and reloads itself after a set number of operations (`MAX_OPERATIONS_BEFORE_REFRESH`).
-- **Async Resilience**: Network and WebSocket calls must use the internal `withRetry` utility (which wraps `p-retry`) to survive sleep modes and rate limits. ALWAYS throw `RetriableError` in `LLMApiClient` on failure.
+- **Async Resilience**: Always throw `RetriableError` in `LLMApiClient` on failure so `withRetry` can retry (see root CLAUDE.md for `withRetry` details).
 - **State**: Services should remain as stateless as possible. Pass data via arguments or update the UI via the imported `Stores`.

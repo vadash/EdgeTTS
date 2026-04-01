@@ -4,33 +4,9 @@
 
 ## Architecture
 
-### 3-Message Prompt Topology
-We use a 3-message structure to defeat recency bias and improve compliance:
-1. **System**: Preamble + Role + Examples (`src/config/prompts/shared.ts`)
-2. **User**: Content + Constraints (language rules + task rules + schema + execution trigger)
-3. **Assistant**: Prefill (biases model into correct reasoning track)
-
-**Prefill Behavior**: `PREFILL_PRESETS` currently only supports `none` and `auto` (which resolves to `none`). The compliance presets (`cn_compliance`, `en_compliance`) were removed as they are no longer needed with the simplified 3-message topology.
-
-See `promptFormatters.ts` for message assembly functions.
-
-### Prompt Structure
-Prompts in `src/config/prompts/` are split into per-concern files:
-- **`role.ts`**: Task description and identity
-- **`rules.ts`**: Task-specific constraints + in-JSON `reasoning` field reasoning steps
-- **`schema.ts`**: JSON schema example
-- **`builder.ts`**: Assembles full message array, moved from PromptStrategy.ts
-- **`examples/en.ts`**: Structured `{ input, output, label? }` few-shot examples (reasoning is inside the JSON output)
-- **`examples/index.ts`**: `getExamples(language)` — returns filtered examples
-
-Stages: `extract/` → `merge/` → `assign/` → `qa/`
-
-See `src/config/prompts/CLAUDE.md` for the full prompt module documentation.
-
-### Shared Prompt Utilities (`src/config/prompts/shared/`)
-- **`preambles.ts`**: `SYSTEM_PREAMBLE_CN` (anti-refusal framing), `PREFILL_PRESETS` (assistant prefills including `'auto'` for language-aware selection)
-- **`rules.ts`**: `MIRROR_LANGUAGE_RULES` (output language mirroring), `EXECUTION_TRIGGER` (defeats recency bias)
-- **`formatters.ts`**: `assembleSystemPrompt`, `assembleUserConstraints`, `buildMessages`, `formatExamples`
+### Prompt System
+Prompts follow a 3-message topology (System/User/Assistant) assembled by `promptFormatters.ts`.
+Per-stage files (`role.ts`, `rules.ts`, `schema.ts`, `builder.ts`, `examples/`) and shared utilities (`preambles.ts`, `rules.ts`, `formatters.ts`) are documented in `src/config/prompts/CLAUDE.md`.
 
 ## JSON Repair Pipeline
 
