@@ -270,6 +270,49 @@ function applyArrayAtRootRecovery<T>(
 }
 
 /**
+ * Apply flattened assignments recovery if parsed value is a numeric-key object
+ * and schema expects an object with 'assignments' field.
+ * Detects when LLM returns {"0": "A", "1": "B"} instead of {reasoning: null, assignments: {"0": "A", "1": "B"}}.
+ */
+function applyFlattenedAssignmentsRecovery<T>(
+  parsed: unknown,
+  schema: z.ZodType<T>,
+): unknown {
+  // Only apply if parsed is a plain object (not array, not null)
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    Array.isArray(parsed)
+  ) {
+    return parsed;
+  }
+
+  // Check if schema is a ZodObject with a shape property
+  const zodObj = schema as unknown as { _def?: { shape?: Record<string, unknown> } };
+  if (!zodObj._def?.shape) return parsed;
+
+  const shape = zodObj._def.shape;
+  const recognizedKeys = ['reasoning', 'assignments', 'characters', 'merges'];
+  const hasRecognizedKey = recognizedKeys.some(key => key in (parsed as object));
+
+  // If object has recognized keys, it's already structured correctly
+  if (hasRecognizedKey) return parsed;
+
+  // Check if all keys are numeric strings
+  const keys = Object.keys(parsed);
+  if (keys.length === 0) return parsed;
+
+  const allNumeric = keys.every(key => /^\d+$/.test(key));
+
+  // If all keys are numeric strings, wrap as flattened assignments
+  if (allNumeric) {
+    return { reasoning: null, assignments: parsed };
+  }
+
+  return parsed;
+}
+
+/**
  * Safely parse JSON with progressive fallback waterfall.
  * Returns Zod-style result object for maximum reusability.
  *
@@ -336,7 +379,8 @@ export function safeParseJSON<T>(
   try {
     const parsed = JSON.parse(text);
     if (schema) {
-      const recovered = applyArrayAtRootRecovery(parsed, schema);
+      let recovered = applyArrayAtRootRecovery(parsed, schema);
+      recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
       const data = schema.parse(recovered) as T;
       return { success: true, data };
     }
@@ -360,7 +404,8 @@ export function safeParseJSON<T>(
       const repaired = jsonrepair(selectedBlock.text);
       const parsed = JSON.parse(repaired);
       if (schema) {
-        const recovered = applyArrayAtRootRecovery(parsed, schema);
+        let recovered = applyArrayAtRootRecovery(parsed, schema);
+        recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
         const data = schema.parse(recovered) as T;
         return { success: true, data };
       }
@@ -371,7 +416,8 @@ export function safeParseJSON<T>(
     const repaired = jsonrepair(text);
     const parsed = JSON.parse(repaired);
     if (schema) {
-      const recovered = applyArrayAtRootRecovery(parsed, schema);
+      let recovered = applyArrayAtRootRecovery(parsed, schema);
+      recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
       const data = schema.parse(recovered) as T;
       return { success: true, data };
     }
@@ -398,7 +444,8 @@ export function safeParseJSON<T>(
     const repaired = jsonrepair(selectedBlock.text);
     const parsed = JSON.parse(repaired);
     if (schema) {
-      const recovered = applyArrayAtRootRecovery(parsed, schema);
+      let recovered = applyArrayAtRootRecovery(parsed, schema);
+      recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
       const data = schema.parse(recovered) as T;
       return { success: true, data };
     }
@@ -426,7 +473,8 @@ export function safeParseJSON<T>(
     const repaired = jsonrepair(scrubbed);
     const parsed = JSON.parse(repaired);
     if (schema) {
-      const recovered = applyArrayAtRootRecovery(parsed, schema);
+      let recovered = applyArrayAtRootRecovery(parsed, schema);
+      recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
       const data = schema.parse(recovered) as T;
       return { success: true, data };
     }
