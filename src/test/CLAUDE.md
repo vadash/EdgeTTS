@@ -20,6 +20,8 @@ Vitest-based test suites covering utilities, services, and prompt behavior.
 - Fast and deterministic.
 - **Key test files:**
   - `CharacterUtils.test.ts` - Frequency culling logic (`cullByFrequency`)
+  - `schemas.test.ts` - Schema strictness (extra keys accepted, not rejected)
+  - `text.test.ts` - JSON repair pipeline (array-at-root recovery, flattened assignments, tag stripping)
   - `TextBlockSplitter.test.ts` - Semantic chunking (scene breaks, dividers, chapter headers)
   - `PromptStrategy.test.ts` - Overlap context injection with negative indices
 

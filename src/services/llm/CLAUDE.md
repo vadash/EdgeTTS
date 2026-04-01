@@ -19,6 +19,7 @@ Per-stage files (`role.ts`, `rules.ts`, `schema.ts`, `builder.ts`, `examples/`) 
 | 0 | Input validation (null, empty, already object) |
 | 1 | Native `JSON.parse` |
 | 2 | `extractJsonBlocks` + `jsonrepair` |
+| 2.5 | **Structural recovery**: array-at-root wrapping, flattened-assignments wrapping |
 | 3 | `normalizeText` + `extractJsonBlocks` + `jsonrepair` |
 | 4 | Aggressive `scrubConcatenation` + `jsonrepair` |
 | 5 | Failure (return error result) |
@@ -29,7 +30,7 @@ Returns `{success, data?, error?}` result object. Caller throws `RetriableError`
 - `normalizeText` — Fix smart quotes, control characters
 - `extractJsonBlocks` — Extract ALL balanced blocks (not just last)
 - `scrubConcatenation` — Fix LLM string `+` hallucinations
-- `stripThinkingTags` — Strip `<think>`, `[THINK]`, etc. (regex-based)
+- `stripThinkingTags` — Strip `<think>`, `[THINK]`, `<json_tool_call>`, `<arg_key` tags (regex-based)
 - `stripMarkdownFences` — Strip ``` and ~~~ fences
 
 ## Clients
@@ -39,16 +40,16 @@ Returns `{success, data?, error?}` result object. Caller throws `RetriableError`
 
 ## Schemas
 
-- **`schemas.ts`**: Zod v4 schemas for Extract, Merge, Assign stages with `.strict()` mode enabled
+- **`schemas.ts`**: Zod v4 schemas for Extract, Merge, Assign stages (non-strict; extra keys silently ignored)
 - **`schemaUtils.ts`**: Type utilities and response helpers
 
 All schemas include `reasoning` field (nullable) for chain-of-thought extraction.
-**`.strict()` mode** rejects extra keys at root level — future-proofs against LLM hallucinations adding unexpected fields.
+**Non-strict mode** allows extra keys at root level — tolerates LLM key typos without failing validation.
 
 ## Consensus Voting
 
 ### Merge: 5-Way Voting
-- `MERGE_VOTE_COUNT` (5) votes with random temperatures (0.0-1.0)
+- `MERGE_VOTE_COUNT` (5) votes with random temperatures (0.1-0.7)
 - Union-Find consensus via `buildMergeConsensus()` in `votingConsensus.ts`
 - Pairs in >=2 of 5 votes get merged
 
@@ -58,7 +59,7 @@ All schemas include `reasoning` field (nullable) for chain-of-thought extraction
 - QA prompt (`src/config/prompts/qa/`) reviews draft for: vocative traps, missed action beats, misassigned narration, missing dialogue
 - Falls back to draft results if QA call fails
 - Uses same `AssignSchema` for both passes
-- **Overlap Context**: Last 5 sentences from previous block passed as `overlapSentences` with negative indices `[-5]` through `[-1]`. Read-only (inside `<previous_context_do_not_assign>` tags).
+- **Overlap Context**: Last 10 sentences from previous block passed as `overlapSentences` with negative indices `[-10]` through `[-1]`. Read-only (inside `<previous_context_do_not_assign>` tags).
 
 ## Pre-Merge Frequency Culling
 

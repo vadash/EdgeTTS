@@ -41,7 +41,7 @@ src/
 ## Key Design Decisions
 
 - **Memory:** Never hold audio in RAM. Write chunks to disk via File System Access API to prevent browser OOM.
-- **Structured Outputs:** LLM responses use Zod schemas with `.strict()` mode. Pass through `safeParseJSON()` (in `src/utils/text.ts`) which handles markdown fences, thinking tags, and `jsonrepair`.
+- **Structured Outputs:** LLM responses use Zod schemas (non-strict, extra keys ignored). Pass through `safeParseJSON()` (in `src/utils/text.ts`) which handles markdown fences, thinking tags, `jsonrepair`, and structural recovery (naked arrays, flattened assignments).
 - **QA Pass (Assign):** When enabled (`useVoting`), Assign runs a sequential draft -> QA correction pass (2 API calls). QA catches vocative traps, missed action beats, and narration errors.
 - **Consensus Voting (Merge):** Merge stage uses 5-way voting with random temperatures and Union-Find consensus.
 - **Semantic Chunking:** `TextBlockSplitter` prefers natural scene boundaries (dividers, chapter headers, long narration passages) over arbitrary token-limit cuts.
