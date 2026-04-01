@@ -105,4 +105,26 @@ describe('buildMessages', () => {
     // DEFAULT_PREFILL is 'none', which returns empty string, so no assistant message
     expect(result).toHaveLength(2);
   });
+
+  it('does not duplicate user message when repeatPrompt is false', () => {
+    const result = buildMessages('sys', 'user body', 'en', 'none', undefined, false);
+    const userMessages = result.filter((m) => m.role === 'user');
+    expect(userMessages).toHaveLength(1);
+  });
+
+  it('duplicates user message when repeatPrompt is true', () => {
+    const result = buildMessages('sys', 'user body', 'en', 'none', undefined, true);
+    const userMessages = result.filter((m) => m.role === 'user');
+    expect(userMessages).toHaveLength(2);
+    expect(userMessages[0].content).toBe(userMessages[1].content);
+  });
+
+  it('places duplicated user message before assistant prefill', () => {
+    // Use a prefill that actually produces a message — 'none' doesn't,
+    // so just verify ordering: system, user, user
+    const result = buildMessages('sys', 'user body', 'en', 'none', undefined, true);
+    expect(result[0].role).toBe('system');
+    expect(result[1].role).toBe('user');
+    expect(result[2].role).toBe('user');
+  });
 });

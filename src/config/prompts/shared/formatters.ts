@@ -91,11 +91,16 @@ export function assembleUserConstraints(rules: string, schemaText: string): stri
 /**
  * Build the 3-message array: system + user + assistant prefill.
  *
+ * When `repeatPrompt` is true, the user message is duplicated (`<QUERY><QUERY>`)
+ * so later tokens can attend to the full context bidirectionally during prefill.
+ * Based on Google Research arXiv:2512.14982 — ~4.5% accuracy gain, zero latency cost.
+ *
  * @param systemBody - Task-specific system prompt (role + examples)
  * @param userBody - The actual content (text/characters/paragraphs) + constraints
  * @param detectedLanguage - Detected language code ('zh' for Chinese, others use EN)
  * @param prefill - Which prefill preset to use (default: auto, which resolves based on language)
  * @param preamble - System preamble (default: CN)
+ * @param repeatPrompt - Duplicate user message for improved accuracy (default: false)
  */
 export function buildMessages(
   systemBody: string,
@@ -103,11 +108,16 @@ export function buildMessages(
   _detectedLanguage: string = 'en',
   prefill: PrefillPreset = DEFAULT_PREFILL,
   preamble: string = SYSTEM_PREAMBLE_CN,
+  repeatPrompt: boolean = false,
 ): LLMMessage[] {
   const messages: LLMMessage[] = [
     { role: 'system', content: `${preamble}\n\n${systemBody}` },
     { role: 'user', content: userBody },
   ];
+
+  if (repeatPrompt) {
+    messages.push({ role: 'user', content: userBody });
+  }
 
   // Resolve 'auto' - both zh and non-zh result in no prefill since compliance presets were removed
   let actualPrefill = prefill;

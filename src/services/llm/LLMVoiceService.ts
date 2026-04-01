@@ -210,7 +210,7 @@ export class LLMVoiceService {
       const block = blocks[i];
       const blockText = block.sentences.join('\n');
 
-      const extractMessages = buildExtractPrompt(blockText, this.detectedLanguage);
+      const extractMessages = buildExtractPrompt(blockText, this.detectedLanguage, this.options.repeatPrompt ?? false);
       const response = await withRetry(
         () =>
           this.apiClient.callStructured({
@@ -383,6 +383,7 @@ export class LLMVoiceService {
       context.numberedParagraphs,
       this.detectedLanguage,
       overlapSentences,
+      this.options.repeatPrompt ?? false,
     );
 
     let relativeMap: Map<number, string>;
@@ -435,6 +436,7 @@ export class LLMVoiceService {
           draftResponse.assignments,
           this.detectedLanguage,
           overlapSentences,
+          this.options.repeatPrompt ?? false,
         );
 
         try {
@@ -613,7 +615,7 @@ export class LLMVoiceService {
       `[Merge] Single merge: ${characters.length} characters (temp=${temperature.toFixed(2)})`,
     );
 
-    const mergeMessages = buildMergePrompt(characters, this.detectedLanguage);
+    const mergeMessages = buildMergePrompt(characters, this.detectedLanguage, this.options.mergeConfig?.repeatPrompt ?? false);
 
     // Create a client with the specified temperature
     const client = new LLMApiClient({

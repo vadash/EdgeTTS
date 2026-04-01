@@ -20,6 +20,7 @@ export function buildQAPrompt(
   draftAssignments: Record<string, string>,
   detectedLanguage: string = 'en',
   overlapSentences?: string[],
+  repeatPrompt: boolean = false,
 ) {
   const examples = getQAExamples();
 
@@ -70,5 +71,5 @@ ${draftJson}
 Review the draft assignments above and correct any errors.
 Output the corrected JSON now.`;
 
-  return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage);
+  return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage, undefined, undefined, repeatPrompt);
 }

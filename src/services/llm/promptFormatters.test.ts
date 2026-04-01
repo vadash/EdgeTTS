@@ -13,4 +13,18 @@ describe('buildMessages', () => {
     // DEFAULT_PREFILL is 'none', which returns empty string, so no assistant message
     expect(result).toHaveLength(2);
   });
+
+  it('duplicates user message when repeatPrompt is true', () => {
+    const result = buildMessages('sys', 'user body', 'en', 'none', undefined, true);
+    const userMessages = result.filter((m) => m.role === 'user');
+    expect(userMessages).toHaveLength(2);
+    expect(userMessages[0].content).toBe('user body');
+    expect(userMessages[1].content).toBe('user body');
+  });
+
+  it('does not duplicate user message by default', () => {
+    const result = buildMessages('sys', 'user body');
+    const userMessages = result.filter((m) => m.role === 'user');
+    expect(userMessages).toHaveLength(1);
+  });
 });

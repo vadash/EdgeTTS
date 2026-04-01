@@ -20,6 +20,7 @@ export function buildAssignPrompt(
   numberedParagraphs: string,
   detectedLanguage: string = 'en',
   overlapSentences?: string[],
+  repeatPrompt: boolean = false,
 ) {
   const examples = getAssignExamples();
 
@@ -68,5 +69,5 @@ ${numberedParagraphs}
 5. Only assign speaker codes to paragraphs [0] and above.
 Output the raw JSON now.`;
 
-  return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage);
+  return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage, undefined, undefined, repeatPrompt);
 }
