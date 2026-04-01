@@ -180,11 +180,13 @@ export function stripThinkingTags(text: string): string {
   let result = text
     // Unwrap rogue tool_call tags to preserve inner JSON (CRITICAL: before stripping other tags!)
     // Pattern: <tool_call ...>content</tool_call> -> content
-    .replace(/<tool_call(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/tool_call>/gi, '$1')
+    .replace(/<(?:json_)?tool_call(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/(?:json_)?tool_call>/gi, '$1')
     // Strip orphaned tool_call opening tags
-    .replace(/<tool_call(?:\s+[^>]*)?>\s*/gi, '')
+    .replace(/<(?:json_)?tool_call(?:\s+[^>]*)?>\s*/gi, '')
     // Strip orphaned tool_call closing tags
-    .replace(/\s*<\/tool_call>\s*/gi, ' ')
+    .replace(/\s*<\/(?:json_)?tool_call>\s*/gi, ' ')
+    // Strip arg_key tags entirely (remove both tag and content)
+    .replace(/<arg_key[^>]*>[\s\S]*?<\/arg_key>/gi, '')
     // Strip inner XML wrappers left behind after tool_call unwrapping (e.g. <json>...</json>)
     .replace(/<(json|arg_value|arguments|content)(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/\1>/gi, '$2')
     // Paired bracket tags

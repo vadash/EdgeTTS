@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { safeParseJSON } from "../../../utils/text";
+import { safeParseJSON, stripThinkingTags } from "../../../utils/text";
 
 describe("safeParseJSON array-at-root recovery", () => {
   const TestSchema = z.object({
@@ -79,5 +79,43 @@ describe("safeParseJSON flattened assignments recovery", () => {
     const result = safeParseJSON(json, { schema: AssignSchema });
     // Should fail - no recognized keys and not numeric
     expect(result.success).toBe(false);
+  });
+});
+
+describe("stripThinkingTags expanded patterns", () => {
+  it("should strip <json_tool_call> tags", () => {
+    const input = '<json_tool_call>{"key": "value"}</json_tool_call>';
+    const result = stripThinkingTags(input);
+    expect(result).toBe('{"key": "value"}');
+  });
+
+  it("should strip <json_tool_call> with attributes", () => {
+    const input = '<json_tool_call name="test">{"key": "value"}</json_tool_call>';
+    const result = stripThinkingTags(input);
+    expect(result).toBe('{"key": "value"}');
+  });
+
+  it("should strip <arg_key> tags entirely", () => {
+    const input = '<arg_key>someKey</arg_key>{"key": "value"}';
+    const result = stripThinkingTags(input);
+    expect(result).toBe('{"key": "value"}');
+  });
+
+  it("should strip <arg_key> with content", () => {
+    const input = '{"data": "<arg_key>content</arg_key>value"}';
+    const result = stripThinkingTags(input);
+    expect(result).toBe('{"data": "value"}');
+  });
+
+  it("should still unwrap <arg_value> tags", () => {
+    const input = '{"key": "<arg_value>{"nested": "obj"}</arg_value>"}';
+    const result = stripThinkingTags(input);
+    expect(result).toBe('{"key": "{"nested": "obj"}"}');
+  });
+
+  it("should still strip<think> tags", () => {
+    const input = '<think>{"key": "value"}</think>';
+    const result = stripThinkingTags(input);
+    expect(result).toBe('');
   });
 });
