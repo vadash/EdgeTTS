@@ -26,6 +26,11 @@ export const ASSIGN_RULES = `1. SKIP NON-DIALOGUE:
 7. NEGATIVE INDICES ARE READ-ONLY:
    Paragraphs labeled with negative indices inside the previous context block are from the previous section for context only. Do NOT assign speaker codes to them.
 
+8. MIXED PARAGRAPHS (DIALOGUE + NARRATION):
+   A paragraph that contains ANY dialogue with a clear speaker belongs to that speaker -- even if most of the paragraph is narration describing actions, scenery, or backstory after the quote.
+   The speaker is determined by the dialogue portion (speech verb, action beat, pronoun). The narration tail does NOT change the speaker.
+   Example: "Observe," Professor Viridian said. He put on a gauntlet and reached through the barrier to pluck a leaf. -> Assign to Professor Viridian (he is the one who spoke "Observe").
+
 Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
 CRITICAL: Keep reasoning extremely concise. Do not quote full sentences. Do not analyze every paragraph individually. Only briefly note ambiguous cases.
 Follow these steps IN ORDER:

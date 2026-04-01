@@ -1,6 +1,6 @@
 // src/config/prompts/assign/examples/en.ts
-// 4 few-shot examples for speaker attribution -- EN language
-// Progresses: simple assignment -> vocative trap -> first person + context -> system messages + mixed
+// 5 few-shot examples for speaker attribution -- EN language
+// Progresses: simple assignment -> vocative trap -> first person + context -> system messages + mixed -> dialogue with long narration tail
 
 import type { PromptExample } from '../../shared/formatters';
 
@@ -91,6 +91,25 @@ export const assignExamplesEN: PromptExample[] = [
     "2": "A",
     "4": "B",
     "5": "A"
+  }
+}`,
+  },
+  {
+    label: '(EN/DialogueWithLongNarration)',
+    input: `[Speaker Codes]:
+- A = Professor Viridian [male]
+- B = Mirian [female]
+
+[Numbered Paragraphs]:
+[0] "Observe," Professor Viridian said. He put on a heavy steel gauntlet plated with glowing runes, which looked ridiculous on his thin boney frame. He then reached through the magic barrier and plucked a single leaf.
+[1] The plant erupted in golden light.
+[2] "Observe, the golden crown," the professor said, "hence regal cordyline. Wear proper protective gear, or you're likely to lose your arm."
+[3] Mirian could feel the heat even from the second row. The golden light spun in a circle, crackling with energy.`,
+    output: `{
+  "reasoning": "0 has dialogue 'Observe' with explicit tag 'Professor Viridian said' -- the long narration after it describes his actions but the speaker is Viridian. 1 is narration. 2 has dialogue with explicit tag 'the professor said' -- professor = Viridian. 3 is narration describing Mirian's perspective but no dialogue.",
+  "assignments": {
+    "0": "A",
+    "2": "A"
   }
 }`,
   },
