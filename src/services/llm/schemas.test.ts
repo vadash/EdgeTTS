@@ -39,15 +39,15 @@ describe('Zod Schemas', () => {
     });
   });
 
-  describe('ExtractCharacterSchema strict mode', () => {
-    it('rejects extra keys at root level', () => {
+  describe('ExtractCharacterSchema strict mode removal', () => {
+    it('allows extra keys at root level (strict mode removed)', () => {
       const result = ExtractCharacterSchema.safeParse({
         canonicalName: 'Alice',
         variations: ['Alice'],
         gender: 'female',
-        extraField: 'should be rejected',
+        extraField: 'now allowed',
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
     it('accepts valid object without extra keys', () => {
@@ -94,14 +94,14 @@ describe('Zod Schemas', () => {
     });
   });
 
-  describe('ExtractSchema strict mode', () => {
-    it('rejects extra keys at root level', () => {
+  describe('ExtractSchema strict mode removal', () => {
+    it('allows extra keys at root level (strict mode removed)', () => {
       const result = ExtractSchema.safeParse({
         reasoning: null,
         characters: [{ canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }],
-        extraField: 'should be rejected',
+        extraField: 'now allowed',
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
     it('accepts valid object without extra keys', () => {
@@ -152,14 +152,14 @@ describe('Zod Schemas', () => {
     });
   });
 
-  describe('MergeSchema strict mode', () => {
-    it('rejects extra keys at root level', () => {
+  describe('MergeSchema strict mode removal', () => {
+    it('allows extra keys at root level (strict mode removed)', () => {
       const result = MergeSchema.safeParse({
         reasoning: null,
         merges: [[0, 1]],
-        extraField: 'should be rejected',
+        extraField: 'now allowed',
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
     it('accepts valid object without extra keys', () => {
@@ -189,14 +189,14 @@ describe('Zod Schemas', () => {
     });
   });
 
-  describe('AssignSchema strict mode', () => {
-    it('rejects extra keys at root level', () => {
+  describe('AssignSchema strict mode removal', () => {
+    it('allows extra keys at root level (strict mode removed)', () => {
       const result = AssignSchema.safeParse({
         reasoning: null,
         assignments: { '0': 'A' },
-        extraField: 'should be rejected',
+        extraField: 'now allowed',
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
     it('accepts valid object without extra keys', () => {
