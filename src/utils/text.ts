@@ -237,6 +237,39 @@ export function stripThinkingTags(text: string): string {
 }
 
 /**
+ * Apply array-at-root recovery if parsed value is an array and schema expects an object with array field.
+ * Detects when LLM returns a naked array instead of {reasoning: null, items: [...]} structure.
+ */
+function applyArrayAtRootRecovery<T>(
+  parsed: unknown,
+  schema: z.ZodType<T>,
+): unknown {
+  // Only apply if parsed is an array and schema is a ZodObject with shape
+  if (!Array.isArray(parsed)) return parsed;
+
+  // Check if schema is a ZodObject with a shape property
+  const zodObj = schema as unknown as { _def?: { shape?: Record<string, unknown> } };
+  if (!zodObj._def?.shape) return parsed;
+
+  const shape = zodObj._def.shape;
+  const arrayFields = Object.entries(shape).filter(
+    ([_, fieldSchema]) => {
+      // ZodArray has 'type' property (not 'typeName') set to 'array'
+      const fieldDef = (fieldSchema as unknown as { _def?: { type?: string } })._def;
+      return fieldDef?.type === 'array';
+    },
+  );
+
+  // Only recover if there's exactly one array field in the schema
+  if (arrayFields.length === 1) {
+    const [fieldName] = arrayFields[0];
+    return { reasoning: null, [fieldName]: parsed };
+  }
+
+  return parsed;
+}
+
+/**
  * Safely parse JSON with progressive fallback waterfall.
  * Returns Zod-style result object for maximum reusability.
  *
@@ -303,7 +336,8 @@ export function safeParseJSON<T>(
   try {
     const parsed = JSON.parse(text);
     if (schema) {
-      const data = schema.parse(parsed) as T;
+      const recovered = applyArrayAtRootRecovery(parsed, schema);
+      const data = schema.parse(recovered) as T;
       return { success: true, data };
     }
     return { success: true, data: parsed as T };
@@ -326,7 +360,8 @@ export function safeParseJSON<T>(
       const repaired = jsonrepair(selectedBlock.text);
       const parsed = JSON.parse(repaired);
       if (schema) {
-        const data = schema.parse(parsed) as T;
+        const recovered = applyArrayAtRootRecovery(parsed, schema);
+        const data = schema.parse(recovered) as T;
         return { success: true, data };
       }
       return { success: true, data: parsed as T };
@@ -336,7 +371,8 @@ export function safeParseJSON<T>(
     const repaired = jsonrepair(text);
     const parsed = JSON.parse(repaired);
     if (schema) {
-      const data = schema.parse(parsed) as T;
+      const recovered = applyArrayAtRootRecovery(parsed, schema);
+      const data = schema.parse(recovered) as T;
       return { success: true, data };
     }
     return { success: true, data: parsed as T };
@@ -362,7 +398,8 @@ export function safeParseJSON<T>(
     const repaired = jsonrepair(selectedBlock.text);
     const parsed = JSON.parse(repaired);
     if (schema) {
-      const data = schema.parse(parsed) as T;
+      const recovered = applyArrayAtRootRecovery(parsed, schema);
+      const data = schema.parse(recovered) as T;
       return { success: true, data };
     }
     return { success: true, data: parsed as T };
@@ -389,7 +426,8 @@ export function safeParseJSON<T>(
     const repaired = jsonrepair(scrubbed);
     const parsed = JSON.parse(repaired);
     if (schema) {
-      const data = schema.parse(parsed) as T;
+      const recovered = applyArrayAtRootRecovery(parsed, schema);
+      const data = schema.parse(recovered) as T;
       return { success: true, data };
     }
     return { success: true, data: parsed as T };
