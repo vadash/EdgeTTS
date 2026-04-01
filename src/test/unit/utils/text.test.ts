@@ -127,7 +127,7 @@ describe("safeParseJSON with real schemas", () => {
     const json = '[{"canonicalName": "John", "variations": ["Johnny"], "gender": "male"}]';
     const result = safeParseJSON(json, { schema: ExtractSchema });
     expect(result.success).toBe(true);
-    if (result.success) {
+    if (result.success && result.data) {
       expect(result.data.reasoning).toBeNull();
       expect(result.data.characters).toHaveLength(1);
       expect(result.data.characters[0].canonicalName).toBe("John");
@@ -138,7 +138,7 @@ describe("safeParseJSON with real schemas", () => {
     const json = '[[0, 1], [2, 3]]';
     const result = safeParseJSON(json, { schema: MergeSchema });
     expect(result.success).toBe(true);
-    if (result.success) {
+    if (result.success && result.data) {
       expect(result.data.reasoning).toBeNull();
       expect(result.data.merges).toHaveLength(2);
       expect(result.data.merges[0]).toEqual([0, 1]);
@@ -149,7 +149,7 @@ describe("safeParseJSON with real schemas", () => {
     const json = '{"0": "Narrator", "1": "Alice", "2": "Bob"}';
     const result = safeParseJSON(json, { schema: AssignSchema });
     expect(result.success).toBe(true);
-    if (result.success) {
+    if (result.success && result.data) {
       expect(result.data.reasoning).toBeNull();
       expect(result.data.assignments).toEqual({
         "0": "Narrator",
@@ -164,7 +164,7 @@ describe("safeParseJSON with real schemas", () => {
     const json = '{"reasonin": "some thought", "characters": [{"canonicalName": "Test", "variations": [], "gender": "unknown"}]}';
     const result = safeParseJSON(json, { schema: ExtractSchema });
     expect(result.success).toBe(true);
-    if (result.success) {
+    if (result.success && result.data) {
       expect(result.data.reasoning).toBeNull(); // defaulted
       expect(result.data.characters).toHaveLength(1);
     }

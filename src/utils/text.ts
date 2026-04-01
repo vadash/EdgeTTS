@@ -293,7 +293,6 @@ function applyFlattenedAssignmentsRecovery<T>(
   const zodObj = schema as unknown as { _def?: { shape?: Record<string, unknown> } };
   if (!zodObj._def?.shape) return parsed;
 
-  const shape = zodObj._def.shape;
   const recognizedKeys = ['reasoning', 'assignments', 'characters', 'merges'];
   const hasRecognizedKey = recognizedKeys.some(key => key in (parsed as object));
 
