@@ -95,7 +95,7 @@ describe('generate-index.js', () => {
     expect(html).toContain('setTimeout');
     expect(html).toContain('clearTimeout');
     expect(html).toContain('./sha/ccc3333333333333333333333333333333333333/index.html');
-    expect(html).toContain('mousemove');
+    expect(html).toContain('keydown');
   });
 
   it('includes build timestamp for current SHA', () => {
