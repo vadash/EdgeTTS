@@ -727,30 +727,28 @@ export async function runConversion(
       voiceMap = resumedVoiceMap!;
       const assignments = resumedAssignments!;
 
+      // voiceMap is already the reviewed map from pipeline_state.json
       llm.setCharacters(characters);
       llm.setVoiceMap(voiceMap);
       llm.setSpeakerAssignments(assignments);
 
-      llm.setPendingReview(true);
-      await llm.awaitReview();
-      const reviewedVoiceMap = llm.characterVoiceMap.value;
-      const existingProfile = llm.loadedProfile.value;
       const remappedAssignments = assignments.map((a) => ({
         ...a,
         voiceId:
           a.speaker === 'narrator'
             ? input.narratorVoice
-            : (reviewedVoiceMap.get(a.speaker) ?? input.narratorVoice),
+            : (voiceMap!.get(a.speaker) ?? input.narratorVoice),
       }));
 
+      // Save voice profile (idempotent — safe to re-save on resume)
       await saveVoiceProfile(
         directoryHandle,
         fileNames,
         characters,
-        reviewedVoiceMap,
+        voiceMap!,
         remappedAssignments,
         input.narratorVoice,
-        existingProfile,
+        null,
         logger,
       );
 
