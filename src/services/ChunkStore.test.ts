@@ -19,14 +19,14 @@ class MockFileSystem {
         return {
           createWritable: async (opts?: { keepExistingData?: boolean }) => {
             let position = 0;
-            const existingData = opts?.keepExistingData ? file.data : new Uint8Array(0);
             return {
               write: async (data: Uint8Array | string) => {
                 const bytes = typeof data === 'string'
                   ? new TextEncoder().encode(data)
                   : data;
-                const before = existingData.slice(0, position);
-                const after = existingData.slice(position + bytes.length);
+                const currentData = file.data;
+                const before = currentData.slice(0, position);
+                const after = currentData.slice(position + bytes.length);
                 file.data = new Uint8Array([...before, ...bytes, ...after]);
                 position += bytes.length;
               },
@@ -70,5 +70,33 @@ describe('ChunkStore', () => {
 
     const result = await store.readChunk(0);
     expect(result).toEqual(testData);
+  });
+
+  it('should handle concurrent writes without data loss', async () => {
+    await store.init(mockDirHandle);
+
+    const numWorkers = 15;
+    const chunksPerWorker = 10;
+    const promises: Promise<void>[] = [];
+
+    for (let worker = 0; worker < numWorkers; worker++) {
+      for (let i = 0; i < chunksPerWorker; i++) {
+        const index = worker * chunksPerWorker + i;
+        const data = new Uint8Array([index, index + 1, index + 2]);
+        promises.push(store.writeChunk(index, data));
+      }
+    }
+
+    await Promise.all(promises);
+    await store.prepareForRead();
+
+    // Verify all chunks written correctly
+    for (let worker = 0; worker < numWorkers; worker++) {
+      for (let i = 0; i < chunksPerWorker; i++) {
+        const index = worker * chunksPerWorker + i;
+        const result = await store.readChunk(index);
+        expect(result).toEqual(new Uint8Array([index, index + 1, index + 2]));
+      }
+    }
   });
 });
