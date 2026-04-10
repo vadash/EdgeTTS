@@ -63,7 +63,10 @@ class ChunkStore {
 
 **Internal state:**
 - `Map<number, {offset: number, length: number}>` — in-memory index built from the JSONL file on init.
-- `FileSystemFileHandle` + `FileSystemWritableFileStream` for each file (data and index).
+- `currentOffset: number` — next write position in `chunks_data.bin`.
+- `currentIndexOffset: number` — next write position in `chunks_index.jsonl` (tracked because `seek()` requires an explicit byte position; unlike the data file, the index file's byte length is not derivable from the entry map).
+- `textEncoder: TextEncoder` — reused to compute byte lengths of JSONL lines.
+- `FileSystemFileHandle` for each file (data and index).
 - An async drain queue for serializing concurrent writes from multiple TTS workers.
 
 ### Writer Queue
@@ -93,6 +96,12 @@ private async drain(): Promise<void> {
     const dataStream = await this.dataHandle.createWritable({ keepExistingData: true })
     const indexStream = await this.indexHandle.createWritable({ keepExistingData: true })
 
+    // CRITICAL: createWritable({ keepExistingData: true }) preserves existing
+    // file data but positions the write cursor at byte 0. Without explicit seek(),
+    // each batch would overwrite the beginning of the file.
+    await dataStream.seek(this.currentOffset)
+    await indexStream.seek(this.currentIndexOffset)
+
     for (const item of batch) {
       const offset = this.currentOffset
       await dataStream.write(item.data)
@@ -100,6 +109,7 @@ private async drain(): Promise<void> {
       await indexStream.write(indexLine)
       this.index.set(item.index, { offset, length: item.data.byteLength })
       this.currentOffset += item.data.byteLength
+      this.currentIndexOffset += this.textEncoder.encode(indexLine).byteLength
     }
 
     // Close both streams — this commits the swap file to disk.
@@ -158,32 +168,36 @@ async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
   this.indexHandle = await directoryHandle.getFileHandle('chunks_index.jsonl', { create: true })
 
   let maxValidOffset = 0
+  let validIndexBytes = 0
 
   // Parse existing index
   try {
     const indexFile = await this.indexHandle.getFile()
     const text = await indexFile.text()
     const lines = text.split('\n').filter(line => line.trim().length > 0)
+    let bytePosition = 0
     for (const line of lines) {
+      const lineBytes = this.textEncoder.encode(line + '\n').byteLength
       try {
         const entry = JSON.parse(line)
         if (typeof entry.i === 'number' && typeof entry.o === 'number' && typeof entry.l === 'number') {
           this.index.set(entry.i, { offset: entry.o, length: entry.l })
           maxValidOffset = Math.max(maxValidOffset, entry.o + entry.l)
+          validIndexBytes = bytePosition + lineBytes
         }
       } catch {
         // Torn/truncated last line — discard it and stop
         break
       }
+      bytePosition += lineBytes
     }
   } catch {
     // File doesn't exist yet — fresh start
   }
 
-  // Position append offset after the highest valid byte
-  // (NOT just the last line — chunks are written out of order, so
-  // the last JSONL line does not necessarily have the highest offset)
+  // Position append offsets after the highest valid byte in each file
   this.currentOffset = maxValidOffset
+  this.currentIndexOffset = validIndexBytes
 }
 ```
 
