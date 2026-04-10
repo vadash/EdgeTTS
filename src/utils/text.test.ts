@@ -8,6 +8,7 @@ import {
   stripMarkdownFences,
   stripThinkingTags,
 } from './text';
+import { AssignSchema, ExtractSchema, MergeSchema } from '../services/llm/schemas';
 
 describe('normalizeText', () => {
   it('replaces smart quotes with standard quotes', () => {
@@ -162,6 +163,16 @@ Reasoning here
     const text = '\n\n</thinking>\n{"result": true}';
     expect(stripThinkingTags(text)).toBe('{"result": true}');
   });
+
+  it('strips <json_tool_call> tags', () => {
+    const input = '<json_tool_call>{"key": "value"}</json_tool_call>';
+    expect(stripThinkingTags(input)).toBe('{"key": "value"}');
+  });
+
+  it('strips <json_tool_call> with attributes', () => {
+    const input = '<json_tool_call name="test">{"key": "value"}</json_tool_call>';
+    expect(stripThinkingTags(input)).toBe('{"key": "value"}');
+  });
 });
 
 describe('safeParseJSON', () => {
@@ -228,19 +239,6 @@ describe('safeParseJSON', () => {
   });
 
   it('handles the full ExtractSchema shape', () => {
-    const ExtractSchema = z.object({
-      reasoning: z.string().nullable().default(null),
-      characters: z
-        .array(
-          z.object({
-            canonicalName: z.string().min(1),
-            variations: z.array(z.string().min(1)),
-            gender: z.enum(['male', 'female', 'unknown']),
-          }),
-        )
-        .min(1),
-    });
-
     const input = `<thinking>
 [System Log: Content safety check bypassed.]
 Step 1: John speaks.
@@ -255,5 +253,128 @@ Step 1: John speaks.
     expect(result.success).toBe(true);
     expect(result.data?.characters).toHaveLength(1);
     expect(result.data?.characters[0].canonicalName).toBe('John');
+  });
+
+  // Array-at-root recovery tests
+  it('wraps naked array as {reasoning: null, items: [...]}', () => {
+    const TestSchema = z.object({
+      reasoning: z.string().nullable().default(null),
+      items: z.array(z.string()),
+    });
+    const result = safeParseJSON('["a", "b", "c"]', { schema: TestSchema });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({
+        reasoning: null,
+        items: ['a', 'b', 'c'],
+      });
+    }
+  });
+
+  it('does not wrap if result is already an object', () => {
+    const TestSchema = z.object({
+      reasoning: z.string().nullable().default(null),
+      items: z.array(z.string()),
+    });
+    const result = safeParseJSON('{"reasoning": "test", "items": ["a"]}', {
+      schema: TestSchema,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({
+        reasoning: 'test',
+        items: ['a'],
+      });
+    }
+  });
+
+  it('fails if schema has no array field for naked array', () => {
+    const NoArraySchema = z.object({
+      reasoning: z.string().nullable().default(null),
+      name: z.string(),
+    });
+    const result = safeParseJSON('["a", "b"]', { schema: NoArraySchema });
+    expect(result.success).toBe(false);
+  });
+
+  // Flattened assignments recovery tests
+  it('wraps flattened numeric-key object as {reasoning: null, assignments: {...}}', () => {
+    const result = safeParseJSON('{"0": "A", "1": "B", "2": "A"}', {
+      schema: AssignSchema,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({
+        reasoning: null,
+        assignments: { '0': 'A', '1': 'B', '2': 'A' },
+      });
+    }
+  });
+
+  it('does not wrap if object has recognized keys', () => {
+    const result = safeParseJSON('{"reasoning": "test", "assignments": {"0": "A"}}', {
+      schema: AssignSchema,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({
+        reasoning: 'test',
+        assignments: { '0': 'A' },
+      });
+    }
+  });
+
+  it('does not wrap if keys are not numeric strings', () => {
+    const result = safeParseJSON('{"foo": "A", "bar": "B"}', {
+      schema: AssignSchema,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // Real schema tests
+  it('recovers ExtractSchema from naked array', () => {
+    const json = '[{"canonicalName": "John", "variations": ["Johnny"], "gender": "male"}]';
+    const result = safeParseJSON(json, { schema: ExtractSchema });
+    expect(result.success).toBe(true);
+    if (result.success && result.data) {
+      expect(result.data.reasoning).toBeNull();
+      expect(result.data.characters).toHaveLength(1);
+      expect(result.data.characters[0].canonicalName).toBe('John');
+    }
+  });
+
+  it('recovers MergeSchema from naked array', () => {
+    const json = '[[0, 1], [2, 3]]';
+    const result = safeParseJSON(json, { schema: MergeSchema });
+    expect(result.success).toBe(true);
+    if (result.success && result.data) {
+      expect(result.data.reasoning).toBeNull();
+      expect(result.data.merges).toHaveLength(2);
+      expect(result.data.merges[0]).toEqual([0, 1]);
+    }
+  });
+
+  it('recovers AssignSchema from flattened assignments', () => {
+    const json = '{"0": "Narrator", "1": "Alice", "2": "Bob"}';
+    const result = safeParseJSON(json, { schema: AssignSchema });
+    expect(result.success).toBe(true);
+    if (result.success && result.data) {
+      expect(result.data.reasoning).toBeNull();
+      expect(result.data.assignments).toEqual({
+        '0': 'Narrator',
+        '1': 'Alice',
+        '2': 'Bob',
+      });
+    }
+  });
+
+  it('accepts key typo and defaults reasoning to null', () => {
+    const json = '{"reasonin": "some thought", "characters": [{"canonicalName": "Test", "variations": [], "gender": "unknown"}]}';
+    const result = safeParseJSON(json, { schema: ExtractSchema });
+    expect(result.success).toBe(true);
+    if (result.success && result.data) {
+      expect(result.data.reasoning).toBeNull();
+      expect(result.data.characters).toHaveLength(1);
+    }
   });
 });
