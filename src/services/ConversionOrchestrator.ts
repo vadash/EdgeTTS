@@ -11,6 +11,7 @@ import type {
   VoiceProfileFile,
 } from '@/state/types';
 import type { Stores } from '@/stores';
+import { updateProgress } from '@/stores/ConversionStore';
 import { withPermissionRetry } from '@/utils/retry';
 import type { AudioMerger } from './AudioMerger';
 import type { FFmpegService } from './FFmpegService';
@@ -796,7 +797,7 @@ async function runTTSStage(
   signal: AbortSignal,
   report: (stage: string, current: number, total: number, message: string) => void,
   services: ConversionOrchestratorServices,
-  _stores: Stores,
+  stores: Stores,
 ): Promise<void> {
   const { logger, workerPoolFactory, audioMergerFactory, ffmpegService } = services;
 
@@ -819,6 +820,7 @@ async function runTTSStage(
   }
 
   report('tts-conversion', 0, chunks.length, `Converting ${chunks.length} chunks to audio...`);
+  updateProgress(0, chunks.length, 0);
 
   const ttsConfig: TTSConfig = {
     voice: `Microsoft Server Speech Text to Speech Voice (${input.narratorVoice})`,
@@ -859,6 +861,32 @@ async function runTTSStage(
         chunks.length,
         `Resuming: found ${audioMap.size}/${chunks.length} cached chunks`,
       );
+      updateProgress(audioMap.size, chunks.length, 0);
+    }
+
+    // Load previously failed chunks
+    try {
+      const failedHandle = await tempDirHandle.getFileHandle('failed_chunks.json');
+      const failedFile = await failedHandle.getFile();
+      const failedText = await failedFile.text();
+      const failedIndices: number[] = JSON.parse(failedText);
+      let skippedCount = 0;
+      for (const idx of failedIndices) {
+        if (!audioMap.has(idx)) {
+          audioMap.set(idx, '');
+          skippedCount++;
+        }
+      }
+      if (skippedCount > 0) {
+        report(
+          'tts-conversion',
+          audioMap.size,
+          chunks.length,
+          `Skipping ${skippedCount} previously failed chunk(s)`,
+        );
+      }
+    } catch {
+      // No failed_chunks.json or corrupted — treat as empty set
     }
   }
 
@@ -898,6 +926,7 @@ async function runTTSStage(
               chunks.length,
               `Written ${completed}/${chunks.length} files`,
             );
+            updateProgress(completed, chunks.length, failedTasks.size);
           }
         },
         onTaskError: (partIndex, error) => {
@@ -908,6 +937,7 @@ async function runTTSStage(
             chunks.length,
             `Part ${partIndex + 1} failed: ${getErrorMessage(error)}`,
           );
+          updateProgress(audioMap.size, chunks.length, failedTasks.size);
         },
         onAllComplete: () => {
           resolve();
@@ -938,6 +968,40 @@ async function runTTSStage(
 
       signal.removeEventListener('abort', abortHandler);
     });
+
+    // Persist failed chunks
+    if (failedTasks.size > 0) {
+      try {
+        const workDir = tempDirHandle ?? await directoryHandle.getDirectoryHandle('_temp_work');
+        // Load existing failed set and union with current failures
+        let existingFailed: Set<number> = new Set();
+        try {
+          const existingHandle = await workDir.getFileHandle('failed_chunks.json');
+          const existingFile = await existingHandle.getFile();
+          const existingText = await existingFile.text();
+          const existingIndices: number[] = JSON.parse(existingText);
+          existingFailed = new Set(existingIndices);
+        } catch {
+          // No existing file — start fresh
+        }
+        for (const idx of failedTasks) {
+          existingFailed.add(idx);
+        }
+        const failedJson = JSON.stringify([...existingFailed].sort((a, b) => a - b));
+        const failedFileHandle = await workDir.getFileHandle('failed_chunks.json', { create: true });
+        const writable = await failedFileHandle.createWritable();
+        await writable.write(failedJson);
+        await writable.close();
+        report(
+          'tts-conversion',
+          audioMap.size,
+          chunks.length,
+          `Persisted ${existingFailed.size} total failed chunk(s) to failed_chunks.json`,
+        );
+      } catch (err) {
+        logger.warn(`Failed to persist failed_chunks.json: ${(err as Error).message}`);
+      }
+    }
 
     tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work');
   }
