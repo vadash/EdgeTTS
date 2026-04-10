@@ -33,7 +33,7 @@ describe('ConversionStore', () => {
     });
 
     it('starts with zero progress', () => {
-      expect(conversion.value.progress).toEqual({ current: 0, total: 0 });
+      expect(conversion.value.progress).toEqual({ current: 0, total: 0, failed: 0 });
     });
 
     it('starts with no error', () => {
@@ -92,19 +92,41 @@ describe('ConversionStore', () => {
   describe('progress management', () => {
     it('updates progress', () => {
       updateProgress(5, 10);
-      expect(conversion.value.progress).toEqual({ current: 5, total: 10 });
+      expect(conversion.value.progress).toEqual({ current: 5, total: 10, failed: 0 });
+    });
+
+    it('updates progress with failed count', () => {
+      updateProgress(5, 10, 2);
+      expect(conversion.value.progress).toEqual({ current: 5, total: 10, failed: 2 });
+    });
+
+    it('defaults failed to 0 when not provided', () => {
+      updateProgress(5, 10);
+      expect(conversion.value.progress).toEqual({ current: 5, total: 10, failed: 0 });
     });
 
     it('increments progress', () => {
       updateProgress(5, 10);
       incrementProgress();
-      expect(conversion.value.progress).toEqual({ current: 6, total: 10 });
+      expect(conversion.value.progress).toEqual({ current: 6, total: 10, failed: 0 });
+    });
+
+    it('increments progress preserving failed count', () => {
+      updateProgress(5, 10, 2);
+      incrementProgress();
+      expect(conversion.value.progress).toEqual({ current: 6, total: 10, failed: 2 });
     });
 
     it('sets total count', () => {
       updateProgress(3, 5);
       setTotal(20);
-      expect(conversion.value.progress).toEqual({ current: 3, total: 20 });
+      expect(conversion.value.progress).toEqual({ current: 3, total: 20, failed: 0 });
+    });
+
+    it('sets total preserving failed count', () => {
+      updateProgress(3, 5, 2);
+      setTotal(20);
+      expect(conversion.value.progress).toEqual({ current: 3, total: 20, failed: 2 });
     });
 
     it('calculates progress percentage', () => {
@@ -134,9 +156,9 @@ describe('ConversionStore', () => {
     });
 
     it('resets progress to zero', () => {
-      updateProgress(5, 10);
+      updateProgress(5, 10, 2);
       startConversion();
-      expect(conversion.value.progress).toEqual({ current: 0, total: 0 });
+      expect(conversion.value.progress).toEqual({ current: 0, total: 0, failed: 0 });
     });
 
     it('clears error', () => {
@@ -192,14 +214,14 @@ describe('ConversionStore', () => {
   describe('reset', () => {
     it('resets all state to initial values', () => {
       setStatus('converting');
-      updateProgress(5, 10);
+      updateProgress(5, 10, 2);
       setError('Error');
       startConversion();
 
       resetConversionStore();
 
       expect(conversion.value.status).toBe('idle');
-      expect(conversion.value.progress).toEqual({ current: 0, total: 0 });
+      expect(conversion.value.progress).toEqual({ current: 0, total: 0, failed: 0 });
       expect(conversion.value.startTime).toBeNull();
       expect(conversion.value.phaseStartTime).toBeNull();
       expect(conversion.value.error).toBeNull();
@@ -325,6 +347,25 @@ describe('ConversionStore', () => {
       // ETA should be based on assign phase only (10s for 10 items = 1s/item)
       // 90 remaining * 1s = 90s = 00:01:30
       expect(estimatedTimeRemaining.value).toBe('00:01:30');
+
+      vi.restoreAllMocks();
+    });
+
+    it('excludes failed chunks from remaining work estimate', () => {
+      const startTime = 1000000;
+      vi.spyOn(Date, 'now').mockReturnValue(startTime);
+      startConversion();
+      setStatus('converting');
+      updateProgress(0, 100, 0);
+
+      // Advance time by 10 seconds, complete 10 items with 5 failed
+      vi.spyOn(Date, 'now').mockReturnValue(startTime + 10000);
+      updateProgress(10, 100, 5);
+
+      // 10 successful items in 10 seconds = 1s/item
+      // Remaining successful items: 100 - 10 - 5 = 85
+      // ETA: 85 * 1s = 85s = 00:01:25
+      expect(estimatedTimeRemaining.value).toBe('00:01:25');
 
       vi.restoreAllMocks();
     });

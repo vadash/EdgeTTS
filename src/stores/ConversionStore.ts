@@ -20,6 +20,7 @@ export type ConversionStatus =
 export interface Progress {
   current: number;
   total: number;
+  failed: number;
 }
 
 export interface ConversionError {
@@ -51,7 +52,7 @@ interface ConversionState {
 
 const defaultState: ConversionState = {
   status: 'idle',
-  progress: { current: 0, total: 0 },
+  progress: { current: 0, total: 0, failed: 0 },
   startTime: null,
   phaseStartTime: null,
   error: null,
@@ -110,7 +111,7 @@ export const elapsedTime = computed(() => {
 });
 
 export const estimatedTimeRemaining = computed(() => {
-  const { current, total } = conversion.value.progress;
+  const { current, total, failed } = conversion.value.progress;
   const status = conversion.value.status;
 
   if (
@@ -126,8 +127,10 @@ export const estimatedTimeRemaining = computed(() => {
   if (!start || total === 0 || current === 0) return null;
 
   const elapsed = Date.now() - start;
+  const successfulCurrent = current - failed;
+  if (successfulCurrent <= 0) return null;
   const rate = elapsed / current;
-  const remainingItems = total - current;
+  const remainingItems = total - current - failed;
   return formatDuration(remainingItems * rate);
 });
 
@@ -180,22 +183,23 @@ export function setStatus(status: ConversionStatus): void {
     status === 'merging'
   ) {
     newState.phaseStartTime = Date.now();
-    newState.progress = { current: 0, total: conversion.value.progress.total };
+    newState.progress = { current: 0, total: conversion.value.progress.total, failed: 0 };
   }
   conversion.value = newState;
 }
 
-export function updateProgress(current: number, total: number): void {
-  patchState({ progress: { current, total } });
+export function updateProgress(current: number, total: number, failed: number = 0): void {
+  patchState({ progress: { current, total, failed } });
 }
 
 export function incrementProgress(): void {
-  const { current, total } = conversion.value.progress;
-  patchState({ progress: { current: current + 1, total } });
+  const { current, total, failed } = conversion.value.progress;
+  patchState({ progress: { current: current + 1, total, failed } });
 }
 
 export function setTotal(total: number): void {
-  patchState({ progress: { current: conversion.value.progress.current, total } });
+  const { current, failed } = conversion.value.progress;
+  patchState({ progress: { current, total, failed } });
 }
 
 export function setError(message: string, code?: string): void {
