@@ -10,11 +10,16 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
   const splitter = new TextBlockSplitter();
 
   describe('Priority 1: Explicit Scene Dividers', () => {
-    it('drops *** divider at threshold and starts next block clean', () => {
+    it.each([
+      ['***', 'drops *** divider at threshold and starts next block clean'],
+      ['---', 'drops --- divider at threshold'],
+      ['* * *', 'drops * * * divider at threshold'],
+      ['===', 'drops === divider at threshold'],
+      ['___', 'drops ___ divider at threshold'],
+    ])('%s', (divider, _description) => {
       const maxTokens = 100;
       // 86 tokens = 344 chars > 85 threshold (100 * 0.85 = 85)
       const filler = tokenFill(86);
-      const divider = '***';
       const newScene = 'New scene begins here.';
 
       const blocks = splitter.splitIntoBlocks([filler, divider, newScene], maxTokens);
@@ -23,50 +28,6 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       expect(blocks[0].sentences).toEqual([filler]);
       // divider dropped, newScene starts block 1
       expect(blocks[1].sentences).toEqual([newScene]);
-    });
-
-    it('drops --- divider at threshold', () => {
-      const maxTokens = 100;
-      const filler = tokenFill(86);
-
-      const blocks = splitter.splitIntoBlocks([filler, '---', 'After divider.'], maxTokens);
-
-      expect(blocks).toHaveLength(2);
-      expect(blocks[0].sentences).toEqual([filler]);
-      expect(blocks[1].sentences).toEqual(['After divider.']);
-    });
-
-    it('drops * * * divider at threshold', () => {
-      const maxTokens = 100;
-      const filler = tokenFill(86);
-
-      const blocks = splitter.splitIntoBlocks([filler, '* * *', 'After divider.'], maxTokens);
-
-      expect(blocks).toHaveLength(2);
-      expect(blocks[0].sentences).toEqual([filler]);
-      expect(blocks[1].sentences).toEqual(['After divider.']);
-    });
-
-    it('drops === divider at threshold', () => {
-      const maxTokens = 100;
-      const filler = tokenFill(86);
-
-      const blocks = splitter.splitIntoBlocks([filler, '===', 'After divider.'], maxTokens);
-
-      expect(blocks).toHaveLength(2);
-      expect(blocks[0].sentences).toEqual([filler]);
-      expect(blocks[1].sentences).toEqual(['After divider.']);
-    });
-
-    it('drops ___ divider at threshold', () => {
-      const maxTokens = 100;
-      const filler = tokenFill(86);
-
-      const blocks = splitter.splitIntoBlocks([filler, '___', 'After divider.'], maxTokens);
-
-      expect(blocks).toHaveLength(2);
-      expect(blocks[0].sentences).toEqual([filler]);
-      expect(blocks[1].sentences).toEqual(['After divider.']);
     });
   });
 
@@ -94,24 +55,18 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       expect(blocks[1].sentences[0]).toBe('Глава 3');
     });
 
-    it('recognizes Prologue as chapter header', () => {
+    it.each([
+      ['Prologue', 'The story begins.'],
+      ['Epilogue', 'The end.'],
+      ['Book 2', 'The second book.'],
+    ])('recognizes %s as chapter header', (header, content) => {
       const maxTokens = 100;
       const filler = tokenFill(86);
 
-      const blocks = splitter.splitIntoBlocks([filler, 'Prologue', 'The story begins.'], maxTokens);
+      const blocks = splitter.splitIntoBlocks([filler, header, content], maxTokens);
 
       expect(blocks).toHaveLength(2);
-      expect(blocks[1].sentences[0]).toBe('Prologue');
-    });
-
-    it('recognizes Epilogue as chapter header', () => {
-      const maxTokens = 100;
-      const filler = tokenFill(86);
-
-      const blocks = splitter.splitIntoBlocks([filler, 'Epilogue', 'The end.'], maxTokens);
-
-      expect(blocks).toHaveLength(2);
-      expect(blocks[1].sentences[0]).toBe('Epilogue');
+      expect(blocks[1].sentences[0]).toBe(header);
     });
 
     it('recognizes Russian Пролог and Эпилог', () => {
@@ -123,16 +78,6 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
 
       const blocks2 = splitter.splitIntoBlocks([filler, 'Эпилог', 'Конец.'], maxTokens);
       expect(blocks2[1].sentences[0]).toBe('Эпилог');
-    });
-
-    it('recognizes Book N as chapter header', () => {
-      const maxTokens = 100;
-      const filler = tokenFill(86);
-
-      const blocks = splitter.splitIntoBlocks([filler, 'Book 2', 'The second book.'], maxTokens);
-
-      expect(blocks).toHaveLength(2);
-      expect(blocks[1].sentences[0]).toBe('Book 2');
     });
 
     it('does NOT treat long text starting with Chapter as header', () => {
