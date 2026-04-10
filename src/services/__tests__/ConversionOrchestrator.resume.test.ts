@@ -41,7 +41,7 @@ describe('checkResumeState', () => {
     expect(result!.cachedChunks).toBe(0);
   });
 
-  it('counts cached chunk files', async () => {
+  it('counts cached chunk files using new format', async () => {
     const dirHandle = createMockDirectoryHandle();
     const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
 
@@ -57,7 +57,41 @@ describe('checkResumeState', () => {
     );
     await stateWritable.close();
 
-    // Write chunk files
+    // Write chunks using new ChunkStore format
+    const dataFile = await tempDir.getFileHandle('chunks_data.bin', { create: true });
+    const dataWritable = await dataFile.createWritable();
+    await dataWritable.write(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9]));
+    await dataWritable.close();
+
+    const indexFile = await tempDir.getFileHandle('chunks_index.jsonl', { create: true });
+    const indexWritable = await indexFile.createWritable();
+    await indexWritable.write('{"i":0,"o":0,"l":3}\n');
+    await indexWritable.write('{"i":1,"o":3,"l":3}\n');
+    await indexWritable.write('{"i":2,"o":6,"l":3}\n');
+    await indexWritable.close();
+
+    const result = await checkResumeState(dirHandle);
+    expect(result).not.toBeNull();
+    expect(result!.cachedChunks).toBe(3);
+  });
+
+  it('wipes legacy format chunk files', async () => {
+    const dirHandle = createMockDirectoryHandle();
+    const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
+
+    // Write pipeline state
+    const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
+    const stateWritable = await stateFile.createWritable();
+    await stateWritable.write(
+      JSON.stringify({
+        assignments: [],
+        characterVoiceMap: {},
+        fileNames: [],
+      }),
+    );
+    await stateWritable.close();
+
+    // Write legacy chunk files (old format)
     for (const name of ['chunk_0001.bin', 'chunk_0002.bin', 'chunk_0003.bin']) {
       const f = await tempDir.getFileHandle(name, { create: true });
       const w = await f.createWritable();
@@ -65,9 +99,23 @@ describe('checkResumeState', () => {
       await w.close();
     }
 
-    const result = await checkResumeState(dirHandle);
-    expect(result).not.toBeNull();
-    expect(result!.cachedChunks).toBe(3);
+    const logs: string[] = [];
+    const log = (msg: string) => logs.push(msg);
+
+    const result = await checkResumeState(dirHandle, log);
+    // Should return null because legacy format is detected and wiped
+    expect(result).toBeNull();
+    expect(logs.some(msg => msg.includes('legacy format detected'))).toBe(true);
+
+    // Verify _temp_work was removed
+    let tempWorkExists = false;
+    try {
+      await dirHandle.getDirectoryHandle('_temp_work');
+      tempWorkExists = true;
+    } catch {
+      tempWorkExists = false;
+    }
+    expect(tempWorkExists).toBe(false);
   });
 
   it('logs messages when log callback provided', async () => {

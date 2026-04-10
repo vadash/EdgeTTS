@@ -38,14 +38,34 @@ async function tryReadJSON<T>(dir: FileSystemDirectoryHandle, filename: string):
   }
 }
 
-async function countChunkFiles(dir: FileSystemDirectoryHandle): Promise<number> {
-  let count = 0;
+async function countNewFormatChunks(dir: FileSystemDirectoryHandle): Promise<number> {
+  try {
+    const indexHandle = await dir.getFileHandle('chunks_index.jsonl');
+    const indexFile = await indexHandle.getFile();
+    const text = await indexFile.text();
+    // Count non-empty lines
+    return text.split('\n').filter(line => line.trim().length > 0).length;
+  } catch {
+    return 0;
+  }
+}
+
+async function hasNewFormat(dir: FileSystemDirectoryHandle): Promise<boolean> {
+  try {
+    await dir.getFileHandle('chunks_index.jsonl');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function hasOldFormat(dir: FileSystemDirectoryHandle): Promise<boolean> {
   for await (const [name, handle] of dir.entries()) {
-    if (handle.kind === 'file' && name.endsWith('.bin') && name.startsWith('chunk_')) {
-      count++;
+    if (handle.kind === 'file' && name.startsWith('chunk_') && name.endsWith('.bin')) {
+      return true;
     }
   }
-  return count;
+  return false;
 }
 
 async function fileExists(dir: FileSystemDirectoryHandle, name: string): Promise<boolean> {
@@ -72,13 +92,33 @@ export async function checkResumeState(
     return null;
   }
 
+  // Legacy detection: old format present but no new format index
+  const hasNew = await hasNewFormat(tempDir);
+  const hasOld = await hasOldFormat(tempDir);
+
+  if (hasOld && !hasNew) {
+    log?.('Resume check: legacy format detected, wiping for fresh start');
+    // Wipe temp directory
+    try {
+      await dirHandle.removeEntry('_temp_work', { recursive: true });
+    } catch {
+      // Ignore cleanup errors
+    }
+    return null;
+  }
+
   const hasLLMState = await fileExists(tempDir, 'pipeline_state.json');
   if (!hasLLMState) {
     log?.('Resume check: _temp_work exists but no pipeline_state.json');
     return null;
   }
 
-  const cachedChunks = await countChunkFiles(tempDir);
+  const cachedChunks = hasNew ? await countNewFormatChunks(tempDir) : 0;
+
+  if (cachedChunks === 0 && !hasLLMState) {
+    log?.('Resume check: no resumable state found');
+    return null;
+  }
 
   log?.(
     `Resume check: resumable state found (${cachedChunks} cached chunks, LLM state: ${hasLLMState})`,
