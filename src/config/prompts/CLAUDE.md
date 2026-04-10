@@ -29,7 +29,7 @@ src/config/prompts/
 We use a 3-message topology:
 1. **System**: Preamble + Role + Examples (via `assembleSystemPrompt`)
 2. **User**: Content + Constraints (language rules + task rules + schema + execution trigger)
-3. **Assistant**: Prefill (biases model into correct track)
+3. **Assistant**: Prefill (biases model into correct track; currently defaults to `none`)
 
 ## Code Style
 
@@ -39,4 +39,6 @@ We use a 3-message topology:
 ## Gotchas
 
 - **Recency Bias Defeat**: Schema and rules are placed in the **user** prompt (end of context window) to defeat recency bias.
-- **QA Stage**: Reuses Assign's schema (`ASSIGN_SCHEMA_TEXT`). Builder injects draft assignments as `<draft_assignments>` XML block.
+- **Prompt Repetition**: When `REPEAT_PROMPT` is true, the User message is duplicated (`<QUERY><QUERY>`) for improved bidirectional attention during prefill.
+- **Overlap Context**: In the Assign and QA stages, the last 10 sentences from the previous block are passed as `overlapSentences` with negative indices (`[-10]`). These are read-only and must NOT be assigned.
+- **QA Stage**: Reuses Assign's schema (`ASSIGN_SCHEMA_TEXT`). Builder injects draft assignments as a `<draft_assignments>` block.

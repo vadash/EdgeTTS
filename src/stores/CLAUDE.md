@@ -6,13 +6,15 @@ Global application state mapped to UI components using `@preact/signals`. No Red
 
 - **Signal Stores**: `ConversionStore`, `LLMStore`, `SettingsStore`. These export isolated `signal()` instances and computed values directly.
 - **Class Stores**: `DataStore`, `LanguageStore`, `LogStore` (LoggerStore). These wrap signals in classes.
-- **StoreContext**: `StoreContext.tsx` provides hooks (e.g., `useSettings()`, `useConversion()`) that bundle signals and actions for components.
+- **StoreContext**: `StoreContext.tsx` provides hooks that bundle signals and actions for components. Use `useStores()`, `useSettings()`, `useConversion()`, `useLLM()`, `useLogs()`, `useData()`, and `useLanguage()`.
 
 ## Code Style
 
-- **Mutation**: Mutate state via exported functions (e.g., `setProcessingStatus`), do not mutate signal `.value` directly from UI components.
+- **Mutation**: Mutate state via exported setter functions (e.g., `setProcessingStatus()`), do not mutate signal `.value` directly from UI components.
+- **Derived State**: Use `computed()` signals heavily for derived data (e.g., `isProcessing`, `progressPercent`, `estimatedTimeRemaining`).
 
 ## Gotchas
 
-- **Persistence**: `SettingsStore` and `LLMStore` save to `localStorage` automatically via an `effect()` hook. LocalStorage keys are centralized in `src/config/storage.ts`.
-- **Security**: LLM API keys MUST be encrypted before saving. Use `encryptValue` / `decryptValue` from `SecureStorage.ts` (which utilizes non-extractable IndexedDB crypto keys).
+- **Persistence**: `SettingsStore`, `LanguageStore`, and `LLMStore` save to `localStorage` automatically (often via an `effect()` hook). LocalStorage keys are centralized in `src/config/storage.ts`.
+- **Security**: LLM API keys MUST be encrypted before saving. `LLMStore` uses `encryptValue` / `decryptValue` from `SecureStorage.ts` (which utilizes non-extractable IndexedDB crypto keys bound to the browser origin).
+- **Store Hydration**: Settings are hydrated asynchronously during startup in `src/index.tsx` via `initializeStores()`.
