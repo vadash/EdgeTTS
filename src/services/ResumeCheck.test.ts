@@ -17,7 +17,7 @@ class MockFileSystem {
         }
         const file = files.get(name)!;
         return {
-          createWritable: async (opts?: { keepExistingData?: boolean }) => {
+          createWritable: async (_opts?: { keepExistingData?: boolean }) => {
             let position = 0;
             return {
               write: async (data: Uint8Array | string) => {
@@ -47,11 +47,11 @@ class MockFileSystem {
         };
       },
       entries: async function* () {
-        for (const [name, file] of files.entries()) {
+        for (const [name, _file] of files.entries()) {
           yield [name, { kind: 'file' as const }];
         }
       },
-      removeEntry: async (name: string, opts?: { recursive?: boolean }) => {
+      removeEntry: async (name: string, _opts?: { recursive?: boolean }) => {
         files.delete(name);
       },
     };
@@ -86,7 +86,7 @@ describe('ResumeCheck', () => {
 
     // We need to mock getDirectoryHandle to return our mockDir
     const logMessages: string[] = [];
-    const originalGetDirectoryHandle = parentDir.getDirectoryHandle;
+    const _originalGetDirectoryHandle = parentDir.getDirectoryHandle;
     parentDir.getDirectoryHandle = async (name: string) => {
       if (name === '_temp_work') {
         return mockDir;

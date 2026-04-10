@@ -6,7 +6,7 @@ import PQueue from 'p-queue';
 import { isAppError } from '@/errors';
 import { AbortError, withRetry } from '@/utils/retry';
 import type { StatusUpdate, TTSConfig as VoiceConfig } from '../state/types';
-import { ChunkStore } from './ChunkStore';
+import type { ChunkStore } from './ChunkStore';
 import { LadderController } from './LadderController';
 import type { Logger } from './Logger';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';

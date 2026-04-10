@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusUpdate, TTSConfig as VoiceConfig } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
-import { ChunkStore } from './ChunkStore';
+import type { ChunkStore } from './ChunkStore';
 import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from './TTSWorkerPool';
 
 // Mock the ReusableEdgeTTSService
@@ -32,7 +32,7 @@ describe('TTSWorkerPool', () => {
   let mockConnect: ReturnType<typeof vi.fn>;
   let mockDisconnect: ReturnType<typeof vi.fn>;
   let mockIsReady: ReturnType<typeof vi.fn>;
-  let mockDirectoryHandle: FileSystemDirectoryHandle;
+  let _mockDirectoryHandle: FileSystemDirectoryHandle;
   let mockChunkStore: ChunkStore;
 
   beforeEach(() => {
@@ -40,7 +40,7 @@ describe('TTSWorkerPool', () => {
     vi.clearAllMocks();
 
     // Create mock directory handle
-    mockDirectoryHandle = createMockDirectoryHandle();
+    _mockDirectoryHandle = createMockDirectoryHandle();
 
     // Create mock ChunkStore
     mockChunkStore = {

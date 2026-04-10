@@ -7,7 +7,7 @@ import { sanitizeFilename } from '@/utils/file';
 import { withPermissionRetry } from '@/utils/retry';
 import type { FFmpegService } from './FFmpegService';
 import { parseMP3Duration } from './MP3Parser';
-import { ChunkStore } from './ChunkStore';
+import type { ChunkStore } from './ChunkStore';
 
 export type MergeProgressCallback = (current: number, total: number, message: string) => void;
 

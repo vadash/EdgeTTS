@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ChunkStore } from '../ChunkStore';
+import type { ChunkStore } from '../ChunkStore';
 import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from '../TTSWorkerPool';
 
 vi.mock('../ReusableEdgeTTSService', () => ({

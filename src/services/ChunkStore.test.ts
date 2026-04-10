@@ -17,7 +17,7 @@ class MockFileSystem {
         }
         const file = files.get(name)!;
         return {
-          createWritable: async (opts?: { keepExistingData?: boolean }) => {
+          createWritable: async (_opts?: { keepExistingData?: boolean }) => {
             let position = 0;
             return {
               write: async (data: Uint8Array | string) => {

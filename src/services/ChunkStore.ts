@@ -1,5 +1,4 @@
 export class ChunkStore {
-  private directoryHandle: FileSystemDirectoryHandle | null = null;
   private dataHandle: FileSystemFileHandle | null = null;
   private indexHandle: FileSystemFileHandle | null = null;
   private index = new Map<number, { offset: number; length: number }>();
@@ -12,7 +11,6 @@ export class ChunkStore {
   private draining = false;
 
   async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
-    this.directoryHandle = directoryHandle;
     this.dataHandle = await directoryHandle.getFileHandle('chunks_data.bin', { create: true });
     this.indexHandle = await directoryHandle.getFileHandle('chunks_index.jsonl', { create: true });
     await this.parseExistingIndex();
@@ -29,7 +27,7 @@ export class ChunkStore {
       let bytePosition = 0;
 
       for (const line of lines) {
-        const lineBytes = this.textEncoder.encode(line + '\n').byteLength;
+        const lineBytes = this.textEncoder.encode(`${line}\n`).byteLength;
 
         if (line.trim().length === 0) {
           bytePosition += lineBytes;
@@ -96,7 +94,7 @@ export class ChunkStore {
         new Uint8Array(buffer).set(item.data);
         await dataStream.write(new Uint8Array(buffer));
 
-        const indexLine = JSON.stringify({ i: item.index, o: offset, l: item.data.byteLength }) + '\n';
+        const indexLine = `${JSON.stringify({ i: item.index, o: offset, l: item.data.byteLength })}\n`;
         await indexStream.write(indexLine);
 
         this.index.set(item.index, { offset, length: item.data.byteLength });
@@ -145,6 +143,5 @@ export class ChunkStore {
     this.cachedFile = null;
     this.dataHandle = null;
     this.indexHandle = null;
-    this.directoryHandle = null;
   }
 }
