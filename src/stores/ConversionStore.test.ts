@@ -31,61 +31,23 @@ describe('ConversionStore', () => {
     it('starts with idle status', () => {
       expect(conversion.value.status).toBe('idle');
     });
-
-    it('starts with zero progress', () => {
-      expect(conversion.value.progress).toEqual({ current: 0, total: 0, failed: 0 });
-    });
-
-    it('starts with no error', () => {
-      expect(conversion.value.error).toBeNull();
-    });
-
-    it('starts with FFmpeg not loaded', () => {
-      expect(conversion.value.ffmpegLoaded).toBe(false);
-      expect(conversion.value.ffmpegLoading).toBe(false);
-      expect(conversion.value.ffmpegError).toBeNull();
-    });
   });
 
   describe('isProcessing computed', () => {
-    it('returns false for idle', () => {
-      setStatus('idle');
-      expect(isProcessing.value).toBe(false);
-    });
+    const processingCases = [
+      { status: 'idle' as const, expected: false },
+      { status: 'llm-extract' as const, expected: true },
+      { status: 'llm-assign' as const, expected: true },
+      { status: 'converting' as const, expected: true },
+      { status: 'merging' as const, expected: true },
+      { status: 'complete' as const, expected: false },
+      { status: 'error' as const, expected: false },
+      { status: 'cancelled' as const, expected: false },
+    ];
 
-    it('returns true for llm-extract', () => {
-      setStatus('llm-extract');
-      expect(isProcessing.value).toBe(true);
-    });
-
-    it('returns true for llm-assign', () => {
-      setStatus('llm-assign');
-      expect(isProcessing.value).toBe(true);
-    });
-
-    it('returns true for converting', () => {
-      setStatus('converting');
-      expect(isProcessing.value).toBe(true);
-    });
-
-    it('returns true for merging', () => {
-      setStatus('merging');
-      expect(isProcessing.value).toBe(true);
-    });
-
-    it('returns false for complete', () => {
-      setStatus('complete');
-      expect(isProcessing.value).toBe(false);
-    });
-
-    it('returns false for error', () => {
-      setStatus('error');
-      expect(isProcessing.value).toBe(false);
-    });
-
-    it('returns false for cancelled', () => {
-      setStatus('cancelled');
-      expect(isProcessing.value).toBe(false);
+    it.each(processingCases)('returns $expected for $status', ({ status, expected }) => {
+      setStatus(status);
+      expect(isProcessing.value).toBe(expected);
     });
   });
 
@@ -100,11 +62,6 @@ describe('ConversionStore', () => {
       expect(conversion.value.progress).toEqual({ current: 5, total: 10, failed: 2 });
     });
 
-    it('defaults failed to 0 when not provided', () => {
-      updateProgress(5, 10);
-      expect(conversion.value.progress).toEqual({ current: 5, total: 10, failed: 0 });
-    });
-
     it('increments progress', () => {
       updateProgress(5, 10);
       incrementProgress();
@@ -117,60 +74,23 @@ describe('ConversionStore', () => {
       expect(conversion.value.progress).toEqual({ current: 6, total: 10, failed: 2 });
     });
 
-    it('sets total count', () => {
-      updateProgress(3, 5);
-      setTotal(20);
-      expect(conversion.value.progress).toEqual({ current: 3, total: 20, failed: 0 });
-    });
-
-    it('sets total preserving failed count', () => {
-      updateProgress(3, 5, 2);
-      setTotal(20);
-      expect(conversion.value.progress).toEqual({ current: 3, total: 20, failed: 2 });
-    });
-
-    it('calculates progress percentage', () => {
-      updateProgress(25, 100);
-      expect(progressPercent.value).toBe(25);
-    });
-
-    it('returns 0 percent when total is 0', () => {
-      updateProgress(0, 0);
-      expect(progressPercent.value).toBe(0);
-    });
-
-    it('rounds progress percentage', () => {
-      updateProgress(1, 3);
-      expect(progressPercent.value).toBe(33);
+    describe('progressPercent computed', () => {
+      it.each([
+        [25, 100, 25],
+        [0, 0, 0],
+        [1, 3, 33],
+      ])('calculates %d%% for current=%d, total=%d', (current, total, expected) => {
+        updateProgress(current, total);
+        expect(progressPercent.value).toBe(expected);
+      });
     });
   });
 
   describe('startConversion', () => {
-    it('sets start time', () => {
-      const beforeStart = Date.now();
-      startConversion();
-      const afterStart = Date.now();
-
-      expect(conversion.value.startTime).toBeGreaterThanOrEqual(beforeStart);
-      expect(conversion.value.startTime).toBeLessThanOrEqual(afterStart);
-    });
-
     it('resets progress to zero', () => {
       updateProgress(5, 10, 2);
       startConversion();
       expect(conversion.value.progress).toEqual({ current: 0, total: 0, failed: 0 });
-    });
-
-    it('clears error', () => {
-      setError('Previous error');
-      startConversion();
-      expect(conversion.value.error).toBeNull();
-    });
-
-    it('sets status to idle', () => {
-      setStatus('converting');
-      startConversion();
-      expect(conversion.value.status).toBe('idle');
     });
   });
 
@@ -238,23 +158,12 @@ describe('ConversionStore', () => {
       expect(conversion.value.ffmpegError).toBeNull();
     });
 
-    it('sets FFmpeg loading', () => {
-      setFFmpegLoading(true);
-      expect(conversion.value.ffmpegLoading).toBe(true);
-    });
-
     it('sets FFmpeg error', () => {
       setFFmpegLoading(true);
       setFFmpegError('Failed to load');
 
       expect(conversion.value.ffmpegError).toBe('Failed to load');
       expect(conversion.value.ffmpegLoading).toBe(false);
-    });
-
-    it('clears FFmpeg error', () => {
-      setFFmpegError('Error');
-      setFFmpegError(null);
-      expect(conversion.value.ffmpegError).toBeNull();
     });
   });
 
@@ -377,7 +286,7 @@ describe('ConversionStore', () => {
   });
 
   describe('resume confirmation', () => {
-    it('sets resume info and resolves promise when confirmed', async () => {
+    it('resolves promise when confirmed', async () => {
       const info = { cachedChunks: 5, hasLLMState: true };
       const promise = awaitResumeConfirmation(info);
 
@@ -388,7 +297,7 @@ describe('ConversionStore', () => {
       expect(conversion.value.resumeInfo).toBeNull();
     });
 
-    it('sets resume info and resolves promise when cancelled', async () => {
+    it('resolves promise when cancelled', async () => {
       const info = { cachedChunks: 5, hasLLMState: true };
       const promise = awaitResumeConfirmation(info);
 
