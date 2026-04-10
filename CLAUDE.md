@@ -2,22 +2,7 @@
 
 A local-first Text-to-Speech web app that converts books (EPUB/FB2/TXT) to audiobooks using Edge TTS and LLMs for character voice assignment.
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Webpack dev server on port 3000 |
-| `npm run build` | Production build to `dist/latest` |
-| `npm run preview` | Serve the `dist/` directory locally |
-| `npm test` | Run unit tests (Vitest) - fast, mocked |
-| `npm run test:real` | Run integration tests against real LLM APIs |
-| `npm run test:real:qa` | Run integration tests with QA Pass enabled |
-| `npm run lint` | Lint code using Biome |
-| `npm run format` | Format code using Biome |
-| `npm run typecheck` | Run TypeScript type checking |
-| `npm run repomix` | Generate codebase context markdown files for AI |
-
-## Architecture Map (Progressive Disclosure)
+## Architecture Map
 
 ```text
 src/
