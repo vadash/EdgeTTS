@@ -797,7 +797,7 @@ async function runTTSStage(
   signal: AbortSignal,
   report: (stage: string, current: number, total: number, message: string) => void,
   services: ConversionOrchestratorServices,
-  stores: Stores,
+  _stores: Stores,
 ): Promise<void> {
   const { logger, workerPoolFactory, audioMergerFactory, ffmpegService } = services;
 

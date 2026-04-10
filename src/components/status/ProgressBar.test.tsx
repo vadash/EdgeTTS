@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/preact';
+import { render } from '@testing-library/preact';
 import { ProgressBar } from './ProgressBar';
 
 describe('ProgressBar', () => {
