@@ -133,6 +133,8 @@ const indexedDBMock = {
 
 Object.defineProperty(window, 'indexedDB', {
   value: indexedDBMock,
+  configurable: true,
+  writable: true,
 });
 
 // Mock WebSocket

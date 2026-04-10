@@ -23,6 +23,10 @@ export const IndexedDBNames = {
   secureDb: 'edgetts_secure',
   /** Store name for encryption keys */
   keysStore: 'keys',
+  /** Database for FFmpeg WASM blob cache (survives offline / version changes) */
+  ffmpegCacheDb: 'edgetts_ffmpeg_cache',
+  /** Store name for FFmpeg WASM blobs */
+  ffmpegCacheStore: 'blobs',
 } as const;
 
 export type StorageKey = (typeof StorageKeys)[keyof typeof StorageKeys];

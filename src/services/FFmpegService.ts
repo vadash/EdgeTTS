@@ -3,16 +3,100 @@
 
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { defaultConfig } from '@/config';
+import { IndexedDBNames } from '@/config/storage';
 import { buildFilterChain } from './audio/buildFilterChain';
 import type { ILogger } from './Logger';
+
+const CORE_KEY = 'ffmpeg-core.js';
+const WASM_KEY = 'ffmpeg-core.wasm';
+
+/**
+ * Persistent cache for FFmpeg WASM blobs in IndexedDB.
+ * Survives offline scenarios and app version changes that remove
+ * the static files from the server.
+ */
+export namespace FFmpegBlobCache {
+  function openDB(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(IndexedDBNames.ffmpegCacheDb, 1);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore(IndexedDBNames.ffmpegCacheStore);
+      };
+    });
+  }
+
+  export async function store(coreBlob: Blob, wasmBlob: Blob): Promise<void> {
+    try {
+      const db = await openDB();
+      const tx = db.transaction(IndexedDBNames.ffmpegCacheStore, 'readwrite');
+      const store = tx.objectStore(IndexedDBNames.ffmpegCacheStore);
+      store.put(coreBlob, CORE_KEY);
+      store.put(wasmBlob, WASM_KEY);
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    } catch {
+      // IndexedDB may be unavailable (private browsing, quota) — non-fatal
+    }
+  }
+
+  export async function load(): Promise<{ coreURL: string; wasmURL: string } | null> {
+    try {
+      const db = await openDB();
+      const tx = db.transaction(IndexedDBNames.ffmpegCacheStore, 'readonly');
+      const store = tx.objectStore(IndexedDBNames.ffmpegCacheStore);
+      const coreBlob: Blob | undefined = await new Promise((resolve, reject) => {
+        const r = store.get(CORE_KEY);
+        r.onerror = () => reject(r.error);
+        r.onsuccess = () => resolve(r.result);
+      });
+      const wasmBlob: Blob | undefined = await new Promise((resolve, reject) => {
+        const r = store.get(WASM_KEY);
+        r.onerror = () => reject(r.error);
+        r.onsuccess = () => resolve(r.result);
+      });
+      db.close();
+      if (coreBlob && wasmBlob) {
+        return {
+          coreURL: URL.createObjectURL(coreBlob),
+          wasmURL: URL.createObjectURL(wasmBlob),
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  export async function clear(): Promise<void> {
+    try {
+      const db = await openDB();
+      const tx = db.transaction(IndexedDBNames.ffmpegCacheStore, 'readwrite');
+      tx.objectStore(IndexedDBNames.ffmpegCacheStore).delete(CORE_KEY);
+      tx.objectStore(IndexedDBNames.ffmpegCacheStore).delete(WASM_KEY);
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+    } catch {
+      // Non-fatal
+    }
+  }
+}
 
 /**
  * Fetches a URL and converts it to a Blob URL.
  * Unlike `toBlobURL` from `@ffmpeg/util`, this checks `resp.ok` so that
  * a 404 (e.g. from a stale GitHub Pages deployment) throws immediately
  * instead of feeding HTML garbage to the FFmpeg Web Worker.
+ * Also returns the raw Blob for persistent caching.
  */
-async function safeToBlobURL(url: string, mimeType: string): Promise<string> {
+async function safeToBlobURL(url: string, mimeType: string): Promise<{ blobURL: string; blob: Blob }> {
   const resp = await fetch(url);
   if (!resp.ok) {
     throw new Error(
@@ -21,7 +105,7 @@ async function safeToBlobURL(url: string, mimeType: string): Promise<string> {
   }
   const body = await resp.blob();
   const blob = new Blob([body], { type: mimeType });
-  return URL.createObjectURL(blob);
+  return { blobURL: URL.createObjectURL(blob), blob };
 }
 
 export type FFmpegProgressCallback = (message: string) => void;
@@ -98,7 +182,7 @@ export class FFmpegService {
       this.logger?.debug?.(`[FFmpeg] ${message}`);
     });
 
-    // Reuse cached blob URLs if available (avoids re-fetch on proactive refresh)
+    // 1. Reuse in-memory blob URLs if available (fastest path, no network)
     if (this.cachedCoreURL && this.cachedWasmURL) {
       try {
         if (onProgress) onProgress('Reloading FFmpeg from cache...');
@@ -109,7 +193,7 @@ export class FFmpegService {
         if (onProgress) onProgress('FFmpeg reloaded from cache');
         return true;
       } catch (err) {
-        this.logger?.warn('FFmpeg reload from cached blob URLs failed, refetching locally', {
+        this.logger?.warn('FFmpeg reload from cached blob URLs failed, trying IndexedDB', {
           error: err instanceof Error ? err.message : String(err),
         });
         this.cachedCoreURL = null;
@@ -117,13 +201,34 @@ export class FFmpegService {
       }
     }
 
+    // 2. Try IndexedDB persistent cache (works offline, survives version changes)
+    try {
+      const cached = await FFmpegBlobCache.load();
+      if (cached) {
+        if (onProgress) onProgress('Reloading FFmpeg from persistent cache...');
+        await ffmpeg.load({ coreURL: cached.coreURL, wasmURL: cached.wasmURL });
+        this.ffmpeg = ffmpeg;
+        this.loaded = true;
+        this.loadError = null;
+        this.cachedCoreURL = cached.coreURL;
+        this.cachedWasmURL = cached.wasmURL;
+        if (onProgress) onProgress('FFmpeg reloaded from persistent cache');
+        return true;
+      }
+    } catch (err) {
+      this.logger?.warn('FFmpeg reload from IndexedDB cache failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // 3. Fetch from local bundle (requires network / server reachable)
     if (onProgress) onProgress('Loading local FFmpeg WebAssembly...');
 
     try {
       // Use relative paths to the files copied by Webpack CopyWebpackPlugin
       const baseURL = '.';
-      const coreURL = await safeToBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript');
-      const wasmURL = await safeToBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm');
+      const { blobURL: coreURL, blob: coreBlob } = await safeToBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript');
+      const { blobURL: wasmURL, blob: wasmBlob } = await safeToBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm');
 
       await ffmpeg.load({ coreURL, wasmURL });
 
@@ -132,6 +237,10 @@ export class FFmpegService {
       this.loadError = null;
       this.cachedCoreURL = coreURL;
       this.cachedWasmURL = wasmURL;
+
+      // Persist to IndexedDB for offline / version-change resilience
+      await FFmpegBlobCache.store(coreBlob, wasmBlob);
+
       if (onProgress) onProgress('FFmpeg loaded successfully from local bundle');
       return true;
     } catch (err) {
