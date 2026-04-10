@@ -47,8 +47,11 @@ class ChunkStore {
   // Write a chunk. Serialized via internal queue. Returns when persisted.
   async writeChunk(index: number, data: Uint8Array): Promise<void>
 
-  // Read a chunk by index. Uses File.slice() on the data file.
+  // Read a chunk by index. Uses File.slice() on the cached File object.
   async readChunk(index: number): Promise<Uint8Array>
+
+  // Cache the File snapshot once before merge starts. Must be called after all writes complete.
+  async prepareForRead(): Promise<void>
 
   // Return set of already-written chunk indices (for resume).
   getExistingIndices(): Set<number>
@@ -82,16 +85,27 @@ private async drain(): Promise<void> {
   this.draining = true
   while (this.queue.length > 0) {
     const batch = this.queue.splice(0, this.queue.length)
+
+    // Open streams for this batch (commit-on-close guarantees crash safety).
+    // Keeping streams open for the entire session would lose all data on crash,
+    // because createWritable() writes to a hidden swap file that only replaces
+    // the real file on .close().
+    const dataStream = await this.dataHandle.createWritable({ keepExistingData: true })
+    const indexStream = await this.indexHandle.createWritable({ keepExistingData: true })
+
     for (const item of batch) {
       const offset = this.currentOffset
-      await this.dataStream.write(item.data)
+      await dataStream.write(item.data)
       const indexLine = JSON.stringify({ i: item.index, o: offset, l: item.data.byteLength }) + '\n'
-      await this.indexStream.write(indexLine)
+      await indexStream.write(indexLine)
       this.index.set(item.index, { offset, length: item.data.byteLength })
       this.currentOffset += item.data.byteLength
     }
-    // Flush after each batch to ensure crash safety
-    // (streams auto-flush on close, but explicit flush ensures data is on disk)
+
+    // Close both streams — this commits the swap file to disk.
+    await dataStream.close()
+    await indexStream.close()
+
     for (const item of batch) {
       item.resolve()
     }
@@ -100,25 +114,38 @@ private async drain(): Promise<void> {
 }
 ```
 
-The queue takes all pending items at once, writes them sequentially, and resolves all promises. This batches writes naturally when workers produce chunks faster than the drain loop processes them.
+**Why streams are opened and closed per batch, not held open:**
+
+The File System Access API's `createWritable()` writes to a hidden temporary swap file. The target file (`chunks_data.bin`) is only updated when `.close()` is called. If the browser crashes while a stream is open, everything written since the last `.close()` is lost. Opening/closing per batch guarantees that a crash only loses at most the current in-flight batch.
+
+The queue takes all pending items at once, writes them sequentially, and resolves all promises. This batches writes naturally when workers produce chunks faster than the drain loop processes them. The overhead of opening two file handles per batch is negligible compared to the actual I/O of writing audio data.
 
 ### Chunk Reading (Merge Phase)
 
 ```typescript
+private cachedFile: File | null = null
+
+// Call once after all writes complete, before merge starts.
+async prepareForRead(): Promise<void> {
+  this.cachedFile = await this.dataHandle.getFile()
+}
+
 async readChunk(index: number): Promise<Uint8Array> {
   const entry = this.index.get(index)
   if (!entry) throw new Error(`Chunk ${index} not found`)
+  if (!this.cachedFile) throw new Error('Call prepareForRead() before reading')
 
-  const file = await this.dataHandle.getFile()
-  const blob = file.slice(entry.offset, entry.offset + entry.length)
+  const blob = this.cachedFile.slice(entry.offset, entry.offset + entry.length)
   const buffer = await blob.arrayBuffer()
   return new Uint8Array(buffer)
 }
 ```
 
-`File.slice()` is handled natively by the OS. When chunks are read in order during merge, the HDD performs sequential reads within a single file — no directory lookups, no file open/close per chunk.
+**Why `prepareForRead()` exists:** `dataHandle.getFile()` crosses the main-thread-to-browser-process IPC boundary. Calling it inside `readChunk()` for 9,000+ chunks adds measurable overhead. `prepareForRead()` calls it once, caches the resulting `File` object, and all subsequent `.slice()` calls operate on that cached reference — zero IPC during the merge loop.
 
-Note: `getFile()` returns a snapshot. For merge groups reading hundreds of chunks, calling `getFile()` once per group (not per chunk) is sufficient since the data file is closed for writing at that point.
+`File.slice()` is handled natively by the OS. Within a single file, the OS page cache and read-ahead buffers handle non-sequential offset jumps efficiently. It is still orders of magnitude faster than resolving 9,000 distinct file inodes.
+
+**Note on read access patterns:** TTS workers complete chunks out of order, so `chunks_data.bin` stores audio in completion order, not chronological story order. When `AudioMerger` reads chunks 0, 1, 2, 3 sequentially, the byte offsets will jump around within the data file. This is expected and acceptable — single-file offset jumps are trivially handled by the OS page cache compared to per-file inode resolution.
 
 ### Crash-Safe Resume
 
@@ -126,12 +153,11 @@ On init, `ChunkStore` reads `chunks_index.jsonl` line by line:
 
 ```typescript
 async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
-  // Open/create data file for append
+  this.directoryHandle = directoryHandle
   this.dataHandle = await directoryHandle.getFileHandle('chunks_data.bin', { create: true })
-  this.dataStream = await this.dataHandle.createWritable({ keepExistingData: true })
-
-  // Open/create index file for append
   this.indexHandle = await directoryHandle.getFileHandle('chunks_index.jsonl', { create: true })
+
+  let maxValidOffset = 0
 
   // Parse existing index
   try {
@@ -143,9 +169,10 @@ async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
         const entry = JSON.parse(line)
         if (typeof entry.i === 'number' && typeof entry.o === 'number' && typeof entry.l === 'number') {
           this.index.set(entry.i, { offset: entry.o, length: entry.l })
+          maxValidOffset = Math.max(maxValidOffset, entry.o + entry.l)
         }
       } catch {
-        // Torn/truncated last line — discard
+        // Torn/truncated last line — discard it and stop
         break
       }
     }
@@ -153,20 +180,17 @@ async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
     // File doesn't exist yet — fresh start
   }
 
-  // Position append offset after last valid chunk
-  this.currentOffset = this.computeMaxOffset()
-
-  // Truncate data file to last valid offset (discard trailing garbage from partial write)
-  // Re-open stream positioned at end of valid data
-  this.indexStream = await this.indexHandle.createWritable({ keepExistingData: true })
-  // Seek to end of valid index data...
+  // Position append offset after the highest valid byte
+  // (NOT just the last line — chunks are written out of order, so
+  // the last JSONL line does not necessarily have the highest offset)
+  this.currentOffset = maxValidOffset
 }
 ```
 
 Key properties:
-- A torn write (power loss, tab crash) can only corrupt the **last line** of the JSONL file.
+- A torn write (power loss, tab tab crash) can only corrupt the **last line** of the JSONL file.
 - Each line is validated with `JSON.parse` + field type checks. Anything that fails is discarded along with all subsequent lines.
-- The data file's valid region is derived from the last valid index entry's `offset + length`.
+- **`maxValidOffset` tracks the highest `offset + length` across all valid entries**, not just the last line. Since TTS workers complete chunks out of order, the last JSONL line is not guaranteed to have the highest byte offset. Using the running max ensures no valid data is overwritten on resume.
 - Resume completes in one read of the JSONL file instead of 100,000 directory listings.
 
 ### Component Changes
@@ -216,6 +240,8 @@ Unchanged in interface: `cleanupTemp()` removes the `_temp_work/` directory. Int
 
 ## Migration
 
-The old per-chunk-file format is **not** backward-compatible. When a user starts a new conversion, the new `ChunkStore` format is used. Any in-progress conversion using the old format will need to restart (the `_temp_work/` directory is ephemeral by design — it's deleted on completion anyway).
+The old per-chunk-file format is **not** backward-compatible. When a user starts a new conversion, the new `ChunkStore` format is used.
+
+**Legacy detection in `ResumeCheck`:** If `_temp_work/` contains `chunk_XXXXXX.bin` files (old format) but no `chunks_index.jsonl` (new format), the directory is wiped clean and the conversion starts fresh. This prevents crashes from stale format state. The `_temp_work/` directory is ephemeral by design — it's deleted on completion anyway — so losing an in-progress old-format resume is acceptable.
 
 No fallback, no dual-mode. Clean cut.
