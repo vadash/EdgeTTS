@@ -7,6 +7,7 @@ import { sanitizeFilename } from '@/utils/file';
 import { withPermissionRetry } from '@/utils/retry';
 import type { FFmpegService } from './FFmpegService';
 import { parseMP3Duration } from './MP3Parser';
+import { ChunkStore } from './ChunkStore';
 
 export type MergeProgressCallback = (current: number, total: number, message: string) => void;
 
@@ -39,6 +40,7 @@ export interface MergerConfig {
   opusMinBitrate?: number;
   opusMaxBitrate?: number;
   opusCompressionLevel?: number;
+  chunkStore?: ChunkStore | null;
 }
 
 /**
@@ -52,10 +54,12 @@ export class AudioMerger {
   private targetDurationMs: number;
   private minDurationMs: number;
   private maxDurationMs: number;
+  private chunkStore: ChunkStore | null = null;
 
   constructor(ffmpegService: FFmpegService, config: MergerConfig) {
     this.ffmpegService = ffmpegService;
     this.config = config;
+    this.chunkStore = config.chunkStore ?? null;
 
     // Duration settings from config
     const targetMinutes = defaultConfig.audio.targetDurationMinutes;
@@ -87,12 +91,12 @@ export class AudioMerger {
    * Get duration from MP3 file, with fallback to byte heuristic
    * Reads file from disk and parses MP3 headers for accurate duration
    */
-  private async getDurationMs(
-    filename: string,
-    tempDirHandle: FileSystemDirectoryHandle,
-  ): Promise<number> {
+  private async getDurationMs(index: number): Promise<number> {
+    if (!this.chunkStore) {
+      throw new Error('ChunkStore not configured');
+    }
     try {
-      const audio = await this.readChunkFromDisk(filename, tempDirHandle);
+      const audio = await this.chunkStore.readChunk(index);
       const parsedDuration = parseMP3Duration(audio);
 
       if (parsedDuration !== null && parsedDuration > 0) {
@@ -108,19 +112,6 @@ export class AudioMerger {
   }
 
   /**
-   * Read a chunk file from disk
-   */
-  private async readChunkFromDisk(
-    filename: string,
-    tempDirHandle: FileSystemDirectoryHandle,
-  ): Promise<Uint8Array> {
-    const fileHandle = await tempDirHandle.getFileHandle(filename);
-    const file = await fileHandle.getFile();
-    const arrayBuffer = await file.arrayBuffer();
-    return new Uint8Array(arrayBuffer);
-  }
-
-  /**
    * Calculate merge groups based on duration and file boundaries
    * Reads file sizes from disk to estimate durations
    */
@@ -128,7 +119,6 @@ export class AudioMerger {
     audioMap: Map<number, string>,
     totalSentences: number,
     fileNames: Array<[string, number]>,
-    tempDirHandle: FileSystemDirectoryHandle,
   ): Promise<MergeGroup[]> {
     const groups: MergeGroup[] = [];
 
@@ -166,7 +156,7 @@ export class AudioMerger {
       const chunkFilename = audioMap.get(i);
       let chunkDurationMs = 0;
       if (chunkFilename) {
-        chunkDurationMs = await this.getDurationMs(chunkFilename, tempDirHandle);
+        chunkDurationMs = await this.getDurationMs(i);
       }
 
       // Check if adding this chunk would exceed max duration
@@ -217,18 +207,26 @@ export class AudioMerger {
     audioMap: Map<number, string>,
     group: MergeGroup,
     totalGroups: number,
-    tempDirHandle: FileSystemDirectoryHandle,
     onProgress?: (message: string) => void,
   ): Promise<MergedFile | null> {
     const chunks: (Uint8Array | null)[] = [];
     let missingCount = 0;
 
+    if (!this.chunkStore) {
+      throw new Error('ChunkStore not configured');
+    }
+
     // Read chunks one by one from disk, null for missing
     for (let i = group.fromIndex; i <= group.toIndex; i++) {
       const chunkFilename = audioMap.get(i);
       if (chunkFilename) {
-        const audio = await this.readChunkFromDisk(chunkFilename, tempDirHandle);
-        chunks.push(audio);
+        try {
+          const audio = await this.chunkStore.readChunk(i);
+          chunks.push(audio);
+        } catch {
+          chunks.push(null);
+          missingCount++;
+        }
       } else {
         chunks.push(null); // Missing chunk - will be replaced with silence
         missingCount++;
@@ -336,7 +334,6 @@ export class AudioMerger {
     audioMap: Map<number, string>,
     totalSentences: number,
     fileNames: Array<[string, number]>,
-    tempDirHandle: FileSystemDirectoryHandle,
     saveDirectoryHandle: FileSystemDirectoryHandle,
     onProgress?: (current: number, total: number, message: string) => void,
   ): Promise<number> {
@@ -357,7 +354,6 @@ export class AudioMerger {
       audioMap,
       totalSentences,
       fileNames,
-      tempDirHandle,
     );
     let savedCount = 0;
     let skippedCount = 0;
@@ -390,7 +386,6 @@ export class AudioMerger {
         audioMap,
         group,
         groups.length,
-        tempDirHandle,
         (msg) => onProgress?.(i + 1, groups.length, msg),
       );
 
