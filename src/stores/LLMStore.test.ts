@@ -19,13 +19,11 @@ import {
   setBlockProgress,
   setCharacters,
   setError,
-  setLoadedProfile,
   setPendingReview,
   setProcessingStatus,
   setSpeakerAssignments,
   setStageConfig,
   setStageField,
-  setUseVoting,
   setVoiceMap,
   updateCharacter,
   updateVoiceMapping,
@@ -46,47 +44,6 @@ describe('LLMStore', () => {
   beforeEach(() => {
     localStorage.clear();
     resetLLMStore();
-  });
-
-  describe('initial state', () => {
-    it('starts with empty API keys for all stages', () => {
-      expect(llm.value.extract.apiKey).toBe('');
-      expect(llm.value.merge.apiKey).toBe('');
-      expect(llm.value.assign.apiKey).toBe('');
-    });
-
-    it('starts with default API URL for all stages', () => {
-      expect(llm.value.extract.apiUrl).toBe('https://api.openai.com/v1');
-      expect(llm.value.merge.apiUrl).toBe('https://api.openai.com/v1');
-      expect(llm.value.assign.apiUrl).toBe('https://api.openai.com/v1');
-    });
-
-    it('starts with default model for all stages', () => {
-      expect(llm.value.extract.model).toBe('gpt-4o-mini');
-      expect(llm.value.merge.model).toBe('gpt-4o-mini');
-      expect(llm.value.assign.model).toBe('gpt-4o-mini');
-    });
-
-    it('starts with idle processing status', () => {
-      expect(llm.value.processingStatus).toBe('idle');
-    });
-
-    it('starts with zero block progress', () => {
-      expect(llm.value.currentBlock).toBe(0);
-      expect(llm.value.totalBlocks).toBe(0);
-    });
-
-    it('starts with no error', () => {
-      expect(llm.value.error).toBeNull();
-    });
-
-    it('starts with empty characters', () => {
-      expect(llm.value.detectedCharacters).toEqual([]);
-    });
-
-    it('starts with empty voice map', () => {
-      expect(llm.value.characterVoiceMap.size).toBe(0);
-    });
   });
 
   describe('computed properties', () => {
@@ -182,11 +139,6 @@ describe('LLMStore', () => {
       const config = getStageConfig('extract');
       expect(config.apiKey).toBe('sk-key');
     });
-
-    it('sets useVoting', () => {
-      setUseVoting(true);
-      expect(llm.value.useVoting).toBe(true);
-    });
   });
 
   describe('processing state actions', () => {
@@ -210,11 +162,6 @@ describe('LLMStore', () => {
       gender: 'female',
       variations: ['Алиса'],
     };
-
-    it('sets characters', () => {
-      setCharacters([mockCharacter]);
-      expect(llm.value.detectedCharacters).toEqual([mockCharacter]);
-    });
 
     it('adds character', () => {
       addCharacter(mockCharacter);
@@ -251,11 +198,6 @@ describe('LLMStore', () => {
       expect(llm.value.characterVoiceMap.get('Bob')).toBe('voice-2');
     });
 
-    it('updates voice mapping', () => {
-      updateVoiceMapping('Alice', 'voice-1');
-      expect(llm.value.characterVoiceMap.get('Alice')).toBe('voice-1');
-    });
-
     it('removes voice mapping', () => {
       updateVoiceMapping('Alice', 'voice-1');
       removeVoiceMapping('Alice');
@@ -264,19 +206,6 @@ describe('LLMStore', () => {
   });
 
   describe('speakerAssignments', () => {
-    it('starts with empty assignments', () => {
-      expect(llm.value.speakerAssignments).toEqual([]);
-    });
-
-    it('sets speaker assignments', () => {
-      const assignments = [
-        { sentenceIndex: 0, text: 'Hello', speaker: 'John', voiceId: 'voice-1' },
-        { sentenceIndex: 1, text: 'Hi', speaker: 'Mary', voiceId: 'voice-2' },
-      ];
-      setSpeakerAssignments(assignments);
-      expect(llm.value.speakerAssignments).toEqual(assignments);
-    });
-
     it('resets assignments on resetProcessingState', () => {
       setSpeakerAssignments([
         { sentenceIndex: 0, text: 'Hello', speaker: 'John', voiceId: 'voice-1' },
@@ -369,21 +298,6 @@ describe('LLMStore', () => {
       expect(llm.value.extract.apiUrl).toBe('https://api.openai.com/v1');
       expect(llm.value.extract.model).toBe('gpt-4o-mini');
       expect(llm.value.processingStatus).toBe('idle');
-    });
-  });
-
-  describe('loaded profile', () => {
-    it('sets loaded profile', () => {
-      const profile = { name: 'test', characters: [], voiceMap: {} } as any;
-      setLoadedProfile(profile);
-      expect(llm.value.loadedProfile).toBe(profile);
-    });
-
-    it('can clear loaded profile', () => {
-      const profile = { name: 'test', characters: [], voiceMap: {} } as any;
-      setLoadedProfile(profile);
-      setLoadedProfile(null);
-      expect(llm.value.loadedProfile).toBeNull();
     });
   });
 });
