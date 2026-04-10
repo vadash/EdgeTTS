@@ -24,7 +24,7 @@ export function StatusPanel() {
   const logger = getLogger();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { current, total } = conversion.progress.value;
+  const { current, total, failed } = conversion.progress.value;
   const entries = logs.entries.value;
 
   // Auto-scroll to bottom on new entries
@@ -96,7 +96,7 @@ export function StatusPanel() {
       {/* Progress */}
       {total > 0 && (
         <div className="px-3 py-2 border-b border-border">
-          <ProgressBar current={current} total={total} eta={eta} />
+          <ProgressBar current={current} total={total} failed={failed} eta={eta} />
         </div>
       )}
 

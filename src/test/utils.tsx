@@ -31,7 +31,7 @@ export interface TestStoresState {
   };
   conversion?: {
     status?: string;
-    progress?: { current: number; total: number };
+    progress?: { current: number; total: number; failed?: number };
   };
   data?: {
     textContent?: string;
@@ -82,7 +82,7 @@ export function renderWithProviders(ui: VNode, options: TestRenderOptions = {}):
   if (options.stores?.conversion) {
     const c = options.stores.conversion;
     if (c.progress) {
-      updateProgress(c.progress.current, c.progress.total);
+      updateProgress(c.progress.current, c.progress.total, c.progress.failed ?? 0);
     }
   }
 
