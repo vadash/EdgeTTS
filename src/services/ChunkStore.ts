@@ -91,7 +91,10 @@ export class ChunkStore {
 
       for (const item of batch) {
         const offset = this.currentOffset;
-        await dataStream.write(item.data);
+        // Ensure we have a regular ArrayBuffer (not SharedArrayBuffer) for File System Access API
+        const buffer = new ArrayBuffer(item.data.byteLength);
+        new Uint8Array(buffer).set(item.data);
+        await dataStream.write(new Uint8Array(buffer));
 
         const indexLine = JSON.stringify({ i: item.index, o: offset, l: item.data.byteLength }) + '\n';
         await indexStream.write(indexLine);

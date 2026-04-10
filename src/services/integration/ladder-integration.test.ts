@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
+import { ChunkStore } from '../ChunkStore';
 import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from '../TTSWorkerPool';
 
 vi.mock('../ReusableEdgeTTSService', () => ({
@@ -17,12 +17,21 @@ vi.mock('../ReusableEdgeTTSService', () => ({
 describe('Ladder Integration - E2E', () => {
   let pool: TTSWorkerPool;
   let options: WorkerPoolOptions;
-  let mockDir: FileSystemDirectoryHandle;
+  let mockChunkStore: ChunkStore;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    mockDir = createMockDirectoryHandle();
+
+    // Create mock ChunkStore
+    mockChunkStore = {
+      init: vi.fn().mockResolvedValue(undefined),
+      writeChunk: vi.fn().mockResolvedValue(undefined),
+      prepareForRead: vi.fn().mockResolvedValue(undefined),
+      readChunk: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+      getExistingIndices: vi.fn().mockReturnValue(new Set<number>()),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ChunkStore;
 
     options = {
       maxWorkers: 15,
@@ -32,7 +41,7 @@ describe('Ladder Integration - E2E', () => {
         pitch: '+0Hz',
         volume: '100',
       },
-      directoryHandle: mockDir,
+      chunkStore: mockChunkStore,
     };
   });
 

@@ -22,6 +22,7 @@ import { exportToProfile } from './llm/VoiceProfile';
 import { checkResumeState, loadPipelineState } from './ResumeCheck';
 import type { TextBlockSplitter } from './TextBlockSplitter';
 import type { TTSWorkerPool } from './TTSWorkerPool';
+import { ChunkStore } from './ChunkStore';
 import {
   allocateByFrequency,
   allocateByGender,
@@ -112,7 +113,7 @@ export interface ConversionOrchestratorServices {
     create(options: import('./TTSWorkerPool').WorkerPoolOptions): TTSWorkerPool;
   };
   audioMergerFactory: {
-    create(config: import('./AudioMerger').MergerConfig): AudioMerger;
+    create(config: import('./AudioMerger').MergerConfig & { chunkStore: ChunkStore }): AudioMerger;
   };
   voicePoolBuilder: VoicePoolBuilder;
   ffmpegService: FFmpegService;
@@ -803,6 +804,11 @@ async function runTTSStage(
 
   const directoryHandle = input.directoryHandle!;
 
+  // ==================== CREATE CHUNKSTORE ====================
+  const chunkStore = new ChunkStore();
+  const tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work', { create: true });
+  await chunkStore.init(tempDirHandle);
+
   // ==================== TTS CONVERSION ====================
   checkCancelled(signal);
 
@@ -831,63 +837,46 @@ async function runTTSStage(
 
   const audioMap = new Map<number, string>();
   const failedTasks = new Set<number>();
-  let tempDirHandle: FileSystemDirectoryHandle | null = null;
 
-  // Pre-scan for cached chunks
-  try {
-    tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work');
-  } catch {
-    // No temp dir yet
+  // Pre-scan for cached chunks using ChunkStore
+  const existingIndices = chunkStore.getExistingIndices();
+  for (const index of existingIndices) {
+    audioMap.set(index, `chunk_${String(index).padStart(6, '0')}.bin`);
   }
 
-  if (tempDirHandle) {
-    for (const chunk of chunks) {
-      const filename = `chunk_${String(chunk.partIndex).padStart(6, '0')}.bin`;
-      try {
-        const handle = await tempDirHandle.getFileHandle(filename);
-        const file = await handle.getFile();
-        if (file.size > 0) {
-          audioMap.set(chunk.partIndex, filename);
-        }
-      } catch {
-        // File doesn't exist
+  if (audioMap.size > 0) {
+    report(
+      'tts-conversion',
+      audioMap.size,
+      chunks.length,
+      `Resuming: found ${audioMap.size}/${chunks.length} cached chunks`,
+    );
+    updateProgress(audioMap.size, chunks.length, 0);
+  }
+
+  // Load previously failed chunks
+  try {
+    const failedHandle = await tempDirHandle.getFileHandle('failed_chunks.json');
+    const failedFile = await failedHandle.getFile();
+    const failedText = await failedFile.text();
+    const failedIndices: number[] = JSON.parse(failedText);
+    let skippedCount = 0;
+    for (const idx of failedIndices) {
+      if (!audioMap.has(idx)) {
+        audioMap.set(idx, '');
+        skippedCount++;
       }
     }
-
-    if (audioMap.size > 0) {
+    if (skippedCount > 0) {
       report(
         'tts-conversion',
         audioMap.size,
         chunks.length,
-        `Resuming: found ${audioMap.size}/${chunks.length} cached chunks`,
+        `Skipping ${skippedCount} previously failed chunk(s)`,
       );
-      updateProgress(audioMap.size, chunks.length, 0);
     }
-
-    // Load previously failed chunks
-    try {
-      const failedHandle = await tempDirHandle.getFileHandle('failed_chunks.json');
-      const failedFile = await failedHandle.getFile();
-      const failedText = await failedFile.text();
-      const failedIndices: number[] = JSON.parse(failedText);
-      let skippedCount = 0;
-      for (const idx of failedIndices) {
-        if (!audioMap.has(idx)) {
-          audioMap.set(idx, '');
-          skippedCount++;
-        }
-      }
-      if (skippedCount > 0) {
-        report(
-          'tts-conversion',
-          audioMap.size,
-          chunks.length,
-          `Skipping ${skippedCount} previously failed chunk(s)`,
-        );
-      }
-    } catch {
-      // No failed_chunks.json or corrupted — treat as empty set
-    }
+  } catch {
+    // No failed_chunks.json or corrupted — treat as empty set
   }
 
   const remainingChunks = chunks.filter((c) => !audioMap.has(c.partIndex));
@@ -902,7 +891,7 @@ async function runTTSStage(
       const workerPool = workerPoolFactory.create({
         maxWorkers: input.ttsThreads,
         config: ttsConfig,
-        directoryHandle: directoryHandle,
+        chunkStore: chunkStore,
         onStatusUpdate: (update) => {
           if (update.message.includes('Retry')) {
             report('tts-conversion', audioMap.size, chunks.length, update.message);
@@ -972,11 +961,10 @@ async function runTTSStage(
     // Persist failed chunks
     if (failedTasks.size > 0) {
       try {
-        const workDir = tempDirHandle ?? await directoryHandle.getDirectoryHandle('_temp_work');
         // Load existing failed set and union with current failures
         let existingFailed: Set<number> = new Set();
         try {
-          const existingHandle = await workDir.getFileHandle('failed_chunks.json');
+          const existingHandle = await tempDirHandle.getFileHandle('failed_chunks.json');
           const existingFile = await existingHandle.getFile();
           const existingText = await existingFile.text();
           const existingIndices: number[] = JSON.parse(existingText);
@@ -988,7 +976,7 @@ async function runTTSStage(
           existingFailed.add(idx);
         }
         const failedJson = JSON.stringify([...existingFailed].sort((a, b) => a - b));
-        const failedFileHandle = await workDir.getFileHandle('failed_chunks.json', { create: true });
+        const failedFileHandle = await tempDirHandle.getFileHandle('failed_chunks.json', { create: true });
         const writable = await failedFileHandle.createWritable();
         await writable.write(failedJson);
         await writable.close();
@@ -1002,8 +990,6 @@ async function runTTSStage(
         logger.warn(`Failed to persist failed_chunks.json: ${(err as Error).message}`);
       }
     }
-
-    tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work');
   }
 
   // ==================== AUDIO MERGE ====================
@@ -1011,6 +997,7 @@ async function runTTSStage(
 
   if (audioMap.size === 0) {
     report('audio-merge', 1, 1, 'No audio to merge');
+    await chunkStore.close();
     await cleanupTemp(directoryHandle, logger);
     return;
   }
@@ -1027,6 +1014,9 @@ async function runTTSStage(
 
   checkCancelled(signal);
 
+  // Prepare ChunkStore for reading
+  await chunkStore.prepareForRead();
+
   const merger = audioMergerFactory.create({
     outputFormat: 'opus',
     silenceRemoval: input.silenceRemoval,
@@ -1040,6 +1030,7 @@ async function runTTSStage(
     opusMinBitrate: input.opusMinBitrate,
     opusMaxBitrate: input.opusMaxBitrate,
     opusCompressionLevel: input.opusCompressionLevel,
+    chunkStore: chunkStore,
   });
 
   const totalChunks = audioMap.size;
@@ -1049,7 +1040,6 @@ async function runTTSStage(
     audioMap,
     totalChunks,
     fileNames,
-    tempDirHandle!,
     directoryHandle,
     (current, total, message) => {
       report('audio-merge', current, total, message);
@@ -1059,6 +1049,7 @@ async function runTTSStage(
   report('audio-merge', totalChunks, totalChunks, `Saved ${savedCount} file(s)`);
 
   // ==================== CLEANUP ====================
+  await chunkStore.close();
   await cleanupTemp(directoryHandle, logger);
 }
 
