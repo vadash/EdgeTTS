@@ -99,4 +99,43 @@ describe('ChunkStore', () => {
       }
     }
   });
+
+  it('should recover from crash with torn last line', async () => {
+    // Simulate pre-existing data with torn last line
+    const dataHandle = await mockDirHandle.getFileHandle('chunks_data.bin', { create: true });
+    const indexHandle = await mockDirHandle.getFileHandle('chunks_index.jsonl', { create: true });
+
+    // Write valid data
+    const dataWritable = await dataHandle.createWritable();
+    await dataWritable.write(new Uint8Array([1, 2, 3, 4, 5]));
+    await dataWritable.close();
+
+    // Write valid index followed by torn/truncated line
+    const indexWritable = await indexHandle.createWritable();
+    await indexWritable.write('{"i":0,"o":0,"l":5}\n');
+    await indexWritable.write('{"i":1,"o":5,"l":3}\n');
+    await indexWritable.write('{"i":2,"o":'); // torn line
+    await indexWritable.close();
+
+    // Create new store and init (should recover)
+    const newStore = new ChunkStore();
+    await newStore.init(mockDirHandle);
+    await newStore.prepareForRead();
+
+    // Should have chunks 0 and 1, not 2
+    expect(newStore.getExistingIndices()).toEqual(new Set([0, 1]));
+
+    const chunk0 = await newStore.readChunk(0);
+    expect(chunk0).toEqual(new Uint8Array([1, 2, 3, 4, 5]));
+  });
+
+  it('should handle empty index file', async () => {
+    await mockDirHandle.getFileHandle('chunks_data.bin', { create: true });
+    await mockDirHandle.getFileHandle('chunks_index.jsonl', { create: true });
+
+    const newStore = new ChunkStore();
+    await newStore.init(mockDirHandle);
+
+    expect(newStore.getExistingIndices()).toEqual(new Set());
+  });
 });
