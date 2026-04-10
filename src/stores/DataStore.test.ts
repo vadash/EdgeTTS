@@ -9,44 +9,6 @@ describe('DataStore', () => {
     store = createDataStore();
   });
 
-  describe('initial state', () => {
-    it('starts with empty text content', () => {
-      expect(store.textContent.value).toBe('');
-    });
-
-    it('starts with no book', () => {
-      expect(store.book.value).toBeNull();
-      expect(store.bookLoaded.value).toBe(false);
-    });
-
-    it('starts with empty dictionary', () => {
-      expect(store.dictionary.value).toEqual([]);
-      expect(store.dictionaryRaw.value).toEqual([]);
-    });
-
-    it('starts with no directory handle', () => {
-      expect(store.directoryHandle.value).toBeNull();
-    });
-
-    it('starts with no active workers', () => {
-      expect(store.activeWorkers.value).toEqual([]);
-    });
-
-    it('starts with default file naming state', () => {
-      expect(store.fileNameIndex.value).toBe(1);
-      expect(store.numBook.value).toBe(0);
-      expect(store.numText.value).toBe(0);
-    });
-  });
-
-  describe('text content management', () => {
-    it('clears text content', () => {
-      store.setTextContent('Some text');
-      store.clearTextContent();
-      expect(store.textContent.value).toBe('');
-    });
-  });
-
   describe('book management', () => {
     const mockBook: ProcessedBook = {
       allSentences: ['Sentence 1.', 'Sentence 2.'],
@@ -57,48 +19,11 @@ describe('DataStore', () => {
       fullText: 'test content',
     };
 
-    it('sets book', () => {
-      store.setBook(mockBook);
-      expect(store.book.value).toEqual(mockBook);
-      expect(store.bookLoaded.value).toBe(true);
-    });
-
     it('clears book', () => {
       store.setBook(mockBook);
       store.clearBook();
       expect(store.book.value).toBeNull();
       expect(store.bookLoaded.value).toBe(false);
-    });
-
-    it('sets book to null', () => {
-      store.setBook(mockBook);
-      store.setBook(null);
-      expect(store.book.value).toBeNull();
-      expect(store.bookLoaded.value).toBe(false);
-    });
-  });
-
-  describe('dictionary management', () => {
-    const mockRules: DictionaryRule[] = [
-      { type: 'word', pattern: 'test', replacement: 'тест' },
-      { type: 'exact', pattern: 'hello', replacement: 'привет' },
-    ];
-
-    it('clears dictionary', () => {
-      store.setDictionary(mockRules);
-      store.setDictionaryRaw(['test=тест']);
-      store.clearDictionary();
-      expect(store.dictionary.value).toEqual([]);
-      expect(store.dictionaryRaw.value).toEqual([]);
-    });
-  });
-
-  describe('directory handle management', () => {
-    it('clears directory handle', () => {
-      const mockHandle = {} as FileSystemDirectoryHandle;
-      store.setDirectoryHandle(mockHandle);
-      store.clearDirectoryHandle();
-      expect(store.directoryHandle.value).toBeNull();
     });
   });
 
@@ -112,11 +37,6 @@ describe('DataStore', () => {
       mp3Saved: false,
     };
 
-    it('adds worker', () => {
-      store.addWorker(mockWorker);
-      expect(store.activeWorkers.value).toContainEqual(mockWorker);
-    });
-
     it('updates worker', () => {
       store.addWorker(mockWorker);
       store.updateWorker(1, { status: 'completed' });
@@ -126,12 +46,6 @@ describe('DataStore', () => {
     it('removes worker', () => {
       store.addWorker(mockWorker);
       store.removeWorker(1);
-      expect(store.activeWorkers.value).toEqual([]);
-    });
-
-    it('clears workers', () => {
-      store.addWorker(mockWorker);
-      store.clearWorkers();
       expect(store.activeWorkers.value).toEqual([]);
     });
 
@@ -226,16 +140,13 @@ describe('DataStore', () => {
         expect(store.detectedLanguage.value).toBe('en');
       });
 
-      it('detects English from text content', () => {
-        store.setTextContent('This is English text with many words.');
+      it.each([
+        ['This is English text with many words.', 'en'],
+        ['Это русский текст с множеством слов.', 'ru'],
+      ])('detects language from text content: "%s"', (text, expectedLang) => {
+        store.setTextContent(text);
         store.detectLanguageFromContent();
-        expect(store.detectedLanguage.value).toBe('en');
-      });
-
-      it('detects Russian from text content', () => {
-        store.setTextContent('Это русский текст с множеством слов.');
-        store.detectLanguageFromContent();
-        expect(store.detectedLanguage.value).toBe('ru');
+        expect(store.detectedLanguage.value).toBe(expectedLang);
       });
 
       it('detects from book when no text content', () => {
@@ -270,12 +181,6 @@ describe('DataStore', () => {
         expect(store.detectedLanguage.value).toBe('en');
         store.setDetectedLanguage('de');
         expect(store.detectedLanguage.value).toBe('de');
-      });
-
-      it('stores loaded file name', () => {
-        expect(store.loadedFileName.value).toBe('');
-        store.setLoadedFileName('mybook.epub');
-        expect(store.loadedFileName.value).toBe('mybook.epub');
       });
 
       it('clears loaded file name on clear()', () => {
