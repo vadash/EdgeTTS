@@ -37,3 +37,5 @@ test.config.local.ts
 nul
 
 # Unsorted
+
+/.jcodemunch.jsonc
