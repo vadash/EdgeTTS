@@ -14,7 +14,7 @@ The engine that drives the conversion from Text -> LLM -> TTS -> Audio File. Man
 - `ConversionOrchestrator.ts` - Main entry point; completely stateless orchestrator function.
 - `ChunkStore.ts` - Handles indexed writes/reads to `chunks_data.bin` on disk. Prevents memory limits on massive books.
 - `LadderController.ts` - Scales TTS concurrent workers up/down dynamically based on success/failure rates.
-- `FFmpegService.ts` - FFmpeg WASM wrapper. Bundled **locally** (not CDN). Proactively reboots to prevent WASM OOM.
+- `FFmpegService.ts` - FFmpeg WASM wrapper. Bundled **locally** (not CDN). Proactively reboots to prevent WASM OOM. Includes `FFmpegBlobCache` namespace for IndexedDB persistence of WASM blobs (offline resilience).
 - `llm/LLMVoiceService.ts` - Orchestrates Extract -> Merge -> Assign API calls, including the QA and Consensus loops.
 - `llm/LLMApiClient.ts` - Low-level API caller with custom fetch for browser header overrides.
 
@@ -22,6 +22,7 @@ The engine that drives the conversion from Text -> LLM -> TTS -> Audio File. Man
 
 - **Memory Management**: Do NOT load entire audio files into memory. `TTSWorkerPool` streams to `ChunkStore` in `_temp_work`. `AudioMerger` reads sequentially.
 - **FFmpeg Leaks**: FFmpeg WASM memory leaks are a risk. `FFmpegService` proactively terminates and reloads itself after `MAX_OPERATIONS_BEFORE_REFRESH` (10 operations).
+- **FFmpeg Loading Cascade**: FFmpegService.reload tries 3 tiers: (1) in-memory blob URLs, (2) IndexedDB persistent blobs, (3) network fetch from local bundle. Tier 2 survives offline and server version changes.
 - **Session Resumption**: `ResumeCheck.ts` reads `_temp_work` and `pipeline_state.json` to seamlessly recover crashed/closed conversions without re-querying the LLM.
 - **Async Resilience**: Always throw `RetriableError` in `LLMApiClient` on failure so `withRetry` can retry. Non-retriable errors kill the pipeline.
 - **State**: Services should remain as stateless as possible. Pass data via arguments or update the UI via the imported `Stores` bundle.

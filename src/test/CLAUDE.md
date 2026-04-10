@@ -35,5 +35,6 @@ Vitest-based test suites covering utilities, services, state logic, and prompt b
 
 - **Mocking Strategy**: Standard unit tests MUST mock all external network calls, File System API (`createMockDirectoryHandle`), and WebSockets.
 - **Global Mocks**: `p-retry`, `p-queue`, and `generic-pool` are mocked globally in `src/test/setup.ts` to execute immediately without actual polling/delays.
+- **IndexedDB Mock Override**: The global `window.indexedDB` mock in `setup.ts` is `configurable` + `writable`. Per-test overrides via `(window as any).indexedDB = {...}` work. When faking IDB request objects, each request must fire `onsuccess` via `queueMicrotask` after returning — otherwise Promises wrapping `request.onsuccess` hang forever.
 - **API Keys for Real Tests**: Real LLM tests require populating `test.config.local.ts` (copy from `.example`) with actual API credentials. Do not commit this file.
 - **Environment Variables**: The `test:real:*` scripts use `cross-env` to temporarily inject `USE_QA=true` or `REPEAT_PROMPT=true` during the test run, overriding `test.config.local.ts` defaults.
