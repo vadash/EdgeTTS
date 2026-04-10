@@ -6,6 +6,7 @@ import PQueue from 'p-queue';
 import { isAppError } from '@/errors';
 import { AbortError, withRetry } from '@/utils/retry';
 import type { StatusUpdate, TTSConfig as VoiceConfig } from '../state/types';
+import { ChunkStore } from './ChunkStore';
 import { LadderController } from './LadderController';
 import type { Logger } from './Logger';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
@@ -27,15 +28,13 @@ export interface WorkerPoolProgress {
 export interface WorkerPoolOptions {
   maxWorkers: number;
   config: VoiceConfig;
-  directoryHandle?: FileSystemDirectoryHandle | null;
+  chunkStore?: ChunkStore | null;
   onStatusUpdate?: (update: StatusUpdate) => void;
-  onTaskComplete?: (partIndex: number, filename: string) => void;
+  onTaskComplete?: (partIndex: number, partIndexStr: string) => void;
   onTaskError?: (partIndex: number, error: Error) => void;
   onAllComplete?: () => void;
   logger?: Logger;
 }
-
-const TEMP_DIR_NAME = '_temp_work';
 
 /**
  * TTSWorkerPool - Uses p-queue for task scheduling and generic-pool for connection management
@@ -45,7 +44,7 @@ const TEMP_DIR_NAME = '_temp_work';
  * - generic-pool manages WebSocket connections with acquire/release semantics
  * - Centralized retry logic with exponential backoff via p-retry
  * - Handles sleep mode recovery via reconnection
- * - Writes audio chunks to disk immediately to prevent OOM
+ * - Writes audio chunks to ChunkStore immediately to prevent OOM
  */
 export class TTSWorkerPool {
   private queue: PQueue;
@@ -53,9 +52,7 @@ export class TTSWorkerPool {
   private ladder: LadderController;
   private completedTasks = new Map<number, string>();
   private failedTasks = new Set<number>();
-  private tempDirHandle: FileSystemDirectoryHandle | null = null;
-  private directoryHandle: FileSystemDirectoryHandle | null = null;
-  private initPromise: Promise<void> | null = null;
+  private chunkStore: ChunkStore | null = null;
 
   // Statistics
   private totalTasks = 0;
@@ -71,7 +68,7 @@ export class TTSWorkerPool {
 
   constructor(options: WorkerPoolOptions) {
     this.voiceConfig = options.config;
-    this.directoryHandle = options.directoryHandle ?? null;
+    this.chunkStore = options.chunkStore ?? null;
     this.onStatusUpdate = options.onStatusUpdate;
     this.onTaskComplete = options.onTaskComplete;
     this.onTaskError = options.onTaskError;
@@ -125,48 +122,6 @@ export class TTSWorkerPool {
         // which doesn't exist in browsers. Idle connections cleaned up via cleanup() instead.
       },
     );
-
-    // Initialize temp directory asynchronously
-    this.initPromise = this.initTempDirectory();
-  }
-
-  /**
-   * Initialize the temp directory for storing audio chunks
-   */
-  private async initTempDirectory(): Promise<void> {
-    if (!this.directoryHandle) {
-      throw new Error('Directory handle required for disk-based audio storage');
-    }
-
-    try {
-      this.tempDirHandle = await this.directoryHandle.getDirectoryHandle(TEMP_DIR_NAME, {
-        create: true,
-      });
-      this.logger?.debug(`Created temp directory: ${TEMP_DIR_NAME}`);
-    } catch (err) {
-      this.logger?.error(`Failed to create temp directory: ${(err as Error).message}`);
-      throw err;
-    }
-  }
-
-  /**
-   * Write audio chunk to disk
-   */
-  private async writeChunkToDisk(partIndex: number, audioData: Uint8Array): Promise<string> {
-    if (!this.tempDirHandle) {
-      throw new Error('Temp directory not initialized');
-    }
-
-    const filename = `chunk_${String(partIndex).padStart(6, '0')}.bin`;
-    const fileHandle = await this.tempDirHandle.getFileHandle(filename, { create: true });
-    const writable = await fileHandle.createWritable();
-    // Create a new ArrayBuffer copy to avoid SharedArrayBuffer issues
-    const buffer = new ArrayBuffer(audioData.byteLength);
-    new Uint8Array(buffer).set(audioData);
-    await writable.write(buffer);
-    await writable.close();
-
-    return filename;
   }
 
   /**
@@ -225,11 +180,6 @@ export class TTSWorkerPool {
    * Acquires connection from pool, executes, releases back
    */
   private async executeTask(task: PoolTask): Promise<void> {
-    // Wait for temp directory initialization
-    if (this.initPromise) {
-      await this.initPromise;
-      this.initPromise = null;
-    }
 
     // Acquire connection from pool
     let service: ReusableEdgeTTSService | null = null;
@@ -295,14 +245,15 @@ export class TTSWorkerPool {
         },
       );
 
-      // Save to disk
-      const filename = await this.writeChunkToDisk(task.partIndex, audioData);
+      // Save to ChunkStore
+      await this.chunkStore!.writeChunk(task.partIndex, audioData);
 
       // Record success for ladder
       this.ladder.recordTask(true, 0);
       this.ladder.evaluate();
 
-      this.completedTasks.set(task.partIndex, filename);
+      // Store part index as string reference for compatibility
+      this.completedTasks.set(task.partIndex, String(task.partIndex));
       this.processedCount++;
 
       this.onStatusUpdate?.({
@@ -311,7 +262,7 @@ export class TTSWorkerPool {
         isComplete: true,
       });
 
-      this.onTaskComplete?.(task.partIndex, filename);
+      this.onTaskComplete?.(task.partIndex, String(task.partIndex));
     } catch (error) {
       // Record failure for ladder
       this.ladder.recordTask(false, 11); // Max retries attempted
@@ -350,7 +301,8 @@ export class TTSWorkerPool {
   }
 
   getTempDirHandle(): FileSystemDirectoryHandle | null {
-    return this.tempDirHandle;
+    // Deprecated: ChunkStore manages storage internally
+    return null;
   }
 
   /**
@@ -371,7 +323,7 @@ export class TTSWorkerPool {
   }
 
   /**
-   * Cleanup temp directory and remove all temp files
+   * Cleanup - close chunkStore and drain connection pool
    */
   async cleanup(): Promise<void> {
     // Drain and clear the connection pool
@@ -382,14 +334,14 @@ export class TTSWorkerPool {
       this.logger?.warn(`Failed to drain connection pool: ${(err as Error).message}`);
     }
 
-    if (this.directoryHandle && this.tempDirHandle) {
+    // Close ChunkStore
+    if (this.chunkStore) {
       try {
-        await this.directoryHandle.removeEntry(TEMP_DIR_NAME, { recursive: true });
-        this.logger?.debug(`Cleaned up temp directory: ${TEMP_DIR_NAME}`);
+        await this.chunkStore.close();
+        this.logger?.debug('Closed ChunkStore');
       } catch (err) {
-        this.logger?.warn(`Failed to cleanup temp directory: ${(err as Error).message}`);
+        this.logger?.warn(`Failed to close ChunkStore: ${(err as Error).message}`);
       }
-      this.tempDirHandle = null;
     }
   }
 

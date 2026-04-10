@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusUpdate, TTSConfig as VoiceConfig } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
+import { ChunkStore } from './ChunkStore';
 import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from './TTSWorkerPool';
 
 // Mock the ReusableEdgeTTSService
@@ -32,6 +33,7 @@ describe('TTSWorkerPool', () => {
   let mockDisconnect: ReturnType<typeof vi.fn>;
   let mockIsReady: ReturnType<typeof vi.fn>;
   let mockDirectoryHandle: FileSystemDirectoryHandle;
+  let mockChunkStore: ChunkStore;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -39,6 +41,16 @@ describe('TTSWorkerPool', () => {
 
     // Create mock directory handle
     mockDirectoryHandle = createMockDirectoryHandle();
+
+    // Create mock ChunkStore
+    mockChunkStore = {
+      init: vi.fn().mockResolvedValue(undefined),
+      writeChunk: vi.fn().mockResolvedValue(undefined),
+      prepareForRead: vi.fn().mockResolvedValue(undefined),
+      readChunk: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
+      getExistingIndices: vi.fn().mockReturnValue(new Set<number>()),
+      close: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ChunkStore;
 
     // Get fresh mock functions for each test
     mockSend = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
@@ -66,7 +78,7 @@ describe('TTSWorkerPool', () => {
     defaultOptions = {
       maxWorkers: 3,
       config: defaultVoiceConfig,
-      directoryHandle: mockDirectoryHandle,
+      chunkStore: mockChunkStore,
     };
   });
 
@@ -126,7 +138,7 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('task completion', () => {
-    it('stores completed audio as filename', async () => {
+    it('stores completed audio by part index', async () => {
       pool = createPool();
       pool.addTask(createTask(0));
 
@@ -134,19 +146,19 @@ describe('TTSWorkerPool', () => {
 
       const completedAudio = pool.getCompletedAudio();
       expect(completedAudio.size).toBe(1);
-      // Now stores filename instead of Uint8Array
-      expect(completedAudio.get(0)).toMatch(/^chunk_\d+\.bin$/);
+      // With ChunkStore, we store the part index as a string reference
+      expect(completedAudio.get(0)).toBe('0');
     });
 
-    it('calls onTaskComplete callback with filename', async () => {
+    it('calls onTaskComplete callback with part index', async () => {
       const onTaskComplete = vi.fn();
       pool = createPool({ onTaskComplete });
       pool.addTask(createTask(0));
 
       await vi.advanceTimersByTimeAsync(100);
 
-      // Now receives filename instead of Uint8Array
-      expect(onTaskComplete).toHaveBeenCalledWith(0, expect.stringMatching(/^chunk_\d+\.bin$/));
+      // With ChunkStore, callback receives part index as string reference
+      expect(onTaskComplete).toHaveBeenCalledWith(0, '0');
     });
 
     it('calls onAllComplete when all tasks done', async () => {
@@ -361,18 +373,19 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('getTempDirHandle', () => {
-    it('returns temp directory handle after initialization', async () => {
+    it('returns null (deprecated - ChunkStore manages storage)', async () => {
       pool = createPool();
       pool.addTask(createTask(0));
 
       await vi.advanceTimersByTimeAsync(100);
 
-      expect(pool.getTempDirHandle()).toBeDefined();
+      // getTempDirHandle now returns null since ChunkStore manages storage
+      expect(pool.getTempDirHandle()).toBeNull();
     });
   });
 
   describe('cleanup', () => {
-    it('removes temp directory', async () => {
+    it('closes chunkStore', async () => {
       pool = createPool();
       pool.addTask(createTask(0));
 
@@ -380,7 +393,7 @@ describe('TTSWorkerPool', () => {
 
       await pool.cleanup();
 
-      expect(pool.getTempDirHandle()).toBeNull();
+      expect(mockChunkStore.close).toHaveBeenCalledTimes(1);
     });
   });
 
