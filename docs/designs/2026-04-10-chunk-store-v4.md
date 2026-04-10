@@ -171,13 +171,23 @@ async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
   let validIndexBytes = 0
 
   // Parse existing index
+  // Iterate the raw split array — do NOT .filter() empty lines first,
+  // because each empty line still consumes bytes on disk (\n = 1 byte).
+  // Filtering before counting would cause validIndexBytes to drift behind
+  // the real file position, eventually corrupting the last valid entry.
   try {
     const indexFile = await this.indexHandle.getFile()
     const text = await indexFile.text()
-    const lines = text.split('\n').filter(line => line.trim().length > 0)
+    const lines = text.split('\n')
     let bytePosition = 0
     for (const line of lines) {
       const lineBytes = this.textEncoder.encode(line + '\n').byteLength
+
+      if (line.trim().length === 0) {
+        bytePosition += lineBytes
+        continue
+      }
+
       try {
         const entry = JSON.parse(line)
         if (typeof entry.i === 'number' && typeof entry.o === 'number' && typeof entry.l === 'number') {
@@ -189,6 +199,7 @@ async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
         // Torn/truncated last line — discard it and stop
         break
       }
+
       bytePosition += lineBytes
     }
   } catch {
@@ -198,6 +209,20 @@ async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
   // Position append offsets after the highest valid byte in each file
   this.currentOffset = maxValidOffset
   this.currentIndexOffset = validIndexBytes
+
+  // Truncate both files to their known-good sizes. A crash may have left
+  // garbage bytes at the tail (partial MP3 data, half-written JSON).
+  // Without truncation, zombie bytes persist and could cause confusion
+  // on future resumes even though the index correctly ignores them.
+  if (this.currentOffset > 0 || this.currentIndexOffset > 0) {
+    const dataTruncate = await this.dataHandle.createWritable({ keepExistingData: true })
+    await dataTruncate.truncate(this.currentOffset)
+    await dataTruncate.close()
+
+    const indexTruncate = await this.indexHandle.createWritable({ keepExistingData: true })
+    await indexTruncate.truncate(this.currentIndexOffset)
+    await indexTruncate.close()
+  }
 }
 ```
 
