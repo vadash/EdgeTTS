@@ -13,7 +13,7 @@ export const mergeExamplesEN: PromptExample[] = [
 3. canonicalName: "Alexander Gray", variations: ["Alexander Gray", "Alex"], gender: "male"
 4. canonicalName: "Elena", variations: ["Elena"], gender: "female"`,
     output: `{
-  "reasoning": "0 and 1 are game systems. 2 and 3 share the variation 'Alex' and are male. 4 is unique.",
+  "reasoning": "0+1: sys. 3+2: shared 'Alex', both M. 4: uniq.",
   "merges": [
     [0, 1],
     [3, 2]
@@ -28,7 +28,7 @@ export const mergeExamplesEN: PromptExample[] = [
 3. canonicalName: "System", variations: ["System"], gender: "female"
 4. canonicalName: "Quest", variations: ["Quest"], gender: "female"`,
     output: `{
-  "reasoning": "Blue Box, Notification, System, and Quest are all game system entities. Merge them with System as the best name.",
+  "reasoning": "0+1+3+4: all sys entities. 3=best name→[3,0,1,4].",
   "merges": [
     [3, 0, 1, 4]
   ]
@@ -40,7 +40,7 @@ export const mergeExamplesEN: PromptExample[] = [
 1. canonicalName: "Mary", variations: ["Mary"], gender: "female"
 2. canonicalName: "John", variations: ["John"], gender: "male"`,
     output: `{
-  "reasoning": "No characters share names or roles.",
+  "reasoning": "No shared names/roles.",
   "merges": []
 }`,
   },
@@ -51,7 +51,7 @@ export const mergeExamplesEN: PromptExample[] = [
 2. canonicalName: "Lyra", variations: ["Lyra"], gender: "female"
 3. canonicalName: "Elena", variations: ["Elena", "Len"], gender: "female"`,
     output: `{
-  "reasoning": "Protagonist and Marcus Chen are likely the same person (male, main character). Marcus Chen is the better name. Elena and Lyra are different people.",
+  "reasoning": "0+1: protag=Marcus(M, MC). 1=better name→[1,0]. Elena≠Lyra.",
   "merges": [
     [1, 0]
   ]
