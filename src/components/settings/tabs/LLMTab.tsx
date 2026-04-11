@@ -140,6 +140,9 @@ export function LLMTab() {
         </p>
       </div>
 
+      {/* Help section - Free API Options */}
+      <LLMHelp />
+
       {/* Prompt Repetition Section */}
       <div className="space-y-3 pt-4 border-t border-gray-700">
         <div>
@@ -234,9 +237,6 @@ export function LLMTab() {
       <Button variant="primary" onClick={() => llm.saveSettings()} className="w-full">
         💾 <Text id="settings.save">Save Settings</Text>
       </Button>
-
-      {/* Help section */}
-      <LLMHelp />
     </div>
   );
 }

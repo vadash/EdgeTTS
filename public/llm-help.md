@@ -1,50 +1,69 @@
-# Free LLM Options for Voice Assignment
+## LongCat
 
-This app uses an OpenAI-compatible API for character detection and voice assignment. Here are free options:
+[Register](https://longcat.chat/platform) · Model: `LongCat-Flash-Thinking` · Endpoint: `https://api.longcat.chat/openai/v1`
 
-## [LongCat]
+Supports both `/chat/completions` and Anthropic `messages` formats.  Baseline 500K tokens/day; expands to 5M with a quick form fill.
 
-API URL: `https://api.longcat.chat/openai/v1`
+***
 
-Model Name: `LongCat-Flash-Thinking`
+## Gemini AI Studio
 
-Reasoning: `high`
+[Register](https://aistudio.google.com/apikey) · Model: `gemma-4-31b-it` · Endpoint: `https://generativelanguage.googleapis.com/v1beta/openai/`
 
-## [iFlow.cn]
+OpenAI-compatible endpoint via Google AI Studio; free only without a billing account attached. Limits for gemma is 1500 RPD [ai.google](https://ai.google.dev/gemini-api/docs/openai)
 
-API URL: `https://apis.iflow.cn/v1`
+***
 
-Model Name: `qwen3-coder-plus` or `kimi-k2-0905`
+## OpenRouter
 
-Reasoning: `high`
+[Register](https://openrouter.ai) · Browse free models: `https://openrouter.ai/models?max_price=0` · Model: `meta-llama/llama-3.3-70b-instruct:free` · Endpoint: `https://openrouter.ai/api/v1`
 
----
+29+ free models available (March 2026) with no credit card required, capped at 200 requests/day per model.  A one-time $10 credit permanently raises the daily limit. [teamday](https://www.teamday.ai/blog/best-free-ai-models-openrouter-2026)
 
-There are many sources offering free credits or inference. Note that nearly all of these have some level of rate limiting. Effectively every provider that offers free inference is doing it because they train on your data - be aware.
+***
 
-- OpenRouter Free Models:
-  - https://openrouter.ai/models?max_price=0
-  - By default, you get 50 free model requests per day from a pretty huge variety.
-  - If you _top up **once** with them_ for $10, they permanently increase your limit to 1000 requests per day. A very solid offering.
+## Nvidia NIM
 
-- Nvidia NIM: Check out Nvidia's Inference Microservices for potential free tiers.
-  - Link: https://build.nvidia.com/explore/discover
-  - A pretty solid free tier with ~40 requests per minute to some very good models.
+[Register](https://build.nvidia.com/explore/discover) · Model: `moonshotai/kimi-k2-instruct-0905` · Endpoint: `https://integrate.api.nvidia.com/v1`
 
-- [Mistral (La Plateforme)](https://console.mistral.ai/): Experiment plan grants free access if you opt into training and complete phone verification.
-  - Limits (per model family): 1 request/second, 500,000 tokens/minute, 1,000,000,000 tokens/month.
-  - Reference model catalog: https://docs.mistral.ai/getting-started/models/models_overview/
+Fully OpenAI-compatible endpoint; new accounts receive 1,000 free inference credits. Catalog includes DeepSeek, Llama, and Kimi variants. [ai-sdk](https://ai-sdk.dev/providers/openai-compatible-providers/nim)
 
-- [Mistral (Codestral)](https://codestral.mistral.ai/): Hosted coding-centric workspace that currently waives usage fees.
-  - Requires a monthly subscription setup, but the plan is presently $0 after phone verification.
-  - Limits: 30 requests/minute, 2,000 requests/day across supported tooling flows.
+***
 
-- [Groq](https://console.groq.com): Token streaming hardware gives fast latencies alongside model-dependent rate caps.
-  - Quotas range from 250 to 14,400 requests/day and 6,000 to 70,000 tokens/minute depending on the model family and modality.
-  - Their dashboard surfaces current free allocations and any temporary throttles.
+## Cerebras
 
-- [iFlow.cn](https://iflow.cn): A number of popular open weight models including GLM 4.5 and Qwen3-Coder.  The site is Chinese only, but to register go to : https://iflow.cn/ log with a Google account, generate/copy an API key; then doc is easy: https://platform.iflow.cn/en/docs.  API baseURL is https://apis.iflow.cn/v1 as url and API key.  Model list at https://platform.iflow.cn/en/models.
+[Register](https://cloud.cerebras.ai) · Model: `llama-3.3-70b` · Endpoint: `https://api.cerebras.ai/v1`
 
-- [LongCat](https://longcat.chat/platform): [LongCat Flash](https://huggingface.co/meituan-longcat/LongCat-Flash-Chat) (and its thinking variant).  Supports both `/chat/completions` and `messages` (Anthropic) format.  A baseline 500,000 tokens perday, but with a quick form fill, 5M tokens.
+Wafer-scale hardware delivers exceptionally fast inference; free tier covers Llama 3.3 70B, Qwen3 235B, GPT-OSS-120B and more.  Limits: 30 RPM, up to 14,400 req/day. [awesomeagents](https://awesomeagents.ai/tools/free-ai-inference-providers-2026/)
 
-- [Ollama Cloud](https://docs.ollama.com/cloud): Supports both OpenAI and Ollama compatible endpoints, with a number of quality models, including deepseek-v3.1:671b-cloud, gpt-oss:20b-cloud, gpt-oss:120b-cloud, kimi-k2:1t-cloud, qwen3-coder:480b-cloud, glm-4.6:cloud, minimax-m2:cloud.   Limits are not clearly documented, beyond "Ollama's cloud includes hourly and daily limits to avoid capacity issues".  However, brief testing suggests the weekly limit is approx 5M tokens, and the hourly limit is about 165,000 tokens.
+***
+
+## Mistral — La Plateforme
+
+[Register](https://console.mistral.ai) · Model: `mistral-small-latest` · Endpoint: `https://api.mistral.ai/v1`
+
+Free "Experiment" tier grants access to all Mistral models; requires training opt-in and phone verification.  Limits: 2 RPM, 1B tokens/month. [awesomeagents](https://awesomeagents.ai/tools/free-ai-inference-providers-2026/)
+
+***
+
+## Mistral — Codestral
+
+[Register](https://codestral.mistral.ai) · Model: `codestral-latest` · Endpoint: `https://codestral.mistral.ai/v1`
+
+Coding-focused model on a separate endpoint; currently $0/month after phone verification. Limits: 30 req/min, 2,000 req/day. [docs.roocode](https://docs.roocode.com/providers/mistral/)
+
+***
+
+## Groq
+
+[Register](https://console.groq.com) · Model: `llama-3.3-70b-versatile` · Endpoint: `https://api.groq.com/openai/v1`
+
+All models accessible on the free tier with no credit card required; rate limits vary by model (250–14,400 req/day, 6K–70K TPM). [community.groq](https://community.groq.com/t/what-is-the-base-url-path-for-groq-api/487)
+
+***
+
+## Ollama Cloud
+
+[Register](https://ollama.com) · Model: `deepseek-v3.1:671b-cloud` · Endpoint: `https://ollama.com/v1`
+
+OpenAI-compatible endpoint  hosting massive cloud models up to 1T parameters (e.g., `kimi-k2:1t-cloud`, `qwen3-coder:480b-cloud`). Approximate limits: ~5M tokens/week, ~165K tokens/hour. [community.n8n](https://community.n8n.io/t/ollama-cloud-connection-tested-successfully-but-model-list-shows-no-results/268828)
