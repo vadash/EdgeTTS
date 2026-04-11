@@ -17,4 +17,4 @@ OUTPUT LANGUAGE PROTOCOL:
  * Positive output format instruction placed at the end of every user prompt.
  * Defeats recency bias -- the last thing the model reads before generating.
  */
-export const EXECUTION_TRIGGER = `OUTPUT FORMAT: Return ONLY a single, valid JSON object. Write all reasoning inside the JSON "reasoning" field. No tool calls, no markdown code blocks, no thinking tags.`;
+export const EXECUTION_TRIGGER = `OUTPUT FORMAT: Return ONLY a single, valid JSON object. Write all reasoning inside the JSON "reasoning" field as concise drafts (max 5 words per step, shorthand notation). No tool calls, no markdown code blocks, no thinking tags.`;
