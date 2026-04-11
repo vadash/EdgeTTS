@@ -32,7 +32,8 @@ describe('buildExtractPrompt', () => {
     const result = buildExtractPrompt('text');
     const userContent = result[1].content as string;
     expect(userContent).toContain('reasoning');
-    expect(userContent).toContain('Step 1: Speaker scan');
+    expect(userContent).toContain('terse drafts');
+    expect(userContent).toContain('max 5 words per step');
   });
 
   it('includes constraints in user message', () => {

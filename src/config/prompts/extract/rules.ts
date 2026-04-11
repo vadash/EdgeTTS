@@ -44,13 +44,5 @@ export const EXTRACT_RULES = `1. HOW TO FIND SPEECH:
    - If they have dialogue, they MUST be extracted.
    - CRITICAL: Extract EVERY named character who speaks, even mentors, shopkeepers, or background characters. If they have dialogue, they MUST be extracted.
 
-Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
-CRITICAL: Keep reasoning extremely concise. Do not quote full sentences or list every quote in the text. Only briefly note ambiguous cases.
-Follow these steps IN ORDER:
-
-Step 1: Speaker scan -- Find every quote, bracket message, telepathy, or thought in the text.
-Step 2: Speaker identify -- Match each to a speaker via speech verbs, action beats, pronouns, or first-person narration.
-Step 3: Vocative check -- Verify names inside quotes are listeners, not speakers. Exclude them.
-Step 4: Gender inference -- Extract gender from pronouns (he/she) or context. Default to "unknown".
-Step 5: Variation merge -- If the same person appears with different names, consolidate into one entry with all variations.
-Step 6: Output -- Compile the final character list with canonical names, variations, and genders.`;
+Write your reasoning inside the JSON "reasoning" field as terse drafts (max 5 words per step). Use shorthand: paragraph numbers, speaker codes, arrow notation. Skip obvious cases. Only note ambiguous or corrected items.
+Shorthand: "N: speaker(code)" for found characters, "voc" for vocatives to skip.`;

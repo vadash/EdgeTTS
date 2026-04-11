@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { EXTRACT_RULES } from '../extract/rules';
 
 describe('EXTRACT_RULES', () => {
-  it('should instruct model to write reasoning inside JSON field, not XML tags', () => {
+  it('should instruct model to write reasoning inside JSON field using Chain of Draft', () => {
     expect(EXTRACT_RULES).toContain(
-      'Write your step-by-step work inside the JSON "reasoning" field',
+      'Write your reasoning inside the JSON "reasoning" field as terse drafts',
     );
+    expect(EXTRACT_RULES).toContain('max 5 words per step');
     expect(EXTRACT_RULES).not.toContain('<thinking_process>');
     expect(EXTRACT_RULES).not.toContain('</thinking_process>');
     expect(EXTRACT_RULES).not.toContain('Write your work inside <thinking> tags');
