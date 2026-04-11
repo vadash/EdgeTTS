@@ -25,7 +25,7 @@ export const qaExamplesEN: PromptExample[] = [
   }
 }`,
     output: `{
-  "reasoning": "Found vocative trap in [2]: 'John' inside quotes is the listener, not speaker. Reassigned to Guard (B).",
+  "reasoning": "2: voc trap, John=listener→B (was A).",
   "assignments": {
     "0": "B",
     "1": "A",
@@ -52,7 +52,7 @@ export const qaExamplesEN: PromptExample[] = [
   }
 }`,
     output: `{
-  "reasoning": "Fixed missed action beat: [0] has 'Mary smiled' action beat, but 'Hello there' is spoken by someone else before Mary smiled. Context suggests Protagonist spoke first.",
+  "reasoning": "0: beat 'Mary smiled' after quote→not Mary. Protag spoke→B (was A).",
   "assignments": {
     "0": "B",
     "1": "A"
@@ -81,7 +81,7 @@ export const qaExamplesEN: PromptExample[] = [
   }
 }`,
     output: `{
-  "reasoning": "Removed misassigned narration from [0] (door description has no speaker). [3] is also narration, correctly omitted.",
+  "reasoning": "0: door narr, rm (was A). 1: sys→B ok. 2: Kira→A ok.",
   "assignments": {
     "1": "B",
     "2": "A"
