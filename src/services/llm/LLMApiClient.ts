@@ -94,22 +94,25 @@ export class LLMApiClient {
 
       // Detect test mode (Node.js environment)
       const isTestMode = typeof window === 'undefined' || typeof navigator === 'undefined';
-      const origin = new URL(url.toString()).origin;
 
       if (!isTestMode) {
-        // Browser mode - add browser fingerprint headers
+        // Browser mode - mimic headers a real browser sends for API calls.
+        // CF inspects header set/order; missing or wrong values trigger bot scoring.
         headers.set('Accept', 'application/json, text/event-stream');
-        if (navigator.userAgent) {
-          headers.set('User-Agent', navigator.userAgent);
-        }
         if (navigator.language) {
-          headers.set('Accept-Language', navigator.language);
+          headers.set('Accept-Language', `${navigator.language},en;q=0.9`);
         }
-        headers.set('Origin', origin);
-        headers.set('Referer', `${origin}/`);
+        // Browsers always send their own origin, not the target's origin.
+        // Setting the API's origin here was a strong non-browser signal.
+        headers.set('Origin', window.location.origin);
+        headers.set('Referer', window.location.href);
       }
 
-      return fetch(url, { ...init, headers });
+      return fetch(url, {
+        ...init,
+        headers,
+        credentials: 'include', // send cookies — CF may require them
+      });
     };
 
     this.client = new OpenAI({

@@ -51,7 +51,7 @@ describe('LLMApiClient header handling', () => {
     }
   });
 
-  it('should not hardcode User-Agent in test mode', async () => {
+  it('should not manually set User-Agent (browser controls it)', async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = vi.fn(async (_url, _init) => {
       return new Response(JSON.stringify({}), {
@@ -76,9 +76,11 @@ describe('LLMApiClient header handling', () => {
       const call = (globalThis.fetch as any).mock.calls[0];
       const headers = call[1]?.headers as Headers;
 
-      // In test mode (jsdom), User-Agent should NOT be the hardcoded Chrome string
+      // customFetch should NOT set User-Agent — it's a forbidden header
+      // that the browser controls. The SDK may set its own (e.g. "OpenAI/JS ...")
+      // but we should never inject a Chrome-style UA string.
       const ua = headers.get('User-Agent');
-      expect(ua).not.toContain('Chrome/120.0.0.0');
+      expect(ua).not.toContain('Chrome/');
     } finally {
       globalThis.fetch = originalFetch;
     }
