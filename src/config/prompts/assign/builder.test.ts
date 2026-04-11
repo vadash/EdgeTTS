@@ -36,7 +36,8 @@ describe('buildAssignPrompt', () => {
     const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs);
     const userContent = result[1].content as string;
     expect(userContent).toContain('reasoning');
-    expect(userContent).toContain('Step 1: Dialogue scan');
+    expect(userContent).toContain('terse drafts');
+    expect(userContent).toContain('max 5 words per step');
   });
 
   it('injects overlap sentences with negative indices when provided', () => {

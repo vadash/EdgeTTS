@@ -31,12 +31,5 @@ export const ASSIGN_RULES = `1. SKIP NON-DIALOGUE:
    The speaker is determined by the dialogue portion (speech verb, action beat, pronoun). The narration tail does NOT change the speaker.
    Example: "Observe," Professor Viridian said. He put on a gauntlet and reached through the barrier to pluck a leaf. -> Assign to Professor Viridian (he is the one who spoke "Observe").
 
-Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
-CRITICAL: Keep reasoning extremely concise. Do not quote full sentences. Do not analyze every paragraph individually. Only briefly note ambiguous cases.
-Follow these steps IN ORDER:
-
-Step 1: Dialogue scan -- Identify every paragraph with quotes, thoughts, or system bracket messages.
-Step 2: Speaker match -- Use speech verbs ("said X"), action beats, pronouns, and first-person narration to identify speakers.
-Step 3: Vocative check -- Names inside quotes are listeners, not speakers. Cross them off.
-Step 4: Context check -- Use paragraph sequence and previous context (negative indices) for ambiguous cases.
-Step 5: Output -- Map paragraph numbers to speaker codes. Skip pure narration. Only assign non-negative indices.`;
+Write your reasoning inside the JSON "reasoning" field as terse drafts (max 5 words per step). Use shorthand: paragraph numbers, speaker codes, arrow notation. Skip obvious cases. Only note ambiguous or corrected items.
+Shorthand: "N: code" for assignments, "narr" for narration-only, "voc" for vocative traps.`;
