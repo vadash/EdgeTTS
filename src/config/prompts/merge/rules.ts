@@ -25,12 +25,5 @@ export const MERGE_RULES = `1. CHECK VARIATIONS AND CONTEXT:
    If no proper name exists, use the most descriptive title.
    Example: 0 is "Irogh". 1 is "The Most Handsome Man". The group should be [0, 1] because "Irogh" is the proper name.
 
-Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the data arrays/objects.
-CRITICAL: Keep reasoning extremely concise. Only list characters that have potential merges; skip obviously unrelated pairs.
-Follow these steps IN ORDER:
-
-Step 1: Variation cross-check -- Compare variations arrays between all character pairs. Flag any shared names.
-Step 2: System entity match -- Link System, Interface, Blue Box, Notification into one group.
-Step 3: Protagonist match -- If Protagonist exists, check if another character is the same person (main character).
-Step 4: Conflict check -- Reject any proposed merges with gender mismatches or insufficient confidence.
-Step 5: Output -- Build merge groups. First number = best/longest canonicalName. Empty array if no merges.`;
+Write your reasoning inside the JSON "reasoning" field as terse drafts (max 5 words per step). Use shorthand: paragraph numbers, speaker codes, arrow notation. Skip obvious cases. Only note ambiguous or corrected items.
+Shorthand: "X+Y→X" for merges, "uniq" for no-match characters, "sys" for system entities.`;

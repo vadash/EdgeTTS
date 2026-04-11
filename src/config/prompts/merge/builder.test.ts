@@ -32,7 +32,8 @@ describe('buildMergePrompt', () => {
     const result = buildMergePrompt(characters);
     const userContent = result[1].content as string;
     expect(userContent).toContain('reasoning');
-    expect(userContent).toContain('Step 1: Variation cross-check');
+    expect(userContent).toContain('terse drafts');
+    expect(userContent).toContain('max 5 words per step');
   });
 
   it('accepts detectedLanguage parameter', () => {

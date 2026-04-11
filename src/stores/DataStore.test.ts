@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { DictionaryRule, ProcessedBook, TTSWorker } from '@/state/types';
+import type { ProcessedBook, TTSWorker } from '@/state/types';
 import { createDataStore, type DataStore } from './DataStore';
 
 describe('DataStore', () => {

@@ -17,7 +17,6 @@ import {
   setFFmpegLoaded,
   setFFmpegLoading,
   setStatus,
-  setTotal,
   startConversion,
   updateProgress,
 } from './ConversionStore';
