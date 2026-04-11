@@ -1,0 +1,10 @@
+#!/bin/bash
+# Pre-commit hook: run all checks via `npm run check`.
+# If any step fails the commit is aborted — fix errors, don't skip them.
+set -euo pipefail
+
+echo "Running pre-commit checks..."
+npm run check
+
+# Re-stage any files modified by formatters/linting
+git add -u

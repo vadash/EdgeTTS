@@ -2,15 +2,8 @@
 
 A local-first Text-to-Speech web app that converts books (EPUB/FB2/TXT) to audiobooks using Edge TTS and LLMs for character voice assignment.
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm ci` | Install dependencies |
-| `npm test` | Run standard unit tests (Vitest) |
-| `npm run lint` | Lint code via Biome |
-| `npm run format` | Format code via Biome |
-| `npm run typecheck` | Run TypeScript compiler checks |
+### Pre-Commit
+- **`npm run check` runs automatically on every commit** (format, lint, typecheck, test). The commit is aborted on any failure — fix errors, never skip them
 
 ## Architecture Map
 
