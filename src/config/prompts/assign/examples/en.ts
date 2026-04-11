@@ -18,7 +18,7 @@ export const assignExamplesEN: PromptExample[] = [
 [2] "I'm right here," Mary said.
 [3] [Quest Updated]`,
     output: `{
-  "reasoning": "0 is narration. 1 has John speaking. 2 has Mary speaking. 3 is a System message.",
+  "reasoning": "0: narr. 1: John→A. 2: Mary→B. 3: sys→C.",
   "assignments": {
     "1": "A",
     "2": "B",
@@ -39,7 +39,7 @@ export const assignExamplesEN: PromptExample[] = [
 [2] "Show your papers, Captain," the guard ordered.
 [3] "Of course."`,
     output: `{
-  "reasoning": "0 is the guard. 1 is the protagonist ('I'). 2 is the guard speaking to Captain (vocative -- Captain is listener). 3 is the guard continuing.",
+  "reasoning": "0: guard→B. 1: 'I'→A. 2: guard→B, Captain voc. 3: guard cont→B.",
   "assignments": {
     "0": "B",
     "1": "A",
@@ -62,7 +62,7 @@ export const assignExamplesEN: PromptExample[] = [
 [3] Elena sighed. "We need to tell the others."
 [4] "Agreed," I said.`,
     output: `{
-  "reasoning": "1 is Protagonist ('I shook my head'). 2 is Marcus (action beat). 3 is Elena (action beat). 4 is Protagonist ('I said').",
+  "reasoning": "1: 'I'→A. 2: Marcus beat→B. 3: Elena beat→C. 4: 'I said'→A.",
   "assignments": {
     "1": "A",
     "2": "B",
@@ -85,7 +85,7 @@ export const assignExamplesEN: PromptExample[] = [
 [4] [Warning: Enemy Level 15 -- Retreat Recommended]
 [5] "Not today." She drew her blade.`,
     output: `{
-  "reasoning": "1 is a system message. 2 is Kira (explicit tag). 3 is narration. 4 is a system message. 5 is Kira (action beat, 'She' refers to Kira).",
+  "reasoning": "1: sys→B. 2: Kira tag→A. 3: narr. 4: sys→B. 5: 'She'=Kira beat→A.",
   "assignments": {
     "1": "B",
     "2": "A",
@@ -106,7 +106,7 @@ export const assignExamplesEN: PromptExample[] = [
 [2] "Observe, the golden crown," the professor said, "hence regal cordyline. Wear proper protective gear, or you're likely to lose your arm."
 [3] Mirian could feel the heat even from the second row. The golden light spun in a circle, crackling with energy.`,
     output: `{
-  "reasoning": "0 has dialogue 'Observe' with explicit tag 'Professor Viridian said' -- the long narration after it describes his actions but the speaker is Viridian. 1 is narration. 2 has dialogue with explicit tag 'the professor said' -- professor = Viridian. 3 is narration describing Mirian's perspective but no dialogue.",
+  "reasoning": "0: Viridian tag→A. 1: narr. 2: professor=Viridian tag→A. 3: narr.",
   "assignments": {
     "0": "A",
     "2": "A"
