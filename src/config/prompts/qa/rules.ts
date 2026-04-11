@@ -37,5 +37,5 @@ export const QA_RULES = `1. REVIEW THE DRAFT:
    Use the same JSON format as the draft: { "reasoning": "...", "assignments": { "0": "A", "1": "B" } }
    The reasoning field should briefly note what errors were found and corrected.
 
-Write your step-by-step work inside the JSON "reasoning" field BEFORE outputting the corrected assignments.
-CRITICAL: Keep reasoning concise. Focus only on errors found and corrections made.`;
+Write your reasoning inside the JSON "reasoning" field as terse drafts (max 5 words per step). Use shorthand: paragraph numbers, speaker codes, arrow notation. Skip obvious cases. Only note ambiguous or corrected items.
+Shorthand: "N: old→new (reason)" for corrections, "ok" for correct assignments, "rm N" for removed.`;
