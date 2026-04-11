@@ -44,7 +44,7 @@ async function countNewFormatChunks(dir: FileSystemDirectoryHandle): Promise<num
     const indexFile = await indexHandle.getFile();
     const text = await indexFile.text();
     // Count non-empty lines
-    return text.split('\n').filter(line => line.trim().length > 0).length;
+    return text.split('\n').filter((line) => line.trim().length > 0).length;
   } catch {
     return 0;
   }

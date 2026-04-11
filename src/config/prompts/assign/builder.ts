@@ -69,5 +69,12 @@ ${numberedParagraphs}
 5. Only assign speaker codes to paragraphs [0] and above.
 Output the raw JSON now.`;
 
-  return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage, undefined, undefined, repeatPrompt);
+  return buildMessages(
+    sys,
+    `${user}\n\n${constraints}`,
+    detectedLanguage,
+    undefined,
+    undefined,
+    repeatPrompt,
+  );
 }

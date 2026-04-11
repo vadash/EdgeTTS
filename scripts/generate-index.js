@@ -68,9 +68,7 @@ const redirectScript = currentEntry
   : '';
 
 // Current build section with Latest badge
-const buildTimestamp = currentEntry
-  ? getTimestampEpoch(resolve(shaDir, currentEntry))
-  : '';
+const buildTimestamp = currentEntry ? getTimestampEpoch(resolve(shaDir, currentEntry)) : '';
 const currentSection = currentEntry
   ? `
     <div class="versions current">

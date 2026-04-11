@@ -350,11 +350,7 @@ export class AudioMerger {
       throw new Error(`Directory permission check failed: ${(err as Error).message}`);
     }
 
-    const groups = await this.calculateMergeGroups(
-      audioMap,
-      totalSentences,
-      fileNames,
-    );
+    const groups = await this.calculateMergeGroups(audioMap, totalSentences, fileNames);
     let savedCount = 0;
     let skippedCount = 0;
 
@@ -382,11 +378,8 @@ export class AudioMerger {
         `Processing part ${i + 1}/${groups.length} (~${durationMin} min)`,
       );
 
-      const merged = await this.mergeAudioGroupAsync(
-        audioMap,
-        group,
-        groups.length,
-        (msg) => onProgress?.(i + 1, groups.length, msg),
+      const merged = await this.mergeAudioGroupAsync(audioMap, group, groups.length, (msg) =>
+        onProgress?.(i + 1, groups.length, msg),
       );
 
       if (merged) {

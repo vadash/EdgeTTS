@@ -369,7 +369,8 @@ Step 1: John speaks.
   });
 
   it('accepts key typo and defaults reasoning to null', () => {
-    const json = '{"reasonin": "some thought", "characters": [{"canonicalName": "Test", "variations": [], "gender": "unknown"}]}';
+    const json =
+      '{"reasonin": "some thought", "characters": [{"canonicalName": "Test", "variations": [], "gender": "unknown"}]}';
     const result = safeParseJSON(json, { schema: ExtractSchema });
     expect(result.success).toBe(true);
     if (result.success && result.data) {

@@ -105,7 +105,7 @@ describe('checkResumeState', () => {
     const result = await checkResumeState(dirHandle, log);
     // Should return null because legacy format is detected and wiped
     expect(result).toBeNull();
-    expect(logs.some(msg => msg.includes('legacy format detected'))).toBe(true);
+    expect(logs.some((msg) => msg.includes('legacy format detected'))).toBe(true);
 
     // Verify _temp_work was removed
     let tempWorkExists = false;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AssignContext, LLMCharacter } from '@/state/types';
+import type { LLMCharacter } from '@/state/types';
+import type { AssignContext } from './PromptStrategy';
 import {
   buildAssignPrompt,
   buildExtractPrompt,

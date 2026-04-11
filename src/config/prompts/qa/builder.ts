@@ -71,5 +71,12 @@ ${draftJson}
 Review the draft assignments above and correct any errors.
 Output the corrected JSON now.`;
 
-  return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage, undefined, undefined, repeatPrompt);
+  return buildMessages(
+    sys,
+    `${user}\n\n${constraints}`,
+    detectedLanguage,
+    undefined,
+    undefined,
+    repeatPrompt,
+  );
 }

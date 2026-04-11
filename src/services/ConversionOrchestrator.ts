@@ -976,7 +976,9 @@ async function runTTSStage(
           existingFailed.add(idx);
         }
         const failedJson = JSON.stringify([...existingFailed].sort((a, b) => a - b));
-        const failedFileHandle = await tempDirHandle.getFileHandle('failed_chunks.json', { create: true });
+        const failedFileHandle = await tempDirHandle.getFileHandle('failed_chunks.json', {
+          create: true,
+        });
         const writable = await failedFileHandle.createWritable();
         await writable.write(failedJson);
         await writable.close();

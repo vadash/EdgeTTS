@@ -180,7 +180,6 @@ export class TTSWorkerPool {
    * Acquires connection from pool, executes, releases back
    */
   private async executeTask(task: PoolTask): Promise<void> {
-
     // Acquire connection from pool
     let service: ReusableEdgeTTSService | null = null;
 

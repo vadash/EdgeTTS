@@ -242,10 +242,7 @@ export function stripThinkingTags(text: string): string {
  * Apply array-at-root recovery if parsed value is an array and schema expects an object with array field.
  * Detects when LLM returns a naked array instead of {reasoning: null, items: [...]} structure.
  */
-function applyArrayAtRootRecovery<T>(
-  parsed: unknown,
-  schema: z.ZodType<T>,
-): unknown {
+function applyArrayAtRootRecovery<T>(parsed: unknown, schema: z.ZodType<T>): unknown {
   // Only apply if parsed is an array and schema is a ZodObject with shape
   if (!Array.isArray(parsed)) return parsed;
 
@@ -254,13 +251,11 @@ function applyArrayAtRootRecovery<T>(
   if (!zodObj._def?.shape) return parsed;
 
   const shape = zodObj._def.shape;
-  const arrayFields = Object.entries(shape).filter(
-    ([_, fieldSchema]) => {
-      // ZodArray has 'type' property (not 'typeName') set to 'array'
-      const fieldDef = (fieldSchema as unknown as { _def?: { type?: string } })._def;
-      return fieldDef?.type === 'array';
-    },
-  );
+  const arrayFields = Object.entries(shape).filter(([_, fieldSchema]) => {
+    // ZodArray has 'type' property (not 'typeName') set to 'array'
+    const fieldDef = (fieldSchema as unknown as { _def?: { type?: string } })._def;
+    return fieldDef?.type === 'array';
+  });
 
   // Only recover if there's exactly one array field in the schema
   if (arrayFields.length === 1) {
@@ -276,16 +271,9 @@ function applyArrayAtRootRecovery<T>(
  * and schema expects an object with 'assignments' field.
  * Detects when LLM returns {"0": "A", "1": "B"} instead of {reasoning: null, assignments: {"0": "A", "1": "B"}}.
  */
-function applyFlattenedAssignmentsRecovery<T>(
-  parsed: unknown,
-  schema: z.ZodType<T>,
-): unknown {
+function applyFlattenedAssignmentsRecovery<T>(parsed: unknown, schema: z.ZodType<T>): unknown {
   // Only apply if parsed is a plain object (not array, not null)
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    Array.isArray(parsed)
-  ) {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return parsed;
   }
 
@@ -294,7 +282,7 @@ function applyFlattenedAssignmentsRecovery<T>(
   if (!zodObj._def?.shape) return parsed;
 
   const recognizedKeys = ['reasoning', 'assignments', 'characters', 'merges'];
-  const hasRecognizedKey = recognizedKeys.some(key => key in (parsed as object));
+  const hasRecognizedKey = recognizedKeys.some((key) => key in (parsed as object));
 
   // If object has recognized keys, it's already structured correctly
   if (hasRecognizedKey) return parsed;
@@ -303,7 +291,7 @@ function applyFlattenedAssignmentsRecovery<T>(
   const keys = Object.keys(parsed);
   if (keys.length === 0) return parsed;
 
-  const allNumeric = keys.every(key => /^\d+$/.test(key));
+  const allNumeric = keys.every((key) => /^\d+$/.test(key));
 
   // If all keys are numeric strings, wrap as flattened assignments
   if (allNumeric) {

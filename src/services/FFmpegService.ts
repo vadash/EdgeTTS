@@ -96,7 +96,10 @@ export namespace FFmpegBlobCache {
  * instead of feeding HTML garbage to the FFmpeg Web Worker.
  * Also returns the raw Blob for persistent caching.
  */
-async function safeToBlobURL(url: string, mimeType: string): Promise<{ blobURL: string; blob: Blob }> {
+async function safeToBlobURL(
+  url: string,
+  mimeType: string,
+): Promise<{ blobURL: string; blob: Blob }> {
   const resp = await fetch(url);
   if (!resp.ok) {
     throw new Error(
@@ -227,8 +230,14 @@ export class FFmpegService {
     try {
       // Use relative paths to the files copied by Webpack CopyWebpackPlugin
       const baseURL = '.';
-      const { blobURL: coreURL, blob: coreBlob } = await safeToBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript');
-      const { blobURL: wasmURL, blob: wasmBlob } = await safeToBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm');
+      const { blobURL: coreURL, blob: coreBlob } = await safeToBlobURL(
+        `${baseURL}/ffmpeg-core.js`,
+        'text/javascript',
+      );
+      const { blobURL: wasmURL, blob: wasmBlob } = await safeToBlobURL(
+        `${baseURL}/ffmpeg-core.wasm`,
+        'application/wasm',
+      );
 
       await ffmpeg.load({ coreURL, wasmURL });
 

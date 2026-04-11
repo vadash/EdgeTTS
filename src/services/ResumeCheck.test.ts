@@ -21,16 +21,16 @@ class MockFileSystem {
             let position = 0;
             return {
               write: async (data: Uint8Array | string) => {
-                const bytes = typeof data === 'string'
-                  ? new TextEncoder().encode(data)
-                  : data;
+                const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
                 const currentData = file.data;
                 const before = currentData.slice(0, position);
                 const after = currentData.slice(position + bytes.length);
                 file.data = new Uint8Array([...before, ...bytes, ...after]);
                 position += bytes.length;
               },
-              seek: async (offset: number) => { position = offset; },
+              seek: async (offset: number) => {
+                position = offset;
+              },
               truncate: async (size: number) => {
                 file.data = file.data.slice(0, size);
               },
@@ -97,7 +97,7 @@ describe('ResumeCheck', () => {
     const result = await checkResumeState(parentDir, (msg) => logMessages.push(msg));
     // Should return null because chunks_index.jsonl doesn't exist (legacy wipe)
     expect(result).toBeNull();
-    expect(logMessages.some(msg => msg.includes('legacy format detected'))).toBe(true);
+    expect(logMessages.some((msg) => msg.includes('legacy format detected'))).toBe(true);
   });
 
   it('should detect new format with chunks_index.jsonl', async () => {

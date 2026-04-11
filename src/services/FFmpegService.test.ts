@@ -172,20 +172,36 @@ function createFakeIDB() {
       const ops = {
         get: (key: string) => {
           const result = store.get(key);
-          const req = { onsuccess: null as ((ev: any) => void) | null, onerror: null as ((ev: any) => void) | null, result };
-          queueMicrotask(() => { if (req.onsuccess) req.onsuccess({}); });
+          const req = {
+            onsuccess: null as ((ev: any) => void) | null,
+            onerror: null as ((ev: any) => void) | null,
+            result,
+          };
+          queueMicrotask(() => {
+            if (req.onsuccess) req.onsuccess({});
+          });
           return req;
         },
         put: (value: Blob, key: string) => {
           store.set(key, value);
-          const req = { onsuccess: null as ((ev: any) => void) | null, onerror: null as ((ev: any) => void) | null };
-          queueMicrotask(() => { if (req.onsuccess) req.onsuccess({}); });
+          const req = {
+            onsuccess: null as ((ev: any) => void) | null,
+            onerror: null as ((ev: any) => void) | null,
+          };
+          queueMicrotask(() => {
+            if (req.onsuccess) req.onsuccess({});
+          });
           return req;
         },
         delete: (key: string) => {
           store.delete(key);
-          const req = { onsuccess: null as ((ev: any) => void) | null, onerror: null as ((ev: any) => void) | null };
-          queueMicrotask(() => { if (req.onsuccess) req.onsuccess({}); });
+          const req = {
+            onsuccess: null as ((ev: any) => void) | null,
+            onerror: null as ((ev: any) => void) | null,
+          };
+          queueMicrotask(() => {
+            if (req.onsuccess) req.onsuccess({});
+          });
           return req;
         },
       };

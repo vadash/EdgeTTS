@@ -36,7 +36,11 @@ export class ChunkStore {
 
         try {
           const entry = JSON.parse(line);
-          if (typeof entry.i === 'number' && typeof entry.o === 'number' && typeof entry.l === 'number') {
+          if (
+            typeof entry.i === 'number' &&
+            typeof entry.o === 'number' &&
+            typeof entry.l === 'number'
+          ) {
             this.index.set(entry.i, { offset: entry.o, length: entry.l });
             maxValidOffset = Math.max(maxValidOffset, entry.o + entry.l);
             validIndexBytes = bytePosition + lineBytes;

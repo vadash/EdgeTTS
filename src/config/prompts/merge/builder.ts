@@ -14,7 +14,11 @@ import { MERGE_ROLE } from './role';
 import { MERGE_RULES } from './rules';
 import { MERGE_SCHEMA_TEXT } from './schema';
 
-export function buildMergePrompt(characters: LLMCharacter[], detectedLanguage: string = 'en', repeatPrompt: boolean = false) {
+export function buildMergePrompt(
+  characters: LLMCharacter[],
+  detectedLanguage: string = 'en',
+  repeatPrompt: boolean = false,
+) {
   const examples = getMergeExamples();
   const characterList = characters
     .map(
@@ -34,5 +38,12 @@ If characters share a variation, or are clearly the same entity (like System and
 The first number in each group must be the best/longest name.
 If no merges are needed, output "merges": [].`;
 
-  return buildMessages(sys, `${user}\n\n${constraints}`, detectedLanguage, undefined, undefined, repeatPrompt);
+  return buildMessages(
+    sys,
+    `${user}\n\n${constraints}`,
+    detectedLanguage,
+    undefined,
+    undefined,
+    repeatPrompt,
+  );
 }
