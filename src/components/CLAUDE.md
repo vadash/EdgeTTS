@@ -28,3 +28,4 @@ src/components/
 - **Signal Unwrapping:** Do NOT unwrap signals (`.value`) inside JSX unless necessary for string/primitive interpolation. Pass the signal directly to components if supported to optimize and localize rendering.
 - **Performance:** This is a local-first app. Avoid heavy computations in render. Use `computed` signals for derived state.
 - **UI State vs Global State:** Use local `useState` for transient UI state (e.g., dropdown open). Use global stores for persistent or shared state (e.g., Conversion progress).
+- **Dismissible Notifications**: Use `NotificationBanner` from `@/components/common` for dismissible UI hints. Wrap in conditional logic based on both `dismissedNotifications[storageKey]` and feature state (e.g., `!isConfigured`). Storage keys defined in `DismissedNotifications` interface in `UISettingsStore.ts`.

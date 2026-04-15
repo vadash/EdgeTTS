@@ -34,6 +34,8 @@ Vitest-based test suites covering utilities, services, state logic, and prompt b
 ## Gotchas
 
 - **Mocking Strategy**: Standard unit tests MUST mock all external network calls, File System API (`createMockDirectoryHandle`), and WebSockets.
+- **TDD Workflow**: Write failing tests first (`npm test -- --run`), implement minimal code to pass, then refactor. Each task should have its own test file.
+- **localStorage Testing**: Always call `localStorage.clear()` in `beforeEach`. Mock `StorageKeys` imports when testing store persistence. Use `vi.spyOn(window.localStorage, 'getItem')` to simulate parse errors.
 - **Global Mocks**: `p-retry`, `p-queue`, and `generic-pool` are mocked globally in `src/test/setup.ts` to execute immediately without actual polling/delays.
 - **IndexedDB Mock Override**: The global `window.indexedDB` mock in `setup.ts` is `configurable` + `writable`. Per-test overrides via `(window as any).indexedDB = {...}` work. When faking IDB request objects, each request must fire `onsuccess` via `queueMicrotask` after returning — otherwise Promises wrapping `request.onsuccess` hang forever.
 - **API Keys for Real Tests**: Real LLM tests require populating `test.config.local.ts` (copy from `.example`) with actual API credentials. Do not commit this file.

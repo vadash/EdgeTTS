@@ -45,3 +45,8 @@ src/
 - **File System API**: The app writes directly to the user's hard drive to prevent OOM errors. All file operations MUST use `withPermissionRetry` to gracefully handle browser security context drops.
 - **Async Resilience**: Network and WebSocket calls must use the internal `withRetry` utility (which wraps `p-retry`) to survive sleep modes and rate limits.
 - **KeepAwake Strategy**: The app uses `AudioContext` dummy oscillators, Web Locks API, and Screen Wake Lock to prevent background tab throttling during long conversions.
+
+## UI State Persistence
+
+- **UISettings Store**: Use `UISettingsStore` for transient UI state that persists across sessions (e.g., dismissed notifications) — stored unencrypted in localStorage via `StorageKeys.uiSettings`
+- **Settings vs UISettings**: `SettingsStore` = user-configurable app settings (encrypted where sensitive); `UISettingsStore` = UI state that survives reloads but NOT settings reset
