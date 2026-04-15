@@ -148,6 +148,9 @@
     "en": "EN",
     "ru": "RU"
   },
+  "notificationBanner": {
+    "dismissAria": "Закрыть уведомление"
+  },
   "about": {
     "title": "О Edge TTS",
     "headline": "Edge TTS Web",
