@@ -97,6 +97,24 @@ describe('TTSWorkerPool', () => {
     filenum: String(partIndex + 1).padStart(4, '0'),
   });
 
+  describe('retry state initialization', () => {
+    it('initializes retryCount Map as empty', () => {
+      pool = createPool();
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryCount).toBeInstanceOf(Map);
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryCount.size).toBe(0);
+    });
+
+    it('initializes retryTimers Map as empty', () => {
+      pool = createPool();
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryTimers).toBeInstanceOf(Map);
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryTimers.size).toBe(0);
+    });
+  });
+
   describe('addTask', () => {
     it('adds a single task to the queue', () => {
       pool = createPool();

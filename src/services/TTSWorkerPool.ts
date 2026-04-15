@@ -66,6 +66,12 @@ export class TTSWorkerPool {
   private onAllComplete?: () => void;
   private logger?: Logger;
 
+  // Retry state management
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in upcoming tasks
+  private retryCount = new Map<number, number>();
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in upcoming tasks
+  private retryTimers = new Map<number, NodeJS.Timeout>();
+
   constructor(options: WorkerPoolOptions) {
     this.voiceConfig = options.config;
     this.chunkStore = options.chunkStore ?? null;
