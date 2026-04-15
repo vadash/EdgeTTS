@@ -271,9 +271,9 @@ describe('ConversionStore', () => {
       updateProgress(10, 100, 5);
 
       // 10 successful items in 10 seconds = 1s/item
-      // Remaining successful items: 100 - 10 - 5 = 85
-      // ETA: 85 * 1s = 85s = 00:01:25
-      expect(estimatedTimeRemaining.value).toBe('00:01:25');
+      // Remaining items: 100 - 10 = 90
+      // ETA: 90 * 1s = 90s = 00:01:30
+      expect(estimatedTimeRemaining.value).toBe('00:01:30');
 
       vi.restoreAllMocks();
     });

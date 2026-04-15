@@ -113,7 +113,7 @@ export const elapsedTime = computed(() => {
 });
 
 export const estimatedTimeRemaining = computed(() => {
-  const { current, total, failed } = conversion.value.progress;
+  const { current, total } = conversion.value.progress;
   const status = conversion.value.status;
 
   if (
@@ -126,14 +126,17 @@ export const estimatedTimeRemaining = computed(() => {
   }
 
   const start = conversion.value.phaseStartTime;
-  if (!start || total === 0 || current === 0) return null;
+  if (!start || total === 0 || current === 0 || current >= total) return null;
 
   const elapsed = Date.now() - start;
-  const successfulCurrent = current - failed;
-  if (successfulCurrent <= 0) return null;
-  const rate = elapsed / current;
-  const remainingItems = total - current - failed;
-  return formatDuration(remainingItems * rate);
+  const baseline = conversion.value.phaseStartProgress;
+  const processed = current - baseline;
+
+  if (processed <= 0) return null;
+
+  const timePerItem = elapsed / processed;
+  const remainingItems = total - current;
+  return formatDuration(remainingItems * timePerItem);
 });
 
 // ============================================================================
