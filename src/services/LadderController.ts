@@ -59,7 +59,7 @@ export class LadderController {
 
     // Check for errors that should trigger scale down
     // If any task failed after max retries, scale down immediately
-    const hasHardFailure = this.history.some((h) => !h.success && h.retries >= 10);
+    const hasHardFailure = this.history.some((h) => !h.success && h.retries >= 5);
 
     if (hasHardFailure) {
       this.scaleDown();

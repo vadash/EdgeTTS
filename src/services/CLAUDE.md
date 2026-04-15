@@ -35,7 +35,7 @@ The TTSWorkerPool uses **immediate re-enqueuing** of failed tasks instead of inl
 
 **How it works:**
 1. Task fails → Connection destroyed (not released)
-2. Retry delay calculated (10s → 20s → 40s ... → 600s max)
+2. Retry delay calculated (30s → 120s → 300s → 600s → 1200s max)
 3. Task scheduled via `setTimeout` to re-enqueue
 4. Worker slot freed immediately to process healthy chunks
 5. On timeout, task re-added to queue with fresh connection
@@ -56,8 +56,8 @@ When modifying TTSWorkerPool or integrating with it:
 ### LadderController Integration
 
 - **Success:** Record `0` retries (actual retry count cleared before recording)
-- **Permanent failure:** Record `11` retries (max retry limit)
-- **Intermediate retries:** Do NOT record — avoids triggering `hasHardFailure` scale-down which looks for `retries >= 10`
+- **Permanent failure:** Record `5` retries (max retry limit)
+- **Intermediate retries:** Do NOT record — avoids triggering `hasHardFailure` scale-down which looks for `retries >= 5`
 
 ### Status Update Pattern
 
@@ -73,4 +73,4 @@ Retry state (`retryCount`, `retryTimers`) is lost on page refresh — this is ac
 
 ### TTS Failure Logging
 
-When a task permanently fails (after 11 retries), the pool writes a failure log entry to `logs/tts_fail*.json` in the directory handle. Each log contains: `partIndex`, `text`, `errorMessage`, `retryCount: 11`, and `timestamp`. This is non-fatal — if logging fails, the conversion continues.
+When a task permanently fails (after 5 retries), the pool writes a failure log entry to `logs/tts_fail*.json` in the directory handle. Each log contains: `partIndex`, `text`, `errorMessage`, `retryCount: 5`, and `timestamp`. This is non-fatal — if logging fails, the conversion continues.

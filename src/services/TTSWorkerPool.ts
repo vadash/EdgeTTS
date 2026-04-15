@@ -308,17 +308,17 @@ export class TTSWorkerPool {
   }
 
   /**
-   * Calculate exponential backoff delay with jitter and max cap
-   * Formula: Math.min(baseDelay * 2^(attempt-1) + jitter, maxDelay)
-   * @param attempt - Retry attempt number (1-indexed)
+   * Calculate retry delay with custom progression and jitter
+   * Progression: 30s → 120s → 300s → 600s → 1200s (capped)
+   * @param attempt - Retry attempt number (1-indexed, max 5)
    * @returns Delay in milliseconds
    */
   private calculateRetryDelay(attempt: number): number {
-    const baseDelay = 10_000; // 10 seconds
-    const maxDelay = 600_000; // 10 minutes
+    const delays = [30_000, 120_000, 300_000, 600_000, 1_200_000]; // 30s, 2m, 5m, 10m, 20m
+    const baseDelay = delays[Math.min(attempt - 1, delays.length - 1)];
     const jitter = Math.random() * 1000; // 0-1000ms random jitter
 
-    return Math.min(baseDelay * 2 ** (attempt - 1) + jitter, maxDelay);
+    return baseDelay + jitter;
   }
 
   /**
@@ -335,12 +335,12 @@ export class TTSWorkerPool {
     this.retryCount.set(task.partIndex, attempt);
 
     // Check if we've exceeded max retries
-    if (attempt > 11) {
+    if (attempt > 5) {
       // Log the failure for debugging
       await this.logTTSFailure(task, error);
 
       // Permanent failure - record with ladder
-      this.ladder.recordTask(false, 11);
+      this.ladder.recordTask(false, 5);
       this.ladder.evaluate();
 
       // Add to failed tasks
@@ -351,7 +351,7 @@ export class TTSWorkerPool {
       this.onTaskError?.(task.partIndex, error instanceof Error ? error : new Error(String(error)));
 
       this.logger?.error(
-        `Task ${task.partIndex} failed permanently after 11 attempts`,
+        `Task ${task.partIndex} failed permanently after 5 attempts`,
         error as Error,
       );
 
@@ -371,7 +371,7 @@ export class TTSWorkerPool {
     });
 
     this.logger?.warn(
-      `Task ${task.partIndex} failed (attempt ${attempt}/11). Retrying in ${Math.round(delay / 1000)}s`,
+      `Task ${task.partIndex} failed (attempt ${attempt}/5). Retrying in ${Math.round(delay / 1000)}s`,
     );
 
     // Schedule retry with setTimeout
@@ -435,7 +435,7 @@ export class TTSWorkerPool {
         partIndex: task.partIndex,
         text: task.text,
         errorMessage,
-        retryCount: 11,
+        retryCount: 5,
         timestamp: new Date().toISOString(),
       };
 

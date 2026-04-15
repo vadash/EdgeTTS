@@ -656,7 +656,7 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('calculateRetryDelay', () => {
-    it('calculates delay progression: attempt 1 → ~10s', () => {
+    it('calculates delay progression: attempt 1 → ~30s', () => {
       pool = createPool();
       // Mock Math.random for deterministic testing (mid-range jitter)
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -664,71 +664,66 @@ describe('TTSWorkerPool', () => {
       // @ts-expect-error - accessing private method for testing
       const delay = pool.calculateRetryDelay(1);
 
-      // baseDelay * 2^(1-1) + jitter = 10000 * 1 + 500 = 10500ms
-      expect(delay).toBe(10500);
+      // delays[0] + jitter = 30000 + 500 = 30500ms
+      expect(delay).toBe(30500);
     });
 
-    it('calculates delay progression: attempt 2 → ~20s', () => {
+    it('calculates delay progression: attempt 2 → ~120s', () => {
       pool = createPool();
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
       // @ts-expect-error - accessing private method for testing
       const delay = pool.calculateRetryDelay(2);
 
-      // baseDelay * 2^(2-1) + jitter = 10000 * 2 + 500 = 20500ms
-      expect(delay).toBe(20500);
+      // delays[1] + jitter = 120000 + 500 = 120500ms
+      expect(delay).toBe(120500);
     });
 
-    it('calculates delay progression: attempt 3 → ~40s', () => {
+    it('calculates delay progression: attempt 3 → ~300s', () => {
       pool = createPool();
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
       // @ts-expect-error - accessing private method for testing
       const delay = pool.calculateRetryDelay(3);
 
-      // baseDelay * 2^(3-1) + jitter = 10000 * 4 + 500 = 40500ms
-      expect(delay).toBe(40500);
+      // delays[2] + jitter = 300000 + 500 = 300500ms
+      expect(delay).toBe(300500);
     });
 
-    it('calculates delay progression: attempt 4 → ~80s', () => {
+    it('calculates delay progression: attempt 4 → ~600s', () => {
       pool = createPool();
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
       // @ts-expect-error - accessing private method for testing
       const delay = pool.calculateRetryDelay(4);
 
-      // baseDelay * 2^(4-1) + jitter = 10000 * 8 + 500 = 80500ms
-      expect(delay).toBe(80500);
+      // delays[3] + jitter = 600000 + 500 = 600500ms
+      expect(delay).toBe(600500);
     });
 
-    it('calculates delay progression: attempt 5 → ~160s', () => {
+    it('calculates delay progression: attempt 5 → ~1200s (capped)', () => {
       pool = createPool();
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
       // @ts-expect-error - accessing private method for testing
       const delay = pool.calculateRetryDelay(5);
 
-      // baseDelay * 2^(5-1) + jitter = 10000 * 16 + 500 = 160500ms
-      expect(delay).toBe(160500);
+      // delays[4] + jitter = 1200000 + 500 = 1200500ms (capped at max)
+      expect(delay).toBe(1200500);
     });
 
-    it('caps max delay at 600s (10 minutes) for attempts 7-11', () => {
+    it('caps max delay at 1200s (20 minutes) - attempts beyond 5 use last delay', () => {
       pool = createPool();
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
       // @ts-expect-error - accessing private method for testing
       const calculateDelay = (attempt: number) => pool.calculateRetryDelay(attempt);
 
-      // Attempt 6: 10000 * 2^5 + 500 = 320500ms (not capped yet)
-      expect(calculateDelay(6)).toBe(320500);
-
-      // Attempts 7-11 should all be capped at maxDelay (600000ms)
-      // Note: When capped, jitter is not applied since Math.min returns maxDelay directly
-      expect(calculateDelay(7)).toBe(600000); // Capped at 600000
-      expect(calculateDelay(8)).toBe(600000);
-      expect(calculateDelay(9)).toBe(600000);
-      expect(calculateDelay(10)).toBe(600000);
-      expect(calculateDelay(11)).toBe(600000);
+      // Attempts beyond 5 should use delays[4] (1200000ms)
+      expect(calculateDelay(6)).toBe(1200500);
+      expect(calculateDelay(7)).toBe(1200500);
+      expect(calculateDelay(10)).toBe(1200500);
+      expect(calculateDelay(100)).toBe(1200500);
     });
 
     it('adds jitter randomness to delays', () => {
@@ -866,7 +861,7 @@ describe('TTSWorkerPool', () => {
       // @ts-expect-error - calling private method for testing
       await pool.handleTaskFailure(task, new Error('Test error'));
 
-      expect(recordTaskSpy).toHaveBeenCalledWith(false, 11);
+      expect(recordTaskSpy).toHaveBeenCalledWith(false, 5);
       expect(evaluateSpy).toHaveBeenCalled();
     });
 
@@ -878,7 +873,7 @@ describe('TTSWorkerPool', () => {
 
       // Set retry count to exceed max
       // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 11);
+      pool.retryCount.set(task.partIndex, 5);
 
       // @ts-expect-error - calling private method for testing
       await pool.handleTaskFailure(task, new Error('Test error'));
@@ -897,7 +892,7 @@ describe('TTSWorkerPool', () => {
 
       // Set retry count to exceed max
       // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 11);
+      pool.retryCount.set(task.partIndex, 5);
 
       // @ts-expect-error - calling private method for testing
       await pool.handleTaskFailure(task, new Error('Test error'));
@@ -913,7 +908,7 @@ describe('TTSWorkerPool', () => {
 
       // Set retry count to exceed max
       // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 11);
+      pool.retryCount.set(task.partIndex, 5);
 
       // @ts-expect-error - calling private method for testing
       expect(pool.retryCount.has(task.partIndex)).toBe(true);
@@ -934,7 +929,7 @@ describe('TTSWorkerPool', () => {
 
       // Set retry count to exceed max
       // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 11);
+      pool.retryCount.set(task.partIndex, 5);
 
       // Spy on the private logTTSFailure method
       // @ts-expect-error - accessing private method for testing
@@ -1180,7 +1175,7 @@ describe('TTSWorkerPool', () => {
         partIndex: 5,
         text: 'Sample text for TTS',
         errorMessage: 'TTS service unavailable',
-        retryCount: 11,
+        retryCount: 5,
         timestamp: expect.any(String),
       });
 
