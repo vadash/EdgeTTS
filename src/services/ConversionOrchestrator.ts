@@ -892,6 +892,7 @@ async function runTTSStage(
         maxWorkers: input.ttsThreads,
         config: ttsConfig,
         chunkStore: chunkStore,
+        directoryHandle: directoryHandle,
         onStatusUpdate: (update) => {
           if (update.message.includes('Retry')) {
             report('tts-conversion', audioMap.size, chunks.length, update.message);
