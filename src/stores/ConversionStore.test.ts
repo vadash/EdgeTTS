@@ -305,4 +305,57 @@ describe('ConversionStore', () => {
       expect(conversion.value.resumeInfo).toBeNull();
     });
   });
+
+  describe('setStatus idempotence', () => {
+    it('does not reset phaseStartTime when called with same status', () => {
+      const startTime = 1000000;
+      vi.spyOn(Date, 'now').mockReturnValue(startTime);
+      startConversion();
+      setStatus('converting');
+      updateProgress(0, 100);
+
+      const initialPhaseStartTime = conversion.value.phaseStartTime;
+      expect(initialPhaseStartTime).toBe(startTime);
+
+      // Advance time
+      vi.spyOn(Date, 'now').mockReturnValue(startTime + 5000);
+
+      // Call setStatus again with same status
+      setStatus('converting');
+
+      // phaseStartTime should NOT have been reset
+      expect(conversion.value.phaseStartTime).toBe(initialPhaseStartTime);
+
+      vi.restoreAllMocks();
+    });
+
+    it('initializes phaseStartProgress when entering processing status', () => {
+      startConversion();
+      updateProgress(10, 100);
+
+      setStatus('converting');
+
+      expect(conversion.value.phaseStartProgress).toBe(0);
+    });
+
+    it('resets phaseStartTime when transitioning to different status', () => {
+      const startTime = 1000000;
+      vi.spyOn(Date, 'now').mockReturnValue(startTime);
+      startConversion();
+      setStatus('llm-extract');
+
+      const extractStartTime = conversion.value.phaseStartTime;
+      expect(extractStartTime).toBe(startTime);
+
+      // Advance time and transition to different status
+      vi.spyOn(Date, 'now').mockReturnValue(startTime + 10000);
+      setStatus('llm-assign');
+
+      // phaseStartTime SHOULD be reset when status changes
+      expect(conversion.value.phaseStartTime).toBe(startTime + 10000);
+      expect(conversion.value.phaseStartTime).not.toBe(extractStartTime);
+
+      vi.restoreAllMocks();
+    });
+  });
 });

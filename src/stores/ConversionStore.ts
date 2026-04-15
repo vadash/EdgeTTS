@@ -177,6 +177,9 @@ export function startConversion(): void {
 }
 
 export function setStatus(status: ConversionStatus): void {
+  // Idempotent guard: do nothing if status hasn't changed
+  if (conversion.value.status === status) return;
+
   const newState = { ...conversion.value, status };
   if (
     status === 'llm-extract' ||
@@ -185,6 +188,7 @@ export function setStatus(status: ConversionStatus): void {
     status === 'merging'
   ) {
     newState.phaseStartTime = Date.now();
+    newState.phaseStartProgress = 0;
     newState.progress = { current: 0, total: conversion.value.progress.total, failed: 0 };
   }
   conversion.value = newState;
