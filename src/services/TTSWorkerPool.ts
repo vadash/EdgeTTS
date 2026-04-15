@@ -309,16 +309,18 @@ export class TTSWorkerPool {
 
   /**
    * Calculate retry delay with custom progression and jitter
-   * Progression: 30s → 120s → 300s → 600s → 1200s (capped)
+   * Progression: 15-30s → 60-120s → 150-300s → 300-600s → 600-1200s (capped)
+   * Uses half-max jitter to prevent thundering herd (baseDelay/2 to baseDelay)
    * @param attempt - Retry attempt number (1-indexed, max 5)
    * @returns Delay in milliseconds
    */
   private calculateRetryDelay(attempt: number): number {
     const delays = [30_000, 120_000, 300_000, 600_000, 1_200_000]; // 30s, 2m, 5m, 10m, 20m
     const baseDelay = delays[Math.min(attempt - 1, delays.length - 1)];
-    const jitter = Math.random() * 1000; // 0-1000ms random jitter
+    const halfDelay = baseDelay / 2;
+    const jitter = Math.random() * halfDelay; // 0 to baseDelay/2 random jitter
 
-    return baseDelay + jitter;
+    return halfDelay + jitter; // Results in baseDelay/2 to baseDelay
   }
 
   /**
