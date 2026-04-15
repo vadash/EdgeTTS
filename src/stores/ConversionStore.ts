@@ -39,6 +39,7 @@ interface ConversionState {
   progress: Progress;
   startTime: number | null;
   phaseStartTime: number | null;
+  phaseStartProgress: number;
   error: ConversionError | null;
   ffmpegLoaded: boolean;
   ffmpegLoading: boolean;
@@ -55,6 +56,7 @@ const defaultState: ConversionState = {
   progress: { current: 0, total: 0, failed: 0 },
   startTime: null,
   phaseStartTime: null,
+  phaseStartProgress: 0,
   error: null,
   ffmpegLoaded: false,
   ffmpegLoading: false,
