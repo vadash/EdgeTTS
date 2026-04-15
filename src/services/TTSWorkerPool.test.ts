@@ -926,6 +926,42 @@ describe('TTSWorkerPool', () => {
     });
   });
 
+  describe('directoryHandle option', () => {
+    it('accepts directoryHandle in WorkerPoolOptions', () => {
+      const mockDirHandle = createMockDirectoryHandle();
+
+      const pool = createPool({
+        directoryHandle: mockDirHandle,
+      });
+
+      expect(pool).toBeInstanceOf(TTSWorkerPool);
+    });
+
+    it('stores directoryHandle in options', () => {
+      const mockDirHandle = createMockDirectoryHandle();
+
+      const pool = createPool({
+        directoryHandle: mockDirHandle,
+      });
+
+      expect(pool.options.directoryHandle).toBe(mockDirHandle);
+    });
+
+    it('accepts null as directoryHandle value', () => {
+      const pool = createPool({
+        directoryHandle: null,
+      });
+
+      expect(pool).toBeInstanceOf(TTSWorkerPool);
+    });
+
+    it('defaults to undefined when directoryHandle is not provided', () => {
+      const pool = createPool();
+
+      expect(pool.options.directoryHandle).toBeUndefined();
+    });
+  });
+
   describe('executeTask (refactored without withRetry)', () => {
     it('uses release() on success, records actual retry count, and deletes retryCount', async () => {
       const onTaskComplete = vi.fn();

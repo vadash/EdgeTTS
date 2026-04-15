@@ -27,6 +27,7 @@ export interface WorkerPoolOptions {
   maxWorkers: number;
   config: VoiceConfig;
   chunkStore?: ChunkStore | null;
+  directoryHandle?: FileSystemDirectoryHandle | null;
   onStatusUpdate?: (update: StatusUpdate) => void;
   onTaskComplete?: (partIndex: number, partIndexStr: string) => void;
   onTaskError?: (partIndex: number, error: Error) => void;
@@ -68,6 +69,9 @@ export class TTSWorkerPool {
   private retryCount = new Map<number, number>();
   private retryTimers = new Map<number, NodeJS.Timeout>();
 
+  // Options storage for access in tests
+  public readonly options: WorkerPoolOptions;
+
   constructor(options: WorkerPoolOptions) {
     this.voiceConfig = options.config;
     this.chunkStore = options.chunkStore ?? null;
@@ -77,6 +81,7 @@ export class TTSWorkerPool {
     this.onAllComplete = options.onAllComplete;
     this.logger = options.logger;
     this.maxWorkers = options.maxWorkers;
+    this.options = options;
 
     // Initialize ladder controller for adaptive scaling
     this.ladder = new LadderController(
