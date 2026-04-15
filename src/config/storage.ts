@@ -13,6 +13,8 @@ export const StorageKeys = {
   language: 'edgetts_language',
   /** Encrypted LLM API key */
   encryptedApiKey: 'llm_api_key_encrypted',
+  /** UI settings (dismissed notifications, etc.) */
+  uiSettings: 'edgetts-ui-settings',
 } as const;
 
 /**
