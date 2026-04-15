@@ -328,6 +328,21 @@ export class TTSWorkerPool {
   }
 
   /**
+   * Calculate exponential backoff delay with jitter and max cap
+   * Formula: Math.min(baseDelay * 2^(attempt-1) + jitter, maxDelay)
+   * @param attempt - Retry attempt number (1-indexed)
+   * @returns Delay in milliseconds
+   */
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in upcoming tasks
+  private calculateRetryDelay(attempt: number): number {
+    const baseDelay = 10_000; // 10 seconds
+    const maxDelay = 600_000; // 10 minutes
+    const jitter = Math.random() * 1000; // 0-1000ms random jitter
+
+    return Math.min(baseDelay * 2 ** (attempt - 1) + jitter, maxDelay);
+  }
+
+  /**
    * Cleanup - close chunkStore and drain connection pool
    */
   async cleanup(): Promise<void> {
