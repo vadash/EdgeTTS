@@ -27,6 +27,7 @@ export {
   resetConversionStore,
   resumeInfo,
   setError,
+  setPhaseBaseline,
   setStatus,
   startConversion,
   startTime,

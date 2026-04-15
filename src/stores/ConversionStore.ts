@@ -276,3 +276,7 @@ export function cancelResume(): void {
   patchState({ resumeInfo: null });
   resumeResolve = null;
 }
+
+export function setPhaseBaseline(count: number): void {
+  patchState({ phaseStartProgress: count });
+}
