@@ -74,9 +74,9 @@ describe('Ladder Integration - E2E', () => {
   });
 
   it('scales down when errors occur', async () => {
+    // First, scale up with successful tasks
     pool = new TTSWorkerPool(options);
 
-    // First, scale up to 8 workers
     const successTasks: PoolTask[] = Array.from({ length: 160 }, (_, i) => ({
       partIndex: i,
       text: `Text ${i}`,
@@ -84,38 +84,50 @@ describe('Ladder Integration - E2E', () => {
       filenum: String(i + 1).padStart(4, '0'),
     }));
 
-    // Mock to fail on task 161
+    pool.addTasks(successTasks);
+
+    // Process all successful tasks
+    while (pool.getProgress().completed < 160) {
+      await vi.advanceTimersByTimeAsync(100);
+    }
+
+    // Now create a new pool with a failing mock to test error handling
+    // Mock to fail
     const { ReusableEdgeTTSService } = await import('../ReusableEdgeTTSService');
     vi.mocked(ReusableEdgeTTSService).mockImplementation(function () {
       return {
         connect: vi.fn().mockResolvedValue(undefined),
-        send: vi.fn().mockImplementationOnce(() => Promise.reject(new Error('Rate limited'))),
+        send: vi.fn().mockRejectedValue(new Error('Rate limited')),
         disconnect: vi.fn(),
         isReady: vi.fn().mockReturnValue(true),
         getState: vi.fn().mockReturnValue('READY'),
       };
     });
 
-    pool.addTasks(successTasks);
+    // Create new pool with failing mock
+    const errorPool = new TTSWorkerPool(options);
 
-    // Process
-    while (pool.getProgress().completed < 160) {
-      await vi.advanceTimersByTimeAsync(100);
-    }
-
-    // Now add a task that will fail
+    // Add a task that will fail
     const failingTask: PoolTask = {
-      partIndex: 160,
+      partIndex: 0,
       text: 'This will fail',
       filename: 'test',
-      filenum: '0161',
+      filenum: '0001',
     };
-    pool.addTask(failingTask);
 
-    await vi.advanceTimersByTimeAsync(5000);
+    // Set retry count to exceed max so it will fail permanently
+    // @ts-expect-error - accessing private property for testing
+    errorPool.retryCount.set(failingTask.partIndex, 11);
 
-    // Verify failure was recorded and workers handled
-    const progress = pool.getProgress();
+    errorPool.addTask(failingTask);
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    // Verify failure was recorded
+    const progress = errorPool.getProgress();
     expect(progress.failed).toBeGreaterThanOrEqual(1);
+
+    // Cleanup
+    await errorPool.cleanup();
   });
 });

@@ -281,7 +281,13 @@ describe('TTSWorkerPool', () => {
       });
 
       pool = createPool({ onTaskError });
-      pool.addTask(createTask(0));
+
+      // Set retry count to exceed max so it will fail permanently
+      const task = createTask(0);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 11);
+
+      pool.addTask(task);
 
       await vi.advanceTimersByTimeAsync(100);
 
@@ -829,6 +835,170 @@ describe('TTSWorkerPool', () => {
 
       // @ts-expect-error - accessing private property for testing
       expect(pool.retryCount.has(task.partIndex)).toBe(false);
+    });
+  });
+
+  describe('executeTask (refactored without withRetry)', () => {
+    it('uses release() on success, records actual retry count, and deletes retryCount', async () => {
+      const onTaskComplete = vi.fn();
+      pool = createPool({ onTaskComplete });
+
+      // Spy on connectionPool.release
+      // @ts-expect-error - accessing private property for testing
+      const releaseSpy = vi.spyOn(pool.connectionPool, 'release');
+
+      const task = createTask(0);
+
+      // Set a retry count to simulate previous retries
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 3);
+
+      // @ts-expect-error - accessing private property for testing
+      const ladder = pool.ladder;
+      const recordTaskSpy = vi.spyOn(ladder, 'recordTask');
+
+      pool.addTask(task);
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Verify release was called
+      expect(releaseSpy).toHaveBeenCalled();
+
+      // Verify ladder.recordTask was called with true and actual retry count (3)
+      expect(recordTaskSpy).toHaveBeenCalledWith(true, 3);
+
+      // Verify retryCount was deleted to prevent memory leak
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryCount.has(task.partIndex)).toBe(false);
+    });
+
+    it('uses destroy() on failure (not release), then calls handleTaskFailure', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      // Make send fail
+      mockSend = vi.fn().mockRejectedValue(new Error('Network failure'));
+
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
+
+      // @ts-expect-error - accessing private property for testing
+      const destroySpy = vi.spyOn(pool.connectionPool, 'destroy');
+
+      const task = createTask(0);
+
+      // Set retry count to exceed max so it will fail permanently
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 11);
+
+      pool.addTask(task);
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Verify destroy was called (not release)
+      expect(destroySpy).toHaveBeenCalled();
+
+      // Verify onTaskError was called (via handleTaskFailure)
+      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
+    });
+
+    it('handles destroy() errors gracefully when socket already dead', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      // Make send fail
+      mockSend = vi.fn().mockRejectedValue(new Error('Network failure'));
+
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
+
+      // Make destroy throw an error (simulating already-dead socket)
+      // @ts-expect-error - accessing private property for testing
+      vi.spyOn(pool.connectionPool, 'destroy').mockRejectedValue(
+        new Error('Socket already closed'),
+      );
+
+      const task = createTask(0);
+
+      // Set retry count to exceed max so it will fail permanently
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 11);
+
+      // Should not throw despite destroy error
+      pool.addTask(task);
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Verify onTaskError was still called
+      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
+    });
+
+    it('skips all state updates when pool is cleared (totalTasks === 0)', async () => {
+      pool = createPool();
+
+      // Make send succeed
+      mockSend = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
+
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
+
+      // @ts-expect-error - accessing private property for testing
+      const releaseSpy = vi.spyOn(pool.connectionPool, 'release');
+
+      // @ts-expect-error - accessing private property for testing
+      const ladder = pool.ladder;
+      const recordTaskSpy = vi.spyOn(ladder, 'recordTask');
+
+      const task = createTask(0);
+      pool.addTask(task);
+
+      // Simulate pool being cleared while task is executing
+      // @ts-expect-error - accessing private property for testing
+      pool.totalTasks = 0;
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Verify release was still called (cleanup happens)
+      expect(releaseSpy).toHaveBeenCalled();
+
+      // Verify ladder.recordTask was NOT called (state updates skipped)
+      expect(recordTaskSpy).not.toHaveBeenCalled();
+    });
+
+    it('defaults retry count to 0 when not tracked in retryCount Map', async () => {
+      const onTaskComplete = vi.fn();
+      pool = createPool({ onTaskComplete });
+
+      // @ts-expect-error - accessing private property for testing
+      const ladder = pool.ladder;
+      const recordTaskSpy = vi.spyOn(ladder, 'recordTask');
+
+      const task = createTask(0);
+
+      // Don't set any retry count - should default to 0
+      pool.addTask(task);
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Verify ladder.recordTask was called with true and 0 (default)
+      expect(recordTaskSpy).toHaveBeenCalledWith(true, 0);
     });
   });
 });

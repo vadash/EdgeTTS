@@ -3,8 +3,6 @@
 
 import { createPool, type Pool } from 'generic-pool';
 import PQueue from 'p-queue';
-import { isAppError } from '@/errors';
-import { AbortError, withRetry } from '@/utils/retry';
 import type { StatusUpdate, TTSConfig as VoiceConfig } from '../state/types';
 import type { ChunkStore } from './ChunkStore';
 import { LadderController } from './LadderController';
@@ -180,7 +178,7 @@ export class TTSWorkerPool {
   }
 
   /**
-   * Executes a single task with retry logic
+   * Executes a single task with direct error handling (no withRetry wrapper)
    * Acquires connection from pool, executes, releases back
    */
   private async executeTask(task: PoolTask): Promise<void> {
@@ -204,85 +202,60 @@ export class TTSWorkerPool {
           }
         : this.voiceConfig;
 
-      // === CENTRALIZED RETRY LOGIC ===
-      // This handles: Sleep mode disconnects, Rate limits, Network drops
-      const currentService = service; // Capture for closure
-      const audioData = await withRetry(
-        async () => {
-          // Ensure connected (Reusable service handles idempotency)
-          // If PC slept, state is likely disconnected, this reconnects.
-          if (!currentService.isReady()) {
-            await currentService.connect();
-          }
+      // Ensure connected (Reusable service handles idempotency)
+      // If PC slept, state is likely disconnected, this reconnects.
+      if (!service.isReady()) {
+        await service.connect();
+      }
 
-          // Send request
-          return await currentService.send({
-            text: task.text,
-            config: taskConfig,
-          });
-        },
-        {
-          maxRetries: 11, // Try for 1 hour in total then skip
-          baseDelay: 10 * 1000,
-          maxDelay: 600 * 1000,
-          shouldRetry: (error) => {
-            // Only stop for explicit cancellation - retry everything else forever
-            if (error instanceof AbortError) return false;
-            if (isAppError(error) && error.isCancellation()) return false;
-            return true;
-          },
-          onRetry: (attempt, err, delay) => {
-            this.logger?.warn(
-              `Retrying task ${task.partIndex} (Attempt ${attempt}). Waiting ${Math.round(delay)}ms. Error: ${err}`,
-            );
-
-            this.onStatusUpdate?.({
-              partIndex: task.partIndex,
-              message: `Part ${String(task.partIndex + 1).padStart(4, '0')}: Retry ${attempt}...`,
-              isComplete: false,
-            });
-
-            // Force disconnect on error to ensure clean state for next attempt
-            currentService.disconnect();
-          },
-        },
-      );
+      // Send request directly (no withRetry wrapper)
+      const audioData = await service.send({
+        text: task.text,
+        config: taskConfig,
+      });
 
       // Save to ChunkStore
       await this.chunkStore!.writeChunk(task.partIndex, audioData);
 
-      // Record success for ladder
-      this.ladder.recordTask(true, 0);
-      this.ladder.evaluate();
+      // Post-cancellation safety check: skip state updates if pool was cleared
+      if (this.totalTasks > 0) {
+        // Read actual retry count from Map (defaults to 0 if not tracked)
+        const actualRetries = this.retryCount.get(task.partIndex) ?? 0;
 
-      // Store part index as string reference for compatibility
-      this.completedTasks.set(task.partIndex, String(task.partIndex));
-      this.processedCount++;
+        // Record success for ladder with actual retry count
+        this.ladder.recordTask(true, actualRetries);
+        this.ladder.evaluate();
 
-      this.onStatusUpdate?.({
-        partIndex: task.partIndex,
-        message: `Part ${String(task.partIndex + 1).padStart(4, '0')}: Complete`,
-        isComplete: true,
-      });
+        // Store part index as string reference for compatibility
+        this.completedTasks.set(task.partIndex, String(task.partIndex));
+        this.processedCount++;
 
-      this.onTaskComplete?.(task.partIndex, String(task.partIndex));
+        this.onStatusUpdate?.({
+          partIndex: task.partIndex,
+          message: `Part ${String(task.partIndex + 1).padStart(4, '0')}: Complete`,
+          isComplete: true,
+        });
+
+        this.onTaskComplete?.(task.partIndex, String(task.partIndex));
+      }
+
+      // Cleanup: delete retryCount to prevent memory leaks
+      this.retryCount.delete(task.partIndex);
+
+      // Release connection back to pool on success
+      await this.connectionPool.release(service);
     } catch (error) {
-      // Record failure for ladder
-      this.ladder.recordTask(false, 11); // Max retries attempted
-      this.ladder.evaluate();
+      // Destroy connection on failure (not release)
+      try {
+        await this.connectionPool.destroy(service!);
+      } catch {
+        // Socket may already be dead - ignore error
+      }
 
-      this.failedTasks.add(task.partIndex);
-      this.processedCount++;
-      this.onTaskError?.(task.partIndex, error instanceof Error ? error : new Error(String(error)));
-      this.logger?.error(`Task ${task.partIndex} failed permanently`, error as Error);
-    } finally {
-      // Release connection back to pool
-      if (service) {
-        try {
-          await this.connectionPool.release(service);
-        } catch {
-          // Connection may have been destroyed during retry
-        }
+      // Post-cancellation safety check: skip state updates if pool was cleared
+      if (this.totalTasks > 0) {
+        // Delegate to handleTaskFailure for retry logic
+        await this.handleTaskFailure(task, error);
       }
     }
   }
@@ -344,7 +317,6 @@ export class TTSWorkerPool {
    * @param task - The failed task
    * @param error - The error that caused the failure
    */
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: will be used in Task 5
   private async handleTaskFailure(task: PoolTask, error: unknown): Promise<void> {
     // Get current retry count (default to 0 if not tracked)
     const currentCount = this.retryCount.get(task.partIndex) ?? 0;

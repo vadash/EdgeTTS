@@ -122,6 +122,10 @@ describe('TTSWorkerPool - Ladder Integration', () => {
       filenum: '0001',
     };
 
+    // Set retry count to exceed max so it will fail permanently
+    // @ts-expect-error - accessing private property for testing
+    pool.retryCount.set(task.partIndex, 11);
+
     pool.addTask(task);
 
     // Wait for task to fail (with retries)
