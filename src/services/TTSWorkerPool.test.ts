@@ -530,12 +530,12 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('warmup', () => {
-    it('warms up ladder workers (2), not maxWorkers', async () => {
+    it('warms up ladder workers (3), not maxWorkers', async () => {
       pool = createPool({ maxWorkers: 5 });
       await pool.warmup();
 
-      // Ladder starts at 2 workers, not maxWorkers
-      expect(mockConnect).toHaveBeenCalledTimes(2);
+      // Ladder starts at 3 workers (minWorkers), not maxWorkers
+      expect(mockConnect).toHaveBeenCalledTimes(3);
     });
 
     it('ignores connection errors during warmup', async () => {

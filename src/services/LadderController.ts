@@ -9,6 +9,7 @@ export interface TaskResult {
 export interface LadderConfig {
   sampleSize: number;
   successThreshold: number;
+  scaleUpThreshold: number;
   scaleUpIncrement: number;
   scaleDownFactor: number;
 }
@@ -16,7 +17,7 @@ export interface LadderConfig {
 export class LadderController {
   private currentWorkers: number;
   private history: TaskResult[] = [];
-  private readonly minWorkers = 2;
+  private readonly minWorkers = 3;
   private tasksSinceLastScaleUp = 0;
 
   constructor(
@@ -64,7 +65,7 @@ export class LadderController {
       this.scaleDown();
       this.tasksSinceLastScaleUp = 0;
     } else if (
-      successRate >= this.config.successThreshold &&
+      successRate >= this.config.scaleUpThreshold &&
       this.tasksSinceLastScaleUp >= this.config.sampleSize
     ) {
       // Scale up if success rate is high AND we've processed enough tasks since last scale up

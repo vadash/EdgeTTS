@@ -49,7 +49,7 @@ describe('TTSWorkerPool - Ladder Integration', () => {
     vi.useRealTimers();
   });
 
-  it('warmup uses ladder workers (2), not maxWorkers', async () => {
+  it('warmup uses ladder workers (3), not maxWorkers', async () => {
     pool = new TTSWorkerPool(options);
 
     // Spy on connectionPool.acquire
@@ -62,8 +62,8 @@ describe('TTSWorkerPool - Ladder Integration', () => {
 
     await pool.warmup();
 
-    // Should warm up 2 connections (ladder min), not 10
-    expect(acquireSpy).toHaveBeenCalledTimes(2);
+    // Should warm up 3 connections (ladder minWorkers), not 10
+    expect(acquireSpy).toHaveBeenCalledTimes(3);
   });
 
   it('has ladder controller instance', async () => {
@@ -77,7 +77,7 @@ describe('TTSWorkerPool - Ladder Integration', () => {
           getCurrentWorkers: () => number;
         }
       ).getCurrentWorkers(),
-    ).toBe(2);
+    ).toBe(3);
   });
 
   it('records successful task for ladder evaluation', async () => {

@@ -91,7 +91,8 @@ export class TTSWorkerPool {
       {
         sampleSize: 20,
         successThreshold: 0.9,
-        scaleUpIncrement: 1,
+        scaleUpThreshold: 0.8,
+        scaleUpIncrement: 2,
         scaleDownFactor: 0.5,
       },
       this.maxWorkers,
