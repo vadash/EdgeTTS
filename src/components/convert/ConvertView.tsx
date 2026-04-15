@@ -10,6 +10,7 @@ import {
 } from '@/stores';
 import { Text } from 'preact-i18n';
 import { NotificationBanner } from '@/components/common';
+import { isEdgeBrowser } from '@/stores/UISettingsStore';
 import { ConvertButton } from './ConvertButton';
 import { FileDropZone } from './FileDropZone';
 import { QuickVoiceSelect } from './QuickVoiceSelect';
@@ -18,6 +19,8 @@ import { TextEditor } from './TextEditor';
 import { VoiceReviewModal } from './VoiceReviewModal';
 
 export function ConvertView() {
+  const isEdge = isEdgeBrowser();
+
   return (
     <div className="flex-1 flex flex-col md:flex-row gap-4 p-4 min-h-0">
       {/* Left Panel - Controls & Editor */}
@@ -38,6 +41,17 @@ export function ConvertView() {
 
         {/* Notification Banners */}
         <div className="flex flex-col gap-2 flex-shrink-0">
+          <NotificationBanner
+            type="warning"
+            storageKey="browserCompatibility"
+            show={!isEdge}
+            title={<Text id="convert.hints.browserTitle">Browser Not Supported</Text>}
+          >
+            <Text id="convert.hints.browserDesc">
+              This app requires Microsoft Edge browser for TTS functionality. Chrome and other
+              browsers are not supported.
+            </Text>
+          </NotificationBanner>
           <NotificationBanner
             type="warning"
             storageKey="llmRequired"

@@ -137,6 +137,7 @@ export {
   defaultState as defaultUISettings,
   dismissNotification,
   dismissedNotifications,
+  isEdgeBrowser,
   loadFromStorage as loadUISettings,
   resetUISettings,
   uiSettings,

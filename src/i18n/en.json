@@ -123,7 +123,9 @@
       "llmRequiredTitle": "LLM API Key Required",
       "llmRequiredDesc": "This app uses AI to detect characters and assign voices. It will not work without an API key. Please configure one in Settings → LLM.",
       "resumeTitle": "Crash Recovery & Resume",
-      "resumeDesc": "Audio generation is auto-saved to your selected folder. If you close the tab, just upload the same file, select the same folder, and you can resume where you left off (available after the AI finishes assigning voices)."
+      "resumeDesc": "Audio generation is auto-saved to your selected folder. If you close the tab, just upload the same file, select the same folder, and you can resume where you left off (available after the AI finishes assigning voices).",
+      "browserTitle": "Browser Not Supported",
+      "browserDesc": "This app requires Microsoft Edge browser for TTS functionality. Chrome and other browsers are not supported."
     }
   },
   "status": {

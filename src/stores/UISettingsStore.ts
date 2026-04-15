@@ -14,6 +14,8 @@ export interface DismissedNotifications {
   llmRequired: boolean;
   /** Resume feature tip notification dismissed */
   resumeFeatureTip: boolean;
+  /** Browser compatibility warning dismissed */
+  browserCompatibility: boolean;
 }
 
 export interface UISettings {
@@ -28,6 +30,7 @@ export const defaultState: UISettings = {
   dismissedNotifications: {
     llmRequired: false,
     resumeFeatureTip: false,
+    browserCompatibility: false,
   },
 };
 
@@ -85,4 +88,15 @@ export function dismissNotification(key: keyof DismissedNotifications): void {
 export function resetUISettings(): void {
   uiSettings.value = { ...defaultState };
   localStorage.removeItem(StorageKeys.uiSettings);
+}
+
+// ============================================================================
+// Browser Detection
+// ============================================================================
+
+/** Detects if the user is running Microsoft Edge browser */
+export function isEdgeBrowser(): boolean {
+  const ua = navigator.userAgent.toLowerCase();
+  // Edge includes 'edg' in user agent but not 'chrome' alone
+  return ua.includes('edg') && !ua.includes('opr') && !ua.includes('opera');
 }
