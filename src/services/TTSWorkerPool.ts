@@ -394,6 +394,13 @@ export class TTSWorkerPool {
    * Cleanup - close chunkStore and drain connection pool
    */
   async cleanup(): Promise<void> {
+    // Clear pending retry timers to prevent ghost tasks from waking after cancellation
+    for (const timer of this.retryTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.retryTimers.clear();
+    this.retryCount.clear();
+
     // Drain and clear the connection pool
     try {
       await this.connectionPool.drain();
@@ -414,6 +421,13 @@ export class TTSWorkerPool {
   }
 
   clear(): void {
+    // Clear pending retry timers to prevent ghost tasks from waking after cancellation
+    for (const timer of this.retryTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.retryTimers.clear();
+    this.retryCount.clear();
+
     // Clear the p-queue
     this.queue.clear();
 

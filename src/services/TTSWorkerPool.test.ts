@@ -419,6 +419,50 @@ describe('TTSWorkerPool', () => {
 
       expect(mockChunkStore.close).toHaveBeenCalledTimes(1);
     });
+
+    it('clears all timers in retryTimers Map using clearTimeout', async () => {
+      pool = createPool();
+
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+
+      // Set up some timers
+      const timer1 = setTimeout(() => {}, 10000);
+      const timer2 = setTimeout(() => {}, 20000);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(0, timer1);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(1, timer2);
+
+      await pool.cleanup();
+
+      expect(clearTimeoutSpy).toHaveBeenCalledWith(timer1);
+      expect(clearTimeoutSpy).toHaveBeenCalledWith(timer2);
+
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it('clears both retryTimers and retryCount Maps', async () => {
+      pool = createPool();
+
+      // Set up timers and retry counts
+      const timer1 = setTimeout(() => {}, 10000);
+      const timer2 = setTimeout(() => {}, 20000);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(0, timer1);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(1, timer2);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(0, 3);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(1, 5);
+
+      await pool.cleanup();
+
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryTimers.size).toBe(0);
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryCount.size).toBe(0);
+    });
   });
 
   describe('clear', () => {
@@ -438,6 +482,50 @@ describe('TTSWorkerPool', () => {
       });
       expect(pool.getCompletedAudio().size).toBe(0);
       expect(pool.getFailedTasks().size).toBe(0);
+    });
+
+    it('clears all timers in retryTimers Map using clearTimeout', () => {
+      pool = createPool();
+
+      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+
+      // Set up some timers
+      const timer1 = setTimeout(() => {}, 10000);
+      const timer2 = setTimeout(() => {}, 20000);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(0, timer1);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(1, timer2);
+
+      pool.clear();
+
+      expect(clearTimeoutSpy).toHaveBeenCalledWith(timer1);
+      expect(clearTimeoutSpy).toHaveBeenCalledWith(timer2);
+
+      clearTimeoutSpy.mockRestore();
+    });
+
+    it('clears both retryTimers and retryCount Maps', () => {
+      pool = createPool();
+
+      // Set up timers and retry counts
+      const timer1 = setTimeout(() => {}, 10000);
+      const timer2 = setTimeout(() => {}, 20000);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(0, timer1);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(1, timer2);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(0, 3);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(1, 5);
+
+      pool.clear();
+
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryTimers.size).toBe(0);
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryCount.size).toBe(0);
     });
   });
 
