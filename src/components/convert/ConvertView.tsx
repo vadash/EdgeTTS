@@ -4,9 +4,12 @@ import {
   cancelReview,
   confirmResume,
   confirmReview,
+  isConfigured,
   pendingReview,
   resumeInfo,
 } from '@/stores';
+import { Text } from 'preact-i18n';
+import { NotificationBanner } from '@/components/common';
 import { ConvertButton } from './ConvertButton';
 import { FileDropZone } from './FileDropZone';
 import { QuickVoiceSelect } from './QuickVoiceSelect';
@@ -31,6 +34,31 @@ export function ConvertView() {
             <QuickVoiceSelect />
             <ConvertButton />
           </div>
+        </div>
+
+        {/* Notification Banners */}
+        <div className="flex flex-col gap-2 flex-shrink-0">
+          <NotificationBanner
+            type="warning"
+            storageKey="llmRequired"
+            show={!isConfigured.value}
+            title={<Text id="convert.hints.llmRequiredTitle">LLM API Key Required</Text>}
+          >
+            <Text id="convert.hints.llmRequiredDesc">
+              This app uses AI to detect characters and assign voices. It will not work without an
+              API key.
+            </Text>
+          </NotificationBanner>
+          <NotificationBanner
+            type="info"
+            storageKey="resumeFeatureTip"
+            title={<Text id="convert.hints.resumeTitle">Crash Recovery & Resume</Text>}
+          >
+            <Text id="convert.hints.resumeDesc">
+              Audio generation is auto-saved to your selected folder. If you close the tab, you can
+              resume later.
+            </Text>
+          </NotificationBanner>
         </div>
 
         {/* Text Editor */}

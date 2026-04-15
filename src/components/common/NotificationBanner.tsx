@@ -6,7 +6,7 @@ type NotificationType = 'warning' | 'info';
 
 interface NotificationBannerProps {
   type: NotificationType;
-  title: string;
+  title: ComponentChildren;
   children: ComponentChildren;
   storageKey: keyof typeof dismissedNotifications.value;
   show?: boolean;
