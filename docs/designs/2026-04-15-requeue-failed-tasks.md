@@ -349,18 +349,18 @@ Run actual conversion with network issues:
 
 ## Implementation Checklist
 
-- [ ] Add `retryCount` and `retryTimers` Maps to class
-- [ ] Implement `calculateRetryDelay()` method
-- [ ] Implement `handleTaskFailure()` method
-- [ ] Implement `requeueTask()` method
-- [ ] Modify `executePrimaryTask()` to remove `withRetry` wrapper
-- [ ] Change failure handling to `destroy()` instead of `release()`
-- [ ] Add timeout clearing to `cleanup()` and `clear()`
-- [ ] Update `onStatusUpdate` calls for retry messages
-- [ ] Update LadderController calls (only final states)
-- [ ] Write unit tests
-- [ ] Write integration tests
-- [ ] Manual testing with real conversion
+- [x] Add `retryCount` and `retryTimers` Maps to class
+- [x] Implement `calculateRetryDelay()` method
+- [x] Implement `handleTaskFailure()` method
+- [x] Implement `requeueTask()` method
+- [x] Modify `executePrimaryTask()` to remove `withRetry` wrapper
+- [x] Change failure handling to `destroy()` instead of `release()`
+- [x] Add timeout clearing to `cleanup()` and `clear()`
+- [x] Update `onStatusUpdate` calls for retry messages
+- [x] Update LadderController calls (only final states)
+- [x] Write unit tests
+- [x] Write integration tests
+- [x] Manual testing with real conversion
 
 ## Trade-offs
 
