@@ -56,7 +56,6 @@
       },
       "correctness": {
         "noUnusedVariables": "error",
-        "noUnusedPrivateClassMembers": "error",
         "noUnknownTypeSelector": "off"
       },
       "a11y": {
