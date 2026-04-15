@@ -480,9 +480,12 @@ export async function runConversion(
     existingBook?.fileNames ?? ([[extractFilename(text), 0]] as Array<[string, number]>);
 
   // Progress reporter helper
-  const report = (stage: string, _current: number, _total: number, message: string) => {
+  const report = (stage: string, current: number, total: number, message: string, failed = 0) => {
     logger.info(message);
     updateStatus(stage, stores);
+    if (total > 0) {
+      updateProgress(current, total, failed);
+    }
   };
 
   let llmService: LLMVoiceService | null = null;
@@ -796,7 +799,7 @@ async function runTTSStage(
   assignments: SpeakerAssignment[],
   fileNames: Array<[string, number]>,
   signal: AbortSignal,
-  report: (stage: string, current: number, total: number, message: string) => void,
+  report: (stage: string, current: number, total: number, message: string, failed?: number) => void,
   services: ConversionOrchestratorServices,
   _stores: Stores,
 ): Promise<void> {
@@ -825,8 +828,7 @@ async function runTTSStage(
     throw new Error('No pronounceable content to convert');
   }
 
-  report('tts-conversion', 0, chunks.length, `Converting ${chunks.length} chunks to audio...`);
-  updateProgress(0, chunks.length, 0);
+  report('tts-conversion', 0, chunks.length, `Converting ${chunks.length} chunks to audio...`, 0);
 
   const ttsConfig: TTSConfig = {
     voice: `Microsoft Server Speech Text to Speech Voice (${input.narratorVoice})`,
@@ -850,8 +852,8 @@ async function runTTSStage(
       audioMap.size,
       chunks.length,
       `Resuming: found ${audioMap.size}/${chunks.length} cached chunks`,
+      0,
     );
-    updateProgress(audioMap.size, chunks.length, 0);
   }
 
   // Load previously failed chunks
@@ -915,8 +917,8 @@ async function runTTSStage(
               completed,
               chunks.length,
               `Written ${completed}/${chunks.length} files`,
+              failedTasks.size,
             );
-            updateProgress(completed, chunks.length, failedTasks.size);
           }
         },
         onTaskError: (partIndex, error) => {
@@ -926,8 +928,8 @@ async function runTTSStage(
             audioMap.size,
             chunks.length,
             `Part ${partIndex + 1} failed: ${getErrorMessage(error)}`,
+            failedTasks.size,
           );
-          updateProgress(audioMap.size, chunks.length, failedTasks.size);
         },
         onAllComplete: () => {
           resolve();
