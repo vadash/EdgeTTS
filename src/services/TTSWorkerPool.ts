@@ -69,7 +69,6 @@ export class TTSWorkerPool {
   // Retry state management
   // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in upcoming tasks
   private retryCount = new Map<number, number>();
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in upcoming tasks
   private retryTimers = new Map<number, NodeJS.Timeout>();
 
   constructor(options: WorkerPoolOptions) {
@@ -340,6 +339,26 @@ export class TTSWorkerPool {
     const jitter = Math.random() * 1000; // 0-1000ms random jitter
 
     return Math.min(baseDelay * 2 ** (attempt - 1) + jitter, maxDelay);
+  }
+
+  /**
+   * Re-enqueue a failed task back to the queue after its delay expires
+   * @param task - The task to re-enqueue
+   */
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in upcoming tasks
+  private requeueTask(task: PoolTask): void {
+    // Fire status update
+    this.onStatusUpdate?.({
+      partIndex: task.partIndex,
+      message: 'Retrying now...',
+      isComplete: false,
+    });
+
+    // Add task back to queue
+    this.queue.add(() => this.executeTask(task));
+
+    // Delete the timer from retryTimers
+    this.retryTimers.delete(task.partIndex);
   }
 
   /**

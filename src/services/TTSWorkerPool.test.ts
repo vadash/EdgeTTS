@@ -655,4 +655,57 @@ describe('TTSWorkerPool', () => {
       expect(maxDelay - minDelay).toBe(1000);
     });
   });
+
+  describe('requeueTask', () => {
+    it('adds task back to queue', async () => {
+      const onStatusUpdate = vi.fn();
+      pool = createPool({ onStatusUpdate });
+
+      const task = createTask(0);
+      // Set up a timer for the task
+      const timer = setTimeout(() => {}, 1000);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(task.partIndex, timer);
+
+      // @ts-expect-error - calling private method for testing
+      pool.requeueTask(task);
+
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryTimers.has(task.partIndex)).toBe(false);
+    });
+
+    it('fires onStatusUpdate with retry message', async () => {
+      const onStatusUpdate = vi.fn();
+      pool = createPool({ onStatusUpdate });
+
+      const task = createTask(0);
+      const timer = setTimeout(() => {}, 1000);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(task.partIndex, timer);
+
+      // @ts-expect-error - calling private method for testing
+      pool.requeueTask(task);
+
+      expect(onStatusUpdate).toHaveBeenCalledWith({
+        partIndex: 0,
+        message: 'Retrying now...',
+        isComplete: false,
+      });
+    });
+
+    it('deletes timer from retryTimers', async () => {
+      pool = createPool();
+
+      const task = createTask(0);
+      const timer = setTimeout(() => {}, 1000);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryTimers.set(task.partIndex, timer);
+
+      // @ts-expect-error - calling private method for testing
+      pool.requeueTask(task);
+
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryTimers.has(task.partIndex)).toBe(false);
+    });
+  });
 });
