@@ -16,8 +16,10 @@ import * as LLMStore from './LLMStore';
 import { loadSettings as llmLoadSettings, llm as llmSignal } from './LLMStore';
 // Import signal-based stores
 import * as SettingsStore from './SettingsStore';
+import * as UISettingsStore from './UISettingsStore';
 // Import individual exports for typed hook return values
 import { resetSettingsStore, settings as settingsSignal } from './SettingsStore';
+import { resetUISettings, uiSettings as uiSettingsSignal } from './UISettingsStore';
 
 // ============================================================================
 // Store Types
@@ -40,9 +42,14 @@ export type LLMStoreType = typeof LLMStore & {
   saveSettings: () => Promise<void>;
 };
 
+export type UISettingsStoreType = typeof UISettingsStore & {
+  value: typeof uiSettingsSignal;
+  reset: () => void;
+};
+
 /**
  * All stores combined
- * Settings, Conversion, and LLM are signal-based (no class instances)
+ * Settings, Conversion, LLM, and UISettings are signal-based (no class instances)
  * Logs, Data, and Language remain as class instances for now
  */
 export interface Stores {
@@ -50,6 +57,7 @@ export interface Stores {
   settings: typeof SettingsStore;
   conversion: typeof ConversionStore;
   llm: typeof LLMStore;
+  uiSettings: typeof UISettingsStore;
 
   // Class-based stores
   logs: LoggerStore;
@@ -159,6 +167,21 @@ export function useLanguage(): LanguageStore {
   return stores.language;
 }
 
+/**
+ * Hook to get UI settings store (signal-based)
+ * Returns a typed object with all UI settings signals and actions
+ */
+export function useUISettings(): UISettingsStoreType {
+  const stores = useStores();
+  return {
+    ...stores.uiSettings,
+    value: uiSettingsSignal,
+    reset: () => {
+      resetUISettings();
+    },
+  } as UISettingsStoreType;
+}
+
 // ============================================================================
 // Store Factory
 // ============================================================================
@@ -173,6 +196,7 @@ export function createStores(): Stores {
     settings: SettingsStore,
     conversion: ConversionStore,
     llm: LLMStore,
+    uiSettings: UISettingsStore,
     logs,
     data: createDataStore(),
     language: createLanguageStore(),

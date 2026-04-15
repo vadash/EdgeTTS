@@ -134,6 +134,14 @@ function createMockStores(): Stores {
       setBook: vi.fn(),
     } as any,
     language: {} as any,
+    uiSettings: {
+      uiSettings: {
+        value: { dismissedNotifications: { llmRequired: false, resumeFeatureTip: false } },
+      },
+      dismissedNotifications: { value: { llmRequired: false, resumeFeatureTip: false } },
+      dismissNotification: vi.fn(),
+      resetUISettings: vi.fn(),
+    } as any,
   };
 }
 

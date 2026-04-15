@@ -77,6 +77,7 @@ export {
 } from './LLMStore';
 // Signal-based stores - export entire modules
 export * as SettingsStoreModule from './SettingsStore';
+export * as UISettingsStoreModule from './UISettingsStore';
 // Re-export commonly used items from signal stores for convenience
 export {
   applyOpusPreset,
@@ -132,6 +133,14 @@ export {
   stereoWidthEnabled,
   ttsThreads,
 } from './SettingsStore';
+export {
+  defaultState as defaultUISettings,
+  dismissNotification,
+  dismissedNotifications,
+  loadFromStorage as loadUISettings,
+  resetUISettings,
+  uiSettings,
+} from './UISettingsStore';
 // Context and hooks
 export {
   createStores,
@@ -145,4 +154,5 @@ export {
   useLogs,
   useSettings,
   useStores,
+  useUISettings,
 } from './StoreContext';
