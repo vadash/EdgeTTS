@@ -1077,7 +1077,6 @@ function updateStatus(stage: string, stores: Stores): void {
     case 'tts-conversion':
       conversion.setStatus('converting');
       llm.setProcessingStatus('idle');
-      conversion.updateProgress(0, 0);
       break;
     case 'audio-merge':
       conversion.setStatus('merging');
