@@ -69,6 +69,9 @@ export class TTSWorkerPool {
   private retryCount = new Map<number, number>();
   private retryTimers = new Map<number, NodeJS.Timeout>();
 
+  // Failure logging
+  private failureLogCounter = 0;
+
   // Options storage for access in tests
   public readonly options: WorkerPoolOptions;
 
@@ -393,6 +396,53 @@ export class TTSWorkerPool {
 
     // Delete the timer from retryTimers
     this.retryTimers.delete(task.partIndex);
+  }
+
+  /**
+   * Log TTS failure to a file in the logs directory
+   * @param task - The failed task
+   * @param error - The error that caused the failure
+   */
+  private async logTTSFailure(task: PoolTask, error: unknown): Promise<void> {
+    try {
+      // Return early if no directory handle is available
+      if (!this.options.directoryHandle) {
+        return;
+      }
+
+      // Get or create the logs subdirectory
+      const logsDir = await this.options.directoryHandle.getDirectoryHandle('logs', {
+        create: true,
+      });
+
+      // Increment the failure log counter
+      this.failureLogCounter++;
+
+      // Create the failure log file
+      const fileName = `tts_fail${this.failureLogCounter}.json`;
+      const fileHandle = await logsDir.getFileHandle(fileName, { create: true });
+      const writable = await fileHandle.createWritable();
+
+      // Extract error message from Error or string
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Write the log entry as JSON
+      const logEntry = {
+        partIndex: task.partIndex,
+        text: task.text,
+        errorMessage,
+        retryCount: 11,
+        timestamp: new Date().toISOString(),
+      };
+
+      await writable.write(JSON.stringify(logEntry, null, 2));
+      await writable.close();
+    } catch (err) {
+      // Non-fatal: log the error but don't throw
+      this.logger?.warn('Failed to write TTS failure log', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   /**

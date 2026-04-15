@@ -1125,4 +1125,163 @@ describe('TTSWorkerPool', () => {
       expect(recordTaskSpy).toHaveBeenCalledWith(true, 0);
     });
   });
+
+  describe('logTTSFailure', () => {
+    it('writes failure log to logs/tts_fail1.json with correct content', async () => {
+      const mockDirHandle = createMockDirectoryHandle();
+
+      pool = createPool({ directoryHandle: mockDirHandle });
+
+      const task: PoolTask = {
+        partIndex: 5,
+        text: 'Sample text for TTS',
+        filename: 'test',
+        filenum: '0006',
+      };
+
+      const error = new Error('TTS service unavailable');
+
+      // @ts-expect-error - calling private method for testing
+      await pool.logTTSFailure(task, error);
+
+      // Verify the written JSON content
+      const logsDir = await mockDirHandle.getDirectoryHandle('logs');
+      const fileHandle = await logsDir.getFileHandle('tts_fail1.json');
+      const file = await fileHandle.getFile();
+      const text = await file.text();
+      const logEntry = JSON.parse(text);
+
+      expect(logEntry).toEqual({
+        partIndex: 5,
+        text: 'Sample text for TTS',
+        errorMessage: 'TTS service unavailable',
+        retryCount: 11,
+        timestamp: expect.any(String),
+      });
+
+      // Verify timestamp is a valid ISO string
+      expect(new Date(logEntry.timestamp)).toBeInstanceOf(Date);
+    });
+
+    it('increments failureLogCounter for each failure', async () => {
+      const mockDirHandle = createMockDirectoryHandle();
+
+      pool = createPool({ directoryHandle: mockDirHandle });
+
+      const task1: PoolTask = {
+        partIndex: 1,
+        text: 'First failure',
+        filename: 'test',
+        filenum: '0002',
+      };
+
+      const task2: PoolTask = {
+        partIndex: 2,
+        text: 'Second failure',
+        filename: 'test',
+        filenum: '0003',
+      };
+
+      const error = new Error('Failed');
+
+      // @ts-expect-error - calling private method for testing
+      await pool.logTTSFailure(task1, error);
+
+      // Verify first file was created
+      const logsDir = await mockDirHandle.getDirectoryHandle('logs');
+      await expect(logsDir.getFileHandle('tts_fail1.json')).resolves.toBeDefined();
+
+      // @ts-expect-error - calling private method for testing
+      await pool.logTTSFailure(task2, error);
+
+      // Verify second file was created
+      await expect(logsDir.getFileHandle('tts_fail2.json')).resolves.toBeDefined();
+    });
+
+    it('returns early when directoryHandle is null', async () => {
+      const mockDirHandle = createMockDirectoryHandle();
+
+      pool = createPool({ directoryHandle: null });
+
+      const task: PoolTask = {
+        partIndex: 0,
+        text: 'Test',
+        filename: 'test',
+        filenum: '0001',
+      };
+
+      const error = new Error('Failed');
+
+      // @ts-expect-error - calling private method for testing
+      await pool.logTTSFailure(task, error);
+
+      // Verify no logs directory was created (returned early)
+      await expect(
+        mockDirHandle
+          .getDirectoryHandle('logs')
+          .then(() => true)
+          .catch(() => false),
+      ).resolves.toBe(false);
+    });
+
+    it('handles non-Error errors by converting to string', async () => {
+      const mockDirHandle = createMockDirectoryHandle();
+
+      pool = createPool({ directoryHandle: mockDirHandle });
+
+      const task: PoolTask = {
+        partIndex: 0,
+        text: 'Test',
+        filename: 'test',
+        filenum: '0001',
+      };
+
+      const nonErrorError = 'String error message';
+
+      // @ts-expect-error - calling private method for testing
+      await pool.logTTSFailure(task, nonErrorError);
+
+      const logsDir = await mockDirHandle.getDirectoryHandle('logs');
+      const fileHandle = await logsDir.getFileHandle('tts_fail1.json');
+      const file = await fileHandle.getFile();
+      const text = await file.text();
+      const logEntry = JSON.parse(text);
+
+      expect(logEntry.errorMessage).toBe('String error message');
+    });
+
+    it('handles errors gracefully and calls logger.warn', async () => {
+      const mockDirHandle = createMockDirectoryHandle();
+      const { createMockLogger } = await import('@/test/mocks/MockLogger');
+      const logger = createMockLogger();
+
+      // Make getDirectoryHandle throw
+      vi.spyOn(mockDirHandle, 'getDirectoryHandle').mockRejectedValue(
+        new Error('Permission denied'),
+      );
+
+      pool = createPool({ directoryHandle: mockDirHandle, logger });
+
+      const task: PoolTask = {
+        partIndex: 0,
+        text: 'Test',
+        filename: 'test',
+        filenum: '0001',
+      };
+
+      const error = new Error('TTS failed');
+
+      // Should not throw
+      // @ts-expect-error - calling private method for testing
+      await expect(pool.logTTSFailure(task, error)).resolves.toBeUndefined();
+
+      // Verify logger.warn was called
+      expect(logger.warn).toHaveBeenCalledWith(
+        'Failed to write TTS failure log',
+        expect.objectContaining({
+          error: expect.any(String),
+        }),
+      );
+    });
+  });
 });
