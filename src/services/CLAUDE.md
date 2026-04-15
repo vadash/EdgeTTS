@@ -70,3 +70,7 @@ This prevents user perception that the app froze when tasks are in background ti
 ### In-Memory State
 
 Retry state (`retryCount`, `retryTimers`) is lost on page refresh — this is acceptable per requirements. Only permanent state (completed audio files, failed task list) persists.
+
+### TTS Failure Logging
+
+When a task permanently fails (after 11 retries), the pool writes a failure log entry to `logs/tts_fail*.json` in the directory handle. Each log contains: `partIndex`, `text`, `errorMessage`, `retryCount: 11`, and `timestamp`. This is non-fatal — if logging fails, the conversion continues.

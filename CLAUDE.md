@@ -33,6 +33,7 @@ src/
 ## Key Design Decisions
 
 - **Memory/Disk Management:** Never hold audio in RAM. `TTSWorkerPool` writes chunks to disk immediately via `ChunkStore`. `AudioMerger` reads them sequentially.
+- **Prompt Engineering:** LLM prompts use Chain-of-Draft (CoD) shorthand — concise reasoning (max 5 words/step) instead of verbose Chain-of-Thought. See `src/config/prompts/CLAUDE.md`.
 - **Structured Outputs:** LLM responses use Zod 4 schemas (non-strict). Pass through `safeParseJSON()` (in `src/utils/text.ts`) which handles markdown fences, tag stripping, `jsonrepair`, and structural recovery (naked arrays, flattened assignments).
 - **QA Pass (Assign):** When enabled (`useVoting`), Assign runs a sequential draft -> QA correction pass. QA catches vocative traps, missed action beats, and narration errors.
 - **Consensus Voting (Merge):** Merge stage uses 5-way voting with random temperatures and Union-Find consensus.
