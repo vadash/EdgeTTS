@@ -118,7 +118,13 @@
   },
   "convert": {
     "button": "Convert",
-    "selectFolder": "Select folder to save"
+    "selectFolder": "Select folder to save",
+    "hints": {
+      "llmRequiredTitle": "LLM API Key Required",
+      "llmRequiredDesc": "This app uses AI to detect characters and assign voices. It will not work without an API key. Please configure one in Settings → LLM.",
+      "resumeTitle": "Crash Recovery & Resume",
+      "resumeDesc": "Audio generation is auto-saved to your selected folder. If you close the tab, just upload the same file, select the same folder, and you can resume where you left off (available after the AI finishes assigning voices)."
+    }
   },
   "status": {
     "ready": "Ready",
@@ -149,7 +155,8 @@
     "ru": "RU"
   },
   "notificationBanner": {
-    "dismissAria": "Dismiss notification"
+    "dismiss": "Dismiss",
+    "dismissAria": "Dismiss this notification"
   },
   "about": {
     "title": "About Edge TTS",
