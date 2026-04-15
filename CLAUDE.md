@@ -3,7 +3,7 @@
 A local-first Text-to-Speech web app that converts books (EPUB/FB2/TXT) to audiobooks using Edge TTS and LLMs for character voice assignment.
 
 ### Pre-Commit
-- **`npm run check` runs automatically on every commit** (format, lint, typecheck, test). The commit is aborted on any failure — fix errors, never skip them
+- **Never run `npm run check` manually** — it runs automatically on every commit. If it fails, fix the errors and commit again.
 
 ## Architecture Map
 
@@ -32,21 +32,16 @@ src/
 
 ## Key Design Decisions
 
-- **Memory/Disk Management:** Never hold audio in RAM. `TTSWorkerPool` writes chunks to disk immediately via `ChunkStore`. `AudioMerger` reads them sequentially.
-- **Prompt Engineering:** LLM prompts use Chain-of-Draft (CoD) shorthand — concise reasoning (max 5 words/step) instead of verbose Chain-of-Thought. See `src/config/prompts/CLAUDE.md`.
-- **Structured Outputs:** LLM responses use Zod 4 schemas (non-strict). Pass through `safeParseJSON()` (in `src/utils/text.ts`) which handles markdown fences, tag stripping, `jsonrepair`, and structural recovery (naked arrays, flattened assignments).
-- **QA Pass (Assign):** When enabled (`useVoting`), Assign runs a sequential draft -> QA correction pass. QA catches vocative traps, missed action beats, and narration errors.
-- **Consensus Voting (Merge):** Merge stage uses 5-way voting with random temperatures and Union-Find consensus.
-- **Semantic Chunking:** `TextBlockSplitter` prefers natural scene boundaries (dividers, chapter headers, long narration passages) over arbitrary token-limit cuts.
-- **Frequency Culling:** Characters with < 3 name mentions are filtered before the LLM merge step to reduce hallucinations and API costs.
+- **Memory/Disk Management:** Never hold audio in RAM. See `services/CLAUDE.md`
+- **Prompt Engineering:** Chain-of-Draft (CoD) shorthand. See `src/config/prompts/CLAUDE.md`
+- **Structured Outputs:** Zod 4 schemas + `safeParseJSON()` repair pipeline. See `src/services/llm/CLAUDE.md`
+- **QA Pass (Assign):** When enabled (`useVoting`), Assign runs a sequential draft -> QA correction pass
+- **Consensus Voting (Merge):** 5-way voting with random temperatures and Union-Find consensus
+- **Semantic Chunking:** Natural scene boundaries preferred. See `services/CLAUDE.md`
+- **Frequency Culling:** Characters with < 3 mentions filtered pre-merge
 
 ## Gotchas
 
 - **File System API**: The app writes directly to the user's hard drive to prevent OOM errors. All file operations MUST use `withPermissionRetry` to gracefully handle browser security context drops.
 - **Async Resilience**: Network and WebSocket calls must use the internal `withRetry` utility (which wraps `p-retry`) to survive sleep modes and rate limits.
 - **KeepAwake Strategy**: The app uses `AudioContext` dummy oscillators, Web Locks API, and Screen Wake Lock to prevent background tab throttling during long conversions.
-
-## UI State Persistence
-
-- **UISettings Store**: Use `UISettingsStore` for transient UI state that persists across sessions (e.g., dismissed notifications) — stored unencrypted in localStorage via `StorageKeys.uiSettings`
-- **Settings vs UISettings**: `SettingsStore` = user-configurable app settings (encrypted where sensitive); `UISettingsStore` = UI state that survives reloads but NOT settings reset

@@ -43,9 +43,3 @@ We use a 3-message topology:
 - **Prompt Repetition**: When `REPEAT_PROMPT` is true, the User message is duplicated (`<QUERY><QUERY>`) for improved bidirectional attention during prefill.
 - **Overlap Context**: In the Assign and QA stages, the last 10 sentences from the previous block are passed as `overlapSentences` with negative indices (`[-10]`). These are read-only and must NOT be assigned.
 - **QA Stage**: Reuses Assign's schema (`ASSIGN_SCHEMA_TEXT`). Builder injects draft assignments as a `<draft_assignments>` block.
-
-## Code Style
-
-- **Few-Shot Examples**: Each example object has: `{ input, output, label? }`. The `reasoning` is inside the JSON output.
-- **Language Mirroring**: Non-English stories must preserve original script in values (JSON keys remain English). `MIRROR_LANGUAGE_RULES` handles this.
-- **CoD Shorthand Convention**: All LLM prompts use Chain-of-Draft (CoD) reasoning — terse drafts with max 5 words per step. Shorthand notation: paragraph numbers (N:), speaker codes, arrow notation (→), "voc" for vocatives, "narr" for narration, "sys" for system entities. The `EXECUTION_TRIGGER` in `shared/rules.ts` enforces this globally.
