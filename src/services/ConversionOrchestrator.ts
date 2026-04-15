@@ -847,6 +847,7 @@ async function runTTSStage(
   }
 
   if (audioMap.size > 0) {
+    _stores.conversion.setPhaseBaseline(audioMap.size);
     report(
       'tts-conversion',
       audioMap.size,
