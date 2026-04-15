@@ -335,6 +335,9 @@ export class TTSWorkerPool {
 
     // Check if we've exceeded max retries
     if (attempt > 11) {
+      // Log the failure for debugging
+      await this.logTTSFailure(task, error);
+
       // Permanent failure - record with ladder
       this.ladder.recordTask(false, 11);
       this.ladder.evaluate();

@@ -924,6 +924,31 @@ describe('TTSWorkerPool', () => {
       // @ts-expect-error - accessing private property for testing
       expect(pool.retryCount.has(task.partIndex)).toBe(false);
     });
+
+    it('calls logTTSFailure when task permanently fails after 11 retries', async () => {
+      const mockDirHandle = createMockDirectoryHandle();
+      const onTaskError = vi.fn();
+      pool = createPool({ directoryHandle: mockDirHandle, onTaskError });
+
+      const task = createTask(0);
+
+      // Set retry count to exceed max
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 11);
+
+      // Spy on the private logTTSFailure method
+      // @ts-expect-error - accessing private method for testing
+      const logTTSFailureSpy = vi.spyOn(pool, 'logTTSFailure');
+
+      const error = new Error('Permanent TTS failure');
+
+      // @ts-expect-error - calling private method for testing
+      await pool.handleTaskFailure(task, error);
+
+      // Verify logTTSFailure was called with the correct task and error
+      expect(logTTSFailureSpy).toHaveBeenCalledWith(task, error);
+      expect(logTTSFailureSpy).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('directoryHandle option', () => {
