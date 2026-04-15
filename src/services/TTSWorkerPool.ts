@@ -67,7 +67,6 @@ export class TTSWorkerPool {
   private logger?: Logger;
 
   // Retry state management
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in upcoming tasks
   private retryCount = new Map<number, number>();
   private retryTimers = new Map<number, NodeJS.Timeout>();
 
@@ -332,7 +331,6 @@ export class TTSWorkerPool {
    * @param attempt - Retry attempt number (1-indexed)
    * @returns Delay in milliseconds
    */
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in upcoming tasks
   private calculateRetryDelay(attempt: number): number {
     const baseDelay = 10_000; // 10 seconds
     const maxDelay = 600_000; // 10 minutes
@@ -342,10 +340,69 @@ export class TTSWorkerPool {
   }
 
   /**
+   * Handle task failure with retry state management and permanent failure handling
+   * @param task - The failed task
+   * @param error - The error that caused the failure
+   */
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: will be used in Task 5
+  private async handleTaskFailure(task: PoolTask, error: unknown): Promise<void> {
+    // Get current retry count (default to 0 if not tracked)
+    const currentCount = this.retryCount.get(task.partIndex) ?? 0;
+    const attempt = currentCount + 1;
+
+    // Update retry count
+    this.retryCount.set(task.partIndex, attempt);
+
+    // Check if we've exceeded max retries
+    if (attempt > 11) {
+      // Permanent failure - record with ladder
+      this.ladder.recordTask(false, 11);
+      this.ladder.evaluate();
+
+      // Add to failed tasks
+      this.failedTasks.add(task.partIndex);
+      this.processedCount++;
+
+      // Call error callback
+      this.onTaskError?.(task.partIndex, error instanceof Error ? error : new Error(String(error)));
+
+      this.logger?.error(
+        `Task ${task.partIndex} failed permanently after 11 attempts`,
+        error as Error,
+      );
+
+      // Cleanup: delete retryCount to prevent memory leaks
+      this.retryCount.delete(task.partIndex);
+      return;
+    }
+
+    // Calculate delay for this attempt
+    const delay = this.calculateRetryDelay(attempt);
+
+    // Fire status update with delay info
+    this.onStatusUpdate?.({
+      partIndex: task.partIndex,
+      message: `Part ${String(task.partIndex + 1).padStart(4, '0')}: Retry in ${Math.round(delay / 1000)}s...`,
+      isComplete: false,
+    });
+
+    this.logger?.warn(
+      `Task ${task.partIndex} failed (attempt ${attempt}/11). Retrying in ${Math.round(delay / 1000)}s`,
+    );
+
+    // Schedule retry with setTimeout
+    const timer = setTimeout(() => {
+      this.requeueTask(task);
+    }, delay);
+
+    // Store timer in retryTimers for potential cancellation
+    this.retryTimers.set(task.partIndex, timer);
+  }
+
+  /**
    * Re-enqueue a failed task back to the queue after its delay expires
    * @param task - The task to re-enqueue
    */
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: used in upcoming tasks
   private requeueTask(task: PoolTask): void {
     // Fire status update
     this.onStatusUpdate?.({

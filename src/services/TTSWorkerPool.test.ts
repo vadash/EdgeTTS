@@ -708,4 +708,127 @@ describe('TTSWorkerPool', () => {
       expect(pool.retryTimers.has(task.partIndex)).toBe(false);
     });
   });
+
+  describe('handleTaskFailure', () => {
+    it('increments retryCount on each failure', async () => {
+      const onStatusUpdate = vi.fn();
+      pool = createPool({ onStatusUpdate });
+
+      const task = createTask(0);
+
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryCount.get(task.partIndex)).toBeUndefined();
+
+      // @ts-expect-error - calling private method for testing
+      await pool.handleTaskFailure(task, new Error('Test error'));
+
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryCount.get(task.partIndex)).toBe(1);
+
+      // @ts-expect-error - calling private method for testing
+      await pool.handleTaskFailure(task, new Error('Test error'));
+
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryCount.get(task.partIndex)).toBe(2);
+    });
+
+    it('schedules retry with correct delay when below max retries', async () => {
+      const onStatusUpdate = vi.fn();
+      pool = createPool({ onStatusUpdate });
+
+      const task = createTask(0);
+
+      // @ts-expect-error - calling private method for testing
+      await pool.handleTaskFailure(task, new Error('Test error'));
+
+      // Verify retry timer was scheduled
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryTimers.has(task.partIndex)).toBe(true);
+
+      // Verify status update was fired
+      expect(onStatusUpdate).toHaveBeenCalledWith({
+        partIndex: 0,
+        message: expect.stringContaining('Retry in'),
+        isComplete: false,
+      });
+    });
+
+    it('calls ladder.recordTask(false, 11) and ladder.evaluate() on permanent failure', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      const task = createTask(0);
+
+      // Set up spies before calling handleTaskFailure
+      // @ts-expect-error - accessing private property for testing
+      const ladder = pool.ladder;
+      const recordTaskSpy = vi.spyOn(ladder, 'recordTask');
+      const evaluateSpy = vi.spyOn(ladder, 'evaluate');
+
+      // Set retry count to exceed max (11 attempts means retryCount should be 11)
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 11);
+
+      // @ts-expect-error - calling private method for testing
+      await pool.handleTaskFailure(task, new Error('Test error'));
+
+      expect(recordTaskSpy).toHaveBeenCalledWith(false, 11);
+      expect(evaluateSpy).toHaveBeenCalled();
+    });
+
+    it('adds to failedTasks and increments processedCount on permanent failure', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      const task = createTask(0);
+
+      // Set retry count to exceed max
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 11);
+
+      // @ts-expect-error - calling private method for testing
+      await pool.handleTaskFailure(task, new Error('Test error'));
+
+      expect(pool.getFailedTasks().has(0)).toBe(true);
+
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.processedCount).toBe(1);
+    });
+
+    it('calls onTaskError callback on permanent failure', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      const task = createTask(0);
+
+      // Set retry count to exceed max
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 11);
+
+      // @ts-expect-error - calling private method for testing
+      await pool.handleTaskFailure(task, new Error('Test error'));
+
+      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
+    });
+
+    it('deletes retryCount entry on permanent failure to prevent memory leaks', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      const task = createTask(0);
+
+      // Set retry count to exceed max
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 11);
+
+      // @ts-expect-error - calling private method for testing
+      expect(pool.retryCount.has(task.partIndex)).toBe(true);
+
+      // @ts-expect-error - calling private method for testing
+      await pool.handleTaskFailure(task, new Error('Test error'));
+
+      // @ts-expect-error - accessing private property for testing
+      expect(pool.retryCount.has(task.partIndex)).toBe(false);
+    });
+  });
 });
