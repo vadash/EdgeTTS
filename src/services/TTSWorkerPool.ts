@@ -147,11 +147,14 @@ export class TTSWorkerPool {
       this.logger?.warn('Network disconnected. Pausing TTS queue.');
       this.queue.pause();
     };
-    window.addEventListener('online', this.handleOnline);
-    window.addEventListener('offline', this.handleOffline);
+    // Guard browser globals for jsdom compatibility
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.handleOnline);
+      window.addEventListener('offline', this.handleOffline);
+    }
 
     // Pause immediately if starting offline
-    if (!navigator.onLine) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
       this.logger?.warn('Started offline. TTS queue paused.');
       this.queue.pause();
     }
@@ -471,8 +474,10 @@ export class TTSWorkerPool {
    */
   async cleanup(): Promise<void> {
     // Remove network event listeners
-    if (this.handleOnline) window.removeEventListener('online', this.handleOnline);
-    if (this.handleOffline) window.removeEventListener('offline', this.handleOffline);
+    if (typeof window !== 'undefined') {
+      if (this.handleOnline) window.removeEventListener('online', this.handleOnline);
+      if (this.handleOffline) window.removeEventListener('offline', this.handleOffline);
+    }
 
     // Clear pending retry timers to prevent ghost tasks from waking after cancellation
     for (const timer of this.retryTimers.values()) {
@@ -502,8 +507,10 @@ export class TTSWorkerPool {
 
   clear(): void {
     // Remove network event listeners
-    if (this.handleOnline) window.removeEventListener('online', this.handleOnline);
-    if (this.handleOffline) window.removeEventListener('offline', this.handleOffline);
+    if (typeof window !== 'undefined') {
+      if (this.handleOnline) window.removeEventListener('online', this.handleOnline);
+      if (this.handleOffline) window.removeEventListener('offline', this.handleOffline);
+    }
 
     // Clear pending retry timers to prevent ghost tasks from waking after cancellation
     for (const timer of this.retryTimers.values()) {
