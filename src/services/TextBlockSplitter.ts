@@ -208,31 +208,6 @@ export class TextBlockSplitter {
       const sentence = sentences[i];
       const tokens = this.estimateTokens(sentence);
 
-      // Handle oversized sentence
-      if (tokens > maxTokens) {
-        if (currentBlock.length > 0) {
-          blocks.push({
-            blockIndex: blockIndex++,
-            sentences: currentBlock,
-            sentenceStartIndex,
-          });
-          currentBlock = [];
-          currentTokens = 0;
-          sentenceStartIndex = i;
-        }
-        // Split long sentence
-        const chunks = this.splitLongSentence(sentence, maxTokens);
-        for (const chunk of chunks) {
-          blocks.push({
-            blockIndex: blockIndex++,
-            sentences: [chunk],
-            sentenceStartIndex: i,
-          });
-        }
-        sentenceStartIndex = i + 1;
-        continue;
-      }
-
       // Semantic break: check when past warning threshold
       if (currentTokens > WARNING_THRESHOLD) {
         const priority = this.getBreakPriority(sentence);
@@ -313,32 +288,6 @@ export class TextBlockSplitter {
     }
 
     return blocks;
-  }
-
-  /**
-   * Split oversized sentence by clause separators
-   */
-  private splitLongSentence(sentence: string, maxTokens: number): string[] {
-    const chunks: string[] = [];
-    const maxChars = maxTokens * 4;
-    const separators = ['; ', ', ', ' -- ', ' - ', ' '];
-    let remaining = sentence;
-
-    while (remaining.length > maxChars) {
-      let splitPoint = maxChars;
-      for (const sep of separators) {
-        const idx = remaining.lastIndexOf(sep, maxChars);
-        if (idx > maxChars / 2) {
-          splitPoint = idx + sep.length;
-          break;
-        }
-      }
-      chunks.push(remaining.slice(0, splitPoint).trim());
-      remaining = remaining.slice(splitPoint).trim();
-    }
-
-    if (remaining) chunks.push(remaining);
-    return chunks;
   }
 
   /**
