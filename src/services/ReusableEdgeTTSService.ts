@@ -267,6 +267,13 @@ export class ReusableEdgeTTSService {
 
     this.audioChunks = [];
 
+    // Reject the promise FIRST, before cleanup nulls requestReject
+    if (this.requestReject) {
+      this.requestReject(error);
+      this.requestResolve = null;
+      this.requestReject = null;
+    }
+
     // Close socket on error to ensure fresh connection on retry
     // Request failures (timeout, send error) may leave the socket in
     // an inconsistent state even if still technically open
@@ -274,12 +281,6 @@ export class ReusableEdgeTTSService {
       this.cleanup();
     } else {
       this.state = 'DISCONNECTED';
-    }
-
-    if (this.requestReject) {
-      this.requestReject(error);
-      this.requestResolve = null;
-      this.requestReject = null;
     }
   }
 
