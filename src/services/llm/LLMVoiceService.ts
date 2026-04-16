@@ -23,6 +23,7 @@ import {
 } from './PromptStrategy';
 import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
 import { buildMergeConsensus } from './votingConsensus';
+import { runWithConcurrency } from './runWithConcurrency';
 
 /**
  * Unambiguous speech/dialogue symbols (no contraction risk):
@@ -195,60 +196,35 @@ export class LLMVoiceService {
     onProgress?: ProgressCallback,
   ): Promise<LLMCharacter[]> {
     this.logger?.info(`[Extract] Starting (${blocks.length} blocks)`);
-    const allCharacters: LLMCharacter[] = [];
     const controller = new AbortController();
     this.abortController = controller;
     this.apiClient.resetLogging();
 
-    for (let i = 0; i < blocks.length; i++) {
-      if (controller.signal.aborted) {
-        throw new Error('Operation cancelled');
-      }
+    // Map blocks to task thunks for parallel execution
+    const tasks = blocks.map(
+      (block, i) => () => this.extractBlock(block, i, blocks.length, controller),
+    );
 
-      onProgress?.(i + 1, blocks.length);
+    // Run tasks with concurrency control
+    const responses = await runWithConcurrency(tasks, {
+      concurrency: this.options.maxConcurrentRequests ?? 2,
+      signal: controller.signal,
+      onProgress: (completed, total) => onProgress?.(completed, total),
+    });
 
-      const block = blocks[i];
-      const blockText = block.sentences.join('\n');
-
-      const extractMessages = buildExtractPrompt(
-        blockText,
-        this.detectedLanguage,
-        this.options.repeatPrompt ?? false,
-      );
-      const response = await withRetry(
-        () =>
-          this.apiClient.callStructured({
-            messages: extractMessages,
-            schema: ExtractSchema,
-            schemaName: 'ExtractSchema',
-            signal: controller.signal,
-          }),
-        {
-          maxRetries: RETRY_CONFIG.extract, // Keep retrying until valid
-          signal: controller.signal,
-          onRetry: (attempt, error) => {
-            this.logger?.warn(
-              `[Extract] Block ${i + 1}/${blocks.length} retry ${attempt}: ${getErrorMessage(error)}`,
-            );
-          },
-        },
-      );
-
+    // Collect all characters
+    const allCharacters: LLMCharacter[] = [];
+    for (const response of responses) {
       allCharacters.push(...response.characters);
+    }
 
-      // Save first extract phase log
-      if (i === 0) {
-        await this.apiClient.debugLogger?.savePhaseLog(
-          'extract',
-          { messages: extractMessages },
-          response,
-        );
-      }
-
-      // Small delay between requests
-      if (i < blocks.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, LLM_DELAY_MS));
-      }
+    // Save first extract phase log
+    if (responses[0]?.debugLog) {
+      await this.apiClient.debugLogger?.savePhaseLog(
+        'extract',
+        { messages: responses[0].debugLog.messages },
+        responses[0].debugLog.response,
+      );
     }
 
     // Simple merge by canonicalName
@@ -273,6 +249,48 @@ export class LLMVoiceService {
     }
 
     return merged;
+  }
+
+  /**
+   * Extract characters from a single block
+   */
+  private async extractBlock(
+    block: TextBlock,
+    index: number,
+    total: number,
+    controller: AbortController,
+  ): Promise<{ characters: LLMCharacter[]; debugLog?: { messages: object; response: object } }> {
+    const blockText = block.sentences.join('\n');
+
+    const extractMessages = buildExtractPrompt(
+      blockText,
+      this.detectedLanguage,
+      this.options.repeatPrompt ?? false,
+    );
+
+    const response = await withRetry(
+      () =>
+        this.apiClient.callStructured({
+          messages: extractMessages,
+          schema: ExtractSchema,
+          schemaName: 'ExtractSchema',
+          signal: controller.signal,
+        }),
+      {
+        maxRetries: RETRY_CONFIG.extract,
+        signal: controller.signal,
+        onRetry: (attempt, error) => {
+          this.logger?.warn(
+            `[Extract] Block ${index + 1}/${total} retry ${attempt}: ${getErrorMessage(error)}`,
+          );
+        },
+      },
+    );
+
+    // Collect debug log for first block only
+    const debugLog = index === 0 ? { messages: extractMessages, response } : undefined;
+
+    return { characters: response.characters, debugLog };
   }
 
   /**
