@@ -69,6 +69,10 @@ export class TTSWorkerPool {
   private retryCount = new Map<number, number>();
   private retryTimers = new Map<number, NodeJS.Timeout>();
 
+  // Network event handlers
+  private handleOnline?: () => void;
+  private handleOffline?: () => void;
+
   // Failure logging
   private failureLogCounter = 0;
 
@@ -99,8 +103,8 @@ export class TTSWorkerPool {
       this.logger,
     );
 
-    // Initialize p-queue with concurrency matching worker count
-    this.queue = new PQueue({ concurrency: options.maxWorkers });
+    // Initialize p-queue with ladder's starting concurrency (minWorkers, not maxWorkers)
+    this.queue = new PQueue({ concurrency: this.ladder.getCurrentWorkers() });
 
     // Listen for queue idle to trigger onAllComplete
     this.queue.on('idle', () => {
@@ -133,6 +137,24 @@ export class TTSWorkerPool {
         // which doesn't exist in browsers. Idle connections cleaned up via cleanup() instead.
       },
     );
+
+    // Network Offline/Online Handling - pause queue when offline to preserve retry budget
+    this.handleOnline = () => {
+      this.logger?.info('Network restored. Resuming TTS queue.');
+      this.queue.start();
+    };
+    this.handleOffline = () => {
+      this.logger?.warn('Network disconnected. Pausing TTS queue.');
+      this.queue.pause();
+    };
+    window.addEventListener('online', this.handleOnline);
+    window.addEventListener('offline', this.handleOffline);
+
+    // Pause immediately if starting offline
+    if (!navigator.onLine) {
+      this.logger?.warn('Started offline. TTS queue paused.');
+      this.queue.pause();
+    }
   }
 
   /**
@@ -167,22 +189,9 @@ export class TTSWorkerPool {
   addTasks(tasks: PoolTask[]): void {
     this.totalTasks += tasks.length;
 
-    // Add tasks gradually based on current ladder setting
-    const currentWorkers = this.ladder.getCurrentWorkers();
-    const batchSize = currentWorkers;
-
-    for (let i = 0; i < tasks.length; i += batchSize) {
-      const batch = tasks.slice(i, i + batchSize);
-      for (const task of batch) {
-        this.queue.add(() => this.executeTask(task));
-      }
-
-      // After each batch, pause briefly before next batch
-      if (i + batchSize < tasks.length) {
-        setTimeout(() => {
-          // Next batch will be processed after this delay
-        }, 100);
-      }
+    // Let p-queue handle the concurrency. No manual batching needed.
+    for (const task of tasks) {
+      this.queue.add(() => this.executeTask(task));
     }
   }
 
@@ -234,6 +243,9 @@ export class TTSWorkerPool {
         // Record success for ladder with actual retry count
         this.ladder.recordTask(true, actualRetries);
         this.ladder.evaluate();
+
+        // Sync p-queue concurrency with the ladder
+        this.queue.concurrency = this.ladder.getCurrentWorkers();
 
         // Store part index as string reference for compatibility
         this.completedTasks.set(task.partIndex, String(task.partIndex));
@@ -309,18 +321,18 @@ export class TTSWorkerPool {
 
   /**
    * Calculate retry delay with custom progression and jitter
-   * Progression: 15-30s → 60-120s → 150-300s → 300-600s → 600-1200s (capped)
+   * Progression: 1.5-3s → 5-10s → 15-30s → 30-60s → 60-120s (capped)
    * Uses half-max jitter to prevent thundering herd (baseDelay/2 to baseDelay)
    * @param attempt - Retry attempt number (1-indexed, max 5)
    * @returns Delay in milliseconds
    */
   private calculateRetryDelay(attempt: number): number {
-    const delays = [30_000, 120_000, 300_000, 600_000, 1_200_000]; // 30s, 2m, 5m, 10m, 20m
+    const delays = [3_000, 10_000, 30_000, 60_000, 120_000]; // 3s, 10s, 30s, 60s, 120s
     const baseDelay = delays[Math.min(attempt - 1, delays.length - 1)];
     const halfDelay = baseDelay / 2;
-    const jitter = Math.random() * halfDelay; // 0 to baseDelay/2 random jitter
+    const jitter = Math.random() * halfDelay;
 
-    return halfDelay + jitter; // Results in baseDelay/2 to baseDelay
+    return halfDelay + jitter;
   }
 
   /**
@@ -344,6 +356,9 @@ export class TTSWorkerPool {
       // Permanent failure - record with ladder
       this.ladder.recordTask(false, 5);
       this.ladder.evaluate();
+
+      // Sync p-queue concurrency with the ladder
+      this.queue.concurrency = this.ladder.getCurrentWorkers();
 
       // Add to failed tasks
       this.failedTasks.add(task.partIndex);
@@ -455,6 +470,10 @@ export class TTSWorkerPool {
    * Cleanup - close chunkStore and drain connection pool
    */
   async cleanup(): Promise<void> {
+    // Remove network event listeners
+    if (this.handleOnline) window.removeEventListener('online', this.handleOnline);
+    if (this.handleOffline) window.removeEventListener('offline', this.handleOffline);
+
     // Clear pending retry timers to prevent ghost tasks from waking after cancellation
     for (const timer of this.retryTimers.values()) {
       clearTimeout(timer);
@@ -482,6 +501,10 @@ export class TTSWorkerPool {
   }
 
   clear(): void {
+    // Remove network event listeners
+    if (this.handleOnline) window.removeEventListener('online', this.handleOnline);
+    if (this.handleOffline) window.removeEventListener('offline', this.handleOffline);
+
     // Clear pending retry timers to prevent ghost tasks from waking after cancellation
     for (const timer of this.retryTimers.values()) {
       clearTimeout(timer);

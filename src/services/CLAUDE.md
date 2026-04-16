@@ -35,7 +35,7 @@ The TTSWorkerPool uses **immediate re-enqueuing** of failed tasks instead of inl
 
 **How it works:**
 1. Task fails → Connection destroyed (not released)
-2. Retry delay calculated (30s → 120s → 300s → 600s → 1200s max)
+2. Retry delay calculated (3s → 10s → 30s → 60s → 120s max, with half-max jitter)
 3. Task scheduled via `setTimeout` to re-enqueue
 4. Worker slot freed immediately to process healthy chunks
 5. On timeout, task re-added to queue with fresh connection
@@ -58,11 +58,18 @@ When modifying TTSWorkerPool or integrating with it:
 - **Success:** Record `0` retries (actual retry count cleared before recording)
 - **Permanent failure:** Record `5` retries (max retry limit)
 - **Intermediate retries:** Do NOT record — avoids triggering `hasHardFailure` scale-down which looks for `retries >= 5`
+- **Queue sync:** After every `ladder.evaluate()`, p-queue concurrency is synced to `ladder.getCurrentWorkers()`
+
+### Network Handling
+
+- p-queue pauses on `offline` events and resumes on `online` events
+- Preserves retry budget when WiFi drops during long conversions
+- Event listeners cleaned up in both `cleanup()` and `clear()`
 
 ### Status Update Pattern
 
 Two status updates during retry cycle:
-1. **On failure:** `"Part XXXX: Failed. Retrying in 30s (Attempt 3)"`
+1. **On failure:** `"Part XXXX: Retry in Xs..."`
 2. **On re-execution:** `"Part XXXX: Retrying now..."`
 
 This prevents user perception that the app froze when tasks are in background timers.
