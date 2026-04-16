@@ -253,6 +253,94 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
   });
 
+  describe('forceSplitLongParagraphs - hard cut fallback', () => {
+    const splitter = new TextBlockSplitter();
+
+    it('returns paragraphs ≤3000 chars unchanged', () => {
+      const input = ['Short paragraph.', 'Another short paragraph.'];
+      const result = (splitter as any).forceSplitLongParagraphs(input);
+      expect(result).toEqual(input);
+    });
+
+    it('splits long paragraph at last space before 3000 chars', () => {
+      // Create a paragraph with a space at position 2999
+      const longPara = `${'a'.repeat(2999)} bbb`;
+      const result = (splitter as any).forceSplitLongParagraphs([longPara]);
+      expect(result).toHaveLength(2);
+      expect(result[0].length).toBeLessThanOrEqual(3000);
+      expect(result[1].length).toBeLessThanOrEqual(3000);
+      // Should have trimmed whitespace
+      expect(result[0]).not.toMatch(/^\s/);
+      expect(result[0]).not.toMatch(/\s$/);
+      expect(result[1]).not.toMatch(/^\s/);
+      expect(result[1]).not.toMatch(/\s$/);
+    });
+
+    it('splits at comma if better than space', () => {
+      // Space at 2500, comma at 2800 (better - closer to 3000)
+      // Total length: 3500 chars (exceeds limit)
+      const longPara = `${'a'.repeat(2500)} ${'b'.repeat(299)},${'c'.repeat(701)}`;
+      const result = (splitter as any).forceSplitLongParagraphs([longPara]);
+      expect(result).toHaveLength(2);
+      // Should split at comma (2800), not at space (2500)
+      expect(result[0].length).toBeGreaterThan(2500);
+      expect(result[0].length).toBeLessThanOrEqual(3000);
+    });
+
+    it('hard cuts at exactly 3000 chars if no space/comma found', () => {
+      // No spaces or commas in first 3000 chars
+      const longPara = 'a'.repeat(3100);
+      const result = (splitter as any).forceSplitLongParagraphs([longPara]);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toBe('a'.repeat(3000));
+      expect(result[1]).toBe('a'.repeat(100));
+    });
+
+    it('handles multiple long paragraphs', () => {
+      const para1 = 'a'.repeat(3500);
+      const para2 = 'b'.repeat(4000);
+      const result = (splitter as any).forceSplitLongParagraphs([para1, para2]);
+      // First paragraph splits into 2
+      expect(result[0]).toBe('a'.repeat(3000));
+      expect(result[1]).toBe('a'.repeat(500));
+      // Second paragraph splits into 2
+      expect(result[2]).toBe('b'.repeat(3000));
+      expect(result[3]).toBe('b'.repeat(1000));
+    });
+
+    it('handles paragraph that needs multiple splits', () => {
+      // 9000 chars with no spaces/commas = 3 hard cuts
+      const longPara = 'a'.repeat(9000);
+      const result = (splitter as any).forceSplitLongParagraphs([longPara]);
+      expect(result).toHaveLength(3);
+      expect(result[0]).toBe('a'.repeat(3000));
+      expect(result[1]).toBe('a'.repeat(3000));
+      expect(result[2]).toBe('a'.repeat(3000));
+    });
+
+    it('all resulting strings are trimmed', () => {
+      const longPara = `${'a'.repeat(2999)}   bbb   `;
+      const result = (splitter as any).forceSplitLongParagraphs([longPara]);
+      for (const chunk of result) {
+        expect(chunk).toEqual(chunk.trim());
+      }
+    });
+
+    it('handles empty array', () => {
+      const result = (splitter as any).forceSplitLongParagraphs([]);
+      expect(result).toEqual([]);
+    });
+
+    it('handles mixed long and short paragraphs', () => {
+      const input = ['Short', 'a'.repeat(3500), 'Another short'];
+      const result = (splitter as any).forceSplitLongParagraphs(input);
+      expect(result[0]).toBe('Short');
+      expect(result[1]).toBe('a'.repeat(3000));
+      expect(result[2]).toBe('a'.repeat(500));
+      expect(result[3]).toBe('Another short');
+    });
+  });
+
   describe('Integration: createAssignBlocks and createExtractBlocks', () => {
     it('createAssignBlocks (8k) splits at scene divider in full text', () => {
       // 8k maxTokens, 85% threshold = 6800 tokens.

@@ -98,6 +98,49 @@ export class TextBlockSplitter {
   }
 
   /**
+   * Force-split paragraphs that exceed MAX_PARAGRAPH_CHARS (3000).
+   * This is a safety net for edge cases where splitParagraphIntoSentences fails.
+   * Splits at the last space or comma before the limit, with hard cut fallback.
+   * TODO: Will be integrated into splitIntoParagraphs() in Task 2
+   */
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Used in Task 2
+  private forceSplitLongParagraphs(paragraphs: string[]): string[] {
+    const MAX_PARAGRAPH_CHARS = 3000;
+    const result: string[] = [];
+
+    for (const paragraph of paragraphs) {
+      let remaining = paragraph;
+
+      while (remaining.length > MAX_PARAGRAPH_CHARS) {
+        // Find the best split point (last space or comma before limit)
+        const lastSpaceIndex = remaining.lastIndexOf(' ', MAX_PARAGRAPH_CHARS);
+        const lastCommaIndex = remaining.lastIndexOf(',', MAX_PARAGRAPH_CHARS);
+
+        // Choose the split point that's later but >1500 (minimum chunk size)
+        let splitPoint = MAX_PARAGRAPH_CHARS;
+        const MIN_CHUNK_SIZE = 1500;
+
+        if (lastCommaIndex > MIN_CHUNK_SIZE && lastCommaIndex > lastSpaceIndex) {
+          splitPoint = lastCommaIndex + 1; // Split after comma
+        } else if (lastSpaceIndex > MIN_CHUNK_SIZE) {
+          splitPoint = lastSpaceIndex + 1; // Split after space
+        }
+
+        // Extract chunk and add to result
+        result.push(remaining.slice(0, splitPoint).trim());
+        remaining = remaining.slice(splitPoint).trim();
+      }
+
+      // Add remaining part if any
+      if (remaining) {
+        result.push(remaining);
+      }
+    }
+
+    return result;
+  }
+
+  /**
    * Check for common abbreviations (en/ru)
    */
   private isAbbreviation(text: string): boolean {
