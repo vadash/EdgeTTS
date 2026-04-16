@@ -136,7 +136,6 @@ export class LLMVoiceService {
   public mergeApiClient: LLMApiClient;
   private abortController: AbortController | null = null;
   private logger: ILogger;
-  private isFirstAssignBlock: boolean = true; // track first assign block
   private detectedLanguage: string; // NEW - store for prompt building
 
   constructor(options: LLMVoiceServiceOptions) {
@@ -307,26 +306,16 @@ export class LLMVoiceService {
     this.logger?.info(
       `[Assign] Starting (${blocks.length} blocks, max ${maxConcurrent} concurrent${this.options.useVoting ? ', voting enabled' : ''})`,
     );
-    const results: SpeakerAssignment[] = [];
-    let completed = 0;
 
     this.abortController = new AbortController();
-    this.isFirstAssignBlock = true; // reset for new conversion
 
     // Build code mapping from characters (including variations)
     const { nameToCode, codeToName } = buildCodeMapping(characters);
 
-    // Process blocks in batches
-    for (let i = 0; i < blocks.length; i += maxConcurrent) {
-      if (this.abortController.signal.aborted) {
-        throw new Error('Operation cancelled');
-      }
-
-      const batch = blocks.slice(i, i + maxConcurrent);
-      this.logger?.info(`[Assign] Processing batch of ${batch.length} blocks`);
-      const batchPromises = batch.map((block, batchIndex) => {
-        const blockNum = i + batchIndex + 1;
-        const globalIndex = i + batchIndex;
+    // Build task array for parallel processing
+    const tasks = blocks.map((block, globalIndex) => {
+      const blockNum = globalIndex + 1;
+      return () => {
         const overlapSentences =
           globalIndex > 0 ? blocks[globalIndex - 1].sentences.slice(-OVERLAP_SIZE) : undefined;
         this.logger?.info(`[assign] Starting block ${blockNum}/${blocks.length}`);
@@ -337,6 +326,7 @@ export class LLMVoiceService {
           nameToCode,
           codeToName,
           overlapSentences,
+          globalIndex === 0, // isFirstBlock
         )
           .then((result) => {
             this.logger?.info(`[assign] Completed block ${blockNum}/${blocks.length}`);
@@ -349,25 +339,20 @@ export class LLMVoiceService {
             );
             throw err;
           });
-      });
+      };
+    });
 
-      const batchResults = await Promise.all(batchPromises);
+    // Run all tasks with concurrency control
+    const results = await runWithConcurrency(tasks, {
+      concurrency: maxConcurrent,
+      signal: this.abortController.signal,
+      onProgress,
+    });
 
-      for (const blockAssignments of batchResults) {
-        results.push(...blockAssignments);
-        completed++;
-        onProgress?.(completed, blocks.length);
-      }
-
-      // Small delay between batches to avoid overwhelming LLM server
-      if (i + maxConcurrent < blocks.length) {
-        await new Promise((resolve) => setTimeout(resolve, LLM_DELAY_MS));
-      }
-    }
-
-    // Sort by sentence index
-    results.sort((a, b) => a.sentenceIndex - b.sentenceIndex);
-    return results;
+    // Flatten and sort by sentence index
+    const flatResults = results.flat();
+    flatResults.sort((a, b) => a.sentenceIndex - b.sentenceIndex);
+    return flatResults;
   }
 
   /**
@@ -382,6 +367,7 @@ export class LLMVoiceService {
     nameToCode: Map<string, string>,
     codeToName: Map<string, string>,
     overlapSentences?: string[],
+    isFirstBlock: boolean = false,
   ): Promise<SpeakerAssignment[]> {
     this.logger.debug?.(
       `[processAssignBlock] Block starting at ${block.sentenceStartIndex}, ${block.sentences.length} sentences`,
@@ -441,7 +427,7 @@ export class LLMVoiceService {
       }
 
       // Save first assign phase log (draft)
-      if (this.isFirstAssignBlock) {
+      if (isFirstBlock) {
         await this.apiClient.debugLogger?.savePhaseLog(
           'assign_draft',
           { messages: assignMessages },
@@ -491,13 +477,12 @@ export class LLMVoiceService {
           }
 
           // Save QA phase log
-          if (this.isFirstAssignBlock) {
+          if (isFirstBlock) {
             await this.apiClient.debugLogger?.savePhaseLog(
               'assign_qa',
               { messages: qaMessages },
               qaResponse,
             );
-            this.isFirstAssignBlock = false;
           }
 
           this.logger?.info(
@@ -509,18 +494,10 @@ export class LLMVoiceService {
             `[assign] QA pass failed at ${block.sentenceStartIndex}, using draft: ${getErrorMessage(qaError)}`,
           );
           relativeMap = draftMap;
-
-          if (this.isFirstAssignBlock) {
-            this.isFirstAssignBlock = false;
-          }
         }
       } else {
         // No QA pass - use draft directly
         relativeMap = draftMap;
-
-        if (this.isFirstAssignBlock) {
-          this.isFirstAssignBlock = false;
-        }
       }
     } catch (_e) {
       this.logger?.warn(
