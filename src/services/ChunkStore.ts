@@ -13,7 +13,42 @@ export class ChunkStore {
   async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
     this.dataHandle = await directoryHandle.getFileHandle('chunks_data.bin', { create: true });
     this.indexHandle = await directoryHandle.getFileHandle('chunks_index.jsonl', { create: true });
+    await this.cleanupCrswapFiles(directoryHandle);
     await this.parseExistingIndex();
+  }
+
+  /**
+   * Clean up orphaned .crswap files created by Chrome's File System Access API.
+   * These temporary swap files can accumulate when writes are interrupted (browser crash,
+   * tab close, system sleep) and are safe to delete as the main files contain the valid data.
+   */
+  private async cleanupCrswapFiles(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
+    const patterns = ['chunks_data.bin', 'chunks_index.jsonl'];
+    const toDelete: string[] = [];
+
+    for await (const entry of directoryHandle.values()) {
+      if (entry.kind !== 'file') continue;
+
+      const name = entry.name;
+      // Match files like: chunks_data.bin.crswap, chunks_data.bin.1.crswap, chunks_data.bin.2.crswap, etc.
+      if (
+        patterns.some(
+          (pattern) =>
+            name === `${pattern}.crswap` ||
+            (name.startsWith(`${pattern}.`) && name.endsWith('.crswap')),
+        )
+      ) {
+        toDelete.push(name);
+      }
+    }
+
+    for (const name of toDelete) {
+      try {
+        await directoryHandle.removeEntry(name);
+      } catch {
+        // Ignore errors (file may have been deleted by another process)
+      }
+    }
   }
 
   private async parseExistingIndex(): Promise<void> {

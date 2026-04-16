@@ -46,6 +46,14 @@ class MockFileSystem {
           }),
         };
       },
+      values: async function* () {
+        for (const [name] of files) {
+          yield { kind: 'file' as const, name };
+        }
+      },
+      removeEntry: async (name: string) => {
+        files.delete(name);
+      },
     };
   }
 }
