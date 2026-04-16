@@ -99,7 +99,7 @@ describe('ReusableEdgeTTSService', () => {
 
       const result = makeSSML('<<test>> & "quoted" & \'single\'', defaultConfig);
 
-      expect(result).toContain('&lt;&lt;test&amp;gt;&gt;');
+      expect(result).toContain('&lt;&lt;test&gt;&gt;');
       expect(result).toContain('&amp;');
       expect(result).toContain('&quot;quoted&quot;');
       expect(result).toContain('&apos;single&apos;');

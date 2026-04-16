@@ -371,10 +371,17 @@ export class ReusableEdgeTTSService {
   }
 
   private makeSSML(text: string, config: TTSConfig): string {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+
     return (
       "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>\n" +
       `<voice name='${config.voice}'><prosody pitch='${config.pitch}' rate='${config.rate}' volume='${config.volume}'>\n` +
-      text +
+      escaped +
       '</prosody></voice></speak>'
     );
   }
