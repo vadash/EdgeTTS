@@ -392,4 +392,62 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       expect(chapterBlock!.sentences[0]).toBe('Chapter 10');
     });
   });
+
+  describe('splitIntoParagraphs with forceSplitLongParagraphs guard', () => {
+    it('splits 15000-char paragraph with no punctuation into 5 chunks of ≤3000 chars', () => {
+      // A paragraph with no punctuation — splitParagraphIntoSentences will fail
+      // and return the entire paragraph as-is. The guard should force-split it.
+      const longPara = 'a'.repeat(15000);
+      const result = splitter.splitIntoParagraphs(longPara);
+
+      // Should split into 5 chunks of exactly 3000 chars each
+      expect(result).toHaveLength(5);
+      for (const chunk of result) {
+        expect(chunk.length).toBeLessThanOrEqual(3000);
+      }
+      expect(result[0]).toBe('a'.repeat(3000));
+      expect(result[1]).toBe('a'.repeat(3000));
+      expect(result[2]).toBe('a'.repeat(3000));
+      expect(result[3]).toBe('a'.repeat(3000));
+      expect(result[4]).toBe('a'.repeat(3000));
+    });
+
+    it('force-splits paragraph entirely inside quotes correctly', () => {
+      // A paragraph with only quotes — splitParagraphIntoSentences will fail
+      // because it can't find sentence boundaries. The guard should handle it.
+      const quotedPara = `"${'a'.repeat(14998)}"`;
+      const result = splitter.splitIntoParagraphs(quotedPara);
+
+      // Should split into 5 chunks (including the quote characters)
+      expect(result).toHaveLength(5);
+      for (const chunk of result) {
+        expect(chunk.length).toBeLessThanOrEqual(3000);
+      }
+    });
+
+    it('normal paragraphs with punctuation still work as before', () => {
+      // Normal text with punctuation — should be handled by
+      // splitParagraphIntoSentences, and the guard should pass it through.
+      const text = 'First paragraph.\nSecond paragraph.\nThird paragraph.';
+      const result = splitter.splitIntoParagraphs(text);
+
+      expect(result).toHaveLength(3);
+      expect(result).toEqual(['First paragraph.', 'Second paragraph.', 'Third paragraph.']);
+    });
+
+    it('mixed long and normal paragraphs are handled correctly', () => {
+      // One long paragraph without punctuation, one normal paragraph
+      const text = `aaa${'a'.repeat(14997)}\nNormal paragraph.`;
+      const result = splitter.splitIntoParagraphs(text);
+
+      // First paragraph splits into 5 chunks, second stays as-is
+      expect(result.length).toBeGreaterThanOrEqual(6);
+      // All chunks should be ≤3000 chars
+      for (const chunk of result) {
+        expect(chunk.length).toBeLessThanOrEqual(3000);
+      }
+      // Last chunk should be the normal paragraph
+      expect(result[result.length - 1]).toBe('Normal paragraph.');
+    });
+  });
 });

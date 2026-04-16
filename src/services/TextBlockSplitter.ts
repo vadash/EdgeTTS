@@ -32,7 +32,9 @@ export class TextBlockSplitter {
       }
     }
 
-    return paragraphs;
+    // Safety net: ensure no paragraph exceeds 3000 chars, even if
+    // splitParagraphIntoSentences fails to find proper boundaries
+    return this.forceSplitLongParagraphs(paragraphs);
   }
 
   /**
@@ -101,9 +103,7 @@ export class TextBlockSplitter {
    * Force-split paragraphs that exceed MAX_PARAGRAPH_CHARS (3000).
    * This is a safety net for edge cases where splitParagraphIntoSentences fails.
    * Splits at the last space or comma before the limit, with hard cut fallback.
-   * TODO: Will be integrated into splitIntoParagraphs() in Task 2
    */
-  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Used in Task 2
   private forceSplitLongParagraphs(paragraphs: string[]): string[] {
     const MAX_PARAGRAPH_CHARS = 3000;
     const result: string[] = [];
