@@ -45,8 +45,8 @@ export function GeneralTab() {
       <Slider
         label="settings.ttsThreads"
         value={settings.ttsThreads.value}
-        min={1}
-        max={20}
+        min={5}
+        max={40}
         onChange={(v) => settings.setTtsThreads(v)}
       />
 

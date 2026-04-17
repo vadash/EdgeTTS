@@ -27,7 +27,7 @@ describe('SettingsStore', () => {
       expect(settings.value.narratorVoice).toBe('ru-RU, DmitryNeural');
       expect(settings.value.rate).toBe(0);
       expect(settings.value.pitch).toBe(0);
-      expect(settings.value.ttsThreads).toBe(15);
+      expect(settings.value.ttsThreads).toBe(20);
       expect(settings.value.llmThreads).toBe(2);
       expect(settings.value.outputFormat).toBe('opus');
       expect(settings.value.silenceRemovalEnabled).toBe(true);
@@ -130,7 +130,7 @@ describe('SettingsStore', () => {
       resetSettings();
 
       expect(settings.value.rate).toBe(0);
-      expect(settings.value.ttsThreads).toBe(15);
+      expect(settings.value.ttsThreads).toBe(20);
       expect(settings.value.llmThreads).toBe(2);
     });
 
@@ -162,7 +162,7 @@ describe('SettingsStore', () => {
       expect(settings.value.rate).toBe(50);
       // Other settings remain unchanged
       expect(settings.value.pitch).toBe(0);
-      expect(settings.value.ttsThreads).toBe(15);
+      expect(settings.value.ttsThreads).toBe(20);
     });
   });
 });

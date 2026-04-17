@@ -58,7 +58,7 @@ const defaultSettings: AppSettings = {
   enabledVoices: [...DEFAULT_ENABLED_VOICES],
   rate: 0,
   pitch: 0,
-  ttsThreads: 15,
+  ttsThreads: 20,
   llmThreads: 2,
   lexxRegister: true,
   showDopSettings: false,

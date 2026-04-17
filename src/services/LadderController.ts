@@ -17,7 +17,7 @@ export interface LadderConfig {
 export class LadderController {
   private currentWorkers: number;
   private history: TaskResult[] = [];
-  private readonly minWorkers = 3;
+  private readonly minWorkers = 5;
   private tasksSinceLastScaleUp = 0;
 
   constructor(

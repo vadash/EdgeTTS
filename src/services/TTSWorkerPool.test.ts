@@ -531,12 +531,12 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('warmup', () => {
-    it('warms up ladder workers (3), not maxWorkers', async () => {
+    it('warms up ladder workers (5), not maxWorkers', async () => {
       pool = createPool({ maxWorkers: 5 });
       await pool.warmup();
 
-      // Ladder starts at 3 workers (minWorkers), not maxWorkers
-      expect(mockConnect).toHaveBeenCalledTimes(3);
+      // Ladder starts at 5 workers (minWorkers), not maxWorkers
+      expect(mockConnect).toHaveBeenCalledTimes(5);
     });
 
     it('ignores connection errors during warmup', async () => {
@@ -1314,7 +1314,7 @@ describe('TTSWorkerPool', () => {
       await pool.warmup();
 
       expect(onConcurrencyChange).toHaveBeenCalledTimes(1);
-      expect(onConcurrencyChange).toHaveBeenCalledWith(3); // Ladder starts at minWorkers (3)
+      expect(onConcurrencyChange).toHaveBeenCalledWith(5); // Ladder starts at minWorkers (5)
     });
 
     it('calls onConcurrencyChange when task succeeds and ladder adjusts', async () => {

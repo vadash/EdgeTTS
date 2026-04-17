@@ -19,7 +19,6 @@ import {
   setFFmpegError,
   setFFmpegLoaded,
   setFFmpegLoading,
-  setPhaseBaseline,
   setStatus,
   startConversion,
   updateProgress,
