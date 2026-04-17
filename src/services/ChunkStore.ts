@@ -1,186 +1,270 @@
-export class ChunkStore {
-  private dataHandle: FileSystemFileHandle | null = null;
-  private indexHandle: FileSystemFileHandle | null = null;
-  private index = new Map<number, { offset: number; length: number }>();
-  private currentOffset = 0;
-  private currentIndexOffset = 0;
-  private cachedFile: File | null = null;
-  private textEncoder = new TextEncoder();
+import {
+  openDatabase,
+  putChunk,
+  getAllChunks,
+  getAllKeys,
+  getChunk,
+  deleteKeys,
+  clearDatabase,
+  closeDatabase,
+} from './ChunkIDB';
 
-  private queue: Array<{ index: number; data: Uint8Array; resolve: () => void }> = [];
-  private draining = false;
+const FLUSH_THRESHOLD = 2000;
+
+export class ChunkStore {
+  private directoryHandle: FileSystemDirectoryHandle | null = null;
+  private ramIndex = new Map<number, { file: string; offset: number; length: number }>();
+  private fileCache = new Map<string, File>();
+  private fileCounter = 0;
+  private flushing = false;
+  private db: IDBDatabase | null = null;
 
   async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
-    this.dataHandle = await directoryHandle.getFileHandle('chunks_data.bin', { create: true });
-    this.indexHandle = await directoryHandle.getFileHandle('chunks_index.jsonl', { create: true });
-    await this.cleanupCrswapFiles(directoryHandle);
+    this.directoryHandle = directoryHandle;
+    this.db = await openDatabase();
+    await this.migrateOldFormat();
     await this.parseExistingIndex();
   }
 
   /**
-   * Clean up orphaned .crswap files created by Chrome's File System Access API.
-   * These temporary swap files can accumulate when writes are interrupted (browser crash,
-   * tab close, system sleep) and are safe to delete as the main files contain the valid data.
+   * If old-format files (chunks_data.bin, chunks_index.jsonl) exist,
+   * delete them along with any crswap files and numbered chunk files,
+   * then clear IDB. Preserve pipeline_state.json and failed_chunks.json.
    */
-  private async cleanupCrswapFiles(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
-    const patterns = ['chunks_data.bin', 'chunks_index.jsonl'];
+  private async migrateOldFormat(): Promise<void> {
+    let hasOldFormat = false;
     const toDelete: string[] = [];
 
-    for await (const entry of directoryHandle.values()) {
+    for await (const entry of this.directoryHandle!.values()) {
       if (entry.kind !== 'file') continue;
-
       const name = entry.name;
-      // Match files like: chunks_data.bin.crswap, chunks_data.bin.1.crswap, chunks_data.bin.2.crswap, etc.
+
+      if (name === 'chunks_data.bin' || name === 'chunks_index.jsonl') {
+        hasOldFormat = true;
+      }
+
+      // Collect old-format files, crswap files, and any numbered chunk files
       if (
-        patterns.some(
-          (pattern) =>
-            name === `${pattern}.crswap` ||
-            (name.startsWith(`${pattern}.`) && name.endsWith('.crswap')),
-        )
+        name === 'chunks_data.bin' ||
+        name === 'chunks_index.jsonl' ||
+        (name.startsWith('chunks_data.bin') && name.endsWith('.crswap')) ||
+        (name.startsWith('chunks_index.jsonl') && name.endsWith('.crswap')) ||
+        /^chunks_data_\d+\.bin$/.test(name) ||
+        /^chunks_index_\d+\.jsonl$/.test(name)
       ) {
         toDelete.push(name);
       }
     }
 
-    for (const name of toDelete) {
-      try {
-        await directoryHandle.removeEntry(name);
-      } catch {
-        // Ignore errors (file may have been deleted by another process)
+    if (hasOldFormat) {
+      for (const name of toDelete) {
+        try {
+          await this.directoryHandle!.removeEntry(name);
+        } catch {
+          // Ignore errors
+        }
+      }
+      if (this.db) {
+        await clearDatabase(this.db);
       }
     }
   }
 
+  /**
+   * Scan directory for numbered index files and IDB contents to rebuild RAM index.
+   */
   private async parseExistingIndex(): Promise<void> {
-    let maxValidOffset = 0;
-    let validIndexBytes = 0;
+    let maxFileIndex = -1;
 
-    try {
-      const indexFile = await this.indexHandle!.getFile();
-      const text = await indexFile.text();
-      const lines = text.split('\n');
-      let bytePosition = 0;
-
-      for (const line of lines) {
-        const lineBytes = this.textEncoder.encode(`${line}\n`).byteLength;
-
-        if (line.trim().length === 0) {
-          bytePosition += lineBytes;
-          continue;
+    for await (const entry of this.directoryHandle!.values()) {
+      if (entry.kind !== 'file') continue;
+      const match = entry.name.match(/^chunks_index_(\d+)\.jsonl$/);
+      if (match) {
+        const fileIndex = parseInt(match[1], 10);
+        if (fileIndex > maxFileIndex) {
+          maxFileIndex = fileIndex;
         }
 
-        try {
-          const entry = JSON.parse(line);
-          if (
-            typeof entry.i === 'number' &&
-            typeof entry.o === 'number' &&
-            typeof entry.l === 'number'
-          ) {
-            this.index.set(entry.i, { offset: entry.o, length: entry.l });
-            maxValidOffset = Math.max(maxValidOffset, entry.o + entry.l);
-            validIndexBytes = bytePosition + lineBytes;
+        // Parse the index file
+        const fileHandle = await this.directoryHandle!.getFileHandle(entry.name);
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        const lines = text.split('\n');
+
+        for (const line of lines) {
+          if (line.trim().length === 0) continue;
+          try {
+            const parsed = JSON.parse(line);
+            if (
+              typeof parsed.i === 'number' &&
+              typeof parsed.o === 'number' &&
+              typeof parsed.l === 'number'
+            ) {
+              this.ramIndex.set(parsed.i, {
+                file: `chunks_data_${fileIndex}.bin`,
+                offset: parsed.o,
+                length: parsed.l,
+              });
+            }
+          } catch {
+            break;
           }
-        } catch {
-          break;
         }
-
-        bytePosition += lineBytes;
       }
-    } catch {
-      // Fresh start
     }
 
-    this.currentOffset = maxValidOffset;
-    this.currentIndexOffset = validIndexBytes;
+    this.fileCounter = maxFileIndex + 1;
 
-    // Truncate to known-good sizes
-    if (this.currentOffset > 0 || this.currentIndexOffset > 0) {
-      const dataTruncate = await this.dataHandle!.createWritable({ keepExistingData: true });
-      await dataTruncate.truncate(this.currentOffset);
-      await dataTruncate.close();
-
-      const indexTruncate = await this.indexHandle!.createWritable({ keepExistingData: true });
-      await indexTruncate.truncate(this.currentIndexOffset);
-      await indexTruncate.close();
+    // Also load IDB entries
+    if (this.db) {
+      const idbChunks = await getAllChunks(this.db);
+      for (const { key, data } of idbChunks) {
+        this.ramIndex.set(key, { file: 'idb', offset: 0, length: data.byteLength });
+      }
     }
   }
 
   async writeChunk(index: number, data: Uint8Array): Promise<void> {
-    return new Promise((resolve) => {
-      this.queue.push({ index, data, resolve });
-      if (!this.draining) {
-        void this.drain();
-      }
-    });
+    if (!this.db) throw new Error('ChunkStore not initialized');
+
+    await putChunk(this.db, index, data);
+    this.ramIndex.set(index, { file: 'idb', offset: 0, length: data.byteLength });
+
+    // Check if we should auto-flush
+    const keys = await getAllKeys(this.db);
+    if (keys.length >= FLUSH_THRESHOLD && !this.flushing) {
+      await this.flushToDisk();
+    }
   }
 
-  private async drain(): Promise<void> {
-    this.draining = true;
+  /**
+   * Flush IDB chunks to numbered disk files.
+   * Streams one chunk at a time via getChunk() to keep RAM flat.
+   */
+  private async flushToDisk(): Promise<void> {
+    this.flushing = true;
 
-    while (this.queue.length > 0) {
-      const batch = this.queue.splice(0, this.queue.length);
+    try {
+      const keys = await getAllKeys(this.db!);
 
-      const dataStream = await this.dataHandle!.createWritable({ keepExistingData: true });
-      const indexStream = await this.indexHandle!.createWritable({ keepExistingData: true });
+      if (keys.length === 0) {
+        return;
+      }
 
-      await dataStream.seek(this.currentOffset);
-      await indexStream.seek(this.currentIndexOffset);
+      const dataFileName = `chunks_data_${this.fileCounter}.bin`;
+      const indexFileName = `chunks_index_${this.fileCounter}.jsonl`;
 
-      for (const item of batch) {
-        const offset = this.currentOffset;
+      const dataHandle = await this.directoryHandle!.getFileHandle(dataFileName, { create: true });
+      const indexHandle = await this.directoryHandle!.getFileHandle(indexFileName, {
+        create: true,
+      });
+
+      const dataStream = await dataHandle.createWritable({ keepExistingData: false });
+      const indexStream = await indexHandle.createWritable({ keepExistingData: false });
+
+      let byteOffset = 0;
+      const flushedKeys: number[] = [];
+
+      for (const key of keys) {
+        const chunkData = await getChunk(this.db!, key);
+        if (!chunkData) continue;
+
         // Ensure we have a regular ArrayBuffer (not SharedArrayBuffer) for File System Access API
-        const buffer = new ArrayBuffer(item.data.byteLength);
-        new Uint8Array(buffer).set(item.data);
+        const buffer = new ArrayBuffer(chunkData.byteLength);
+        new Uint8Array(buffer).set(chunkData);
         await dataStream.write(new Uint8Array(buffer));
 
-        const indexLine = `${JSON.stringify({ i: item.index, o: offset, l: item.data.byteLength })}\n`;
+        const indexEntry = { i: key, o: byteOffset, l: chunkData.byteLength };
+        const indexLine = `${JSON.stringify(indexEntry)}\n`;
         await indexStream.write(indexLine);
 
-        this.index.set(item.index, { offset, length: item.data.byteLength });
-        this.currentOffset += item.data.byteLength;
-        this.currentIndexOffset += this.textEncoder.encode(indexLine).byteLength;
+        // Update RAM index to point to disk file
+        this.ramIndex.set(key, {
+          file: dataFileName,
+          offset: byteOffset,
+          length: chunkData.byteLength,
+        });
+
+        byteOffset += chunkData.byteLength;
+        flushedKeys.push(key);
       }
 
       await dataStream.close();
       await indexStream.close();
 
-      for (const item of batch) {
-        item.resolve();
-      }
-    }
+      // Delete flushed keys from IDB
+      await deleteKeys(this.db!, flushedKeys);
 
-    this.draining = false;
+      this.fileCounter++;
+
+      // Recurse if more chunks accumulated during flush
+      const remaining = await getAllKeys(this.db!);
+      if (remaining.length >= FLUSH_THRESHOLD) {
+        await this.flushToDisk();
+      }
+    } finally {
+      this.flushing = false;
+    }
   }
 
   async prepareForRead(): Promise<void> {
-    this.cachedFile = await this.dataHandle!.getFile();
+    // Flush any remaining IDB chunks to disk
+    await this.flushToDisk();
+
+    // Cache File objects for all unique data files in RAM index
+    const uniqueFiles = new Set<string>();
+    for (const entry of this.ramIndex.values()) {
+      if (entry.file !== 'idb') {
+        uniqueFiles.add(entry.file);
+      }
+    }
+
+    for (const fileName of uniqueFiles) {
+      const fileHandle = await this.directoryHandle!.getFileHandle(fileName);
+      const file = await fileHandle.getFile();
+      this.fileCache.set(fileName, file);
+    }
   }
 
   async readChunk(index: number): Promise<Uint8Array> {
-    const entry = this.index.get(index);
+    const entry = this.ramIndex.get(index);
     if (!entry) {
       throw new Error(`Chunk ${index} not found`);
     }
-    if (!this.cachedFile) {
-      throw new Error('Call prepareForRead() before reading');
+
+    if (entry.file === 'idb') {
+      const data = await getChunk(this.db!, index);
+      if (!data) throw new Error(`Chunk ${index} not found in IDB`);
+      return data;
     }
 
-    const blob = this.cachedFile.slice(entry.offset, entry.offset + entry.length);
+    const file = this.fileCache.get(entry.file);
+    if (!file) {
+      throw new Error(`File ${entry.file} not cached. Call prepareForRead() first.`);
+    }
+
+    const blob = file.slice(entry.offset, entry.offset + entry.length);
     const buffer = await blob.arrayBuffer();
     return new Uint8Array(buffer);
   }
 
   getExistingIndices(): Set<number> {
-    return new Set(this.index.keys());
+    return new Set(this.ramIndex.keys());
+  }
+
+  async clearDatabase(): Promise<void> {
+    if (this.db) {
+      await clearDatabase(this.db);
+    }
+    this.ramIndex.clear();
   }
 
   async close(): Promise<void> {
-    // Drain any pending writes
-    if (this.queue.length > 0 && !this.draining) {
-      await this.drain();
+    if (this.db) {
+      await closeDatabase(this.db);
+      this.db = null;
     }
-    this.cachedFile = null;
-    this.dataHandle = null;
-    this.indexHandle = null;
+    this.fileCache.clear();
+    this.directoryHandle = null;
   }
 }

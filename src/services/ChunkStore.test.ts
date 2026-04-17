@@ -1,7 +1,30 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ChunkStore } from './ChunkStore';
 
-// Mock File System Access API
+// Mock ChunkIDB module
+vi.mock('./ChunkIDB', () => ({
+  openDatabase: vi.fn(),
+  putChunk: vi.fn(),
+  getAllChunks: vi.fn(),
+  getAllKeys: vi.fn(),
+  getChunk: vi.fn(),
+  deleteKeys: vi.fn(),
+  clearDatabase: vi.fn(),
+  closeDatabase: vi.fn(),
+}));
+
+import {
+  openDatabase,
+  putChunk,
+  getAllChunks,
+  getAllKeys,
+  getChunk,
+  deleteKeys,
+  clearDatabase,
+  closeDatabase,
+} from './ChunkIDB';
+
+// Mock File System Access API — supports multiple numbered files
 class MockFileSystem {
   files = new Map<string, { data: Uint8Array; name: string }>();
 
@@ -62,88 +85,381 @@ describe('ChunkStore', () => {
   let mockFs: MockFileSystem;
   let mockDirHandle: FileSystemDirectoryHandle;
   let store: ChunkStore;
+  let mockDb: any;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     mockFs = new MockFileSystem();
     mockDirHandle = mockFs.createDirectoryHandle() as FileSystemDirectoryHandle;
     store = new ChunkStore();
+
+    mockDb = {};
+    vi.mocked(openDatabase).mockResolvedValue(mockDb as any);
+    vi.mocked(putChunk).mockResolvedValue(undefined);
+    vi.mocked(getAllChunks).mockResolvedValue([]);
+    vi.mocked(getAllKeys).mockResolvedValue([]);
+    vi.mocked(getChunk).mockResolvedValue(undefined);
+    vi.mocked(deleteKeys).mockResolvedValue(undefined);
+    vi.mocked(clearDatabase).mockResolvedValue(undefined);
+    vi.mocked(closeDatabase).mockResolvedValue(undefined);
   });
 
-  it('should write and read a chunk', async () => {
-    await store.init(mockDirHandle);
+  describe('init', () => {
+    it('should open IDB database on init', async () => {
+      await store.init(mockDirHandle);
+      expect(openDatabase).toHaveBeenCalled();
+    });
 
-    const testData = new Uint8Array([1, 2, 3, 4, 5]);
-    await store.writeChunk(0, testData);
-    await store.prepareForRead();
+    it('should migrate old format files on init', async () => {
+      // Create old-format files
+      await mockDirHandle.getFileHandle('chunks_data.bin', { create: true });
+      await mockDirHandle.getFileHandle('chunks_index.jsonl', { create: true });
 
-    const result = await store.readChunk(0);
-    expect(result).toEqual(testData);
+      await store.init(mockDirHandle);
+
+      // Old files should be deleted
+      await expect(mockDirHandle.getFileHandle('chunks_data.bin')).rejects.toThrow(
+        'File not found',
+      );
+      await expect(mockDirHandle.getFileHandle('chunks_index.jsonl')).rejects.toThrow(
+        'File not found',
+      );
+
+      // IDB should be cleared during migration
+      expect(clearDatabase).toHaveBeenCalledWith(mockDb);
+    });
   });
 
-  it('should handle concurrent writes without data loss', async () => {
-    await store.init(mockDirHandle);
+  describe('writeChunk', () => {
+    it('should store chunk in IDB', async () => {
+      await store.init(mockDirHandle);
+      const data = new Uint8Array([1, 2, 3]);
 
-    const numWorkers = 15;
-    const chunksPerWorker = 10;
-    const promises: Promise<void>[] = [];
+      await store.writeChunk(0, data);
 
-    for (let worker = 0; worker < numWorkers; worker++) {
-      for (let i = 0; i < chunksPerWorker; i++) {
-        const index = worker * chunksPerWorker + i;
-        const data = new Uint8Array([index, index + 1, index + 2]);
-        promises.push(store.writeChunk(index, data));
+      expect(putChunk).toHaveBeenCalledWith(mockDb, 0, data);
+    });
+
+    it('should add entry to RAM index', async () => {
+      await store.init(mockDirHandle);
+
+      await store.writeChunk(0, new Uint8Array([1]));
+      await store.writeChunk(5, new Uint8Array([2]));
+
+      expect(store.getExistingIndices()).toEqual(new Set([0, 5]));
+    });
+
+    it('should auto-flush when IDB count reaches FLUSH_THRESHOLD', async () => {
+      await store.init(mockDirHandle);
+
+      // Mock a small set of keys but the threshold check sees >= 2000
+      // We don't need to actually flush 2000 keys — just verify the flush triggers
+      const keys = [0, 1, 2];
+      let keysCallCount = 0;
+      vi.mocked(getAllKeys).mockImplementation(async () => {
+        keysCallCount++;
+        // Call 1: writeChunk threshold check — return 2000 fake key lengths to trigger flush
+        // We only return the actual 3 keys, but override the threshold check by returning
+        // an array of length 2000
+        if (keysCallCount === 1) return Array.from({ length: 2000 }, (_, i) => i);
+        // Call 2: flushToDisk snapshot — return 3 actual keys to iterate
+        if (keysCallCount === 2) return keys;
+        // Call 3+: post-flush check — empty
+        return [];
+      });
+      vi.mocked(getChunk).mockImplementation(async (_db, key) => new Uint8Array([key]));
+
+      await store.writeChunk(0, new Uint8Array([0]));
+
+      // Verify numbered files were created (flush triggered)
+      expect(mockFs.files.has('chunks_data_0.bin')).toBe(true);
+      expect(mockFs.files.has('chunks_index_0.jsonl')).toBe(true);
+
+      // Verify deleteKeys was called with the snapshot keys
+      expect(deleteKeys).toHaveBeenCalledWith(mockDb, expect.arrayContaining(keys));
+    });
+  });
+
+  describe('flushToDisk', () => {
+    it('should stream chunks one at a time via getChunk during flush (not getAllChunks)', async () => {
+      await store.init(mockDirHandle);
+
+      // Clear getAllChunks call history from init (parseExistingIndex calls it)
+      vi.mocked(getAllChunks).mockClear();
+
+      const keys = [0, 1, 2];
+      vi.mocked(getAllKeys).mockResolvedValue(keys);
+      vi.mocked(getChunk).mockImplementation(async (_db, key) => new Uint8Array([key * 10]));
+
+      // Write 3 chunks (below threshold, so flush won't auto-trigger)
+      // getAllKeys returns 3 which is < 2000, so no auto-flush
+      for (const k of keys) {
+        await store.writeChunk(k, new Uint8Array([k * 10]));
       }
-    }
 
-    await Promise.all(promises);
-    await store.prepareForRead();
+      // Manually flush by calling prepareForRead
+      await store.prepareForRead();
 
-    // Verify all chunks written correctly
-    for (let worker = 0; worker < numWorkers; worker++) {
-      for (let i = 0; i < chunksPerWorker; i++) {
-        const index = worker * chunksPerWorker + i;
-        const result = await store.readChunk(index);
-        expect(result).toEqual(new Uint8Array([index, index + 1, index + 2]));
+      // Verify getChunk was called for each key individually
+      expect(getChunk).toHaveBeenCalled();
+
+      // Verify getAllChunks was NOT called during flush — only getAllKeys + getChunk per key
+      expect(getAllChunks).not.toHaveBeenCalled();
+    });
+
+    it('should write correct JSONL index entries', async () => {
+      await store.init(mockDirHandle);
+
+      const keys = [0, 1];
+      vi.mocked(getAllKeys).mockResolvedValue(keys);
+      vi.mocked(getChunk).mockImplementation(async (_db, key) => {
+        if (key === 0) return new Uint8Array([1, 2, 3]);
+        if (key === 1) return new Uint8Array([4, 5]);
+        return undefined;
+      });
+
+      for (const k of keys) {
+        await store.writeChunk(k, new Uint8Array([1])); // data doesn't matter, mocked
       }
-    }
+
+      await store.prepareForRead();
+
+      // Read the index file
+      const indexHandle = await mockDirHandle.getFileHandle('chunks_index_0.jsonl');
+      const indexFile = await indexHandle.getFile();
+      const indexText = await indexFile.text();
+
+      const lines = indexText.trim().split('\n');
+      expect(lines).toHaveLength(2);
+
+      const entry0 = JSON.parse(lines[0]);
+      expect(entry0).toHaveProperty('i', 0);
+      expect(entry0).toHaveProperty('o', 0);
+      expect(entry0).toHaveProperty('l', 3); // [1,2,3] = 3 bytes
+
+      const entry1 = JSON.parse(lines[1]);
+      expect(entry1).toHaveProperty('i', 1);
+      expect(entry1).toHaveProperty('o', 3);
+      expect(entry1).toHaveProperty('l', 2); // [4,5] = 2 bytes
+    });
+
+    it('should increment file counter for subsequent flushes', async () => {
+      await store.init(mockDirHandle);
+
+      // Track which phase we're in for getAllKeys mocking
+      // Phase 1: first write + flush | Phase 2: second write + flush
+      let phase = 1;
+
+      vi.mocked(getAllKeys).mockImplementation(async () => {
+        if (phase === 1) return [0]; // 1 key for first flush
+        return [1]; // 1 key for second flush
+      });
+      vi.mocked(getChunk).mockImplementation(async (_db, key) => new Uint8Array([key]));
+
+      await store.writeChunk(0, new Uint8Array([0]));
+      await store.prepareForRead();
+
+      expect(mockFs.files.has('chunks_data_0.bin')).toBe(true);
+      expect(mockFs.files.has('chunks_index_0.jsonl')).toBe(true);
+
+      // Switch to phase 2
+      phase = 2;
+
+      await store.writeChunk(1, new Uint8Array([1]));
+      await store.prepareForRead();
+
+      expect(mockFs.files.has('chunks_data_1.bin')).toBe(true);
+      expect(mockFs.files.has('chunks_index_1.jsonl')).toBe(true);
+    });
   });
 
-  it('should recover from crash with torn last line', async () => {
-    // Simulate pre-existing data with torn last line
-    const dataHandle = await mockDirHandle.getFileHandle('chunks_data.bin', { create: true });
-    const indexHandle = await mockDirHandle.getFileHandle('chunks_index.jsonl', { create: true });
+  describe('prepareForRead', () => {
+    it('should flush remaining IDB chunks to disk', async () => {
+      await store.init(mockDirHandle);
 
-    // Write valid data
-    const dataWritable = await dataHandle.createWritable();
-    await dataWritable.write(new Uint8Array([1, 2, 3, 4, 5]));
-    await dataWritable.close();
+      vi.mocked(getAllKeys).mockResolvedValue([0, 1]);
+      vi.mocked(getChunk).mockImplementation(async (_db, key) => new Uint8Array([key]));
 
-    // Write valid index followed by torn/truncated line
-    const indexWritable = await indexHandle.createWritable();
-    await indexWritable.write('{"i":0,"o":0,"l":5}\n');
-    await indexWritable.write('{"i":1,"o":5,"l":3}\n');
-    await indexWritable.write('{"i":2,"o":'); // torn line
-    await indexWritable.close();
+      await store.writeChunk(0, new Uint8Array([0]));
+      await store.writeChunk(1, new Uint8Array([1]));
 
-    // Create new store and init (should recover)
-    const newStore = new ChunkStore();
-    await newStore.init(mockDirHandle);
-    await newStore.prepareForRead();
+      await store.prepareForRead();
 
-    // Should have chunks 0 and 1, not 2
-    expect(newStore.getExistingIndices()).toEqual(new Set([0, 1]));
-
-    const chunk0 = await newStore.readChunk(0);
-    expect(chunk0).toEqual(new Uint8Array([1, 2, 3, 4, 5]));
+      // After prepareForRead, all data should be on disk
+      expect(mockFs.files.has('chunks_data_0.bin')).toBe(true);
+    });
   });
 
-  it('should handle empty index file', async () => {
-    await mockDirHandle.getFileHandle('chunks_data.bin', { create: true });
-    await mockDirHandle.getFileHandle('chunks_index.jsonl', { create: true });
+  describe('readChunk', () => {
+    it('should read chunk from disk after flush', async () => {
+      await store.init(mockDirHandle);
 
-    const newStore = new ChunkStore();
-    await newStore.init(mockDirHandle);
+      vi.mocked(getAllKeys).mockResolvedValue([0]);
+      vi.mocked(getChunk).mockResolvedValue(new Uint8Array([10, 20, 30]));
 
-    expect(newStore.getExistingIndices()).toEqual(new Set());
+      await store.writeChunk(0, new Uint8Array([10, 20, 30]));
+      await store.prepareForRead();
+
+      const result = await store.readChunk(0);
+      expect(result).toEqual(new Uint8Array([10, 20, 30]));
+    });
+
+    it('should read chunk from IDB directly when not flushed', async () => {
+      await store.init(mockDirHandle);
+
+      vi.mocked(getChunk).mockResolvedValue(new Uint8Array([5, 6, 7]));
+
+      await store.writeChunk(0, new Uint8Array([5, 6, 7]));
+
+      // Don't call prepareForRead — chunk should still be readable from IDB
+      const result = await store.readChunk(0);
+      expect(result).toEqual(new Uint8Array([5, 6, 7]));
+    });
+
+    it('should throw if chunk index not found', async () => {
+      await store.init(mockDirHandle);
+
+      await expect(store.readChunk(999)).rejects.toThrow('Chunk 999 not found');
+    });
+  });
+
+  describe('getExistingIndices', () => {
+    it('should return all indices from RAM index', async () => {
+      await store.init(mockDirHandle);
+
+      await store.writeChunk(0, new Uint8Array([1]));
+      await store.writeChunk(5, new Uint8Array([2]));
+      await store.writeChunk(10, new Uint8Array([3]));
+
+      expect(store.getExistingIndices()).toEqual(new Set([0, 5, 10]));
+    });
+
+    it('should stay synchronous', () => {
+      // getExistingIndices should not return a Promise
+      const result = store.getExistingIndices();
+      expect(result).toBeInstanceOf(Set);
+      expect(result).not.toBeInstanceOf(Promise);
+    });
+  });
+
+  describe('clearDatabase', () => {
+    it('should call through to ChunkIDB.clearDatabase', async () => {
+      await store.init(mockDirHandle);
+
+      await store.clearDatabase();
+
+      expect(clearDatabase).toHaveBeenCalledWith(mockDb);
+    });
+
+    it('should clear RAM index', async () => {
+      await store.init(mockDirHandle);
+      await store.writeChunk(0, new Uint8Array([1]));
+
+      await store.clearDatabase();
+
+      expect(store.getExistingIndices()).toEqual(new Set());
+    });
+  });
+
+  describe('close', () => {
+    it('should close IDB connection', async () => {
+      await store.init(mockDirHandle);
+      await store.close();
+
+      expect(closeDatabase).toHaveBeenCalledWith(mockDb);
+    });
+  });
+
+  describe('concurrent writes during flush', () => {
+    it('should handle chunks arriving during active flush', async () => {
+      await store.init(mockDirHandle);
+
+      let resolveFirstFlush: () => void;
+      const firstFlushBlocker = new Promise<void>((resolve) => {
+        resolveFirstFlush = resolve;
+      });
+
+      let keysCallIndex = 0;
+      vi.mocked(getAllKeys).mockImplementation(async () => {
+        keysCallIndex++;
+        // Call 1: writeChunk(0) threshold check — return [] (no flush)
+        if (keysCallIndex === 1) return [];
+        // Call 2: writeChunk(1) threshold check — return 2000 to trigger flush
+        if (keysCallIndex === 2) return Array.from({ length: 2000 }, (_, i) => i);
+        // Call 3: flushToDisk snapshot — return [0, 1] (just the keys we wrote)
+        if (keysCallIndex === 3) return [0, 1];
+        // Call 4+: post-flush recursion check — empty
+        return [];
+      });
+
+      // getChunk blocks on first flush, resolves immediately after
+      let getChunkCallCount = 0;
+      vi.mocked(getChunk).mockImplementation(async () => {
+        getChunkCallCount++;
+        if (getChunkCallCount <= 2) {
+          // Block during first flush for the two keys [0, 1]
+          await firstFlushBlocker;
+        }
+        return new Uint8Array([1]);
+      });
+
+      // First write: no flush triggered
+      await store.writeChunk(0, new Uint8Array([0]));
+
+      // Second write triggers flush (getAllKeys returns 2000)
+      // flushToDisk starts, calls getAllKeys again (call 3) → returns [0, 1]
+      // Then calls getChunk(0) which blocks on firstFlushBlocker
+      const writePromise1 = store.writeChunk(1, new Uint8Array([1]));
+
+      // Write another chunk while flush is blocked — goes to IDB
+      // getAllKeys call 4 returns [] (no additional flush)
+      await store.writeChunk(2, new Uint8Array([2]));
+
+      // Now release the flush
+      resolveFirstFlush!();
+      await writePromise1;
+
+      // All chunks should be in the index
+      expect(store.getExistingIndices()).toEqual(new Set([0, 1, 2]));
+    });
+  });
+
+  describe('parseExistingIndex', () => {
+    it('should load existing numbered index files on init', async () => {
+      // Pre-create numbered index files
+      const indexHandle0 = await mockDirHandle.getFileHandle('chunks_index_0.jsonl', {
+        create: true,
+      });
+      const writable0 = await indexHandle0.createWritable();
+      await writable0.write('{"i":0,"o":0,"l":3}\n{"i":1,"o":3,"l":2}\n');
+      await writable0.close();
+
+      // Pre-create corresponding data file
+      const dataHandle0 = await mockDirHandle.getFileHandle('chunks_data_0.bin', { create: true });
+      const dataWritable = await dataHandle0.createWritable();
+      await dataWritable.write(new Uint8Array([1, 2, 3, 4, 5]));
+      await dataWritable.close();
+
+      // No IDB chunks
+      vi.mocked(getAllChunks).mockResolvedValue([]);
+
+      const newStore = new ChunkStore();
+      await newStore.init(mockDirHandle);
+
+      expect(newStore.getExistingIndices()).toEqual(new Set([0, 1]));
+    });
+
+    it('should load IDB entries on init', async () => {
+      // No disk files, but IDB has chunks
+      vi.mocked(getAllChunks).mockResolvedValue([
+        { key: 10, data: new Uint8Array([1]) },
+        { key: 20, data: new Uint8Array([2]) },
+      ]);
+
+      const newStore = new ChunkStore();
+      await newStore.init(mockDirHandle);
+
+      expect(newStore.getExistingIndices()).toEqual(new Set([10, 20]));
+    });
   });
 });
