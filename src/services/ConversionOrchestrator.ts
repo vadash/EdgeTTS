@@ -428,6 +428,9 @@ export async function runConversion(
   let resumedVoiceMap: Map<string, string> | undefined;
   let resumedCharacters: LLMCharacter[] | undefined;
 
+  // Create ChunkStore early so it's available for clearDatabase on fresh start
+  const chunkStore = new ChunkStore();
+
   if (resumeInfo) {
     const confirmed = await conversion.awaitResumeConfirmation(resumeInfo);
     if (!confirmed) {
@@ -450,13 +453,14 @@ export async function runConversion(
       }
     }
   } else {
-    // Fresh start - clean any leftover _temp_work
+    // Fresh start - clean any leftover _temp_work and IDB data
     try {
       await directoryHandle.removeEntry('_temp_work', { recursive: true });
       logger.info('Cleaned up _temp_work directory');
     } catch {
       // Expected if no temp dir exists
     }
+    await chunkStore.clearDatabase();
   }
 
   // ==================== VOICE POOL VALIDATION ====================
@@ -725,7 +729,16 @@ export async function runConversion(
       );
 
       // Continue to TTS with assignments
-      await runTTSStage(input, assignments, fileNames, signal, report, services, stores);
+      await runTTSStage(
+        input,
+        assignments,
+        fileNames,
+        signal,
+        report,
+        services,
+        stores,
+        chunkStore,
+      );
     } else {
       // ==================== RESUME MODE - SKIP LLM ====================
       characters = resumedCharacters!;
@@ -764,7 +777,16 @@ export async function runConversion(
         input.lexxRegister,
       );
 
-      await runTTSStage(input, withDictionary, fileNames, signal, report, services, stores);
+      await runTTSStage(
+        input,
+        withDictionary,
+        fileNames,
+        signal,
+        report,
+        services,
+        stores,
+        chunkStore,
+      );
     }
 
     // ==================== COMPLETE ====================
@@ -802,13 +824,13 @@ async function runTTSStage(
   report: (stage: string, current: number, total: number, message: string, failed?: number) => void,
   services: ConversionOrchestratorServices,
   _stores: Stores,
+  chunkStore: ChunkStore,
 ): Promise<void> {
   const { logger, workerPoolFactory, audioMergerFactory, ffmpegService } = services;
 
   const directoryHandle = input.directoryHandle!;
 
-  // ==================== CREATE CHUNKSTORE ====================
-  const chunkStore = new ChunkStore();
+  // ==================== INIT CHUNKSTORE ====================
   const tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work', { create: true });
   await chunkStore.init(tempDirHandle);
 

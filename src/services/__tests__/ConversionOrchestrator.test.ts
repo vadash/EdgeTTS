@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import type { Stores } from '@/stores';
+import { ChunkStore } from '@/services/ChunkStore';
+import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 import {
   type ConversionOrchestratorServices,
   type OrchestratorInput,
@@ -215,5 +217,69 @@ describe('runConversion', () => {
     // With a mock handle that has no _temp_work, it proceeds past resume check
     // This test verifies the basic input validation path
     expect(stores.conversion.cancel).not.toHaveBeenCalled();
+  });
+
+  it('calls chunkStore.clearDatabase() on fresh start (no resume state)', async () => {
+    const clearDatabaseSpy = vi.spyOn(ChunkStore.prototype, 'clearDatabase').mockResolvedValue();
+    const initSpy = vi.spyOn(ChunkStore.prototype, 'init').mockResolvedValue();
+    const closeSpy = vi.spyOn(ChunkStore.prototype, 'close').mockResolvedValue();
+    const getExistingSpy = vi
+      .spyOn(ChunkStore.prototype, 'getExistingIndices')
+      .mockReturnValue(new Set());
+
+    const stores = createMockStores();
+    const services = createMockServices();
+
+    // Mock LLM factory to return a service with all needed methods
+    const mockLLMService = {
+      extractCharacters: vi
+        .fn()
+        .mockResolvedValue([
+          { canonicalName: 'Narrator', variations: ['Narrator'], gender: 'unknown' },
+        ]),
+      assignSpeakers: vi
+        .fn()
+        .mockResolvedValue([
+          { text: 'Hello', sentenceIndex: 0, speaker: 'narrator', voiceId: 'narrator' },
+        ]),
+      cancel: vi.fn(),
+    };
+    services.llmServiceFactory.create = vi.fn().mockReturnValue(mockLLMService);
+
+    // Mock text block splitter
+    services.textBlockSplitter.createExtractBlocks = vi.fn().mockReturnValue(['block1']);
+    services.textBlockSplitter.createAssignBlocks = vi.fn().mockReturnValue(['block1']);
+
+    // Mock worker pool
+    const mockWorkerPool = {
+      addTasks: vi.fn(),
+      clear: vi.fn(),
+    };
+    services.workerPoolFactory.create = vi.fn().mockImplementation((opts: any) => {
+      // Simulate immediate completion
+      setTimeout(() => opts.onAllComplete?.(), 0);
+      return mockWorkerPool;
+    });
+
+    // Mock audio merger
+    const mockMerger = {
+      mergeAndSave: vi.fn().mockResolvedValue(1),
+    };
+    services.audioMergerFactory.create = vi.fn().mockReturnValue(mockMerger);
+
+    const signal = new AbortController().signal;
+    const input = createMockInput({
+      directoryHandle: createMockDirectoryHandle() as unknown as FileSystemDirectoryHandle,
+    });
+
+    // The mock directoryHandle has no _temp_work, so checkResumeState returns null (fresh start)
+    await runConversion(services, stores, signal, input);
+
+    expect(clearDatabaseSpy).toHaveBeenCalledTimes(1);
+
+    clearDatabaseSpy.mockRestore();
+    initSpy.mockRestore();
+    closeSpy.mockRestore();
+    getExistingSpy.mockRestore();
   });
 });
