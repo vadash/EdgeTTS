@@ -101,6 +101,9 @@ function createMockDirectoryHandleWithState(
       if (!files.has(fileName) && !options?.create) {
         throw new DOMException('File not found', 'NotFoundError');
       }
+      if (!files.has(fileName) && options?.create) {
+        files.set(fileName, new Uint8Array([]));
+      }
       return createMockFile(fileName, files);
     },
     removeEntry: async (name: string, _options?: { recursive?: boolean }) => {
