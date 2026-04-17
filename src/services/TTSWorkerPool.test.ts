@@ -843,7 +843,7 @@ describe('TTSWorkerPool', () => {
       });
     });
 
-    it('calls ladder.recordTask(false, 11) and ladder.evaluate() on permanent failure', async () => {
+    it('calls ladder.recordTask(false, 12) and ladder.evaluate() on permanent failure', async () => {
       const onTaskError = vi.fn();
       pool = createPool({ onTaskError });
 
@@ -862,7 +862,7 @@ describe('TTSWorkerPool', () => {
       // @ts-expect-error - calling private method for testing
       await pool.handleTaskFailure(task, new Error('Test error'));
 
-      expect(recordTaskSpy).toHaveBeenCalledWith(false, 5);
+      expect(recordTaskSpy).toHaveBeenCalledWith(false, 12);
       expect(evaluateSpy).toHaveBeenCalled();
     });
 

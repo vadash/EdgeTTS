@@ -351,18 +351,18 @@ export class TTSWorkerPool {
     // Update retry count
     this.retryCount.set(task.partIndex, attempt);
 
+    // Record intermediate failures to ladder for immediate throttling
+    // This happens BEFORE the max retries check so rate limits are caught early
+    this.ladder.recordTask(false, attempt);
+    this.ladder.evaluate();
+    this.queue.concurrency = this.ladder.getCurrentWorkers();
+
     // Check if we've exceeded max retries
     if (attempt > 5) {
       // Log the failure for debugging
       await this.logTTSFailure(task, error);
 
-      // Permanent failure - record with ladder
-      this.ladder.recordTask(false, 5);
-      this.ladder.evaluate();
-
-      // Sync p-queue concurrency with the ladder
-      this.queue.concurrency = this.ladder.getCurrentWorkers();
-
+      // Permanent failure - already recorded above
       // Add to failed tasks
       this.failedTasks.add(task.partIndex);
       this.processedCount++;

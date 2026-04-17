@@ -101,7 +101,7 @@ describe('TTSWorkerPool - Ladder Integration', () => {
     expect(progress.failed).toBe(0);
   });
 
-  it('records failed task for ladder evaluation', async () => {
+  it('records intermediate failures to ladder for immediate throttling', async () => {
     // Mock send to fail
     const { ReusableEdgeTTSService } = await import('./ReusableEdgeTTSService');
     vi.mocked(ReusableEdgeTTSService).mockImplementation(function () {
@@ -116,6 +116,15 @@ describe('TTSWorkerPool - Ladder Integration', () => {
 
     pool = new TTSWorkerPool(options);
 
+    // Spy on ladder methods
+    const ladder = (pool as unknown as Record<string, unknown>).ladder as {
+      recordTask: (success: boolean, retries: number) => void;
+      evaluate: () => void;
+      getCurrentWorkers: () => number;
+    };
+    const recordTaskSpy = vi.spyOn(ladder, 'recordTask');
+    const evaluateSpy = vi.spyOn(ladder, 'evaluate');
+
     const task: PoolTask = {
       partIndex: 0,
       text: 'Test text',
@@ -123,17 +132,25 @@ describe('TTSWorkerPool - Ladder Integration', () => {
       filenum: '0001',
     };
 
-    // Set retry count to exceed max so it will fail permanently
+    // Set retry count to 2 (less than 5, so it's an intermediate failure)
     // @ts-expect-error - accessing private property for testing
-    pool.retryCount.set(task.partIndex, 11);
+    pool.retryCount.set(task.partIndex, 2);
 
     pool.addTask(task);
 
-    // Wait for task to fail (with retries)
-    await vi.advanceTimersByTimeAsync(5000);
+    // Wait for task to be processed and fail
+    await vi.advanceTimersByTimeAsync(100);
 
-    const progress = pool.getProgress();
-    // Should fail after max retries
-    expect(progress.failed).toBeGreaterThanOrEqual(1);
+    // Verify ladder.recordTask was called with false and attempt number
+    expect(recordTaskSpy).toHaveBeenCalledWith(false, 3); // attempt = currentCount (2) + 1 = 3
+
+    // Verify ladder.evaluate was called
+    expect(evaluateSpy).toHaveBeenCalled();
+
+    // Verify queue concurrency was updated
+    const queue = (pool as unknown as Record<string, unknown>).queue as {
+      concurrency: number;
+    };
+    expect(queue.concurrency).toBe(ladder.getCurrentWorkers());
   });
 });
