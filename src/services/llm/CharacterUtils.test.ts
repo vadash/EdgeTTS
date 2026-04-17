@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LLMCharacter } from '@/state/types';
-import { cullByFrequency, normalizeCanonicalNames } from './CharacterUtils';
+import { cullByFrequency } from './CharacterUtils';
 
 function makeChar(
   name: string,
@@ -110,42 +110,5 @@ describe('cullByFrequency', () => {
     const result = cullByFrequency(characters, text.toLowerCase());
 
     expect(result).toHaveLength(0);
-  });
-});
-
-describe('normalizeCanonicalNames', () => {
-  it('should be a pass-through and NOT override canonicalName with longest variation', () => {
-    const characters: LLMCharacter[] = [
-      {
-        canonicalName: 'Irogh',
-        variations: ['Irogh', 'The Most Handsome Man'],
-        gender: 'male',
-      },
-      {
-        canonicalName: 'Bacci',
-        variations: ['Bacci', 'purplescaled woman'],
-        gender: 'female',
-      },
-    ];
-
-    const result = normalizeCanonicalNames(characters);
-
-    // Should preserve original canonicalName, NOT override with longest variation
-    expect(result[0].canonicalName).toBe('Irogh');
-    expect(result[1].canonicalName).toBe('Bacci');
-  });
-
-  it('should preserve canonicalName even when variation is much longer', () => {
-    const characters: LLMCharacter[] = [
-      {
-        canonicalName: 'Bob',
-        variations: ['Bob', 'Robert Smith the Third of the Kingdom of Farlandia'],
-        gender: 'male',
-      },
-    ];
-
-    const result = normalizeCanonicalNames(characters);
-
-    expect(result[0].canonicalName).toBe('Bob');
   });
 });

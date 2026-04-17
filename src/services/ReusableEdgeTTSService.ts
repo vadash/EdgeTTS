@@ -109,6 +109,11 @@ export class ReusableEdgeTTSService {
       this.socket = new WebSocket(url);
 
       this.socket.onopen = () => {
+        // Guard against disconnect() called during CONNECTING phase
+        if (this.state === 'DISCONNECTED') {
+          this.socket?.close();
+          return;
+        }
         clearTimeout(timeoutId);
         this.sendConfig();
         this.state = 'READY';
@@ -118,6 +123,7 @@ export class ReusableEdgeTTSService {
       };
 
       this.socket.onmessage = (event) => {
+        if (this.state === 'DISCONNECTED') return;
         this.handleMessage(event);
       };
 

@@ -95,35 +95,41 @@ export async function convertZipToTxt(
   const results: ConvertedFile[] = [];
   const zip = await JSZip.loadAsync(zipFile);
 
-  const promises: Promise<void>[] = [];
+  // Collect matching entries first, then process sequentially to avoid OOM
+  const entries: Array<{
+    file: JSZip.JSZipObject;
+    baseName: string;
+    type: 'txt' | 'fb2' | 'epub';
+  }> = [];
 
   zip.forEach((_relativePath, file) => {
     const fileNameLower = file.name.toLowerCase();
-    const baseName = file.name.slice(0, file.name.lastIndexOf('.'));
+    const dotIndex = file.name.lastIndexOf('.');
+    if (dotIndex === -1) return;
+    const baseName = file.name.slice(0, dotIndex);
 
     if (fileNameLower.endsWith('.txt')) {
-      promises.push(
-        file.async('text').then((content) => {
-          results.push({ filename: baseName, content });
-        }),
-      );
+      entries.push({ file, baseName, type: 'txt' });
     } else if (fileNameLower.endsWith('.fb2')) {
-      promises.push(
-        file.async('text').then((content) => {
-          results.push({ filename: baseName, content: convertFb2ToTxt(content) });
-        }),
-      );
+      entries.push({ file, baseName, type: 'fb2' });
     } else if (fileNameLower.endsWith('.epub')) {
-      promises.push(
-        file.async('arraybuffer').then(async (content) => {
-          const text = await convertEpubToTxt(content);
-          results.push({ filename: baseName, content: text });
-        }),
-      );
+      entries.push({ file, baseName, type: 'epub' });
     }
   });
 
-  await Promise.all(promises);
+  for (const { file, baseName, type } of entries) {
+    if (type === 'txt') {
+      const content = await file.async('text');
+      results.push({ filename: baseName, content });
+    } else if (type === 'fb2') {
+      const content = convertFb2ToTxt(await file.async('text'));
+      results.push({ filename: baseName, content });
+    } else if (type === 'epub') {
+      const content = await convertEpubToTxt(await file.async('arraybuffer'));
+      results.push({ filename: baseName, content });
+    }
+  }
+
   return results;
 }
 

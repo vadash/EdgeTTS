@@ -4,6 +4,7 @@ import {
   getAllChunks,
   getAllKeys,
   getChunk,
+  getChunksByKeys,
   deleteKeys,
   clearDatabase,
   closeDatabase,
@@ -165,8 +166,10 @@ export class ChunkStore {
       let byteOffset = 0;
       const flushedKeys: number[] = [];
 
-      for (const key of keys) {
-        const chunkData = await getChunk(this.db!, key);
+      // Fetch all chunks in a single IDB transaction instead of one per key
+      const chunks = await getChunksByKeys(this.db!, keys);
+
+      for (const { key, data: chunkData } of chunks) {
         if (!chunkData) continue;
 
         // Ensure we have a regular ArrayBuffer (not SharedArrayBuffer) for File System Access API

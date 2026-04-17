@@ -449,25 +449,34 @@ export class FFmpegService {
   }
 
   /**
-   * Bruteforce cleanup when specific filenames are unknown
+   * Cleanup when specific filenames are unknown.
+   * Uses listDir to discover actual files in the virtual filesystem
+   * instead of guessing filenames with a hardcoded range.
    */
   private async cleanupAll(): Promise<void> {
     if (!this.ffmpeg) return;
 
-    // Common files
-    const filesToDelete = ['concat.txt', 'output.opus', 'silence.mp3'];
+    try {
+      const dirListing = await this.ffmpeg.listDir('/');
+      const filesToDelete = dirListing
+        .filter((f) => f.name !== '.' && f.name !== '..')
+        .map((f) => f.name);
 
-    // Add potential input files (scan reasonable range)
-    for (let i = 0; i < 500; i++) {
-      filesToDelete.push(`input_${i.toString().padStart(5, '0')}.mp3`);
-    }
-
-    for (const file of filesToDelete) {
-      try {
-        await this.ffmpeg.deleteFile(file);
-      } catch {
-        // Ignore errors, DO NOT break the loop
-        // We want to try deleting everything
+      for (const file of filesToDelete) {
+        try {
+          await this.ffmpeg.deleteFile(file);
+        } catch {
+          // Ignore — file may already be gone
+        }
+      }
+    } catch {
+      // listDir failed — fall back to known temp files
+      for (const file of ['concat.txt', 'output.opus', 'silence.mp3']) {
+        try {
+          await this.ffmpeg.deleteFile(file);
+        } catch {
+          // Ignore
+        }
       }
     }
   }

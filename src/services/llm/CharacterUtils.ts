@@ -1,14 +1,5 @@
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 
-/**
- * Normalize canonicalNames - now a pass-through.
- * The LLM's merge step handles proper noun prioritization via prompt instructions.
- */
-export function normalizeCanonicalNames(characters: LLMCharacter[]): LLMCharacter[] {
-  // Trust the LLM's ordering from merge step - proper nouns prioritized via prompt
-  return characters;
-}
-
 export interface CodeMapping {
   nameToCode: Map<string, string>;
   codeToName: Map<string, string>;

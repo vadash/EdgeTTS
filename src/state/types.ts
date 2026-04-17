@@ -50,9 +50,6 @@ export interface AppSettings {
   ttsThreads: number;
   llmThreads: number;
   lexxRegister: boolean;
-  showDopSettings: boolean;
-  isLiteMode: boolean;
-  statusAreaWidth: number;
   // Audio processing settings
   outputFormat: 'opus';
   silenceRemovalEnabled: boolean;

@@ -99,6 +99,39 @@ export async function getAllKeys(db: IDBDatabase): Promise<number[]> {
 }
 
 /**
+ * Retrieves multiple chunks by their keys in a single readonly transaction.
+ * Avoids the overhead of opening a separate transaction per key.
+ *
+ * @param db - The IndexedDB database connection
+ * @param keys - Array of numeric keys to retrieve
+ * @returns Promise<Array<{ key: number; data: Uint8Array | undefined }>>
+ */
+export async function getChunksByKeys(
+  db: IDBDatabase,
+  keys: number[],
+): Promise<Array<{ key: number; data: Uint8Array | undefined }>> {
+  if (keys.length === 0) return [];
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+
+    const results: Array<{ key: number; data: Uint8Array | undefined }> = [];
+
+    for (const key of keys) {
+      const request = store.get(key);
+      request.onsuccess = () => {
+        results.push({ key, data: request.result as Uint8Array | undefined });
+      };
+      request.onerror = () => reject(request.error);
+    }
+
+    tx.oncomplete = () => resolve(results);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/**
  * Retrieves a single chunk by its key.
  * Used during flush to stream one chunk at a time.
  *

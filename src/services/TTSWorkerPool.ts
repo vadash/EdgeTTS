@@ -275,10 +275,12 @@ export class TTSWorkerPool {
       await this.connectionPool.release(service);
     } catch (error) {
       // Destroy connection on failure (not release)
-      try {
-        await this.connectionPool.destroy(service!);
-      } catch {
-        // Socket may already be dead - ignore error
+      if (service) {
+        try {
+          await this.connectionPool.destroy(service);
+        } catch {
+          // Socket may already be dead - ignore error
+        }
       }
 
       // Post-cancellation safety check: skip state updates if pool was cleared
@@ -303,11 +305,6 @@ export class TTSWorkerPool {
       total: this.totalTasks,
       failed: this.failedTasks.size,
     };
-  }
-
-  getTempDirHandle(): FileSystemDirectoryHandle | null {
-    // Deprecated: ChunkStore manages storage internally
-    return null;
   }
 
   /**

@@ -8,6 +8,7 @@ vi.mock('../ChunkIDB', () => ({
   getAllChunks: vi.fn(),
   getAllKeys: vi.fn(),
   getChunk: vi.fn(),
+  getChunksByKeys: vi.fn(),
   deleteKeys: vi.fn(),
   clearDatabase: vi.fn(),
   closeDatabase: vi.fn(),
@@ -19,6 +20,7 @@ import {
   getAllChunks,
   getAllKeys,
   getChunk,
+  getChunksByKeys,
   deleteKeys,
   clearDatabase,
   closeDatabase,
@@ -98,6 +100,7 @@ describe('ChunkStore Integration', () => {
     vi.mocked(getAllChunks).mockResolvedValue([]);
     vi.mocked(getAllKeys).mockResolvedValue([]);
     vi.mocked(getChunk).mockResolvedValue(undefined);
+    vi.mocked(getChunksByKeys).mockResolvedValue([]);
     vi.mocked(deleteKeys).mockResolvedValue(undefined);
     vi.mocked(clearDatabase).mockResolvedValue(undefined);
     vi.mocked(closeDatabase).mockResolvedValue(undefined);
@@ -114,6 +117,9 @@ describe('ChunkStore Integration', () => {
     });
     vi.mocked(getAllKeys).mockImplementation(async () => Array.from(idbStore.keys()));
     vi.mocked(getChunk).mockImplementation(async (_db, key) => idbStore.get(key));
+    vi.mocked(getChunksByKeys).mockImplementation(async (_db, keys) =>
+      keys.map((key) => ({ key, data: idbStore.get(key) })),
+    );
     vi.mocked(deleteKeys).mockImplementation(async (_db, keys) => {
       for (const k of keys) idbStore.delete(k);
     });
@@ -155,6 +161,9 @@ describe('ChunkStore Integration', () => {
     );
     vi.mocked(getAllKeys).mockImplementation(async () => Array.from(idbStore.keys()));
     vi.mocked(getChunk).mockImplementation(async (_db, key) => idbStore.get(key));
+    vi.mocked(getChunksByKeys).mockImplementation(async (_db, keys) =>
+      keys.map((key) => ({ key, data: idbStore.get(key) })),
+    );
     vi.mocked(deleteKeys).mockImplementation(async (_db, keys) => {
       for (const k of keys) idbStore.delete(k);
     });

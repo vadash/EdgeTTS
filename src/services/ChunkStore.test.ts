@@ -8,6 +8,7 @@ vi.mock('./ChunkIDB', () => ({
   getAllChunks: vi.fn(),
   getAllKeys: vi.fn(),
   getChunk: vi.fn(),
+  getChunksByKeys: vi.fn(),
   deleteKeys: vi.fn(),
   clearDatabase: vi.fn(),
   closeDatabase: vi.fn(),
@@ -19,6 +20,7 @@ import {
   getAllChunks,
   getAllKeys,
   getChunk,
+  getChunksByKeys,
   deleteKeys,
   clearDatabase,
   closeDatabase,
@@ -99,6 +101,7 @@ describe('ChunkStore', () => {
     vi.mocked(getAllChunks).mockResolvedValue([]);
     vi.mocked(getAllKeys).mockResolvedValue([]);
     vi.mocked(getChunk).mockResolvedValue(undefined);
+    vi.mocked(getChunksByKeys).mockResolvedValue([]);
     vi.mocked(deleteKeys).mockResolvedValue(undefined);
     vi.mocked(clearDatabase).mockResolvedValue(undefined);
     vi.mocked(closeDatabase).mockResolvedValue(undefined);
@@ -168,6 +171,9 @@ describe('ChunkStore', () => {
         return [];
       });
       vi.mocked(getChunk).mockImplementation(async (_db, key) => new Uint8Array([key]));
+      vi.mocked(getChunksByKeys).mockImplementation(async (_db, k) =>
+        k.map((key) => ({ key, data: new Uint8Array([key]) })),
+      );
 
       await store.writeChunk(0, new Uint8Array([0]));
 
@@ -181,7 +187,7 @@ describe('ChunkStore', () => {
   });
 
   describe('flushToDisk', () => {
-    it('should stream chunks one at a time via getChunk during flush (not getAllChunks)', async () => {
+    it('should fetch all chunks in a single getChunksByKeys call during flush (not getAllChunks)', async () => {
       await store.init(mockDirHandle);
 
       // Clear getAllChunks call history from init (parseExistingIndex calls it)
@@ -189,6 +195,9 @@ describe('ChunkStore', () => {
 
       const keys = [0, 1, 2];
       vi.mocked(getAllKeys).mockResolvedValue(keys);
+      vi.mocked(getChunksByKeys).mockImplementation(async (_db, k) =>
+        k.map((key) => ({ key, data: new Uint8Array([key * 10]) })),
+      );
       vi.mocked(getChunk).mockImplementation(async (_db, key) => new Uint8Array([key * 10]));
 
       // Write 3 chunks (below threshold, so flush won't auto-trigger)
@@ -200,10 +209,10 @@ describe('ChunkStore', () => {
       // Manually flush by calling prepareForRead
       await store.prepareForRead();
 
-      // Verify getChunk was called for each key individually
-      expect(getChunk).toHaveBeenCalled();
+      // Verify getChunksByKeys was called for batch retrieval
+      expect(getChunksByKeys).toHaveBeenCalled();
 
-      // Verify getAllChunks was NOT called during flush — only getAllKeys + getChunk per key
+      // Verify getAllChunks was NOT called during flush — only getAllKeys + getChunksByKeys
       expect(getAllChunks).not.toHaveBeenCalled();
     });
 
@@ -212,6 +221,13 @@ describe('ChunkStore', () => {
 
       const keys = [0, 1];
       vi.mocked(getAllKeys).mockResolvedValue(keys);
+      vi.mocked(getChunksByKeys).mockImplementation(async (_db, k) =>
+        k.map((key) => ({
+          key,
+          data:
+            key === 0 ? new Uint8Array([1, 2, 3]) : key === 1 ? new Uint8Array([4, 5]) : undefined,
+        })),
+      );
       vi.mocked(getChunk).mockImplementation(async (_db, key) => {
         if (key === 0) return new Uint8Array([1, 2, 3]);
         if (key === 1) return new Uint8Array([4, 5]);
@@ -255,6 +271,9 @@ describe('ChunkStore', () => {
         return [1]; // 1 key for second flush
       });
       vi.mocked(getChunk).mockImplementation(async (_db, key) => new Uint8Array([key]));
+      vi.mocked(getChunksByKeys).mockImplementation(async (_db, k) =>
+        k.map((key) => ({ key, data: new Uint8Array([key]) })),
+      );
 
       await store.writeChunk(0, new Uint8Array([0]));
       await store.prepareForRead();
@@ -278,6 +297,9 @@ describe('ChunkStore', () => {
       await store.init(mockDirHandle);
 
       vi.mocked(getAllKeys).mockResolvedValue([0, 1]);
+      vi.mocked(getChunksByKeys).mockImplementation(async (_db, k) =>
+        k.map((key) => ({ key, data: new Uint8Array([key]) })),
+      );
       vi.mocked(getChunk).mockImplementation(async (_db, key) => new Uint8Array([key]));
 
       await store.writeChunk(0, new Uint8Array([0]));
@@ -296,6 +318,9 @@ describe('ChunkStore', () => {
 
       vi.mocked(getAllKeys).mockResolvedValue([0]);
       vi.mocked(getChunk).mockResolvedValue(new Uint8Array([10, 20, 30]));
+      vi.mocked(getChunksByKeys).mockResolvedValue([
+        { key: 0, data: new Uint8Array([10, 20, 30]) },
+      ]);
 
       await store.writeChunk(0, new Uint8Array([10, 20, 30]));
       await store.prepareForRead();
@@ -390,6 +415,17 @@ describe('ChunkStore', () => {
         if (keysCallIndex === 3) return [0, 1];
         // Call 4+: post-flush recursion check — empty
         return [];
+      });
+
+      // getChunksByKeys blocks on first flush, resolves immediately after
+      let getChunksByKeysCallCount = 0;
+      vi.mocked(getChunksByKeys).mockImplementation(async (_db, keys) => {
+        getChunksByKeysCallCount++;
+        if (getChunksByKeysCallCount <= 1) {
+          // Block during first flush for the two keys [0, 1]
+          await firstFlushBlocker;
+        }
+        return keys.map((key) => ({ key, data: new Uint8Array([1]) }));
       });
 
       // getChunk blocks on first flush, resolves immediately after

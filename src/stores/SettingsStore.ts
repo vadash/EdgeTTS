@@ -61,9 +61,6 @@ const defaultSettings: AppSettings = {
   ttsThreads: 20,
   llmThreads: 2,
   lexxRegister: true,
-  showDopSettings: false,
-  isLiteMode: true,
-  statusAreaWidth: 450,
   outputFormat: 'opus',
   silenceRemovalEnabled: true,
   normalizationEnabled: true,
@@ -119,9 +116,6 @@ export const pitch = computed(() => settings.value.pitch);
 export const ttsThreads = computed(() => settings.value.ttsThreads);
 export const llmThreads = computed(() => settings.value.llmThreads);
 export const lexxRegister = computed(() => settings.value.lexxRegister);
-export const showDopSettings = computed(() => settings.value.showDopSettings);
-export const isLiteMode = computed(() => settings.value.isLiteMode);
-export const statusAreaWidth = computed(() => settings.value.statusAreaWidth);
 export const outputFormat = computed(() => settings.value.outputFormat);
 export const silenceRemovalEnabled = computed(() => settings.value.silenceRemovalEnabled);
 export const normalizationEnabled = computed(() => settings.value.normalizationEnabled);
@@ -179,18 +173,6 @@ export function setLlmThreads(value: number): void {
 
 export function setLexxRegister(value: boolean): void {
   settings.value = { ...settings.value, lexxRegister: value };
-}
-
-export function setShowDopSettings(value: boolean): void {
-  settings.value = { ...settings.value, showDopSettings: value };
-}
-
-export function setIsLiteMode(value: boolean): void {
-  settings.value = { ...settings.value, isLiteMode: value };
-}
-
-export function setStatusAreaWidth(value: number): void {
-  settings.value = { ...settings.value, statusAreaWidth: value };
 }
 
 export function setOutputFormat(value: 'opus'): void {

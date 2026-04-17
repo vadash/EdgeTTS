@@ -397,18 +397,6 @@ describe('TTSWorkerPool', () => {
     });
   });
 
-  describe('getTempDirHandle', () => {
-    it('returns null (deprecated - ChunkStore manages storage)', async () => {
-      pool = createPool();
-      pool.addTask(createTask(0));
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      // getTempDirHandle now returns null since ChunkStore manages storage
-      expect(pool.getTempDirHandle()).toBeNull();
-    });
-  });
-
   describe('cleanup', () => {
     it('closes chunkStore', async () => {
       pool = createPool();
