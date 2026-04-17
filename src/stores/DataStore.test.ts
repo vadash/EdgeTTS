@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ProcessedBook, TTSWorker } from '@/state/types';
+import type { ProcessedBook } from '@/state/types';
 import { createDataStore, type DataStore } from './DataStore';
 
 describe('DataStore', () => {
@@ -24,44 +24,6 @@ describe('DataStore', () => {
       store.clearBook();
       expect(store.book.value).toBeNull();
       expect(store.bookLoaded.value).toBe(false);
-    });
-  });
-
-  describe('workers management', () => {
-    const mockWorker: TTSWorker = {
-      id: 1,
-      status: 'processing',
-      filenum: '0',
-      filename: 'test.mp3',
-      audioData: null,
-      mp3Saved: false,
-    };
-
-    it('updates worker', () => {
-      store.addWorker(mockWorker);
-      store.updateWorker(1, { status: 'completed' });
-      expect(store.activeWorkers.value[0].status).toBe('completed');
-    });
-
-    it('removes worker', () => {
-      store.addWorker(mockWorker);
-      store.removeWorker(1);
-      expect(store.activeWorkers.value).toEqual([]);
-    });
-
-    it('does not update non-existent worker', () => {
-      store.addWorker(mockWorker);
-      store.updateWorker(999, { status: 'completed' });
-      expect(store.activeWorkers.value[0].status).toBe('processing');
-    });
-  });
-
-  describe('file naming state', () => {
-    it('increments file name index', () => {
-      store.setFileNameIndex(5);
-      const current = store.incrementFileNameIndex();
-      expect(current).toBe(5);
-      expect(store.fileNameIndex.value).toBe(6);
     });
   });
 
@@ -198,17 +160,6 @@ describe('DataStore', () => {
       store.setDictionary([{ type: 'word', pattern: 'a', replacement: 'b' }]);
       store.setDictionaryRaw(['a=b']);
       store.setDirectoryHandle({} as FileSystemDirectoryHandle);
-      store.addWorker({
-        id: 1,
-        status: 'processing',
-        filenum: '0',
-        filename: 'test',
-        audioData: null,
-        mp3Saved: false,
-      });
-      store.setFileNameIndex(5);
-      store.setNumBook(3);
-      store.setNumText(7);
 
       store.clear();
 
@@ -218,31 +169,16 @@ describe('DataStore', () => {
       expect(store.dictionary.value).toEqual([]);
       expect(store.dictionaryRaw.value).toEqual([]);
       expect(store.directoryHandle.value).toBeNull();
-      expect(store.activeWorkers.value).toEqual([]);
-      expect(store.fileNameIndex.value).toBe(1);
-      expect(store.numBook.value).toBe(0);
-      expect(store.numText.value).toBe(0);
     });
   });
 
   describe('resetForConversion', () => {
-    it('resets conversion-specific state but keeps directory handle', () => {
+    it('keeps directory handle', () => {
       const mockHandle = {} as FileSystemDirectoryHandle;
       store.setDirectoryHandle(mockHandle);
-      store.addWorker({
-        id: 1,
-        status: 'processing',
-        filenum: '0',
-        filename: 'test',
-        audioData: null,
-        mp3Saved: false,
-      });
-      store.setFileNameIndex(5);
 
       store.resetForConversion();
 
-      expect(store.activeWorkers.value).toEqual([]);
-      expect(store.fileNameIndex.value).toBe(1);
       expect(store.directoryHandle.value).toBe(mockHandle);
     });
   });

@@ -2,7 +2,7 @@
 // Manages application data (text content, book, dictionary, file handles)
 
 import { computed, signal } from '@preact/signals';
-import type { DictionaryRule, ProcessedBook, TTSWorker } from '@/state/types';
+import type { DictionaryRule, ProcessedBook } from '@/state/types';
 import {
   type DetectedLanguage,
   type DetectionResult,
@@ -26,14 +26,6 @@ export class DataStore {
 
   // File system
   readonly directoryHandle = signal<FileSystemDirectoryHandle | null>(null);
-
-  // Workers state (for tracking active TTS workers)
-  readonly activeWorkers = signal<TTSWorker[]>([]);
-
-  // File naming state
-  readonly fileNameIndex = signal<number>(1);
-  readonly numBook = signal<number>(0);
-  readonly numText = signal<number>(0);
 
   // Language detection (explicit signal, not computed)
   readonly detectedLanguage = signal<DetectedLanguage>('en');
@@ -147,49 +139,6 @@ export class DataStore {
     this.directoryHandle.value = null;
   }
 
-  // ========== Workers Actions ==========
-
-  setActiveWorkers(workers: TTSWorker[]): void {
-    this.activeWorkers.value = workers;
-  }
-
-  addWorker(worker: TTSWorker): void {
-    this.activeWorkers.value = [...this.activeWorkers.value, worker];
-  }
-
-  updateWorker(id: number, updates: Partial<TTSWorker>): void {
-    const workers = this.activeWorkers.value.map((w) => (w.id === id ? { ...w, ...updates } : w));
-    this.activeWorkers.value = workers;
-  }
-
-  removeWorker(id: number): void {
-    this.activeWorkers.value = this.activeWorkers.value.filter((w) => w.id !== id);
-  }
-
-  clearWorkers(): void {
-    this.activeWorkers.value = [];
-  }
-
-  // ========== File Naming Actions ==========
-
-  setFileNameIndex(index: number): void {
-    this.fileNameIndex.value = index;
-  }
-
-  incrementFileNameIndex(): number {
-    const current = this.fileNameIndex.value;
-    this.fileNameIndex.value = current + 1;
-    return current;
-  }
-
-  setNumBook(num: number): void {
-    this.numBook.value = num;
-  }
-
-  setNumText(num: number): void {
-    this.numText.value = num;
-  }
-
   // ========== Full Reset ==========
 
   /**
@@ -202,10 +151,6 @@ export class DataStore {
     this.dictionary.value = [];
     this.dictionaryRaw.value = [];
     this.directoryHandle.value = null;
-    this.activeWorkers.value = [];
-    this.fileNameIndex.value = 1;
-    this.numBook.value = 0;
-    this.numText.value = 0;
     this.loadedFileName.value = '';
   }
 
@@ -213,8 +158,7 @@ export class DataStore {
    * Reset for new conversion (keep directory handle)
    */
   resetForConversion(): void {
-    this.activeWorkers.value = [];
-    this.fileNameIndex.value = 1;
+    // Currently a no-op but kept for future conversion-specific resets
   }
 }
 

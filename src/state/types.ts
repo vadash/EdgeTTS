@@ -74,15 +74,6 @@ export interface ProcessedBook {
   fullText: string;
 }
 
-export interface TTSWorker {
-  id: number;
-  filename: string;
-  filenum: string;
-  status: 'pending' | 'processing' | 'completed' | 'error';
-  audioData: Uint8Array | null;
-  mp3Saved: boolean;
-}
-
 export interface TTSConfig {
   voice: string;
   pitch: string;
