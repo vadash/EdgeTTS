@@ -70,7 +70,9 @@ export class KokoroFallbackService {
     }
 
     this.initPromise = new Promise<void>((resolve, reject) => {
-      this.worker = new Worker(new URL('./kokoro-worker.ts', import.meta.url), { type: 'module' });
+      this.worker = new Worker(new URL('./workers/kokoro.worker', import.meta.url), {
+        type: 'module',
+      });
 
       this.worker.onmessage = (ev: MessageEvent) => {
         const { type, message } = ev.data as { type: string; message?: string };
