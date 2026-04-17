@@ -75,6 +75,7 @@ export default (_env, argv) => {
           { from: 'public/*.md', to: '[name][ext]' },
           { from: 'node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.js', to: 'ffmpeg-core.js' },
           { from: 'node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm', to: 'ffmpeg-core.wasm' },
+          { from: 'node_modules/onnxruntime-web/dist/*.wasm', to: '[name][ext]' },
           ...(isProduction ? [{ from: 'public/404.html', to: '../404.html' }] : []),
         ],
       }),
