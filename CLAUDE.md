@@ -2,14 +2,6 @@
 
 Local-first TTS web app converting books (EPUB/FB2/TXT) to audiobooks using Edge TTS and LLMs.
 
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Production build |
-| `npm test` | Run unit tests |
-
 ## Architecture
 
 - `src/components/` - Preact + Tailwind UI
