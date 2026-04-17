@@ -47,4 +47,30 @@ describe('ProgressBar', () => {
     const { container } = render(<ProgressBar current={50} total={100} />);
     expect(container.textContent).not.toContain('ETA');
   });
+
+  it('renders LLM worker count when llmWorkers > 0', () => {
+    const { container } = render(<ProgressBar current={50} total={100} llmWorkers={4} />);
+    expect(container.textContent).toContain('LLM: 4');
+  });
+
+  it('renders TTS worker count when ttsWorkers > 0', () => {
+    const { container } = render(<ProgressBar current={50} total={100} ttsWorkers={8} />);
+    expect(container.textContent).toContain('TTS: 8');
+  });
+
+  it('does not render worker badges when both are 0', () => {
+    const { container } = render(
+      <ProgressBar current={50} total={100} llmWorkers={0} ttsWorkers={0} />,
+    );
+    expect(container.textContent).not.toContain('LLM:');
+    expect(container.textContent).not.toContain('TTS:');
+  });
+
+  it('renders LLM badge when both props provided but only LLM is non-zero', () => {
+    const { container } = render(
+      <ProgressBar current={50} total={100} llmWorkers={4} ttsWorkers={0} />,
+    );
+    expect(container.textContent).toContain('LLM: 4');
+    expect(container.textContent).not.toContain('TTS:');
+  });
 });

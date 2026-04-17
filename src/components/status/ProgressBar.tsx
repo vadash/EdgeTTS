@@ -3,9 +3,18 @@ interface ProgressBarProps {
   total: number;
   failed?: number;
   eta?: string;
+  llmWorkers?: number;
+  ttsWorkers?: number;
 }
 
-function ProgressBar({ current, total, failed = 0, eta }: ProgressBarProps) {
+function ProgressBar({
+  current,
+  total,
+  failed = 0,
+  eta,
+  llmWorkers = 0,
+  ttsWorkers = 0,
+}: ProgressBarProps) {
   const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
 
   if (total === 0) return null;
@@ -33,6 +42,11 @@ function ProgressBar({ current, total, failed = 0, eta }: ProgressBarProps) {
             </span>
           )}
           <span>({percentage}%)</span>
+          {(llmWorkers > 0 || ttsWorkers > 0) && (
+            <span className="ml-2 px-2 py-0.5 rounded bg-surface-alt border border-border text-gray-400">
+              {llmWorkers > 0 ? `LLM: ${llmWorkers}` : `TTS: ${ttsWorkers}`}
+            </span>
+          )}
         </div>
         {eta && <span>ETA: {eta}</span>}
       </div>
