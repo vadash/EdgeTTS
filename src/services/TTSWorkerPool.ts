@@ -32,6 +32,7 @@ export interface WorkerPoolOptions {
   onTaskComplete?: (partIndex: number, partIndexStr: string) => void;
   onTaskError?: (partIndex: number, error: Error) => void;
   onAllComplete?: () => void;
+  onConcurrencyChange?: (concurrency: number) => void;
   logger?: Logger;
 }
 
@@ -181,6 +182,7 @@ export class TTSWorkerPool {
     }
     await Promise.allSettled(promises);
     this.logger?.debug(`Warmed up ${workersToWarmup} connections (ladder-controlled)`);
+    this.options.onConcurrencyChange?.(workersToWarmup);
   }
 
   addTask(task: PoolTask): void {
@@ -249,6 +251,9 @@ export class TTSWorkerPool {
 
         // Sync p-queue concurrency with the ladder
         this.queue.concurrency = this.ladder.getCurrentWorkers();
+
+        // Notify about concurrency change
+        this.options.onConcurrencyChange?.(this.queue.concurrency);
 
         // Store part index as string reference for compatibility
         this.completedTasks.set(task.partIndex, String(task.partIndex));
@@ -356,6 +361,7 @@ export class TTSWorkerPool {
     this.ladder.recordTask(false, attempt);
     this.ladder.evaluate();
     this.queue.concurrency = this.ladder.getCurrentWorkers();
+    this.options.onConcurrencyChange?.(this.queue.concurrency);
 
     // Check if we've exceeded max retries
     if (attempt > 5) {

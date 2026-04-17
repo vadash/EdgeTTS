@@ -1305,4 +1305,80 @@ describe('TTSWorkerPool', () => {
       );
     });
   });
+
+  describe('onConcurrencyChange callback', () => {
+    it('calls onConcurrencyChange during warmup with initial concurrency', async () => {
+      const onConcurrencyChange = vi.fn();
+      pool = createPool({ onConcurrencyChange });
+
+      await pool.warmup();
+
+      expect(onConcurrencyChange).toHaveBeenCalledTimes(1);
+      expect(onConcurrencyChange).toHaveBeenCalledWith(3); // Ladder starts at minWorkers (3)
+    });
+
+    it('calls onConcurrencyChange when task succeeds and ladder adjusts', async () => {
+      const onConcurrencyChange = vi.fn();
+      pool = createPool({ onConcurrencyChange });
+
+      pool.addTask(createTask(0));
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Should be called at least once (warmup doesn't set queue.concurrency, but executeTask does)
+      expect(onConcurrencyChange).toHaveBeenCalled();
+    });
+
+    it('calls onConcurrencyChange when task fails and ladder throttles', async () => {
+      const onConcurrencyChange = vi.fn();
+      pool = createPool({ onConcurrencyChange });
+
+      // Make send fail
+      mockSend = vi.fn().mockRejectedValue(new Error('Network failure'));
+
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
+
+      pool.addTask(createTask(0));
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Should be called during failure handling
+      expect(onConcurrencyChange).toHaveBeenCalled();
+    });
+
+    it('passes the correct concurrency value to the callback', async () => {
+      const onConcurrencyChange = vi.fn();
+      pool = createPool({ onConcurrencyChange });
+
+      // Spy on ladder.getCurrentWorkers to verify the value
+      // @ts-expect-error - accessing private property for testing
+      const ladder = pool.ladder;
+      const getCurrentWorkersSpy = vi.spyOn(ladder, 'getCurrentWorkers').mockReturnValue(2);
+
+      pool.addTask(createTask(0));
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Should be called with the value from getCurrentWorkers
+      expect(onConcurrencyChange).toHaveBeenCalledWith(2);
+
+      getCurrentWorkersSpy.mockRestore();
+    });
+
+    it('does not throw if onConcurrencyChange is not provided', async () => {
+      pool = createPool(); // No onConcurrencyChange callback
+
+      // Should not throw during warmup or task execution
+      await expect(pool.warmup()).resolves.toBeUndefined();
+
+      pool.addTask(createTask(0));
+      await vi.advanceTimersByTimeAsync(100);
+      // Test passes if no exception is thrown
+    });
+  });
 });
