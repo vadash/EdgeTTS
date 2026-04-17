@@ -1,6 +1,6 @@
 # Testing Guidelines
 
-Vitest-based test suites covering utilities, services, state logic, and prompt behavior.
+Vitest-based test suites.
 
 ## Commands
 
@@ -8,35 +8,14 @@ Vitest-based test suites covering utilities, services, state logic, and prompt b
 |---------|-------------|
 | `npm test` | Run standard unit tests (`vitest.config.ts`) |
 | `npm run test:watch` | Run tests in watch mode |
-| `npm run test:coverage` | Run tests with coverage report (V8 engine) |
-| `npm run test:real` | Run integration tests against real LLM APIs |
-| `npm run test:real:qa` | Run integration tests with Assign QA Pass enabled |
-| `npm run test:real:repeat` | Run integration tests with Prompt Repetition enabled |
-| `npm run test:real:repeat:qa`| Run integration tests with Repetition AND QA Pass enabled |
-
-## Test Categories
-
-### 1. Standard Unit Tests (`*.test.ts`)
-- Run via `npm test`. Fast, deterministic, isolated (uses JSdom environment).
-- **Key test files:**
-  - `CharacterUtils.test.ts` - Frequency culling logic (`cullByFrequency`).
-  - `schemas.test.ts` - Schema strictness (extra keys safely ignored).
-  - `text.test.ts` - JSON repair pipeline (array-at-root recovery, flattened assignments, tag stripping).
-  - `TextBlockSplitter.test.ts` - Semantic chunking (scene breaks, dividers, chapter headers).
-  - `ChunkStore.integration.test.ts` - Validates out-of-order writes and disk recovery.
-
-### 2. Real LLM Tests (`llm-real.test.ts`)
-- Run via `npm run test:real` (or its `qa`/`repeat` permutations).
-- Uses `vitest.real.config.ts` (has an extended 5-minute timeout and Node environment).
-- These make ACTUAL network calls to OpenAI/Mistral/etc.
-- Use text files in `src/test/fixtures/` and define fixtures in `src/test/fixtures/index.ts` to validate character extraction and dialogue assignment accuracy.
+| `npm run test:real` | Run real LLM integration tests |
+| `npm run test:real:qa` | Real tests + Assign QA Pass enabled |
+| `npm run test:real:repeat` | Real tests + Prompt Repetition enabled |
 
 ## Gotchas
 
-- **Mocking Strategy**: Standard unit tests MUST mock all external network calls, File System API (`createMockDirectoryHandle`), and WebSockets.
-- **TDD Workflow**: Write failing tests first (`npm test -- --run`), implement minimal code to pass, then refactor. Each task should have its own test file.
-- **localStorage Testing**: Always call `localStorage.clear()` in `beforeEach`. Mock `StorageKeys` imports when testing store persistence. Use `vi.spyOn(window.localStorage, 'getItem')` to simulate parse errors.
-- **Global Mocks**: `p-retry`, `p-queue`, and `generic-pool` are mocked globally in `src/test/setup.ts` to execute immediately without actual polling/delays.
-- **IndexedDB Mock Override**: The global `window.indexedDB` mock in `setup.ts` is `configurable` + `writable`. Per-test overrides via `(window as any).indexedDB = {...}` work. When faking IDB request objects, each request must fire `onsuccess` via `queueMicrotask` after returning — otherwise Promises wrapping `request.onsuccess` hang forever.
-- **API Keys for Real Tests**: Real LLM tests require populating `test.config.local.ts` (copy from `.example`) with actual API credentials. Do not commit this file.
-- **Environment Variables**: The `test:real:*` scripts use `cross-env` to temporarily inject `USE_QA=true` or `REPEAT_PROMPT=true` during the test run, overriding `test.config.local.ts` defaults.
+- **Mocking**: Standard tests MUST mock external network, File System API (`createMockDirectoryHandle`), and WebSockets.
+- **Globals**: `p-retry`, `p-queue`, and `generic-pool` are mocked globally in `src/test/setup.ts` to execute immediately.
+- **IndexedDB**: The `window.indexedDB` mock requires `onsuccess` to be fired asynchronously via `queueMicrotask` to prevent hanging promises.
+- **Real LLM Tests**: Require `test.config.local.ts` populated with real API keys (copy from `.example`).
+- **Local Storage**: Always call `localStorage.clear()` in `beforeEach()`.

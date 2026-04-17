@@ -1,74 +1,32 @@
-# LLM Service & Prompts
+# LLM Services
 
-**WHAT**: Orchestrates API calls to OpenAI/Mistral/DeepSeek using robust JSON parsing with repair pipeline.
+API orchestration and strict structured JSON parsing.
 
 ## Architecture
 
-### Prompt System
-Prompts follow a 3-message topology (System/User/Assistant) assembled by `promptFormatters.ts`.
-Per-stage files (`role.ts`, `rules.ts`, `schema.ts`, `builder.ts`, `examples/`) and shared utilities (`preambles.ts`, `rules.ts`, `formatters.ts`) are documented in `src/config/prompts/CLAUDE.md`.
+- `LLMApiClient.ts`: Raw API caller with custom browser headers. Uses `callStructured<T>()`.
+- `schemas.ts`: Zod 4 non-strict schemas (extra keys silently ignored; missing keys default to `null`).
+- `votingConsensus.ts`: 5-way Union-Find consensus logic.
 
-## JSON Repair Pipeline
+## JSON Repair Pipeline (`utils/text.ts`)
 
-**Location**: `src/utils/text.ts`
+`safeParseJSON` applies a 5-tier fallback:
+1. Native `JSON.parse`
+2. `extractJsonBlocks` + `jsonrepair`
+3. Structural recovery (array-at-root wrapping, flattened-assignments)
+4. Aggressive scrub (fix LLM `+` concatenation hallucinations)
+5. Fatal `RetriableError`
 
-`safeParseJSON<T>(input, options)` applies 5-tier waterfall repair:
+Helper fns: `normalizeText`, `stripThinkingTags`, `stripMarkdownFences`.
 
-| Tier | Strategy |
-|------|----------|
-| 0 | Input validation (null, empty, already object) |
-| 1 | Native `JSON.parse` |
-| 2 | `extractJsonBlocks` + `jsonrepair` |
-| 2.5 | **Structural recovery**: array-at-root wrapping, flattened-assignments wrapping |
-| 3 | `normalizeText` + `extractJsonBlocks` + `jsonrepair` |
-| 4 | Aggressive `scrubConcatenation` + `jsonrepair` |
-| 5 | Failure (return error result) |
+## Advanced Pipelines
 
-Returns `{success, data?, error?}` result object. Caller throws `RetriableError` on failure.
+- **Consensus Merge**: 5 votes with random temperatures (0.1-0.7). Pairs in >=2 votes get merged.
+- **QA Pass (Assign)**: If `useVoting` enabled, runs Assign (draft) -> QA (correction). Falls back to draft if QA fails.
+- **Frequency Culling**: `cullByFrequency()` filters characters with <3 mentions BEFORE the LLM merge step.
 
-**Key functions:**
-- `normalizeText` — Fix smart quotes, control characters
-- `extractJsonBlocks` — Extract ALL balanced blocks (not just last)
-- `scrubConcatenation` — Fix LLM string `+` hallucinations
-- `stripThinkingTags` — Strip `<think>`, `[THINK]`, `<json_tool_call>`, `<arg_key` tags (regex-based)
-- `stripMarkdownFences` — Strip ``` and ~~~ fences
+## Gotchas
 
-## Clients
-
-- **`LLMApiClient.ts`**: Manages raw API calls with `callStructured<T>({ messages, schema, schemaName })`
-- **StructuredCallOptions**: Uses `messages` array (not `prompt` object) since v2
-
-## Schemas
-
-- **`schemas.ts`**: Zod v4 schemas for Extract, Merge, Assign stages (non-strict; extra keys silently ignored)
-- **`schemaUtils.ts`**: Type utilities and response helpers
-
-All schemas include `reasoning` field (nullable) for chain-of-thought extraction.
-**Non-strict mode** allows extra keys at root level — tolerates LLM key typos without failing validation.
-
-## Consensus Voting
-
-### Merge: 5-Way Voting
-- `MERGE_VOTE_COUNT` (5) votes with random temperatures (0.1-0.7)
-- Union-Find consensus via `buildMergeConsensus()` in `votingConsensus.ts`
-- Pairs in >=2 of 5 votes get merged
-
-### Assign: QA Pass (Sequential)
-- When `useVoting` is enabled, runs Assign (draft) -> QA (correction) sequentially
-- 2 API calls instead of the old 3-way voting
-- QA prompt (`src/config/prompts/qa/`) reviews draft for: vocative traps, missed action beats, misassigned narration, missing dialogue
-- Falls back to draft results if QA call fails
-- Uses same `AssignSchema` for both passes
-- **Overlap Context**: Last 10 sentences from previous block passed as `overlapSentences` with negative indices `[-10]` through `[-1]`. Read-only (inside `<previous_context_do_not_assign>` tags).
-
-## Pre-Merge Frequency Culling
-
-Before LLM merge, `cullByFrequency()` filters characters with fewer than 3 total name-variation mentions in the raw text. This removes hallucinated characters and reduces API costs.
-
-## Gotchas & Rules
-
-- **RetriableError REQUIRED**: ALL errors in `LLMApiClient` MUST be `RetriableError`. Plain `Error` breaks `withRetry()`.
-- **Safe error logging**: Use `getErrorMessage(e)` from `@/errors`, never `(e as Error).message`
-- **p-retry 7.x**: Callbacks receive context object `{error, attemptNumber, retriesLeft}`, NOT error directly. Use `context.error`.
-- **Prefill Strategy**: Currently only `none` and `auto` are supported. Both result in no assistant prefill message.
-- **Language Mirroring**: Non-English stories must preserve original script in values (JSON keys remain English).
+- **Strict Structured Outputs**: Managed natively by Zod 4's `toJSONSchema({ target: 'draft-7' })`.
+- **Errors**: `LLMApiClient` MUST throw `RetriableError` so `withRetry` catches it. Use `getErrorMessage(e)`.
+- **P-Retry context**: In `p-retry` 7.x, callbacks receive `{error, attemptNumber}`, NOT the raw error.
