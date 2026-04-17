@@ -19,6 +19,22 @@ vi.mock('./ReusableEdgeTTSService', () => {
   };
 });
 
+// Mock KokoroFallbackService
+const mockKokoroPreload = vi.fn().mockResolvedValue(undefined);
+const mockKokoroSynthesize = vi.fn().mockResolvedValue(new Blob([new Uint8Array([10, 20, 30])]));
+
+vi.mock('./KokoroFallbackService', () => {
+  return {
+    KokoroFallbackService: {
+      getInstance: () => ({
+        preload: mockKokoroPreload,
+        synthesize: mockKokoroSynthesize,
+        ready: true,
+      }),
+    },
+  };
+});
+
 // Get the mocked class for access in tests
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 
@@ -38,6 +54,8 @@ describe('TTSWorkerPool', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    mockKokoroPreload.mockResolvedValue(undefined);
+    mockKokoroSynthesize.mockResolvedValue(new Blob([new Uint8Array([10, 20, 30])]));
 
     // Create mock directory handle
     _mockDirectoryHandle = createMockDirectoryHandle();
@@ -269,6 +287,9 @@ describe('TTSWorkerPool', () => {
       const task = createTask(0);
       // @ts-expect-error - accessing private property for testing
       pool.retryCount.set(task.partIndex, 11);
+
+      // Make Kokoro fallback also fail so it falls through to permanent failure
+      mockKokoroSynthesize.mockRejectedValue(new Error('Kokoro unavailable'));
 
       pool.addTask(task);
 
@@ -938,6 +959,8 @@ describe('TTSWorkerPool', () => {
 
       // Make send always fail
       mockSend = vi.fn().mockRejectedValue(new Error('Persistent network error'));
+      // Make Kokoro fallback also fail so it falls through to permanent failure
+      mockKokoroSynthesize.mockRejectedValue(new Error('Kokoro unavailable'));
 
       MockedReusableEdgeTTSService.mockImplementation(function () {
         return {
@@ -962,6 +985,173 @@ describe('TTSWorkerPool', () => {
       expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
       expect(pool.getProgress().failed).toBe(1);
       expect(pool.getFailedTasks().has(0)).toBe(true);
+    });
+  });
+
+  describe('Kokoro fallback integration', () => {
+    it('triggers Kokoro preload when attempt === 2', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      mockSend = vi.fn().mockRejectedValue(new Error('Network error'));
+
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
+
+      const task = createTask(0);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 1); // attempt will be 2
+
+      pool.addTask(task);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockKokoroPreload).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT call preload when attempt === 1', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      mockSend = vi.fn().mockRejectedValue(new Error('Network error'));
+
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
+
+      const task = createTask(0);
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 0); // attempt will be 1
+
+      pool.addTask(task);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockKokoroPreload).not.toHaveBeenCalled();
+    });
+
+    it('falls back to Kokoro synthesize when retries exhausted and writes to ChunkStore', async () => {
+      const onTaskError = vi.fn();
+      const onTaskComplete = vi.fn();
+      pool = createPool({ onTaskError, onTaskComplete });
+
+      mockSend = vi.fn().mockRejectedValue(new Error('Network error'));
+
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
+
+      const task: PoolTask = {
+        partIndex: 0,
+        text: 'Hello world',
+        filename: 'test',
+        filenum: '0001',
+        gender: 'female',
+      };
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 5); // attempt will be 6 > 5
+
+      pool.addTask(task);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockKokoroSynthesize).toHaveBeenCalledWith('Hello world', 'female');
+
+      // Should write the blob as Uint8Array to ChunkStore
+      expect(mockChunkStore.writeChunk).toHaveBeenCalledWith(0, expect.any(Uint8Array));
+
+      // Should NOT be in failedTasks
+      expect(pool.getFailedTasks().has(0)).toBe(false);
+      // Should NOT call onTaskError
+      expect(onTaskError).not.toHaveBeenCalled();
+    });
+
+    it('falls through to failedTasks when Kokoro synthesize throws', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      mockSend = vi.fn().mockRejectedValue(new Error('Network error'));
+      mockKokoroSynthesize.mockRejectedValue(new Error('Kokoro also failed'));
+
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
+
+      const task: PoolTask = {
+        partIndex: 0,
+        text: 'Hello world',
+        filename: 'test',
+        filenum: '0001',
+        gender: 'male',
+      };
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 5); // attempt will be 6 > 5
+
+      pool.addTask(task);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Should be added to failedTasks (existing silence behavior)
+      expect(pool.getFailedTasks().has(0)).toBe(true);
+      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
+    });
+
+    it('defaults gender to unknown when task has no gender field', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      mockSend = vi.fn().mockRejectedValue(new Error('Network error'));
+
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
+
+      const task: PoolTask = {
+        partIndex: 0,
+        text: 'Hello world',
+        filename: 'test',
+        filenum: '0001',
+        // no gender field
+      };
+      // @ts-expect-error - accessing private property for testing
+      pool.retryCount.set(task.partIndex, 5); // attempt will be 6 > 5
+
+      pool.addTask(task);
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockKokoroSynthesize).toHaveBeenCalledWith('Hello world', 'unknown');
     });
   });
 });

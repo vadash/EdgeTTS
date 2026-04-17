@@ -8,6 +8,7 @@ import type { ChunkStore } from './ChunkStore';
 import { LadderController } from './LadderController';
 import type { Logger } from './Logger';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
+import { KokoroFallbackService } from './KokoroFallbackService';
 
 export interface PoolTask {
   partIndex: number;
@@ -15,6 +16,7 @@ export interface PoolTask {
   filename: string;
   filenum: string;
   voice?: string;
+  gender?: 'male' | 'female' | 'unknown';
 }
 
 export interface WorkerPoolProgress {
@@ -76,6 +78,9 @@ export class TTSWorkerPool {
 
   // Failure logging
   private failureLogCounter = 0;
+
+  // Kokoro fallback for exhausted retries
+  private kokoroFallback = KokoroFallbackService.getInstance();
 
   // Options storage for access in tests
   public readonly options: WorkerPoolOptions;
@@ -360,10 +365,35 @@ export class TTSWorkerPool {
     this.queue.concurrency = this.ladder.getCurrentWorkers();
     this.options.onConcurrencyChange?.(this.queue.concurrency);
 
+    // Trigger Kokoro preload at attempt 2 (fire-and-forget, non-blocking)
+    if (attempt === 2) {
+      this.kokoroFallback.preload();
+    }
+
     // Check if we've exceeded max retries
     if (attempt > 5) {
       // Log the failure for debugging
       await this.logTTSFailure(task, error);
+
+      // Try Kokoro fallback before marking as permanently failed
+      try {
+        const blob = await this.kokoroFallback.synthesize(task.text, task.gender ?? 'unknown');
+        const data = new Uint8Array(await blob.arrayBuffer());
+        await this.chunkStore!.writeChunk(task.partIndex, data);
+
+        // Cleanup retry state
+        this.retryCount.delete(task.partIndex);
+        this.processedCount++;
+
+        this.logger?.info(
+          `Task ${task.partIndex} synthesized via Kokoro fallback after 5 Edge TTS failures`,
+        );
+        return;
+      } catch (_kokoroError) {
+        this.logger?.warn(
+          `Kokoro fallback also failed for task ${task.partIndex}, falling through to silence`,
+        );
+      }
 
       // Permanent failure - already recorded above
       // Add to failed tasks
