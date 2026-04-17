@@ -74,8 +74,8 @@ const defaultSettings: AppSettings = {
   fadeInEnabled: true,
   stereoWidthEnabled: false,
   opusPreset: 'pc' as AudioPreset,
-  opusMinBitrate: 32,
-  opusMaxBitrate: 64,
+  opusMinBitrate: 24,
+  opusMaxBitrate: 48,
   opusCompressionLevel: 10,
 };
 

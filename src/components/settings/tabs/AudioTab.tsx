@@ -46,9 +46,9 @@ export function AudioTab() {
           </div>
           <input
             type="range"
-            min="6"
-            max="256"
-            step="2"
+            min="16"
+            max="96"
+            step="1"
             value={settings.opusMinBitrate.value}
             onChange={(e) =>
               settings.setOpusMinBitrate(Number((e.target as HTMLInputElement).value))
@@ -67,9 +67,9 @@ export function AudioTab() {
           </div>
           <input
             type="range"
-            min="6"
-            max="256"
-            step="2"
+            min="24"
+            max="96"
+            step="1"
             value={settings.opusMaxBitrate.value}
             onChange={(e) =>
               settings.setOpusMaxBitrate(Number((e.target as HTMLInputElement).value))

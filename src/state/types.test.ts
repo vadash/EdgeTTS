@@ -11,13 +11,13 @@ describe('AudioPreset', () => {
 
   it('AUDIO_PRESETS should have correct configuration', () => {
     const pc = AUDIO_PRESETS.find((p) => p.name === AudioPreset.PC);
-    expect(pc?.minBitrate).toBe(32);
-    expect(pc?.maxBitrate).toBe(64);
+    expect(pc?.minBitrate).toBe(24);
+    expect(pc?.maxBitrate).toBe(48);
     expect(pc?.compressionLevel).toBe(10);
 
     const mobile = AUDIO_PRESETS.find((p) => p.name === AudioPreset.MOBILE);
-    expect(mobile?.minBitrate).toBe(32);
-    expect(mobile?.maxBitrate).toBe(96);
+    expect(mobile?.minBitrate).toBe(24);
+    expect(mobile?.maxBitrate).toBe(48);
     expect(mobile?.compressionLevel).toBe(3);
   });
 });
@@ -47,13 +47,13 @@ describe('AppSettings interface', () => {
       stereoWidthEnabled: false,
       // New Opus settings
       opusPreset: AudioPreset.PC,
-      opusMinBitrate: 32,
-      opusMaxBitrate: 64,
+      opusMinBitrate: 24,
+      opusMaxBitrate: 48,
       opusCompressionLevel: 10,
     } as AppSettings;
     expect(settings.opusPreset).toBe(AudioPreset.PC);
-    expect(settings.opusMinBitrate).toBe(32);
-    expect(settings.opusMaxBitrate).toBe(64);
+    expect(settings.opusMinBitrate).toBe(24);
+    expect(settings.opusMaxBitrate).toBe(48);
     expect(settings.opusCompressionLevel).toBe(10);
   });
 
@@ -63,8 +63,8 @@ describe('AppSettings interface', () => {
     // If this compiles, the interface accepts these properties
     expect(() => {
       settings.opusPreset = AudioPreset.PC;
-      settings.opusMinBitrate = 32;
-      settings.opusMaxBitrate = 64;
+      settings.opusMinBitrate = 24;
+      settings.opusMaxBitrate = 48;
       settings.opusCompressionLevel = 10;
     }).not.toThrow();
   });
