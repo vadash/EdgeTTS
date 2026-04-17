@@ -45,6 +45,7 @@ interface ConversionState {
   ffmpegLoading: boolean;
   ffmpegError: string | null;
   resumeInfo: ResumeInfo | null;
+  tabBlocked: boolean;
 }
 
 // ============================================================================
@@ -62,6 +63,7 @@ const defaultState: ConversionState = {
   ffmpegLoading: false,
   ffmpegError: null,
   resumeInfo: null,
+  tabBlocked: false,
 };
 
 // ============================================================================
@@ -163,7 +165,7 @@ effect(() => {
 // Internal State Updates
 // ============================================================================
 
-function patchState(partial: Partial<ConversionState>): void {
+export function patchState(partial: Partial<ConversionState>): void {
   conversion.value = { ...conversion.value, ...partial };
 }
 
@@ -279,4 +281,8 @@ export function cancelResume(): void {
 
 export function setPhaseBaseline(count: number): void {
   patchState({ phaseStartProgress: count });
+}
+
+export function clearTabBlocked(): void {
+  patchState({ tabBlocked: false });
 }

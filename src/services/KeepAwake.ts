@@ -42,6 +42,12 @@ export class KeepAwake {
     return this.active;
   }
 
+  static async isConversionRunning(): Promise<boolean> {
+    if (!navigator.locks) return false;
+    const state = await navigator.locks.query();
+    return state.held?.some((lock) => lock.name === 'tts-conversion-active') ?? false;
+  }
+
   private startAudioContext(): void {
     try {
       // Create audio context

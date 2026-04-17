@@ -24,6 +24,7 @@ export {
   // Computed values
   progress,
   progressPercent,
+  clearTabBlocked,
   resetConversionStore,
   resumeInfo,
   setError,

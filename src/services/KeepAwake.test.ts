@@ -1,5 +1,52 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+describe('KeepAwake - isConversionRunning', () => {
+  beforeEach(() => {
+    // Ensure navigator.locks exists with a mock query
+    Object.defineProperty(navigator, 'locks', {
+      value: { query: vi.fn().mockResolvedValue({ held: [] }) },
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns true when tts-conversion-active lock is held', async () => {
+    (navigator.locks.query as ReturnType<typeof vi.fn>).mockResolvedValue({
+      held: [{ name: 'tts-conversion-active' }],
+    });
+
+    const { KeepAwake } = await import('./KeepAwake');
+    const result = await KeepAwake.isConversionRunning();
+    expect(result).toBe(true);
+  });
+
+  it('returns false when lock is not held', async () => {
+    (navigator.locks.query as ReturnType<typeof vi.fn>).mockResolvedValue({
+      held: [],
+    });
+
+    const { KeepAwake } = await import('./KeepAwake');
+    const result = await KeepAwake.isConversionRunning();
+    expect(result).toBe(false);
+  });
+
+  it('returns false when navigator.locks is unavailable', async () => {
+    Object.defineProperty(navigator, 'locks', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+
+    const { KeepAwake } = await import('./KeepAwake');
+    const result = await KeepAwake.isConversionRunning();
+    expect(result).toBe(false);
+  });
+});
+
 describe('KeepAwake - visibility guard', () => {
   let _originalNavigator: Navigator;
   let mockWakeLock: { request: ReturnType<typeof vi.fn> };

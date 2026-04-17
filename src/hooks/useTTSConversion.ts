@@ -4,11 +4,11 @@
 import { useCallback, useRef } from 'preact/hooks';
 import { getOrchestratorServices } from '@/services';
 import { type OrchestratorInput, runConversion } from '@/services/ConversionOrchestrator';
-import { getKeepAwake } from '@/services/KeepAwake';
+import { getKeepAwake, KeepAwake } from '@/services/KeepAwake';
 import type { ProcessedBook } from '@/state/types';
 import type { Stores } from '@/stores';
 import { useStores } from '@/stores';
-import { isProcessing, progress, setError } from '@/stores/ConversionStore';
+import { isProcessing, progress, setError, patchState } from '@/stores/ConversionStore';
 import { isConfigured, llm } from '@/stores/LLMStore';
 // Import signal-based stores directly for snapshot access
 import { settings } from '@/stores/SettingsStore';
@@ -117,6 +117,16 @@ export function useTTSConversion(): UseTTSConversionResult {
         stores.logs.info('Conversion already in progress');
         return;
       }
+
+      // Check if conversion is running in another tab
+      const blocked = await KeepAwake.isConversionRunning();
+      if (blocked) {
+        patchState({ tabBlocked: true, status: 'idle' });
+        return;
+      }
+
+      // Clear any previous tab-blocked state
+      patchState({ tabBlocked: false });
 
       // Build input snapshot from current store state
       const input = buildInput(stores, text);
