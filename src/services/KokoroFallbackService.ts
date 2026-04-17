@@ -1,3 +1,14 @@
+import { FFmpegService } from './FFmpegService';
+import { encodeWav } from './audio/encodeWav';
+
+const GENDER_VOICE_MAP: Record<string, string> = {
+  male: 'am_adam',
+  female: 'af_bella',
+  unknown: 'af_bella',
+};
+
+const SYNTHESIS_TIMEOUT_MS = 20_000;
+
 export const KOKORO_CONFIG = {
   modelId: 'onnx-community/Kokoro-82M-ONNX',
   dtype: 'q8' as const,
@@ -28,6 +39,11 @@ export class KokoroFallbackService {
   private lastUsedAt = 0;
   private inactivityTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingSyntheses = new Set<Promise<unknown>>();
+  private ffmpeg: FFmpegService;
+
+  private constructor() {
+    this.ffmpeg = new FFmpegService();
+  }
 
   static getInstance(): KokoroFallbackService {
     if (!KokoroFallbackService.instance) {
@@ -80,6 +96,153 @@ export class KokoroFallbackService {
     return this.initPromise;
   }
 
+  async synthesize(text: string, gender: 'male' | 'female' | 'unknown'): Promise<Blob> {
+    await this.ensureReady();
+
+    const voice = GENDER_VOICE_MAP[gender] ?? GENDER_VOICE_MAP.unknown;
+
+    const chunks = text.length > KOKORO_CONFIG.maxChunkChars ? this.splitLongText(text) : [text];
+
+    const pcmParts: Float32Array[] = [];
+    for (const chunk of chunks) {
+      const pcm = await this.generateSingle(chunk, voice);
+      pcmParts.push(pcm);
+    }
+
+    // Concatenate PCM
+    const totalLength = pcmParts.reduce((sum, p) => sum + p.length, 0);
+    const concatenated = new Float32Array(totalLength);
+    let offset = 0;
+    for (const p of pcmParts) {
+      concatenated.set(p, offset);
+      offset += p.length;
+    }
+
+    // Encode to WAV
+    const sampleRate = 24000;
+    const wavBlob = encodeWav(concatenated, sampleRate);
+
+    // Transcode WAV → MP3 via dedicated FFmpeg
+    const wavBytes = new Uint8Array(await wavBlob.arrayBuffer());
+    const loaded = await this.ffmpeg.load();
+    if (!loaded) {
+      throw new Error('FFmpeg failed to load for Kokoro transcoding');
+    }
+    const mp3Bytes = await this.ffmpeg.processAudio([wavBytes], {
+      silenceRemoval: false,
+      normalization: false,
+      deEss: false,
+      silenceGapMs: 0,
+      eq: false,
+      compressor: false,
+      fadeIn: false,
+      stereoWidth: false,
+    });
+
+    this.resetInactivityTimer();
+    this.lastUsedAt = Date.now();
+
+    // Create a new Uint8Array to ensure standard ArrayBuffer (not SharedArrayBuffer)
+    const outputBytes = new Uint8Array(mp3Bytes);
+    return new Blob([outputBytes], { type: 'audio/mpeg' });
+  }
+
+  private async ensureReady(): Promise<void> {
+    if (this._ready && this.worker) return;
+    await this.preload();
+  }
+
+  private generateSingle(text: string, voice: string): Promise<Float32Array> {
+    return new Promise<Float32Array>((resolve, reject) => {
+      if (!this.worker) {
+        reject(new Error('Worker not initialized'));
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        reject(new Error(`Synthesis timeout after ${SYNTHESIS_TIMEOUT_MS}ms`));
+      }, SYNTHESIS_TIMEOUT_MS);
+
+      const handleMessage = (ev: MessageEvent) => {
+        const { type } = ev.data as { type: string; audio?: Float32Array; error?: string };
+        if (type === 'generate_result') {
+          clearTimeout(timeout);
+          this.worker?.removeEventListener('message', handleMessage);
+          resolve(ev.data.audio as Float32Array);
+        } else if (type === 'generate_error') {
+          clearTimeout(timeout);
+          this.worker?.removeEventListener('message', handleMessage);
+          reject(new Error(ev.data.error ?? 'Synthesis failed'));
+        }
+      };
+
+      this.worker.addEventListener('message', handleMessage);
+      this.worker.postMessage({ type: 'generate', text, voice });
+    });
+  }
+
+  private splitLongText(text: string): string[] {
+    // Split on sentence boundaries (. ! ?)
+    const sentences = text.split(/(?<=[.!?])\s+/);
+    const chunks: string[] = [];
+    let current = '';
+
+    for (const sentence of sentences) {
+      if (sentence.length > KOKORO_CONFIG.maxChunkChars) {
+        // Hard-split fallback: split on spaces/commas for chunks without punctuation
+        if (current.length > 0) {
+          chunks.push(current);
+          current = '';
+        }
+        const subChunks = this.hardSplit(sentence);
+        chunks.push(...subChunks);
+      } else if (current.length + sentence.length + 1 > KOKORO_CONFIG.maxChunkChars) {
+        chunks.push(current);
+        current = sentence;
+      } else {
+        current = current.length > 0 ? `${current} ${sentence}` : sentence;
+      }
+    }
+
+    if (current.length > 0) {
+      chunks.push(current);
+    }
+
+    return chunks;
+  }
+
+  private hardSplit(text: string): string[] {
+    // Split on spaces or commas, grouping into chunks ≤ maxChunkChars
+    const parts = text.split(/(?<=[ ,])/);
+    const chunks: string[] = [];
+    let current = '';
+
+    for (const part of parts) {
+      if (current.length + part.length > KOKORO_CONFIG.maxChunkChars) {
+        if (current.length > 0) {
+          chunks.push(current);
+          current = '';
+        }
+        // If a single part is still too long, force split
+        if (part.length > KOKORO_CONFIG.maxChunkChars) {
+          for (let i = 0; i < part.length; i += KOKORO_CONFIG.maxChunkChars) {
+            chunks.push(part.slice(i, i + KOKORO_CONFIG.maxChunkChars));
+          }
+        } else {
+          current = part;
+        }
+      } else {
+        current += part;
+      }
+    }
+
+    if (current.length > 0) {
+      chunks.push(current);
+    }
+
+    return chunks;
+  }
+
   private resetInactivityTimer(): void {
     if (this.inactivityTimer !== null) {
       clearTimeout(this.inactivityTimer);
@@ -95,6 +258,7 @@ export class KokoroFallbackService {
       await Promise.allSettled(this.pendingSyntheses);
     }
 
+    this.ffmpeg.terminate();
     this.cleanup();
     KokoroFallbackService.instance = null;
   }

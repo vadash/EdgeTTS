@@ -6,6 +6,9 @@ interface MockWorkerType {
   terminate: ReturnType<typeof vi.fn>;
   onmessage: ((ev: MessageEvent) => void) | null;
   onerror: ((ev: ErrorEvent) => void) | null;
+  addEventListener: (type: string, handler: (ev: MessageEvent) => void) => void;
+  removeEventListener: (type: string, handler: (ev: MessageEvent) => void) => void;
+  dispatchMessage: (data: unknown) => void;
 }
 
 let mockWorkerInstance: MockWorkerType | null = null;
@@ -17,12 +20,67 @@ class MockWorker {
   terminate = vi.fn();
   onmessage: ((ev: MessageEvent) => void) | null = null;
   onerror: ((ev: ErrorEvent) => void) | null = null;
+  private listeners: Record<string, Array<(ev: MessageEvent) => void>> = {};
+
+  addEventListener(type: string, handler: (ev: MessageEvent) => void) {
+    if (!this.listeners[type]) this.listeners[type] = [];
+    this.listeners[type].push(handler);
+  }
+
+  removeEventListener(type: string, handler: (ev: MessageEvent) => void) {
+    if (!this.listeners[type]) return;
+    this.listeners[type] = this.listeners[type].filter((h) => h !== handler);
+  }
+
+  /** Dispatch a message to both onmessage and addEventListener handlers */
+  dispatchMessage(data: unknown) {
+    const ev = { data } as MessageEvent;
+    this.onmessage?.(ev);
+    for (const handler of this.listeners.message ?? []) {
+      handler(ev);
+    }
+  }
 
   constructor() {
     mockWorkerInstance = this as unknown as MockWorkerType;
     workerInstances.push(this as unknown as MockWorkerType);
   }
 }
+
+// Track dedicated FFmpegService instances created by KokoroFallbackService
+const mockFFmpegInstances: Array<{
+  load: ReturnType<typeof vi.fn>;
+  processAudio: ReturnType<typeof vi.fn>;
+  terminate: ReturnType<typeof vi.fn>;
+}> = [];
+
+// Must be a named class for vi.mock's factory to work as a constructor
+class MockFFmpegService {
+  load = vi.fn(async () => true);
+  processAudio = vi.fn(async (chunks: Uint8Array[]) => {
+    const total = chunks.reduce((s, c) => s + c.length, 0);
+    const buf = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks) {
+      buf.set(c, off);
+      off += c.length;
+    }
+    return buf;
+  });
+  terminate = vi.fn();
+
+  constructor() {
+    mockFFmpegInstances.push({
+      load: this.load,
+      processAudio: this.processAudio,
+      terminate: this.terminate,
+    });
+  }
+}
+
+vi.mock('./FFmpegService', () => ({
+  FFmpegService: MockFFmpegService,
+}));
 
 // Must import after MockWorker is defined so the module can reference it
 // But since KokoroFallbackService uses Worker via `new Worker(...)`, we need
@@ -35,6 +93,7 @@ describe('KokoroFallbackService', () => {
     vi.useFakeTimers();
     mockWorkerInstance = null;
     workerInstances.length = 0;
+    mockFFmpegInstances.length = 0;
 
     // Set Worker on globalThis before importing
     (globalThis as Record<string, unknown>).Worker = MockWorker;
@@ -236,5 +295,257 @@ describe('KokoroFallbackService', () => {
     mockWorkerInstance!.onmessage!({ data: { type: 'ready' } } as MessageEvent);
     await successPromise;
     expect(instance.ready).toBe(true);
+  });
+
+  // --- synthesize tests ---
+
+  async function preloadService() {
+    const Svc = await getService();
+    const instance = Svc.getInstance();
+    const preloadPromise = instance.preload();
+    mockWorkerInstance!.onmessage!({ data: { type: 'ready' } } as MessageEvent);
+    await preloadPromise;
+    return { Svc, instance };
+  }
+
+  it('synthesize sends generate message to worker and returns MP3 blob', async () => {
+    const { instance } = await preloadService();
+    const ffmpeg = mockFFmpegInstances[mockFFmpegInstances.length - 1];
+
+    // Start synthesis — respond to worker after a microtask flush
+    const synthPromise = instance.synthesize('Hello', 'female');
+    // Let microtasks flush so generateSingle runs
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Simulate worker responding with PCM data
+    const pcm = new Float32Array(480).fill(0.5);
+    mockWorkerInstance!.dispatchMessage({ type: 'generate_result', audio: pcm, sampleRate: 24000 });
+
+    const blob = await synthPromise;
+    expect(blob).toBeInstanceOf(Blob);
+    // FFmpeg processAudio should have been called (WAV → MP3 transcode)
+    expect(ffmpeg.processAudio).toHaveBeenCalledOnce();
+    // Worker should have received generate message
+    expect(mockWorkerInstance!.postMessage).toHaveBeenCalledWith({
+      type: 'generate',
+      text: 'Hello',
+      voice: 'af_bella',
+    });
+  });
+
+  it('synthesize maps gender to correct voice', async () => {
+    const { instance } = await preloadService();
+
+    // male → am_adam
+    const synthPromise1 = instance.synthesize('Hi', 'male');
+    await vi.advanceTimersByTimeAsync(0);
+    mockWorkerInstance!.dispatchMessage({
+      type: 'generate_result',
+      audio: new Float32Array(100),
+      sampleRate: 24000,
+    });
+    await synthPromise1;
+    expect(mockWorkerInstance!.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'generate', voice: 'am_adam' }),
+    );
+
+    // female → af_bella
+    const synthPromise2 = instance.synthesize('Hi', 'female');
+    await vi.advanceTimersByTimeAsync(0);
+    mockWorkerInstance!.dispatchMessage({
+      type: 'generate_result',
+      audio: new Float32Array(100),
+      sampleRate: 24000,
+    });
+    await synthPromise2;
+    expect(mockWorkerInstance!.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'generate', voice: 'af_bella' }),
+    );
+
+    // unknown → af_bella (same as female default)
+    const synthPromise3 = instance.synthesize('Hi', 'unknown');
+    await vi.advanceTimersByTimeAsync(0);
+    mockWorkerInstance!.dispatchMessage({
+      type: 'generate_result',
+      audio: new Float32Array(100),
+      sampleRate: 24000,
+    });
+    await synthPromise3;
+    expect(mockWorkerInstance!.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'generate', voice: 'af_bella' }),
+    );
+  });
+
+  it('synthesize splits long text on sentence boundaries', async () => {
+    const { instance } = await preloadService();
+
+    // Create text >300 chars with sentence boundaries
+    const sentence = 'This is a test sentence that has some length to it. ';
+    const longText = sentence.repeat(10); // ~480 chars, 10 sentences
+
+    // Set up auto-responder: each time worker gets a generate message, respond
+    const generatePromise = instance.synthesize(longText, 'female');
+    // Flush microtasks repeatedly and respond to each generate call
+    let responded = 0;
+    const responder = async () => {
+      // Keep flushing and responding until the promise settles
+      while (responded < 20) {
+        await vi.advanceTimersByTimeAsync(0);
+        const generateCalls = mockWorkerInstance!.postMessage.mock.calls.filter(
+          (call: unknown[]) => (call[0] as { type: string }).type === 'generate',
+        );
+        if (generateCalls.length > responded) {
+          mockWorkerInstance!.dispatchMessage({
+            type: 'generate_result',
+            audio: new Float32Array(100).fill(0.1),
+            sampleRate: 24000,
+          });
+          responded++;
+          await vi.advanceTimersByTimeAsync(0);
+        } else {
+          break;
+        }
+      }
+    };
+    await responder();
+
+    const blob = await generatePromise;
+    expect(blob).toBeInstanceOf(Blob);
+
+    // Worker should receive multiple generate messages
+    const generateCalls = mockWorkerInstance!.postMessage.mock.calls.filter(
+      (call: unknown[]) => (call[0] as { type: string }).type === 'generate',
+    );
+    expect(generateCalls.length).toBeGreaterThan(1);
+
+    // Each sub-chunk should be ≤300 chars
+    for (const call of generateCalls) {
+      const text = (call[0] as { text: string }).text;
+      expect(text.length).toBeLessThanOrEqual(300);
+    }
+  });
+
+  it('synthesize hard-splits text with no punctuation on spaces/commas', async () => {
+    const { instance } = await preloadService();
+
+    // Long text with no punctuation (no .!?)
+    const longText = 'a '.repeat(200).trim(); // ~400 chars, no punctuation
+
+    const synthPromise = instance.synthesize(longText, 'female');
+    // Flush and respond to each generate call
+    let responded = 0;
+    while (responded < 20) {
+      await vi.advanceTimersByTimeAsync(0);
+      const generateCalls = mockWorkerInstance!.postMessage.mock.calls.filter(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'generate',
+      );
+      if (generateCalls.length > responded) {
+        mockWorkerInstance!.dispatchMessage({
+          type: 'generate_result',
+          audio: new Float32Array(50).fill(0.1),
+          sampleRate: 24000,
+        });
+        responded++;
+      } else {
+        break;
+      }
+    }
+
+    const blob = await synthPromise;
+    expect(blob).toBeInstanceOf(Blob);
+
+    const generateCalls = mockWorkerInstance!.postMessage.mock.calls.filter(
+      (call: unknown[]) => (call[0] as { type: string }).type === 'generate',
+    );
+    expect(generateCalls.length).toBeGreaterThan(1);
+
+    // Each sub-chunk should be ≤300 chars
+    for (const call of generateCalls) {
+      const text = (call[0] as { text: string }).text;
+      expect(text.length).toBeLessThanOrEqual(300);
+    }
+  });
+
+  it('synthesize rejects on 20s timeout if worker does not respond', async () => {
+    const { instance } = await preloadService();
+
+    const synthPromise = instance.synthesize('Hello', 'female');
+    await vi.advanceTimersByTimeAsync(0);
+
+    // Don't respond — advance time past 20s
+    vi.advanceTimersByTime(21_000);
+
+    await expect(synthPromise).rejects.toThrow(/timeout/i);
+  });
+
+  it('synthesize recovers after worker crash — next call succeeds', async () => {
+    const { instance } = await preloadService();
+
+    // First call: worker sends error
+    const failPromise = instance.synthesize('fail', 'female');
+    await vi.advanceTimersByTimeAsync(0);
+    mockWorkerInstance!.dispatchMessage({ type: 'generate_error', error: 'crash' });
+    await expect(failPromise).rejects.toThrow('crash');
+
+    // Second call should still work
+    const okPromise = instance.synthesize('ok', 'female');
+    await vi.advanceTimersByTimeAsync(0);
+    mockWorkerInstance!.dispatchMessage({
+      type: 'generate_result',
+      audio: new Float32Array(100),
+      sampleRate: 24000,
+    });
+    const blob = await okPromise;
+    expect(blob).toBeInstanceOf(Blob);
+  });
+
+  it('synthesize calls resetInactivityTimer after successful synthesis', async () => {
+    const { instance } = await preloadService();
+
+    // Spy on resetInactivityTimer
+    const spy = vi.spyOn(
+      instance as unknown as { resetInactivityTimer: () => void },
+      'resetInactivityTimer',
+    );
+
+    const synthPromise = instance.synthesize('Hello', 'female');
+    await vi.advanceTimersByTimeAsync(0);
+    mockWorkerInstance!.dispatchMessage({
+      type: 'generate_result',
+      audio: new Float32Array(100),
+      sampleRate: 24000,
+    });
+    await synthPromise;
+
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('synthesize uses dedicated FFmpeg instance, not shared singleton', async () => {
+    const { instance } = await preloadService();
+
+    // Should have created a dedicated FFmpegService instance
+    expect(mockFFmpegInstances.length).toBeGreaterThanOrEqual(1);
+
+    const synthPromise = instance.synthesize('Hello', 'female');
+    await vi.advanceTimersByTimeAsync(0);
+    mockWorkerInstance!.dispatchMessage({
+      type: 'generate_result',
+      audio: new Float32Array(100),
+      sampleRate: 24000,
+    });
+    await synthPromise;
+
+    // The dedicated FFmpeg's processAudio should be called
+    const ffmpeg = mockFFmpegInstances[mockFFmpegInstances.length - 1];
+    expect(ffmpeg.processAudio).toHaveBeenCalled();
+  });
+
+  it('dispose terminates dedicated FFmpeg instance', async () => {
+    const { instance } = await preloadService();
+    const ffmpeg = mockFFmpegInstances[mockFFmpegInstances.length - 1];
+
+    await instance.dispose();
+
+    expect(ffmpeg.terminate).toHaveBeenCalled();
   });
 });
