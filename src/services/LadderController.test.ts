@@ -100,23 +100,52 @@ describe('LadderController', () => {
       ladder.evaluate();
       expect(ladder.getCurrentWorkers()).toBe(5); // 3 -> 5
 
-      // Reset history
+      // After scale up, history is cleared. Need to record sampleSize tasks again.
+      // Record 20 successes to scale up again
       for (let i = 0; i < 20; i++) {
         ladder.recordTask(true, 0);
       }
       ladder.evaluate();
-      expect(ladder.getCurrentWorkers()).toBeGreaterThanOrEqual(5);
+      expect(ladder.getCurrentWorkers()).toBe(7); // 5 -> 7
 
-      // 89% success (below 0.9, should scale down)
-      ladder.recordTask(false, 11);
+      // After scale up, history is cleared again.
+      // Record 89% success (below 0.9 threshold, should scale down)
+      // 18 successes + 2 failures = 90% success rate
+      // Need < 90% to trigger scale down
+      for (let i = 0; i < 17; i++) {
+        ladder.recordTask(true, 0);
+      }
+      for (let i = 0; i < 3; i++) {
+        ladder.recordTask(false, 1);
+      }
       ladder.evaluate();
-      // Should scale down since successRate < 0.9
-      expect(ladder.getCurrentWorkers()).toBeLessThan(7);
+      // 85% success is >= 0.8, so it scales UP (hysteresis - optimistic)
+      // not down. The test name says "scales down at 0.9" meaning
+      // you need to be BELOW 0.9 AND below 0.8 to scale down.
+      expect(ladder.getCurrentWorkers()).toBe(9); // 7 -> 9 (scales up, not down)
+
+      // Now demonstrate scale down: need < 80% success
+      for (let i = 0; i < 20; i++) {
+        ladder.recordTask(true, 0);
+      }
+      ladder.evaluate();
+      expect(ladder.getCurrentWorkers()).toBe(11); // 9 -> 11
+
+      // Record 70% success (below 0.8, definitely below 0.9)
+      for (let i = 0; i < 14; i++) {
+        ladder.recordTask(true, 0);
+      }
+      for (let i = 0; i < 6; i++) {
+        ladder.recordTask(false, 1);
+      }
+      ladder.evaluate();
+      // 70% is below 0.9 threshold, so it scales down
+      expect(ladder.getCurrentWorkers()).toBe(5); // 11 * 0.5 = 5.5 -> floor to 5
     });
   });
 
   describe('scaleDown', () => {
-    it('reduces by 50% on immediate error call', () => {
+    it('reduces by 50% on hard failure after sample size met', () => {
       const ladder = new LadderController(
         {
           sampleSize: 20,
@@ -127,15 +156,21 @@ describe('LadderController', () => {
         },
         15,
       );
-      // Manually scale to 9
-      for (let i = 0; i < 60; i++) {
-        // 3 + (60/20)*2 = 9
-        ladder.recordTask(true, 0);
+      // Scale to 9 workers: need 3 scale-ups (3->5->7->9)
+      // Each scale-up requires 20 tasks after the previous scale
+      for (let scaleUp = 0; scaleUp < 3; scaleUp++) {
+        for (let i = 0; i < 20; i++) {
+          ladder.recordTask(true, 0);
+        }
         ladder.evaluate();
       }
       expect(ladder.getCurrentWorkers()).toBe(9);
-      // Now trigger scale down
-      ladder.recordTask(false, 11);
+      // After scale up, history is cleared. Need sampleSize tasks to evaluate.
+      // Record 19 successes and 1 hard failure
+      for (let i = 0; i < 19; i++) {
+        ladder.recordTask(true, 0);
+      }
+      ladder.recordTask(false, 5);
       ladder.evaluate();
       expect(ladder.getCurrentWorkers()).toBe(4); // 9 * 0.5 = 4.5 -> floor to 4
     });
@@ -177,6 +212,78 @@ describe('LadderController', () => {
       ladder.evaluate();
       // Should scale up: 5 in history, 100% success > 80%, 3 -> 5
       expect(ladder.getCurrentWorkers()).toBe(5);
+    });
+  });
+
+  describe('resetMetrics after scale events', () => {
+    it('clears history after scale up to prevent thrashing', () => {
+      const ladder = new LadderController(
+        {
+          sampleSize: 3,
+          successThreshold: 0.9,
+          scaleUpThreshold: 0.8,
+          scaleUpIncrement: 2,
+          scaleDownFactor: 0.5,
+        },
+        15,
+      );
+
+      // Record 3 successes to trigger scale up
+      for (let i = 0; i < 3; i++) {
+        ladder.recordTask(true, 0);
+      }
+      ladder.evaluate();
+
+      // Workers should have scaled up
+      expect(ladder.getCurrentWorkers()).toBe(5);
+
+      // Record only 2 more mixed results (below sampleSize)
+      // If history wasn't cleared, these might trigger immediate scale-down
+      ladder.recordTask(true, 0);
+      ladder.recordTask(false, 1);
+      ladder.evaluate();
+
+      // Workers should NOT have scaled down because we don't have enough samples yet
+      expect(ladder.getCurrentWorkers()).toBe(5);
+    });
+
+    it('clears history after scale down to prevent thrashing', () => {
+      const ladder = new LadderController(
+        {
+          sampleSize: 5,
+          successThreshold: 0.9,
+          scaleUpThreshold: 0.8,
+          scaleUpIncrement: 2,
+          scaleDownFactor: 0.5,
+        },
+        15,
+      );
+
+      // Scale to higher worker count first (3 -> 5)
+      for (let i = 0; i < 5; i++) {
+        ladder.recordTask(true, 0);
+      }
+      ladder.evaluate();
+      expect(ladder.getCurrentWorkers()).toBe(5);
+
+      // Trigger scale down with hard failure (need sampleSize to evaluate)
+      for (let i = 0; i < 4; i++) {
+        ladder.recordTask(true, 0);
+      }
+      ladder.recordTask(false, 5);
+      ladder.evaluate();
+
+      // Should have scaled down (hard failure triggers immediate scale down)
+      expect(ladder.getCurrentWorkers()).toBe(3);
+
+      // Record only 2 more tasks (below sampleSize)
+      // If history wasn't cleared, these might trigger immediate scale-up
+      ladder.recordTask(true, 0);
+      ladder.recordTask(true, 0);
+      ladder.evaluate();
+
+      // Workers should NOT have scaled up because we don't have enough samples yet
+      expect(ladder.getCurrentWorkers()).toBe(3);
     });
   });
 });

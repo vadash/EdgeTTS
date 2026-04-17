@@ -63,18 +63,18 @@ export class LadderController {
 
     if (hasHardFailure) {
       this.scaleDown();
-      this.tasksSinceLastScaleUp = 0;
+      this.resetMetrics();
     } else if (
       successRate >= this.config.scaleUpThreshold &&
       this.tasksSinceLastScaleUp >= this.config.sampleSize
     ) {
       // Scale up if success rate is high AND we've processed enough tasks since last scale up
       this.scaleUp();
-      this.tasksSinceLastScaleUp = 0;
+      this.resetMetrics();
     } else if (successRate < this.config.successThreshold) {
       // Below threshold means significant failure rate
       this.scaleDown();
-      this.tasksSinceLastScaleUp = 0;
+      this.resetMetrics();
     }
   }
 
@@ -95,5 +95,10 @@ export class LadderController {
       this.currentWorkers = newValue;
       this.logger?.warn(`Ladder scaled down to ${this.currentWorkers} workers due to errors`);
     }
+  }
+
+  private resetMetrics(): void {
+    this.history = [];
+    this.tasksSinceLastScaleUp = 0;
   }
 }
