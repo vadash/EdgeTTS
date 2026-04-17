@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { getLogger } from '@/services';
 import type { LogLevel } from '@/services/Logger';
 import { useConversion, useLogs } from '@/stores';
+import { activeLlmWorkers, activeTtsWorkers } from '@/stores/ConversionStore';
 import { ProgressBar } from './ProgressBar';
 
 /**
@@ -96,7 +97,14 @@ export function StatusPanel() {
       {/* Progress */}
       {total > 0 && (
         <div className="px-3 py-2 border-b border-border">
-          <ProgressBar current={current} total={total} failed={failed} eta={eta} />
+          <ProgressBar
+            current={current}
+            total={total}
+            failed={failed}
+            eta={eta}
+            llmWorkers={activeLlmWorkers.value}
+            ttsWorkers={activeTtsWorkers.value}
+          />
         </div>
       )}
 
