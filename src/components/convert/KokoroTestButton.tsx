@@ -3,6 +3,7 @@ import { Button } from '@/components/common';
 import { KokoroFallbackService } from '@/services/KokoroFallbackService';
 
 const TEST_SENTENCE = 'Hello, this is a test of the Kokoro text to speech engine.';
+const TEST_TIMEOUT_MS = 120_000;
 
 const loading = signal(false);
 const error = signal<string | null>(null);
@@ -15,7 +16,12 @@ export function KokoroTestButton() {
     try {
       const kokoro = KokoroFallbackService.getInstance();
       await kokoro.preload();
-      const blob = await kokoro.synthesize(TEST_SENTENCE, 'female');
+      const blob = await Promise.race([
+        kokoro.synthesize(TEST_SENTENCE, 'female'),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Test timed out')), TEST_TIMEOUT_MS),
+        ),
+      ]);
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       await audio.play();

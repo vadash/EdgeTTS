@@ -466,14 +466,14 @@ describe('KokoroFallbackService', () => {
     }
   });
 
-  it('synthesize rejects on 20s timeout if worker does not respond', async () => {
+  it('synthesize rejects on timeout if worker does not respond', async () => {
     const { instance } = await preloadService();
 
     const synthPromise = instance.synthesize('Hello', 'female');
     await vi.advanceTimersByTimeAsync(0);
 
-    // Don't respond — advance time past 20s
-    vi.advanceTimersByTime(21_000);
+    // Don't respond — advance time past the synthesis timeout
+    vi.advanceTimersByTime(181_000);
 
     await expect(synthPromise).rejects.toThrow(/timeout/i);
   });

@@ -7,7 +7,8 @@ const GENDER_VOICE_MAP: Record<string, string> = {
   unknown: 'af_bella',
 };
 
-const SYNTHESIS_TIMEOUT_MS = 20_000;
+const SYNTHESIS_TIMEOUT_MS = 180_000;
+const PRELOAD_TIMEOUT_MS = 120_000;
 
 export const KOKORO_CONFIG = {
   modelId: 'onnx-community/Kokoro-82M-ONNX',
@@ -69,7 +70,7 @@ export class KokoroFallbackService {
       return this.initPromise;
     }
 
-    this.initPromise = new Promise<void>((resolve, reject) => {
+    const workerPromise = new Promise<void>((resolve, reject) => {
       this.worker = new Worker(new URL('./workers/kokoro.worker', import.meta.url), {
         type: 'module',
       });
@@ -94,6 +95,17 @@ export class KokoroFallbackService {
 
       this.worker.postMessage({ type: 'load' });
     });
+
+    // Cache the race wrapper so repeated preload() calls return the same promise
+    this.initPromise = Promise.race([
+      workerPromise,
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Kokoro preload timeout after ${PRELOAD_TIMEOUT_MS}ms`)),
+          PRELOAD_TIMEOUT_MS,
+        ),
+      ),
+    ]);
 
     return this.initPromise;
   }
