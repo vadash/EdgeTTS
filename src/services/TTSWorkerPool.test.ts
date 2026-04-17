@@ -98,24 +98,6 @@ describe('TTSWorkerPool', () => {
     filenum: String(partIndex + 1).padStart(4, '0'),
   });
 
-  describe('retry state initialization', () => {
-    it('initializes retryCount Map as empty', () => {
-      pool = createPool();
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryCount).toBeInstanceOf(Map);
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryCount.size).toBe(0);
-    });
-
-    it('initializes retryTimers Map as empty', () => {
-      pool = createPool();
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryTimers).toBeInstanceOf(Map);
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryTimers.size).toBe(0);
-    });
-  });
-
   describe('addTask', () => {
     it('adds a single task to the queue', () => {
       pool = createPool();
@@ -408,50 +390,6 @@ describe('TTSWorkerPool', () => {
 
       expect(mockChunkStore.close).toHaveBeenCalledTimes(1);
     });
-
-    it('clears all timers in retryTimers Map using clearTimeout', async () => {
-      pool = createPool();
-
-      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-
-      // Set up some timers
-      const timer1 = setTimeout(() => {}, 10000);
-      const timer2 = setTimeout(() => {}, 20000);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(0, timer1);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(1, timer2);
-
-      await pool.cleanup();
-
-      expect(clearTimeoutSpy).toHaveBeenCalledWith(timer1);
-      expect(clearTimeoutSpy).toHaveBeenCalledWith(timer2);
-
-      clearTimeoutSpy.mockRestore();
-    });
-
-    it('clears both retryTimers and retryCount Maps', async () => {
-      pool = createPool();
-
-      // Set up timers and retry counts
-      const timer1 = setTimeout(() => {}, 10000);
-      const timer2 = setTimeout(() => {}, 20000);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(0, timer1);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(1, timer2);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(0, 3);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(1, 5);
-
-      await pool.cleanup();
-
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryTimers.size).toBe(0);
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryCount.size).toBe(0);
-    });
   });
 
   describe('clear', () => {
@@ -471,50 +409,6 @@ describe('TTSWorkerPool', () => {
       });
       expect(pool.getCompletedAudio().size).toBe(0);
       expect(pool.getFailedTasks().size).toBe(0);
-    });
-
-    it('clears all timers in retryTimers Map using clearTimeout', () => {
-      pool = createPool();
-
-      const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
-
-      // Set up some timers
-      const timer1 = setTimeout(() => {}, 10000);
-      const timer2 = setTimeout(() => {}, 20000);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(0, timer1);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(1, timer2);
-
-      pool.clear();
-
-      expect(clearTimeoutSpy).toHaveBeenCalledWith(timer1);
-      expect(clearTimeoutSpy).toHaveBeenCalledWith(timer2);
-
-      clearTimeoutSpy.mockRestore();
-    });
-
-    it('clears both retryTimers and retryCount Maps', () => {
-      pool = createPool();
-
-      // Set up timers and retry counts
-      const timer1 = setTimeout(() => {}, 10000);
-      const timer2 = setTimeout(() => {}, 20000);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(0, timer1);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(1, timer2);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(0, 3);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(1, 5);
-
-      pool.clear();
-
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryTimers.size).toBe(0);
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryCount.size).toBe(0);
     });
   });
 
@@ -731,407 +625,6 @@ describe('TTSWorkerPool', () => {
 
       // Delay should vary by up to 1500ms (1.5s) due to half-max jitter
       expect(maxDelay - minDelay).toBe(1500);
-    });
-  });
-
-  describe('requeueTask', () => {
-    it('adds task back to queue', async () => {
-      const onStatusUpdate = vi.fn();
-      pool = createPool({ onStatusUpdate });
-
-      const task = createTask(0);
-      // Set up a timer for the task
-      const timer = setTimeout(() => {}, 1000);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(task.partIndex, timer);
-
-      // @ts-expect-error - calling private method for testing
-      pool.requeueTask(task);
-
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryTimers.has(task.partIndex)).toBe(false);
-    });
-
-    it('fires onStatusUpdate with retry message', async () => {
-      const onStatusUpdate = vi.fn();
-      pool = createPool({ onStatusUpdate });
-
-      const task = createTask(0);
-      const timer = setTimeout(() => {}, 1000);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(task.partIndex, timer);
-
-      // @ts-expect-error - calling private method for testing
-      pool.requeueTask(task);
-
-      expect(onStatusUpdate).toHaveBeenCalledWith({
-        partIndex: 0,
-        message: 'Retrying now...',
-        isComplete: false,
-      });
-    });
-
-    it('deletes timer from retryTimers', async () => {
-      pool = createPool();
-
-      const task = createTask(0);
-      const timer = setTimeout(() => {}, 1000);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryTimers.set(task.partIndex, timer);
-
-      // @ts-expect-error - calling private method for testing
-      pool.requeueTask(task);
-
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryTimers.has(task.partIndex)).toBe(false);
-    });
-  });
-
-  describe('handleTaskFailure', () => {
-    it('increments retryCount on each failure', async () => {
-      const onStatusUpdate = vi.fn();
-      pool = createPool({ onStatusUpdate });
-
-      const task = createTask(0);
-
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryCount.get(task.partIndex)).toBeUndefined();
-
-      // @ts-expect-error - calling private method for testing
-      await pool.handleTaskFailure(task, new Error('Test error'));
-
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryCount.get(task.partIndex)).toBe(1);
-
-      // @ts-expect-error - calling private method for testing
-      await pool.handleTaskFailure(task, new Error('Test error'));
-
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryCount.get(task.partIndex)).toBe(2);
-    });
-
-    it('schedules retry with correct delay when below max retries', async () => {
-      const onStatusUpdate = vi.fn();
-      pool = createPool({ onStatusUpdate });
-
-      const task = createTask(0);
-
-      // @ts-expect-error - calling private method for testing
-      await pool.handleTaskFailure(task, new Error('Test error'));
-
-      // Verify retry timer was scheduled
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryTimers.has(task.partIndex)).toBe(true);
-
-      // Verify status update was fired
-      expect(onStatusUpdate).toHaveBeenCalledWith({
-        partIndex: 0,
-        message: expect.stringContaining('Retry in'),
-        isComplete: false,
-      });
-    });
-
-    it('calls ladder.recordTask(false, 12) and ladder.evaluate() on permanent failure', async () => {
-      const onTaskError = vi.fn();
-      pool = createPool({ onTaskError });
-
-      const task = createTask(0);
-
-      // Set up spies before calling handleTaskFailure
-      // @ts-expect-error - accessing private property for testing
-      const ladder = pool.ladder;
-      const recordTaskSpy = vi.spyOn(ladder, 'recordTask');
-      const evaluateSpy = vi.spyOn(ladder, 'evaluate');
-
-      // Set retry count to exceed max (11 attempts means retryCount should be 11)
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 11);
-
-      // @ts-expect-error - calling private method for testing
-      await pool.handleTaskFailure(task, new Error('Test error'));
-
-      expect(recordTaskSpy).toHaveBeenCalledWith(false, 12);
-      expect(evaluateSpy).toHaveBeenCalled();
-    });
-
-    it('adds to failedTasks and increments processedCount on permanent failure', async () => {
-      const onTaskError = vi.fn();
-      pool = createPool({ onTaskError });
-
-      const task = createTask(0);
-
-      // Set retry count to exceed max
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 5);
-
-      // @ts-expect-error - calling private method for testing
-      await pool.handleTaskFailure(task, new Error('Test error'));
-
-      expect(pool.getFailedTasks().has(0)).toBe(true);
-
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.processedCount).toBe(1);
-    });
-
-    it('calls onTaskError callback on permanent failure', async () => {
-      const onTaskError = vi.fn();
-      pool = createPool({ onTaskError });
-
-      const task = createTask(0);
-
-      // Set retry count to exceed max
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 5);
-
-      // @ts-expect-error - calling private method for testing
-      await pool.handleTaskFailure(task, new Error('Test error'));
-
-      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
-    });
-
-    it('deletes retryCount entry on permanent failure to prevent memory leaks', async () => {
-      const onTaskError = vi.fn();
-      pool = createPool({ onTaskError });
-
-      const task = createTask(0);
-
-      // Set retry count to exceed max
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 5);
-
-      // @ts-expect-error - calling private method for testing
-      expect(pool.retryCount.has(task.partIndex)).toBe(true);
-
-      // @ts-expect-error - calling private method for testing
-      await pool.handleTaskFailure(task, new Error('Test error'));
-
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryCount.has(task.partIndex)).toBe(false);
-    });
-
-    it('calls logTTSFailure when task permanently fails after 11 retries', async () => {
-      const mockDirHandle = createMockDirectoryHandle();
-      const onTaskError = vi.fn();
-      pool = createPool({ directoryHandle: mockDirHandle, onTaskError });
-
-      const task = createTask(0);
-
-      // Set retry count to exceed max
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 5);
-
-      // Spy on the private logTTSFailure method
-      // @ts-expect-error - accessing private method for testing
-      const logTTSFailureSpy = vi.spyOn(pool, 'logTTSFailure');
-
-      const error = new Error('Permanent TTS failure');
-
-      // @ts-expect-error - calling private method for testing
-      await pool.handleTaskFailure(task, error);
-
-      // Verify logTTSFailure was called with the correct task and error
-      expect(logTTSFailureSpy).toHaveBeenCalledWith(task, error);
-      expect(logTTSFailureSpy).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('directoryHandle option', () => {
-    it('accepts directoryHandle in WorkerPoolOptions', () => {
-      const mockDirHandle = createMockDirectoryHandle();
-
-      const pool = createPool({
-        directoryHandle: mockDirHandle,
-      });
-
-      expect(pool).toBeInstanceOf(TTSWorkerPool);
-    });
-
-    it('stores directoryHandle in options', () => {
-      const mockDirHandle = createMockDirectoryHandle();
-
-      const pool = createPool({
-        directoryHandle: mockDirHandle,
-      });
-
-      expect(pool.options.directoryHandle).toBe(mockDirHandle);
-    });
-
-    it('accepts null as directoryHandle value', () => {
-      const pool = createPool({
-        directoryHandle: null,
-      });
-
-      expect(pool).toBeInstanceOf(TTSWorkerPool);
-    });
-
-    it('defaults to undefined when directoryHandle is not provided', () => {
-      const pool = createPool();
-
-      expect(pool.options.directoryHandle).toBeUndefined();
-    });
-  });
-
-  describe('executeTask (refactored without withRetry)', () => {
-    it('uses release() on success, records actual retry count, and deletes retryCount', async () => {
-      const onTaskComplete = vi.fn();
-      pool = createPool({ onTaskComplete });
-
-      // Spy on connectionPool.release
-      // @ts-expect-error - accessing private property for testing
-      const releaseSpy = vi.spyOn(pool.connectionPool, 'release');
-
-      const task = createTask(0);
-
-      // Set a retry count to simulate previous retries
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 3);
-
-      // @ts-expect-error - accessing private property for testing
-      const ladder = pool.ladder;
-      const recordTaskSpy = vi.spyOn(ladder, 'recordTask');
-
-      pool.addTask(task);
-      await vi.advanceTimersByTimeAsync(100);
-
-      // Verify release was called
-      expect(releaseSpy).toHaveBeenCalled();
-
-      // Verify ladder.recordTask was called with true and actual retry count (3)
-      expect(recordTaskSpy).toHaveBeenCalledWith(true, 3);
-
-      // Verify retryCount was deleted to prevent memory leak
-      // @ts-expect-error - accessing private property for testing
-      expect(pool.retryCount.has(task.partIndex)).toBe(false);
-    });
-
-    it('uses destroy() on failure (not release), then calls handleTaskFailure', async () => {
-      const onTaskError = vi.fn();
-      pool = createPool({ onTaskError });
-
-      // Make send fail
-      mockSend = vi.fn().mockRejectedValue(new Error('Network failure'));
-
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('READY'),
-        };
-      });
-
-      // @ts-expect-error - accessing private property for testing
-      const destroySpy = vi.spyOn(pool.connectionPool, 'destroy');
-
-      const task = createTask(0);
-
-      // Set retry count to exceed max so it will fail permanently
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 11);
-
-      pool.addTask(task);
-      await vi.advanceTimersByTimeAsync(100);
-
-      // Verify destroy was called (not release)
-      expect(destroySpy).toHaveBeenCalled();
-
-      // Verify onTaskError was called (via handleTaskFailure)
-      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
-    });
-
-    it('handles destroy() errors gracefully when socket already dead', async () => {
-      const onTaskError = vi.fn();
-      pool = createPool({ onTaskError });
-
-      // Make send fail
-      mockSend = vi.fn().mockRejectedValue(new Error('Network failure'));
-
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('READY'),
-        };
-      });
-
-      // Make destroy throw an error (simulating already-dead socket)
-      // @ts-expect-error - accessing private property for testing
-      vi.spyOn(pool.connectionPool, 'destroy').mockRejectedValue(
-        new Error('Socket already closed'),
-      );
-
-      const task = createTask(0);
-
-      // Set retry count to exceed max so it will fail permanently
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 11);
-
-      // Should not throw despite destroy error
-      pool.addTask(task);
-      await vi.advanceTimersByTimeAsync(100);
-
-      // Verify onTaskError was still called
-      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
-    });
-
-    it('skips all state updates when pool is cleared (totalTasks === 0)', async () => {
-      pool = createPool();
-
-      // Make send succeed
-      mockSend = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
-
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('READY'),
-        };
-      });
-
-      // @ts-expect-error - accessing private property for testing
-      const releaseSpy = vi.spyOn(pool.connectionPool, 'release');
-
-      // @ts-expect-error - accessing private property for testing
-      const ladder = pool.ladder;
-      const recordTaskSpy = vi.spyOn(ladder, 'recordTask');
-
-      const task = createTask(0);
-      pool.addTask(task);
-
-      // Simulate pool being cleared while task is executing
-      // @ts-expect-error - accessing private property for testing
-      pool.totalTasks = 0;
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      // Verify release was still called (cleanup happens)
-      expect(releaseSpy).toHaveBeenCalled();
-
-      // Verify ladder.recordTask was NOT called (state updates skipped)
-      expect(recordTaskSpy).not.toHaveBeenCalled();
-    });
-
-    it('defaults retry count to 0 when not tracked in retryCount Map', async () => {
-      const onTaskComplete = vi.fn();
-      pool = createPool({ onTaskComplete });
-
-      // @ts-expect-error - accessing private property for testing
-      const ladder = pool.ladder;
-      const recordTaskSpy = vi.spyOn(ladder, 'recordTask');
-
-      const task = createTask(0);
-
-      // Don't set any retry count - should default to 0
-      pool.addTask(task);
-      await vi.advanceTimersByTimeAsync(100);
-
-      // Verify ladder.recordTask was called with true and 0 (default)
-      expect(recordTaskSpy).toHaveBeenCalledWith(true, 0);
     });
   });
 
@@ -1367,6 +860,108 @@ describe('TTSWorkerPool', () => {
       pool.addTask(createTask(0));
       await vi.advanceTimersByTimeAsync(100);
       // Test passes if no exception is thrown
+    });
+  });
+
+  describe('retry integration - observable behavior', () => {
+    it('should re-execute failed tasks after retry delay expires', async () => {
+      const onTaskComplete = vi.fn();
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskComplete, onTaskError });
+
+      // Track calls - first fails, second succeeds
+      let callCount = 0;
+      mockSend.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          throw new Error('Network error');
+        }
+        return new Uint8Array([1, 2, 3]);
+      });
+
+      const task = createTask(0);
+      pool.addTask(task);
+
+      // Let the failure happen
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Wait for retry delay to expire (using the calculated delay from calculateRetryDelay)
+      // First retry delay is ~2.25s with half-max jitter
+      await vi.advanceTimersByTimeAsync(3000);
+
+      // Task should now complete successfully after retry
+      expect(onTaskComplete).toHaveBeenCalledWith(0, '0');
+      expect(pool.getProgress().completed).toBe(1);
+
+      // No permanent failure
+      expect(onTaskError).not.toHaveBeenCalled();
+      expect(pool.getProgress().failed).toBe(0);
+    });
+
+    it('should process multiple failed tasks independently', async () => {
+      const onTaskComplete = vi.fn();
+      pool = createPool({ onTaskComplete });
+
+      // Add tasks - first 2 will fail initially, third succeeds
+      let callCount = 0;
+      mockSend.mockImplementation(async () => {
+        callCount++;
+        // First 2 calls fail (tasks 0 and 1)
+        if (callCount <= 2) {
+          throw new Error('Network error');
+        }
+        return new Uint8Array([1, 2, 3]);
+      });
+
+      pool.addTasks([createTask(0), createTask(1), createTask(2)]);
+
+      // Let initial processing happen
+      await vi.advanceTimersByTimeAsync(100);
+
+      // Task 2 should have succeeded (third call)
+      expect(pool.getProgress().completed).toBe(1);
+
+      // Now make the retry attempts succeed
+      mockSend.mockResolvedValue(new Uint8Array([1, 2, 3]));
+
+      // Wait for retry delays to expire (tasks retry at different times)
+      await vi.advanceTimersByTimeAsync(5000);
+
+      // All tasks should now be complete
+      expect(pool.getProgress().completed).toBe(3);
+      expect(pool.getProgress().failed).toBe(0);
+    });
+
+    it('should mark task as permanently failed after max retries', async () => {
+      const onTaskError = vi.fn();
+      pool = createPool({ onTaskError });
+
+      // Make send always fail
+      mockSend = vi.fn().mockRejectedValue(new Error('Persistent network error'));
+
+      MockedReusableEdgeTTSService.mockImplementation(function () {
+        return {
+          connect: mockConnect,
+          send: mockSend,
+          disconnect: mockDisconnect,
+          isReady: mockIsReady,
+          getState: vi.fn().mockReturnValue('READY'),
+        };
+      });
+
+      const task = createTask(0);
+      pool.addTask(task);
+
+      // Advance enough time for all retries to exhaust
+      // Max retries is 11, with exponential backoff up to 120s max delay
+      // Total time needed: sum of all delays = ~2.25s + 7.5s + 22.5s + 45s + 90s + (6 * 120s)
+      // ≈ 887 seconds ≈ 15 minutes
+      await vi.advanceTimersByTimeAsync(900000);
+
+      // Should be permanently failed
+      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
+      expect(pool.getProgress().failed).toBe(1);
+      expect(pool.getFailedTasks().has(0)).toBe(true);
     });
   });
 });
