@@ -29,6 +29,7 @@
     "generic-pool": "3.9.0",
     "jsonrepair": "3.13.3",
     "jszip": "3.10.1",
+    "kokoro-js": "^1.2.1",
     "openai": "6.34.0",
     "p-queue": "9.1.2",
     "p-retry": "8.0.0",
