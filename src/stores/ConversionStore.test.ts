@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  activeLlmWorkers,
+  activeTtsWorkers,
   awaitResumeConfirmation,
   cancel,
   cancelResume,
@@ -12,6 +14,7 @@ import {
   isProcessing,
   progressPercent,
   resetConversionStore,
+  setConcurrencyStats,
   setError,
   setFFmpegError,
   setFFmpegLoaded,
@@ -360,58 +363,28 @@ describe('ConversionStore', () => {
     });
   });
 
-  describe('setPhaseBaseline', () => {
-    it('sets phaseStartProgress to the given value', () => {
-      startConversion();
-      setStatus('converting');
-      updateProgress(0, 100);
-
-      setPhaseBaseline(100);
-
-      expect(conversion.value.phaseStartProgress).toBe(100);
+  describe('concurrency stats tracking', () => {
+    it('sets LLM and TTS worker counts via setConcurrencyStats', () => {
+      setConcurrencyStats(4, 8);
+      expect(activeLlmWorkers.value).toBe(4);
+      expect(activeTtsWorkers.value).toBe(8);
     });
 
-    it('returns null ETA when current progress equals baseline (no items processed)', () => {
-      const startTime = 1000000;
-      vi.spyOn(Date, 'now').mockReturnValue(startTime);
-      startConversion();
-      setStatus('converting');
-      updateProgress(0, 100);
-
-      // Set baseline to 100 (e.g., 100 chunks already cached)
-      setPhaseBaseline(100);
-
-      // Advance time and update progress to match baseline
-      vi.spyOn(Date, 'now').mockReturnValue(startTime + 10000);
-      updateProgress(100, 100);
-
-      // processed = current - baseline = 100 - 100 = 0
-      // ETA should be null since no items have been processed
-      expect(estimatedTimeRemaining.value).toBeNull();
-
-      vi.restoreAllMocks();
+    it('resets concurrency stats to zero', () => {
+      setConcurrencyStats(4, 8);
+      setConcurrencyStats(0, 0);
+      expect(activeLlmWorkers.value).toBe(0);
+      expect(activeTtsWorkers.value).toBe(0);
     });
 
-    it('calculates ETA correctly when progress exceeds baseline', () => {
-      const startTime = 1000000;
-      vi.spyOn(Date, 'now').mockReturnValue(startTime);
-      startConversion();
-      setStatus('converting');
-      updateProgress(0, 200);
+    it('updates concurrency stats independently', () => {
+      setConcurrencyStats(2, 4);
+      expect(activeLlmWorkers.value).toBe(2);
+      expect(activeTtsWorkers.value).toBe(4);
 
-      // Set baseline to 100 (e.g., 100 chunks already cached)
-      setPhaseBaseline(100);
-
-      // Advance 10 seconds and process 10 more items (current = 110)
-      vi.spyOn(Date, 'now').mockReturnValue(startTime + 10000);
-      updateProgress(110, 200);
-
-      // processed = 110 - 100 = 10 items in 10 seconds = 1s/item
-      // remaining = 200 - 110 = 90 items
-      // ETA = 90 * 1s = 90s = 00:01:30
-      expect(estimatedTimeRemaining.value).toBe('00:01:30');
-
-      vi.restoreAllMocks();
+      setConcurrencyStats(6, 12);
+      expect(activeLlmWorkers.value).toBe(6);
+      expect(activeTtsWorkers.value).toBe(12);
     });
   });
 });

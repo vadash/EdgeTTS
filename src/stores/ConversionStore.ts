@@ -46,6 +46,8 @@ interface ConversionState {
   ffmpegError: string | null;
   resumeInfo: ResumeInfo | null;
   tabBlocked: boolean;
+  activeLlmWorkers: number;
+  activeTtsWorkers: number;
 }
 
 // ============================================================================
@@ -64,6 +66,8 @@ const defaultState: ConversionState = {
   ffmpegError: null,
   resumeInfo: null,
   tabBlocked: false,
+  activeLlmWorkers: 0,
+  activeTtsWorkers: 0,
 };
 
 // ============================================================================
@@ -93,6 +97,8 @@ export const resumeInfo = computed(() => conversion.value.resumeInfo);
 export const ffmpegLoaded = computed(() => conversion.value.ffmpegLoaded);
 export const ffmpegLoading = computed(() => conversion.value.ffmpegLoading);
 export const ffmpegError = computed(() => conversion.value.ffmpegError);
+export const activeLlmWorkers = computed(() => conversion.value.activeLlmWorkers);
+export const activeTtsWorkers = computed(() => conversion.value.activeTtsWorkers);
 
 export const progressPercent = computed(() => {
   const { current, total } = conversion.value.progress;
@@ -285,4 +291,8 @@ export function setPhaseBaseline(count: number): void {
 
 export function clearTabBlocked(): void {
   patchState({ tabBlocked: false });
+}
+
+export function setConcurrencyStats(llm: number, tts: number): void {
+  patchState({ activeLlmWorkers: llm, activeTtsWorkers: tts });
 }
