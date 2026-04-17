@@ -75,6 +75,14 @@ Populated at `init()` by scanning both disk index files AND IDB contents. Always
 - Value: Uint8Array
 - No secondary indexes, no complexity
 
+#### Session Isolation ("Book Bleed" Prevention)
+
+IndexedDB is bound to the browser origin, not to the user's selected output folder. Without explicit cleanup, chunks from a previous conversion (Book A) would bleed into a new conversion (Book B) started in a different folder.
+
+**Prevention:** `clearDatabase()` is called by the Orchestrator at the start of any **fresh** conversion (when `checkResumeState` returns `null`). On **resume**, the IDB data is intentionally preserved — it belongs to the current session's in-flight chunks.
+
+Call site: `ConversionOrchestrator` decides fresh vs. resume via `ResumeCheck`. Fresh start → call `chunkStore.clearDatabase()` before entering the TTS stage. Resume → skip the clear, IDB data is expected.
+
 ### Flush Mechanism
 
 When pending IDB count hits `FLUSH_THRESHOLD` (2000), `flushToDisk()` fires in the background:
@@ -105,11 +113,12 @@ class ChunkStore {
   prepareForRead(): Promise<void>
   readChunk(index: number): Promise<Uint8Array>
   getExistingIndices(): Set<number>
+  clearDatabase(): Promise<void>  // Wipe IDB — called by Orchestrator on fresh start
   close(): Promise<void>
 }
 ```
 
-No changes to `ConversionOrchestrator`, `TTSWorkerPool`, `AudioMerger`, or `ResumeCheck`.
+`ConversionOrchestrator` gains one new call: `chunkStore.clearDatabase()` on fresh start (when `checkResumeState` returns `null`). No changes to `TTSWorkerPool`, `AudioMerger`, or `ResumeCheck`.
 
 ## Crash Safety
 
@@ -138,7 +147,7 @@ Files deleted:
 - `*.crswap`
 - `chunks_data_*.bin` / `chunks_index_*.jsonl` (if any from previous new-format runs)
 
-IDB database (`edgetts_hybrid_chunks`) is created fresh each session — no cleanup needed for old data since the DB name is new.
+IDB database (`edgetts_hybrid_chunks`) is wiped via `clearDatabase()` when the Orchestrator starts a fresh conversion. On resume, IDB data is preserved (it contains the session's in-flight chunks). The migration wipe (old format detected) also calls `clearDatabase()` to ensure no stale IDB data survives a format upgrade.
 
 ## What Gets Removed
 
