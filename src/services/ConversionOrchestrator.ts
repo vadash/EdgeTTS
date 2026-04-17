@@ -502,6 +502,9 @@ export async function runConversion(
     if (!skipLLMSteps) {
       checkCancelled(signal);
 
+      // Set initial LLM concurrency before starting LLM stage
+      conversion.setConcurrencyStats(input.llmThreads, 0);
+
       const extractLLMOptions: LLMServiceFactoryOptions = {
         apiKey: input.extractConfig.apiKey,
         apiUrl: input.extractConfig.apiUrl,
@@ -953,6 +956,9 @@ async function runTTSStage(
             `Part ${partIndex + 1} failed: ${getErrorMessage(error)}`,
             failedTasks.size,
           );
+        },
+        onConcurrencyChange: (concurrency) => {
+          _stores.conversion.setConcurrencyStats(0, concurrency);
         },
         onAllComplete: () => {
           resolve();

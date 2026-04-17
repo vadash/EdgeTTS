@@ -95,6 +95,7 @@ function createMockStores(): Stores {
       setError: vi.fn(),
       setStatus: vi.fn(),
       updateProgress: vi.fn(),
+      setConcurrencyStats: vi.fn(),
       isProcessing: { value: false },
       progress: { value: { current: 0, total: 0 } },
       awaitResumeConfirmation: vi.fn().mockResolvedValue(false),
@@ -276,6 +277,155 @@ describe('runConversion', () => {
     await runConversion(services, stores, signal, input);
 
     expect(clearDatabaseSpy).toHaveBeenCalledTimes(1);
+
+    clearDatabaseSpy.mockRestore();
+    initSpy.mockRestore();
+    closeSpy.mockRestore();
+    getExistingSpy.mockRestore();
+  });
+
+  it('passes onConcurrencyChange callback to worker pool factory', async () => {
+    const clearDatabaseSpy = vi.spyOn(ChunkStore.prototype, 'clearDatabase').mockResolvedValue();
+    const initSpy = vi.spyOn(ChunkStore.prototype, 'init').mockResolvedValue();
+    const closeSpy = vi.spyOn(ChunkStore.prototype, 'close').mockResolvedValue();
+    const getExistingSpy = vi
+      .spyOn(ChunkStore.prototype, 'getExistingIndices')
+      .mockReturnValue(new Set());
+
+    const stores = createMockStores();
+    const services = createMockServices();
+
+    // Add setConcurrencyStats spy to conversion store
+    const setConcurrencyStatsSpy = vi.fn();
+    stores.conversion.setConcurrencyStats = setConcurrencyStatsSpy;
+
+    // Mock LLM factory
+    const mockLLMService = {
+      extractCharacters: vi
+        .fn()
+        .mockResolvedValue([
+          { canonicalName: 'Narrator', variations: ['Narrator'], gender: 'unknown' },
+        ]),
+      assignSpeakers: vi
+        .fn()
+        .mockResolvedValue([
+          { text: 'Hello', sentenceIndex: 0, speaker: 'narrator', voiceId: 'narrator' },
+        ]),
+      cancel: vi.fn(),
+    };
+    services.llmServiceFactory.create = vi.fn().mockReturnValue(mockLLMService);
+
+    // Mock text block splitter
+    services.textBlockSplitter.createExtractBlocks = vi.fn().mockReturnValue(['block1']);
+    services.textBlockSplitter.createAssignBlocks = vi.fn().mockReturnValue(['block1']);
+
+    // Capture the options passed to worker pool factory
+    let capturedPoolOptions: any;
+    const mockWorkerPool = {
+      addTasks: vi.fn(),
+      clear: vi.fn(),
+    };
+    services.workerPoolFactory.create = vi.fn().mockImplementation((opts: any) => {
+      capturedPoolOptions = opts;
+      // Simulate immediate completion
+      setTimeout(() => opts.onAllComplete?.(), 0);
+      return mockWorkerPool;
+    });
+
+    // Mock audio merger
+    const mockMerger = {
+      mergeAndSave: vi.fn().mockResolvedValue(1),
+    };
+    services.audioMergerFactory.create = vi.fn().mockReturnValue(mockMerger);
+
+    const signal = new AbortController().signal;
+    const input = createMockInput({
+      directoryHandle: createMockDirectoryHandle() as unknown as FileSystemDirectoryHandle,
+      ttsThreads: 3,
+    });
+
+    await runConversion(services, stores, signal, input);
+
+    // Verify that onConcurrencyChange callback was passed to worker pool
+    expect(capturedPoolOptions).toBeDefined();
+    expect(capturedPoolOptions.onConcurrencyChange).toBeDefined();
+    expect(typeof capturedPoolOptions.onConcurrencyChange).toBe('function');
+
+    // Verify that calling the callback updates the store
+    capturedPoolOptions.onConcurrencyChange(5);
+    expect(setConcurrencyStatsSpy).toHaveBeenCalledWith(0, 5);
+
+    capturedPoolOptions.onConcurrencyChange(2);
+    expect(setConcurrencyStatsSpy).toHaveBeenCalledWith(0, 2);
+
+    clearDatabaseSpy.mockRestore();
+    initSpy.mockRestore();
+    closeSpy.mockRestore();
+    getExistingSpy.mockRestore();
+  });
+
+  it('sets initial LLM concurrency before starting LLM stage', async () => {
+    const clearDatabaseSpy = vi.spyOn(ChunkStore.prototype, 'clearDatabase').mockResolvedValue();
+    const initSpy = vi.spyOn(ChunkStore.prototype, 'init').mockResolvedValue();
+    const closeSpy = vi.spyOn(ChunkStore.prototype, 'close').mockResolvedValue();
+    const getExistingSpy = vi
+      .spyOn(ChunkStore.prototype, 'getExistingIndices')
+      .mockReturnValue(new Set());
+
+    const stores = createMockStores();
+    const services = createMockServices();
+
+    // Add setConcurrencyStats spy to conversion store
+    const setConcurrencyStatsSpy = vi.fn();
+    stores.conversion.setConcurrencyStats = setConcurrencyStatsSpy;
+
+    // Mock LLM factory to capture when it's called
+    const mockLLMService = {
+      extractCharacters: vi
+        .fn()
+        .mockResolvedValue([
+          { canonicalName: 'Narrator', variations: ['Narrator'], gender: 'unknown' },
+        ]),
+      assignSpeakers: vi
+        .fn()
+        .mockResolvedValue([
+          { text: 'Hello', sentenceIndex: 0, speaker: 'narrator', voiceId: 'narrator' },
+        ]),
+      cancel: vi.fn(),
+    };
+    services.llmServiceFactory.create = vi.fn().mockReturnValue(mockLLMService);
+
+    // Mock text block splitter
+    services.textBlockSplitter.createExtractBlocks = vi.fn().mockReturnValue(['block1']);
+    services.textBlockSplitter.createAssignBlocks = vi.fn().mockReturnValue(['block1']);
+
+    // Mock worker pool
+    const mockWorkerPool = {
+      addTasks: vi.fn(),
+      clear: vi.fn(),
+    };
+    services.workerPoolFactory.create = vi.fn().mockImplementation((opts: any) => {
+      setTimeout(() => opts.onAllComplete?.(), 0);
+      return mockWorkerPool;
+    });
+
+    // Mock audio merger
+    const mockMerger = {
+      mergeAndSave: vi.fn().mockResolvedValue(1),
+    };
+    services.audioMergerFactory.create = vi.fn().mockReturnValue(mockMerger);
+
+    const signal = new AbortController().signal;
+    const input = createMockInput({
+      directoryHandle: createMockDirectoryHandle() as unknown as FileSystemDirectoryHandle,
+      llmThreads: 4,
+    });
+
+    await runConversion(services, stores, signal, input);
+
+    // Verify that setConcurrencyStats was called with initial LLM threads
+    // It should be called at the start of LLM stage with (llmThreads, 0)
+    expect(setConcurrencyStatsSpy).toHaveBeenCalledWith(4, 0);
 
     clearDatabaseSpy.mockRestore();
     initSpy.mockRestore();
