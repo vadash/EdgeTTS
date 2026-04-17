@@ -95,8 +95,8 @@ export class TTSWorkerPool {
     this.ladder = new LadderController(
       {
         sampleSize: 20,
-        successThreshold: 0.9,
-        scaleUpThreshold: 0.8,
+        successThreshold: 0.8, // Drop concurrency if success is < 80%
+        scaleUpThreshold: 0.95, // Increase concurrency only if success is >= 95%
         scaleUpIncrement: 2,
         scaleDownFactor: 0.5,
       },

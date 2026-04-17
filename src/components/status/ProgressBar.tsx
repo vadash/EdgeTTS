@@ -44,7 +44,7 @@ function ProgressBar({
           <span>({percentage}%)</span>
           {(llmWorkers > 0 || ttsWorkers > 0) && (
             <span className="ml-2 px-2 py-0.5 rounded bg-surface-alt border border-border text-gray-400">
-              {llmWorkers > 0 ? `LLM: ${llmWorkers}` : `TTS: ${ttsWorkers}`}
+              {'\u26A1'} {llmWorkers > 0 ? `LLM: ${llmWorkers}` : `TTS: ${ttsWorkers}`}
             </span>
           )}
         </div>
