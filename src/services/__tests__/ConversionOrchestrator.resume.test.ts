@@ -58,12 +58,12 @@ describe('checkResumeState', () => {
     await stateWritable.close();
 
     // Write chunks using new ChunkStore format
-    const dataFile = await tempDir.getFileHandle('chunks_data.bin', { create: true });
+    const dataFile = await tempDir.getFileHandle('chunks_data_0.bin', { create: true });
     const dataWritable = await dataFile.createWritable();
     await dataWritable.write(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9]));
     await dataWritable.close();
 
-    const indexFile = await tempDir.getFileHandle('chunks_index.jsonl', { create: true });
+    const indexFile = await tempDir.getFileHandle('chunks_index_0.jsonl', { create: true });
     const indexWritable = await indexFile.createWritable();
     await indexWritable.write('{"i":0,"o":0,"l":3}\n');
     await indexWritable.write('{"i":1,"o":3,"l":3}\n');

@@ -48,7 +48,12 @@ class MockFileSystem {
       },
       entries: async function* () {
         for (const [name, _file] of files.entries()) {
-          yield [name, { kind: 'file' as const }];
+          yield [name, { kind: 'file' as const, name }];
+        }
+      },
+      values: async function* () {
+        for (const [name, _file] of files.entries()) {
+          yield { kind: 'file' as const, name };
         }
       },
       removeEntry: async (name: string, _opts?: { recursive?: boolean }) => {
@@ -100,10 +105,10 @@ describe('ResumeCheck', () => {
     expect(logMessages.some((msg) => msg.includes('legacy format detected'))).toBe(true);
   });
 
-  it('should detect new format with chunks_index.jsonl', async () => {
+  it('should detect new format with chunks_index_0.jsonl', async () => {
     const mockDir = mockFs.createDirectoryWithFiles({
-      'chunks_data.bin': new Uint8Array([1, 2, 3, 4, 5]),
-      'chunks_index.jsonl': new TextEncoder().encode('{"i":0,"o":0,"l":5}\n'),
+      'chunks_data_0.bin': new Uint8Array([1, 2, 3, 4, 5]),
+      'chunks_index_0.jsonl': new TextEncoder().encode('{"i":0,"o":0,"l":5}\n'),
       'pipeline_state.json': new TextEncoder().encode('{"assignments":[]}'),
     });
 
@@ -133,7 +138,7 @@ describe('ResumeCheck', () => {
 
   it('should return null when no pipeline_state.json exists', async () => {
     const mockDir = mockFs.createDirectoryWithFiles({
-      'chunks_index.jsonl': new TextEncoder().encode('{"i":0,"o":0,"l":5}\n'),
+      'chunks_index_0.jsonl': new TextEncoder().encode('{"i":0,"o":0,"l":5}\n'),
     });
 
     const parentFs = new MockFileSystem();
@@ -149,10 +154,10 @@ describe('ResumeCheck', () => {
     expect(result).toBeNull();
   });
 
-  it('should count multiple chunks from index file', async () => {
+  it('should count multiple chunks from a single numbered index file', async () => {
     const mockDir = mockFs.createDirectoryWithFiles({
-      'chunks_data.bin': new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9]),
-      'chunks_index.jsonl': new TextEncoder().encode(
+      'chunks_data_0.bin': new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9]),
+      'chunks_index_0.jsonl': new TextEncoder().encode(
         '{"i":0,"o":0,"l":3}\n{"i":1,"o":3,"l":3}\n{"i":2,"o":6,"l":3}\n',
       ),
       'pipeline_state.json': new TextEncoder().encode('{"assignments":[]}'),
@@ -174,8 +179,8 @@ describe('ResumeCheck', () => {
 
   it('should handle empty index file', async () => {
     const mockDir = mockFs.createDirectoryWithFiles({
-      'chunks_data.bin': new Uint8Array([]),
-      'chunks_index.jsonl': new TextEncoder().encode(''),
+      'chunks_data_0.bin': new Uint8Array([]),
+      'chunks_index_0.jsonl': new TextEncoder().encode(''),
       'pipeline_state.json': new TextEncoder().encode('{"assignments":[]}'),
     });
 
@@ -191,5 +196,93 @@ describe('ResumeCheck', () => {
     const result = await checkResumeState(parentDir);
     expect(result).not.toBeNull();
     expect(result!.cachedChunks).toBe(0);
+  });
+
+  it('should detect new format with chunks_index_2.jsonl (any numbered variant)', async () => {
+    const mockDir = mockFs.createDirectoryWithFiles({
+      'chunks_index_2.jsonl': new TextEncoder().encode('{"i":0,"o":0,"l":5}\n'),
+      'pipeline_state.json': new TextEncoder().encode('{"assignments":[]}'),
+    });
+
+    const parentFs = new MockFileSystem();
+    const parentDir = parentFs.createDirectoryHandle() as FileSystemDirectoryHandle;
+    parentDir.getDirectoryHandle = async (name: string) => {
+      if (name === '_temp_work') {
+        return mockDir;
+      }
+      throw new Error('Directory not found');
+    };
+
+    const result = await checkResumeState(parentDir);
+    expect(result).not.toBeNull();
+    expect(result!.cachedChunks).toBe(1);
+  });
+
+  it('should return null when no numbered index files exist', async () => {
+    const mockDir = mockFs.createDirectoryWithFiles({
+      'chunks_data_0.bin': new Uint8Array([1, 2, 3]),
+      'pipeline_state.json': new TextEncoder().encode('{"assignments":[]}'),
+    });
+
+    const parentFs = new MockFileSystem();
+    const parentDir = parentFs.createDirectoryHandle() as FileSystemDirectoryHandle;
+    parentDir.getDirectoryHandle = async (name: string) => {
+      if (name === '_temp_work') {
+        return mockDir;
+      }
+      throw new Error('Directory not found');
+    };
+
+    const result = await checkResumeState(parentDir);
+    expect(result).not.toBeNull();
+    expect(result!.cachedChunks).toBe(0);
+  });
+
+  it('should sum line counts across multiple numbered index files', async () => {
+    const mockDir = mockFs.createDirectoryWithFiles({
+      'chunks_data_0.bin': new Uint8Array([1, 2, 3]),
+      'chunks_data_1.bin': new Uint8Array([4, 5]),
+      'chunks_index_0.jsonl': new TextEncoder().encode(
+        '{"i":0,"o":0,"l":3}\n{"i":1,"o":3,"l":3}\n{"i":2,"o":6,"l":3}\n',
+      ),
+      'chunks_index_1.jsonl': new TextEncoder().encode(
+        '{"i":3,"o":0,"l":2}\n{"i":4,"o":2,"l":2}\n',
+      ),
+      'pipeline_state.json': new TextEncoder().encode('{"assignments":[]}'),
+    });
+
+    const parentFs = new MockFileSystem();
+    const parentDir = parentFs.createDirectoryHandle() as FileSystemDirectoryHandle;
+    parentDir.getDirectoryHandle = async (name: string) => {
+      if (name === '_temp_work') {
+        return mockDir;
+      }
+      throw new Error('Directory not found');
+    };
+
+    const result = await checkResumeState(parentDir);
+    expect(result).not.toBeNull();
+    expect(result!.cachedChunks).toBe(5);
+  });
+
+  it('should return 0 cachedChunks when no numbered index files exist but pipeline_state does', async () => {
+    const mockDir = mockFs.createDirectoryWithFiles({
+      'chunks_data_0.bin': new Uint8Array([1, 2, 3]),
+      'pipeline_state.json': new TextEncoder().encode('{"assignments":[]}'),
+    });
+
+    const parentFs = new MockFileSystem();
+    const parentDir = parentFs.createDirectoryHandle() as FileSystemDirectoryHandle;
+    parentDir.getDirectoryHandle = async (name: string) => {
+      if (name === '_temp_work') {
+        return mockDir;
+      }
+      throw new Error('Directory not found');
+    };
+
+    const result = await checkResumeState(parentDir);
+    expect(result).not.toBeNull();
+    expect(result!.cachedChunks).toBe(0);
+    expect(result!.hasLLMState).toBe(true);
   });
 });

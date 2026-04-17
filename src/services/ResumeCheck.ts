@@ -38,25 +38,28 @@ async function tryReadJSON<T>(dir: FileSystemDirectoryHandle, filename: string):
   }
 }
 
+const NUMBERED_INDEX_RE = /^chunks_index_\d+\.jsonl$/;
+
 async function countNewFormatChunks(dir: FileSystemDirectoryHandle): Promise<number> {
-  try {
-    const indexHandle = await dir.getFileHandle('chunks_index.jsonl');
-    const indexFile = await indexHandle.getFile();
-    const text = await indexFile.text();
-    // Count non-empty lines
-    return text.split('\n').filter((line) => line.trim().length > 0).length;
-  } catch {
-    return 0;
+  let total = 0;
+  for await (const entry of dir.values()) {
+    if (entry.kind === 'file' && NUMBERED_INDEX_RE.test(entry.name)) {
+      const handle = await dir.getFileHandle(entry.name);
+      const file = await handle.getFile();
+      const text = await file.text();
+      total += text.split('\n').filter((line) => line.trim().length > 0).length;
+    }
   }
+  return total;
 }
 
 async function hasNewFormat(dir: FileSystemDirectoryHandle): Promise<boolean> {
-  try {
-    await dir.getFileHandle('chunks_index.jsonl');
-    return true;
-  } catch {
-    return false;
+  for await (const entry of dir.values()) {
+    if (entry.kind === 'file' && NUMBERED_INDEX_RE.test(entry.name)) {
+      return true;
+    }
   }
+  return false;
 }
 
 async function hasOldFormat(dir: FileSystemDirectoryHandle): Promise<boolean> {
