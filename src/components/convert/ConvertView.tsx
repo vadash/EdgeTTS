@@ -12,6 +12,7 @@ import { Text } from 'preact-i18n';
 import { NotificationBanner } from '@/components/common';
 import { isEdgeBrowser } from '@/stores/UISettingsStore';
 import { ConvertButton } from './ConvertButton';
+import { KokoroTestButton } from './KokoroTestButton';
 import { FileDropZone } from './FileDropZone';
 import { QuickVoiceSelect } from './QuickVoiceSelect';
 import { ResumeModal } from './ResumeModal';
@@ -36,6 +37,7 @@ export function ConvertView() {
           <div className="flex-1 flex flex-col gap-3">
             <QuickVoiceSelect />
             <ConvertButton />
+            <KokoroTestButton />
           </div>
         </div>
 
