@@ -19,7 +19,8 @@
     "test:real": "vitest run --config vitest.real.config.ts",
     "test:real:qa": "cross-env USE_QA=true vitest run --config vitest.real.config.ts",
     "test:real:repeat": "cross-env REPEAT_PROMPT=true vitest run --config vitest.real.config.ts",
-    "test:real:repeat:qa": "cross-env REPEAT_PROMPT=true USE_QA=true vitest run --config vitest.real.config.ts"
+    "test:real:repeat:qa": "cross-env REPEAT_PROMPT=true USE_QA=true vitest run --config vitest.real.config.ts",
+    "analyze-split": "npx tsx scripts/analyze-split.ts"
   },
   "dependencies": {
     "@ffmpeg/core": "0.12.10",
