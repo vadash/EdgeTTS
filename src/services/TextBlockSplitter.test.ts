@@ -393,6 +393,60 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
   });
 
+  describe('splitParagraphIntoSentences — splits inside dialogue/quotes', () => {
+    const splitter = new TextBlockSplitter();
+
+    it('splits multiple sentences inside curly quotes', () => {
+      // Curly quotes wrapping multiple sentences — each should be its own sentence
+      const text =
+        '\u201CAlchemical mana is classified in three ways. One is usefulness to humans. Remember, this form of classification is archaic, but it\u2019s still used everywhere so you need to know it.\u201D';
+      const result = (splitter as any).splitParagraphIntoSentences(text);
+
+      // Should split at least at the period boundaries inside the quotes
+      expect(result.length).toBeGreaterThanOrEqual(3);
+      for (const sentence of result) {
+        expect(sentence.length).toBeLessThan(300);
+      }
+    });
+
+    it('splits multiple sentences inside plain double quotes', () => {
+      const text = '"First sentence here. Second sentence here. Third sentence here."';
+      const result = (splitter as any).splitParagraphIntoSentences(text);
+
+      expect(result.length).toBeGreaterThanOrEqual(3);
+      for (const sentence of result) {
+        expect(sentence.length).toBeLessThan(100);
+      }
+    });
+
+    it('handles WALL OF TEXT: real royalroad sample (Seneca lecture)', () => {
+      // Real text from sample_3_en_royalroad.txt — sentence index 47 (711 chars)
+      const text =
+        '\u201CAlchemical mana is classified in three ways: One is usefulness to humans. Remember, this form of classification is archaic, but it\u2019s still used everywhere so you need to know it. A-class mana is the only mana that is safe to channel. Classes go A through D, and D-class mana will kill you instantly. Again, a metaphor: You can get energy from eating plants. A-class mana is like a carrot. Great. Eat as many as you want. Using B-class mana is like eating plants that will give you diarrhea; you can do it a little bit, but it will hurt. Using D-class mana is like eating a piece of anthracite coal. Yes, it used to be a plant. Yes, there\u2019s lots of energy in there. No, you can\u2019t use it; don\u2019t eat toxic rocks.\u201D';
+      const result = (splitter as any).splitParagraphIntoSentences(text);
+
+      // Must produce many sentences, not one 711-char block
+      expect(result.length).toBeGreaterThanOrEqual(10);
+      for (const sentence of result) {
+        // No sentence should be a WALL OF TEXT
+        expect(sentence.length).toBeLessThan(200);
+      }
+    });
+
+    it('splits long narrated paragraph with no quotes', () => {
+      const text =
+        'The motto above the Alchemistry Building door read \u201CRespect for the Fundamental Forces of the Universe,\u201D and below that, \u201CIn Memoriam,\u201D and the four names of the deceased, at least two of whom had not respected the magical chemistry they studied in the building.';
+      const result = (splitter as any).splitParagraphIntoSentences(text);
+
+      // Should split into at least 2 sentences
+      expect(result.length).toBeGreaterThanOrEqual(1);
+      // No individual chunk should be a WALL OF TEXT
+      for (const sentence of result) {
+        expect(sentence.length).toBeLessThan(300);
+      }
+    });
+  });
+
   describe('splitIntoParagraphs with forceSplitLongParagraphs guard', () => {
     it('splits 10000-char paragraph with no punctuation into 5 chunks of ≤2000 chars', () => {
       // A paragraph with no punctuation — splitParagraphIntoSentences will fail

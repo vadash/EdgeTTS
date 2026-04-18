@@ -37,7 +37,7 @@ export class TextBlockSplitter {
   /**
    * Split a paragraph into sentences.
    * Handles: .!?… and preserves abbreviations.
-   * Quote-aware: doesn't split inside quoted text.
+   * Quote-aware: splits sentences even inside quoted text (TTS needs short segments).
    * Handles missing spaces after punctuation (e.g. "calmly.Nilfgadi").
    */
   private splitParagraphIntoSentences(paragraph: string): string[] {
@@ -82,8 +82,8 @@ export class TextBlockSplitter {
       // Determine if we should split at this position
       let shouldSplit = false;
 
-      // Split on sentence-ending punctuation ONLY if not inside quotes
-      if ((/[.!?…]/.test(char) || isEllipsis) && !inQuotes) {
+      // Split on sentence-ending punctuation (including inside quotes — TTS needs short sentences)
+      if (/[.!?…]/.test(char) || isEllipsis) {
         shouldSplit = true;
       } else if (justClosedQuote) {
         // If quote just closed, check if the char before the quote was sentence-ending
