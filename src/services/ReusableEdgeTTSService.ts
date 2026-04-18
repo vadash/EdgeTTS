@@ -6,7 +6,7 @@ import { RetriableError } from '@/errors';
 import type { TTSConfig } from '../state/types';
 import { sha256 } from '../utils/sha256';
 import { generateConnectionId } from '../utils/uuid';
-import type { Logger } from './Logger';
+import type { ILogger } from './Logger';
 
 // Windows epoch for Sec-MS-GEC generation
 const WIN_EPOCH = 11644473600;
@@ -44,7 +44,7 @@ export class ReusableEdgeTTSService {
   private socket: WebSocket | null = null;
   private state: ConnectionState = 'DISCONNECTED';
   private bytesDataSeparator: Uint8Array;
-  private logger?: Logger;
+  private logger?: ILogger;
 
   // Connection management
   private connectPromise: Promise<void> | null = null;
@@ -58,7 +58,7 @@ export class ReusableEdgeTTSService {
   private requestReject: ((error: Error) => void) | null = null;
   private requestTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(logger?: Logger) {
+  constructor(logger?: ILogger) {
     this.bytesDataSeparator = new TextEncoder().encode('Path:audio\r\n');
     this.logger = logger;
   }
@@ -118,7 +118,7 @@ export class ReusableEdgeTTSService {
         this.sendConfig();
         this.state = 'READY';
         this.startKeepAlive();
-        this.logger?.debug('WebSocket connected');
+        this.logger?.debug?.('WebSocket connected');
         resolve();
       };
 
@@ -225,7 +225,7 @@ export class ReusableEdgeTTSService {
   }
 
   private handleClose(event: CloseEvent, connectReject?: (error: Error) => void): void {
-    this.logger?.debug(`WebSocket closed: code=${event.code}, reason=${event.reason}`);
+    this.logger?.debug?.(`WebSocket closed: code=${event.code}, reason=${event.reason}`);
 
     const wasConnecting = this.state === 'CONNECTING';
     const wasBusy = this.state === 'BUSY';
@@ -319,7 +319,7 @@ export class ReusableEdgeTTSService {
       if (this.state === 'READY' && this.socket?.readyState === WebSocket.OPEN) {
         // Send speech.config as keep-alive (harmless re-send)
         this.sendConfig();
-        this.logger?.debug('Sent keep-alive');
+        this.logger?.debug?.('Sent keep-alive');
       }
     }, KEEP_ALIVE_INTERVAL);
   }

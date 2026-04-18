@@ -6,7 +6,7 @@ import PQueue from 'p-queue';
 import type { StatusUpdate, TTSConfig as VoiceConfig } from '../state/types';
 import type { ChunkStore } from './ChunkStore';
 import { LadderController } from './LadderController';
-import type { Logger } from './Logger';
+import type { ILogger } from './Logger';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 import { KokoroFallbackService } from './KokoroFallbackService';
 
@@ -35,7 +35,7 @@ export interface WorkerPoolOptions {
   onTaskError?: (partIndex: number, error: Error) => void;
   onAllComplete?: () => void;
   onConcurrencyChange?: (concurrency: number) => void;
-  logger?: Logger;
+  logger?: ILogger;
 }
 
 /**
@@ -66,7 +66,7 @@ export class TTSWorkerPool {
   private onTaskComplete?: (partIndex: number, filename: string) => void;
   private onTaskError?: (partIndex: number, error: Error) => void;
   private onAllComplete?: () => void;
-  private logger?: Logger;
+  private logger?: ILogger;
 
   // Retry state management
   private retryCount = new Map<number, number>();
@@ -186,7 +186,7 @@ export class TTSWorkerPool {
       );
     }
     await Promise.allSettled(promises);
-    this.logger?.debug(`Warmed up ${workersToWarmup} connections (ladder-controlled)`);
+    this.logger?.debug?.(`Warmed up ${workersToWarmup} connections (ladder-controlled)`);
     this.options.onConcurrencyChange?.(workersToWarmup);
   }
 
@@ -367,7 +367,11 @@ export class TTSWorkerPool {
 
     // Trigger Kokoro preload at attempt 2 (fire-and-forget, non-blocking)
     if (attempt === 2) {
-      this.kokoroFallback.preload();
+      this.kokoroFallback.preload().catch((err) => {
+        this.logger?.warn(
+          `Kokoro preload failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
     }
 
     // Check if we've exceeded max retries
@@ -531,7 +535,7 @@ export class TTSWorkerPool {
     if (this.chunkStore) {
       try {
         await this.chunkStore.close();
-        this.logger?.debug('Closed ChunkStore');
+        this.logger?.debug?.('Closed ChunkStore');
       } catch (err) {
         this.logger?.warn(`Failed to close ChunkStore: ${(err as Error).message}`);
       }

@@ -1,4 +1,4 @@
-import type { Logger } from './Logger';
+import type { ILogger } from './Logger';
 
 export interface TaskResult {
   success: boolean;
@@ -23,7 +23,7 @@ export class LadderController {
   constructor(
     private config: LadderConfig,
     private readonly maxWorkers: number,
-    private readonly logger?: Logger,
+    private readonly logger?: ILogger,
   ) {
     this.currentWorkers = this.minWorkers;
   }
@@ -84,7 +84,7 @@ export class LadderController {
     const newValue = this.currentWorkers + this.config.scaleUpIncrement;
     if (newValue <= this.maxWorkers) {
       this.currentWorkers = newValue;
-      this.logger?.debug(`Ladder scaled up to ${this.currentWorkers} workers`);
+      this.logger?.debug?.(`Ladder scaled up to ${this.currentWorkers} workers`);
     }
   }
 
