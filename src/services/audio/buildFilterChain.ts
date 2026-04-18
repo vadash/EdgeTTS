@@ -33,11 +33,9 @@ export function buildFilterChain(config: AudioProcessingConfig): string {
     );
   }
 
-  // 4. Compressor -- gentle vocal compression
+  // 4. Compressor -- gentle vocal compression (3:1 ratio above -30dB)
   if (config.compressor) {
-    filters.push(
-      'compand=attacks=0.1:decays=0.8:points=-90/-90|-50/-50|-30/-30|-20/-20:soft-knee=6:gain=0',
-    );
+    filters.push('compand=attacks=0.02:decays=0.2:points=-90/-90|-30/-30|0/-20:soft-knee=6:gain=0');
   }
 
   // 5. Normalization + 6. Limiter (auto with normalization)
