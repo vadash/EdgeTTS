@@ -1,8 +1,8 @@
 import type { TextBlock } from '@/state/types';
 
 /**
- * TextBlockSplitter - Splits text into paragraphs and blocks for LLM processing
- * Each line (\n) is a paragraph. Large paragraphs (>2000 chars) are split by sentence boundaries.
+ * TextBlockSplitter - Splits text into sentences and blocks for LLM processing
+ * Each line (\n) is split by sentence boundaries.
  */
 export class TextBlockSplitter {
   /**
@@ -13,8 +13,8 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Split text into paragraphs (one per line)
-   * Large paragraphs (>3000 chars) are split by sentence boundaries
+   * Split text into sentences (one per line, then by sentence boundaries).
+   * Always splits into sentences to ensure proper LLM assignment and prevent TTS timeouts.
    */
   splitIntoParagraphs(text: string): string[] {
     const paragraphs: string[] = [];
@@ -24,23 +24,21 @@ export class TextBlockSplitter {
       const trimmed = line.trim();
       if (!trimmed) continue;
 
-      if (trimmed.length > 2000) {
-        const sentences = this.splitParagraphIntoSentences(trimmed);
-        paragraphs.push(...sentences);
-      } else {
-        paragraphs.push(trimmed);
-      }
+      // Always split by sentences to ensure proper LLM assignment and prevent TTS timeouts
+      const sentences = this.splitParagraphIntoSentences(trimmed);
+      paragraphs.push(...sentences);
     }
 
-    // Safety net: ensure no paragraph exceeds 2000 chars, even if
+    // Safety net: ensure no sentence exceeds 2000 chars, even if
     // splitParagraphIntoSentences fails to find proper boundaries
     return this.forceSplitLongParagraphs(paragraphs);
   }
 
   /**
-   * Split a large paragraph into sentences (used for paragraphs >2000 chars)
-   * Handles: .!?... and preserves abbreviations
-   * Quote-aware: doesn't split inside quoted text
+   * Split a paragraph into sentences.
+   * Handles: .!?… and preserves abbreviations.
+   * Quote-aware: doesn't split inside quoted text.
+   * Handles missing spaces after punctuation (e.g. "calmly.Nilfgadi").
    */
   private splitParagraphIntoSentences(paragraph: string): string[] {
     const sentences: string[] = [];
@@ -55,32 +53,58 @@ export class TextBlockSplitter {
       const next = text[i + 1] || '';
       const next2 = text[i + 2] || '';
 
+      let justClosedQuote = false;
+      let isEllipsis = false;
+
       // Track quote state (handle various quote characters)
-      if (char === '"' || char === '"' || char === '<<') {
-        if (!inQuotes) {
-          inQuotes = true;
-        }
-      } else if (char === '"' || char === '"' || char === '>>') {
-        if (inQuotes) {
-          inQuotes = false;
-        }
+      if (char === '"') {
+        // Plain double quote: toggle state
+        inQuotes = !inQuotes;
+        if (!inQuotes) justClosedQuote = true;
+      } else if (char === '\u201C' || char === '\u00AB') {
+        // Opening curly quote or guillemet
+        inQuotes = true;
+      } else if (char === '\u201D' || char === '\u00BB') {
+        // Closing curly quote or guillemet
+        inQuotes = false;
+        justClosedQuote = true;
       }
 
       // Handle ellipsis
       if (char === '.' && next === '.' && next2 === '.') {
         current += '...';
         i += 2;
-        continue;
+        isEllipsis = true;
+      } else {
+        current += char;
       }
 
-      current += char;
+      // Determine if we should split at this position
+      let shouldSplit = false;
 
       // Split on sentence-ending punctuation ONLY if not inside quotes
-      if (/[.!?...]/.test(char) && !inQuotes) {
-        const atEnd = i === text.length - 1;
-        const beforeSpace = /\s/.test(next);
+      if ((/[.!?…]/.test(char) || isEllipsis) && !inQuotes) {
+        shouldSplit = true;
+      } else if (justClosedQuote) {
+        // If quote just closed, check if the char before the quote was sentence-ending
+        const prevCharIdx = current.length - 2; // -1 for the quote char itself
+        if (prevCharIdx >= 0 && /[.!?…]/.test(current[prevCharIdx])) {
+          shouldSplit = true;
+        }
+      }
 
-        if ((atEnd || beforeSpace) && !this.isAbbreviation(current)) {
+      if (shouldSplit) {
+        const atEnd = i === text.length - 1;
+        const afterChar = text[i + 1] || '';
+        const beforeSpace = /\s/.test(afterChar);
+        // Detect missing spaces: e.g. "calmly.Nilfgadi" — next char is uppercase letter
+        const nextIsUpper =
+          afterChar.length > 0 &&
+          afterChar.toUpperCase() === afterChar &&
+          afterChar.toLowerCase() !== afterChar;
+        const beforeQuote = /["\u201C\u00AB]/.test(afterChar);
+
+        if ((atEnd || beforeSpace || nextIsUpper || beforeQuote) && !this.isAbbreviation(current)) {
           const trimmed = current.trim();
           if (trimmed && this.isPronounceable(trimmed)) {
             sentences.push(trimmed);
