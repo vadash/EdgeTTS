@@ -29,9 +29,12 @@ export class TextBlockSplitter {
       paragraphs.push(...sentences);
     }
 
+    // Split long sentences (>300 chars) on structural delimiters and commas
+    const split = this.splitLongSentences(paragraphs);
+
     // Safety net: ensure no sentence exceeds 2000 chars, even if
     // splitParagraphIntoSentences fails to find proper boundaries
-    return this.forceSplitLongParagraphs(paragraphs);
+    return this.forceSplitLongParagraphs(split);
   }
 
   /**
@@ -121,6 +124,80 @@ export class TextBlockSplitter {
     }
 
     return sentences;
+  }
+
+  /**
+   * Split sentences exceeding 300 chars on structural delimiters then commas.
+   * Targets stat blocks and long game-mechanics text that lacks sentence-ending punctuation.
+   */
+  private splitLongSentences(sentences: string[]): string[] {
+    const MAX_SENTENCE_CHARS = 300;
+    // ASCII art separators: long runs of ¯ or _
+    const SEPARATOR_RE = /[¯_]{5,}/g;
+    const result: string[] = [];
+
+    for (const sentence of sentences) {
+      if (sentence.length <= MAX_SENTENCE_CHARS) {
+        result.push(sentence);
+        continue;
+      }
+
+      // Strategy 1: split on structural separators (¯¯¯¯¯, _____)
+      if (SEPARATOR_RE.test(sentence)) {
+        SEPARATOR_RE.lastIndex = 0;
+        const parts = sentence
+          .split(SEPARATOR_RE)
+          .map((p) => p.trim())
+          .filter((p) => p && this.isPronounceable(p));
+        if (parts.length > 1) {
+          // Re-check each part — some may still be too long
+          for (const part of parts) {
+            if (part.length <= MAX_SENTENCE_CHARS) {
+              result.push(part);
+            } else {
+              result.push(...this.splitOnCommas(part, MAX_SENTENCE_CHARS));
+            }
+          }
+          continue;
+        }
+        SEPARATOR_RE.lastIndex = 0;
+      }
+
+      // Strategy 2: split on commas
+      const commaSplit = this.splitOnCommas(sentence, MAX_SENTENCE_CHARS);
+      if (commaSplit.length > 1) {
+        result.push(...commaSplit);
+        continue;
+      }
+
+      // No good split point found — keep as-is (forceSplitLongParagraphs will catch >2000)
+      result.push(sentence);
+    }
+
+    return result;
+  }
+
+  /**
+   * Split text on commas, grouping chunks up to maxChars.
+   */
+  private splitOnCommas(text: string, maxChars: number): string[] {
+    const result: string[] = [];
+    let current = '';
+
+    for (const segment of text.split(',')) {
+      const candidate = current ? current + ',' + segment : segment;
+      if (candidate.length > maxChars && current) {
+        const trimmed = current.trim();
+        if (trimmed && this.isPronounceable(trimmed)) result.push(trimmed);
+        current = segment;
+      } else {
+        current = candidate;
+      }
+    }
+
+    const trimmed = current.trim();
+    if (trimmed && this.isPronounceable(trimmed)) result.push(trimmed);
+    return result;
   }
 
   /**
