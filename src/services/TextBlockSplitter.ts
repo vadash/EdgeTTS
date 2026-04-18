@@ -2,7 +2,7 @@ import type { TextBlock } from '@/state/types';
 
 /**
  * TextBlockSplitter - Splits text into paragraphs and blocks for LLM processing
- * Each line (\n) is a paragraph. Large paragraphs (>3000 chars) are split by sentence boundaries.
+ * Each line (\n) is a paragraph. Large paragraphs (>2000 chars) are split by sentence boundaries.
  */
 export class TextBlockSplitter {
   /**
@@ -24,7 +24,7 @@ export class TextBlockSplitter {
       const trimmed = line.trim();
       if (!trimmed) continue;
 
-      if (trimmed.length > 3000) {
+      if (trimmed.length > 2000) {
         const sentences = this.splitParagraphIntoSentences(trimmed);
         paragraphs.push(...sentences);
       } else {
@@ -32,13 +32,13 @@ export class TextBlockSplitter {
       }
     }
 
-    // Safety net: ensure no paragraph exceeds 3000 chars, even if
+    // Safety net: ensure no paragraph exceeds 2000 chars, even if
     // splitParagraphIntoSentences fails to find proper boundaries
     return this.forceSplitLongParagraphs(paragraphs);
   }
 
   /**
-   * Split a large paragraph into sentences (used for paragraphs >3000 chars)
+   * Split a large paragraph into sentences (used for paragraphs >2000 chars)
    * Handles: .!?... and preserves abbreviations
    * Quote-aware: doesn't split inside quoted text
    */
@@ -100,12 +100,12 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Force-split paragraphs that exceed MAX_PARAGRAPH_CHARS (3000).
+   * Force-split paragraphs that exceed MAX_PARAGRAPH_CHARS (2000).
    * This is a safety net for edge cases where splitParagraphIntoSentences fails.
    * Splits at the last space or comma before the limit, with hard cut fallback.
    */
   private forceSplitLongParagraphs(paragraphs: string[]): string[] {
-    const MAX_PARAGRAPH_CHARS = 3000;
+    const MAX_PARAGRAPH_CHARS = 2000;
     const result: string[] = [];
 
     for (const paragraph of paragraphs) {
@@ -118,7 +118,7 @@ export class TextBlockSplitter {
 
         // Choose the split point that's later but >1500 (minimum chunk size)
         let splitPoint = MAX_PARAGRAPH_CHARS;
-        const MIN_CHUNK_SIZE = 1500;
+        const MIN_CHUNK_SIZE = 500;
 
         if (lastCommaIndex > MIN_CHUNK_SIZE && lastCommaIndex > lastSpaceIndex) {
           splitPoint = lastCommaIndex + 1; // Split after comma

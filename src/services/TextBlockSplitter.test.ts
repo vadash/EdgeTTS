@@ -256,19 +256,19 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
   describe('forceSplitLongParagraphs - hard cut fallback', () => {
     const splitter = new TextBlockSplitter();
 
-    it('returns paragraphs ≤3000 chars unchanged', () => {
+    it('returns paragraphs ≤2000 chars unchanged', () => {
       const input = ['Short paragraph.', 'Another short paragraph.'];
       const result = (splitter as any).forceSplitLongParagraphs(input);
       expect(result).toEqual(input);
     });
 
-    it('splits long paragraph at last space before 3000 chars', () => {
-      // Create a paragraph with a space at position 2999
-      const longPara = `${'a'.repeat(2999)} bbb`;
+    it('splits long paragraph at last space before 2000 chars', () => {
+      // Create a paragraph with a space at position 1999
+      const longPara = `${'a'.repeat(1999)} bbb`;
       const result = (splitter as any).forceSplitLongParagraphs([longPara]);
       expect(result).toHaveLength(2);
-      expect(result[0].length).toBeLessThanOrEqual(3000);
-      expect(result[1].length).toBeLessThanOrEqual(3000);
+      expect(result[0].length).toBeLessThanOrEqual(2000);
+      expect(result[1].length).toBeLessThanOrEqual(2000);
       // Should have trimmed whitespace
       expect(result[0]).not.toMatch(/^\s/);
       expect(result[0]).not.toMatch(/\s$/);
@@ -277,49 +277,49 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
 
     it('splits at comma if better than space', () => {
-      // Space at 2500, comma at 2800 (better - closer to 3000)
-      // Total length: 3500 chars (exceeds limit)
-      const longPara = `${'a'.repeat(2500)} ${'b'.repeat(299)},${'c'.repeat(701)}`;
+      // Space at 1500, comma at 1800 (better - closer to 2000)
+      // Total length: 2500 chars (exceeds limit)
+      const longPara = `${'a'.repeat(1500)} ${'b'.repeat(299)},${'c'.repeat(701)}`;
       const result = (splitter as any).forceSplitLongParagraphs([longPara]);
       expect(result).toHaveLength(2);
-      // Should split at comma (2800), not at space (2500)
-      expect(result[0].length).toBeGreaterThan(2500);
-      expect(result[0].length).toBeLessThanOrEqual(3000);
+      // Should split at comma (1800), not at space (1500)
+      expect(result[0].length).toBeGreaterThan(1500);
+      expect(result[0].length).toBeLessThanOrEqual(2000);
     });
 
-    it('hard cuts at exactly 3000 chars if no space/comma found', () => {
-      // No spaces or commas in first 3000 chars
-      const longPara = 'a'.repeat(3100);
+    it('hard cuts at exactly 2000 chars if no space/comma found', () => {
+      // No spaces or commas in first 2000 chars
+      const longPara = 'a'.repeat(2100);
       const result = (splitter as any).forceSplitLongParagraphs([longPara]);
       expect(result).toHaveLength(2);
-      expect(result[0]).toBe('a'.repeat(3000));
+      expect(result[0]).toBe('a'.repeat(2000));
       expect(result[1]).toBe('a'.repeat(100));
     });
 
     it('handles multiple long paragraphs', () => {
-      const para1 = 'a'.repeat(3500);
-      const para2 = 'b'.repeat(4000);
+      const para1 = 'a'.repeat(2500);
+      const para2 = 'b'.repeat(3000);
       const result = (splitter as any).forceSplitLongParagraphs([para1, para2]);
       // First paragraph splits into 2
-      expect(result[0]).toBe('a'.repeat(3000));
+      expect(result[0]).toBe('a'.repeat(2000));
       expect(result[1]).toBe('a'.repeat(500));
       // Second paragraph splits into 2
-      expect(result[2]).toBe('b'.repeat(3000));
+      expect(result[2]).toBe('b'.repeat(2000));
       expect(result[3]).toBe('b'.repeat(1000));
     });
 
     it('handles paragraph that needs multiple splits', () => {
-      // 9000 chars with no spaces/commas = 3 hard cuts
-      const longPara = 'a'.repeat(9000);
+      // 6000 chars with no spaces/commas = 3 hard cuts
+      const longPara = 'a'.repeat(6000);
       const result = (splitter as any).forceSplitLongParagraphs([longPara]);
       expect(result).toHaveLength(3);
-      expect(result[0]).toBe('a'.repeat(3000));
-      expect(result[1]).toBe('a'.repeat(3000));
-      expect(result[2]).toBe('a'.repeat(3000));
+      expect(result[0]).toBe('a'.repeat(2000));
+      expect(result[1]).toBe('a'.repeat(2000));
+      expect(result[2]).toBe('a'.repeat(2000));
     });
 
     it('all resulting strings are trimmed', () => {
-      const longPara = `${'a'.repeat(2999)}   bbb   `;
+      const longPara = `${'a'.repeat(1999)}   bbb   `;
       const result = (splitter as any).forceSplitLongParagraphs([longPara]);
       for (const chunk of result) {
         expect(chunk).toEqual(chunk.trim());
@@ -332,10 +332,10 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
 
     it('handles mixed long and short paragraphs', () => {
-      const input = ['Short', 'a'.repeat(3500), 'Another short'];
+      const input = ['Short', 'a'.repeat(2500), 'Another short'];
       const result = (splitter as any).forceSplitLongParagraphs(input);
       expect(result[0]).toBe('Short');
-      expect(result[1]).toBe('a'.repeat(3000));
+      expect(result[1]).toBe('a'.repeat(2000));
       expect(result[2]).toBe('a'.repeat(500));
       expect(result[3]).toBe('Another short');
     });
@@ -394,34 +394,34 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
   });
 
   describe('splitIntoParagraphs with forceSplitLongParagraphs guard', () => {
-    it('splits 15000-char paragraph with no punctuation into 5 chunks of ≤3000 chars', () => {
+    it('splits 10000-char paragraph with no punctuation into 5 chunks of ≤2000 chars', () => {
       // A paragraph with no punctuation — splitParagraphIntoSentences will fail
       // and return the entire paragraph as-is. The guard should force-split it.
-      const longPara = 'a'.repeat(15000);
+      const longPara = 'a'.repeat(10000);
       const result = splitter.splitIntoParagraphs(longPara);
 
-      // Should split into 5 chunks of exactly 3000 chars each
+      // Should split into 5 chunks of exactly 2000 chars each
       expect(result).toHaveLength(5);
       for (const chunk of result) {
-        expect(chunk.length).toBeLessThanOrEqual(3000);
+        expect(chunk.length).toBeLessThanOrEqual(2000);
       }
-      expect(result[0]).toBe('a'.repeat(3000));
-      expect(result[1]).toBe('a'.repeat(3000));
-      expect(result[2]).toBe('a'.repeat(3000));
-      expect(result[3]).toBe('a'.repeat(3000));
-      expect(result[4]).toBe('a'.repeat(3000));
+      expect(result[0]).toBe('a'.repeat(2000));
+      expect(result[1]).toBe('a'.repeat(2000));
+      expect(result[2]).toBe('a'.repeat(2000));
+      expect(result[3]).toBe('a'.repeat(2000));
+      expect(result[4]).toBe('a'.repeat(2000));
     });
 
     it('force-splits paragraph entirely inside quotes correctly', () => {
       // A paragraph with only quotes — splitParagraphIntoSentences will fail
       // because it can't find sentence boundaries. The guard should handle it.
-      const quotedPara = `"${'a'.repeat(14998)}"`;
+      const quotedPara = `"${'a'.repeat(9998)}"`;
       const result = splitter.splitIntoParagraphs(quotedPara);
 
       // Should split into 5 chunks (including the quote characters)
       expect(result).toHaveLength(5);
       for (const chunk of result) {
-        expect(chunk.length).toBeLessThanOrEqual(3000);
+        expect(chunk.length).toBeLessThanOrEqual(2000);
       }
     });
 
@@ -437,14 +437,14 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
 
     it('mixed long and normal paragraphs are handled correctly', () => {
       // One long paragraph without punctuation, one normal paragraph
-      const text = `aaa${'a'.repeat(14997)}\nNormal paragraph.`;
+      const text = `aaa${'a'.repeat(9997)}\nNormal paragraph.`;
       const result = splitter.splitIntoParagraphs(text);
 
       // First paragraph splits into 5 chunks, second stays as-is
       expect(result.length).toBeGreaterThanOrEqual(6);
-      // All chunks should be ≤3000 chars
+      // All chunks should be ≤2000 chars
       for (const chunk of result) {
-        expect(chunk.length).toBeLessThanOrEqual(3000);
+        expect(chunk.length).toBeLessThanOrEqual(2000);
       }
       // Last chunk should be the normal paragraph
       expect(result[result.length - 1]).toBe('Normal paragraph.');
