@@ -380,6 +380,10 @@ export class TTSWorkerPool {
       await this.logTTSFailure(task, error);
 
       // Try Kokoro fallback before marking as permanently failed
+      this.logger?.info(
+        `Task ${task.partIndex}: Edge TTS failed 5 times. Attempting Kokoro fallback...`,
+      );
+
       try {
         const blob = await this.kokoroFallback.synthesize(task.text, task.gender ?? 'unknown');
         const data = new Uint8Array(await blob.arrayBuffer());
@@ -393,10 +397,13 @@ export class TTSWorkerPool {
           `Task ${task.partIndex} synthesized via Kokoro fallback after 5 Edge TTS failures`,
         );
         return;
-      } catch (_kokoroError) {
-        this.logger?.warn(
-          `Kokoro fallback also failed for task ${task.partIndex}, falling through to silence`,
-        );
+      } catch (kokoroError) {
+        const kErrorMsg = kokoroError instanceof Error ? kokoroError.message : String(kokoroError);
+        this.logger?.warn(`Kokoro fallback failed for task ${task.partIndex}: ${kErrorMsg}`);
+
+        // Combine both errors so the UI shows the full picture
+        const origMsg = error instanceof Error ? error.message : String(error);
+        error = new Error(`EdgeTTS: ${origMsg} | Kokoro: ${kErrorMsg}`);
       }
 
       // Permanent failure - already recorded above
@@ -404,7 +411,7 @@ export class TTSWorkerPool {
       this.failedTasks.add(task.partIndex);
       this.processedCount++;
 
-      // Call error callback
+      // Call error callback with combined error
       this.onTaskError?.(task.partIndex, error instanceof Error ? error : new Error(String(error)));
 
       this.logger?.error(

@@ -105,7 +105,12 @@ export class KokoroFallbackService {
           PRELOAD_TIMEOUT_MS,
         ),
       ),
-    ]);
+    ]).catch((err) => {
+      // Clear cached promise so subsequent calls retry instead of auto-rejecting
+      this.initPromise = null;
+      this._ready = false;
+      throw err;
+    });
 
     return this.initPromise;
   }
