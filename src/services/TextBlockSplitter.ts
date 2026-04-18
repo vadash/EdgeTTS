@@ -185,7 +185,7 @@ export class TextBlockSplitter {
     let current = '';
 
     for (const segment of text.split(',')) {
-      const candidate = current ? current + ',' + segment : segment;
+      const candidate = current ? `${current},${segment}` : segment;
       if (candidate.length > maxChars && current) {
         const trimmed = current.trim();
         if (trimmed && this.isPronounceable(trimmed)) result.push(trimmed);
