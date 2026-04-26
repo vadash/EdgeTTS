@@ -186,6 +186,8 @@ export interface RandomizeBelowParams {
   narratorVoice: string;
   /** Detected book language */
   bookLanguage: DetectedLanguage;
+  /** Optional speaking frequency per character (name -> line count) */
+  frequency?: Map<string, number>;
 }
 
 /**
@@ -200,6 +202,7 @@ export function randomizeBelowVoices(params: RandomizeBelowParams): Map<string, 
     params.enabledVoices,
     params.narratorVoice,
     params.bookLanguage,
+    params.frequency,
   );
 }
 

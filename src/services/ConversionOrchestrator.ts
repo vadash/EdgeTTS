@@ -1,6 +1,7 @@
 // Conversion Orchestrator - Plain function orchestrator
 // Runs the TTS conversion workflow as a single async function
 
+import { defaultConfig } from '@/config';
 import { AppError, getErrorMessage, insufficientVoicesError, noContentError } from '@/errors';
 import type {
   LLMCharacter,
@@ -24,8 +25,8 @@ import type { TextBlockSplitter } from './TextBlockSplitter';
 import type { TTSWorkerPool } from './TTSWorkerPool';
 import { ChunkStore } from './ChunkStore';
 import {
-  allocateByFrequency,
   allocateByGender,
+  allocateTieredVoices,
   remapAssignments,
   shortVoiceId,
 } from './VoiceAllocator';
@@ -311,7 +312,8 @@ function logVoiceSummary(
   }
 
   const poolSize = pool.male.length + pool.female.length;
-  const uniqueSlots = Math.max(0, poolSize - 1 - 3);
+  const topPercent = Math.round(defaultConfig.llm.topSpeakerPoolPercent * 100);
+  const uniqueSlots = Math.max(1, Math.ceil(defaultConfig.llm.topSpeakerPoolPercent * poolSize));
 
   const sorted = [...characters].sort((a, b) => {
     const freqA = frequency.get(a.canonicalName) ?? 0;
@@ -323,7 +325,7 @@ function logVoiceSummary(
 
   report('');
   report('══════ Voice Assignment ══════');
-  report(`Pool: ${poolSize} | Unique: ${uniqueSlots} | Rare: 3`);
+  report(`Pool: ${poolSize} | Top ${topPercent}%: ${uniqueSlots} unique | Cycle: rest`);
   report('');
 
   const narratorLines = assignments.filter((a) => a.speaker === 'narrator').length;
@@ -336,25 +338,23 @@ function logVoiceSummary(
     const char = sorted[i];
     const lines = frequency.get(char.canonicalName) ?? 0;
     const voice = voiceMap.get(char.canonicalName) ?? '?';
-    const isRare = i >= uniqueSlots;
+    const isTop = i < uniqueSlots;
 
-    if (isRare && i === uniqueSlots && uniqueSlots > 0) {
+    if (i === uniqueSlots && uniqueSlots > 0 && uniqueSlots < sorted.length) {
       report('  ─────────────────────────────');
     }
 
     const genderChar = char.gender === 'male' ? 'M' : char.gender === 'female' ? 'F' : '?';
-    const marker = isRare ? '*' : ' ';
+    const marker = isTop ? '✓' : '↺';
     report(
       `${marker}${String(i + 1).padStart(2)}. ${(`${char.canonicalName.slice(0, 16)}                `).slice(0, 16)} ${genderChar} ${String(lines).padStart(3)}  ${shortVoiceId(voice)}`,
     );
   }
 
-  if (sorted.length > uniqueSlots || sorted.length === 0) {
-    report('  ─────────────────────────────');
-    report(`  *  RARE_MALE         M      ${shortVoiceId(rareVoices.male)}`);
-    report(`  *  RARE_FEMALE       F      ${shortVoiceId(rareVoices.female)}`);
-    report(`  *  RARE_UNKNOWN      ?      ${shortVoiceId(rareVoices.unknown)}`);
-  }
+  report('  ─────────────────────────────');
+  report(`  ↺  CYCLE_MALE        M      ${shortVoiceId(rareVoices.male)}`);
+  report(`  ↺  CYCLE_FEMALE      F      ${shortVoiceId(rareVoices.female)}`);
+  report(`  ↺  CYCLE_UNKNOWN     ?      ${shortVoiceId(rareVoices.unknown)}`);
 
   report('══════════════════════════════');
   report('');
@@ -665,9 +665,20 @@ export async function runConversion(
       // ==================== VOICE REMAPPING (by frequency) ====================
       checkCancelled(signal);
 
-      const frequencyAllocation = allocateByFrequency(characters, assignments, {
-        narratorVoice: input.narratorVoice,
+      // Count speaking frequency for tiered allocation
+      const frequency = new Map<string, number>();
+      for (const a of assignments) {
+        if (a.speaker !== 'narrator') {
+          frequency.set(a.speaker, (frequency.get(a.speaker) ?? 0) + 1);
+        }
+      }
+
+      // Use tiered allocation for better voice distribution
+      const frequencyAllocation = allocateTieredVoices({
+        characters,
+        frequency,
         pool,
+        narratorVoice: input.narratorVoice,
       });
       voiceMap = frequencyAllocation.voiceMap;
       assignments = remapAssignments(assignments, voiceMap, input.narratorVoice);

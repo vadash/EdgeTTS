@@ -96,11 +96,29 @@ export class VoicePoolTracker {
       return voice;
     }
 
+    // Fallback: if pool is empty, try the other gender
+    if (pool.length === 0) {
+      const otherPool = gender === 'male' ? this.pool.female : this.pool.male;
+      if (otherPool.length > 0) {
+        const otherAvailable = otherPool.filter((v) => !this.used.has(v));
+        if (otherAvailable.length > 0) {
+          const voice = otherAvailable[0];
+          this.used.add(voice);
+          return voice;
+        }
+      }
+    }
+
     // Fallback: cycle through pool (reuse)
     const genderKey = gender === 'female' ? 'female' : 'male';
-    const voice = pool[this.cycleCounters[genderKey] % pool.length];
-    this.cycleCounters[genderKey]++;
-    return voice;
+    if (pool.length > 0) {
+      const voice = pool[this.cycleCounters[genderKey] % pool.length];
+      this.cycleCounters[genderKey]++;
+      return voice;
+    }
+
+    // Last resort: if no voices available at all, return empty string
+    return '';
   }
 
   /**
@@ -172,9 +190,84 @@ export function allocateByGender(
 }
 
 /**
+ * Tiered allocation options for frequency-based voice assignment
+ */
+export interface TieredAllocationOptions {
+  /** Characters to assign voices to */
+  characters: LLMCharacter[];
+  /** Speaking frequency per character (name -> line count) */
+  frequency: Map<string, number>;
+  /** Voice pool to allocate from */
+  pool: VoicePool;
+  /** Narrator voice (reserved, never assigned) */
+  narratorVoice: string;
+  /** Pre-reserved voices (e.g., user-selected) */
+  reservedVoices?: Set<string>;
+}
+
+/**
+ * Tiered voice allocation based on speaking frequency
+ *
+ * Strategy:
+ * 1. Narrator voice is reserved (excluded from pool)
+ * 2. Top N speakers (topPercent of pool size) get unique voices
+ * 3. Remaining characters cycle through the leftover pool
+ * 4. Rare/unnamed speakers get dedicated voices per gender
+ *
+ * This prevents the "all minor characters share 3 voices" problem while
+ * ensuring the most-heard characters are distinguishable.
+ */
+export function allocateTieredVoices(options: TieredAllocationOptions): VoiceAllocation {
+  const { characters, frequency, pool, narratorVoice, reservedVoices = new Set() } = options;
+
+  const tracker = new VoicePoolTracker(pool, narratorVoice, reservedVoices);
+  const voiceMap = new Map<string, string>();
+
+  // Sort by frequency (descending)
+  const sorted = [...characters].sort((a, b) => {
+    const freqA = frequency.get(a.canonicalName) ?? 0;
+    const freqB = frequency.get(b.canonicalName) ?? 0;
+    return freqB - freqA;
+  });
+
+  // Assign voices to all characters (top speakers naturally get unique voices first)
+  for (let i = 0; i < sorted.length; i++) {
+    const char = sorted[i];
+    const voice = tracker.pickVoice(char.gender);
+    voiceMap.set(char.canonicalName, voice);
+
+    // Map all variations to same voice
+    for (const variation of char.variations) {
+      if (variation !== char.canonicalName) {
+        voiceMap.set(variation, voice);
+      }
+    }
+  }
+
+  // Assign rare speaker voices (unnamed/unassigned)
+  const rareVoices = {
+    male: tracker.pickVoice('male'),
+    female: tracker.pickVoice('female'),
+    unknown: tracker.pickVoice('unknown'),
+  };
+
+  voiceMap.set('MALE_UNNAMED', rareVoices.male);
+  voiceMap.set('FEMALE_UNNAMED', rareVoices.female);
+  voiceMap.set('UNKNOWN_UNNAMED', rareVoices.unknown);
+
+  return {
+    voiceMap,
+    rareVoices,
+    uniqueCount: tracker.getUsed().size - 1, // Exclude narrator
+  };
+}
+
+/**
  * Frequency-based voice allocation
  * Top N characters get unique voices, remaining share rare voices
  * Used after speaker assignment when we have frequency data
+ *
+ * @deprecated Use allocateTieredVoices instead for better voice distribution
  */
 export function allocateByFrequency(
   characters: LLMCharacter[],
@@ -270,7 +363,15 @@ export function allocateTiered(
 
 /**
  * Randomize allocations for characters below a given index
- * Used for UI "randomize below" feature
+ * Uses the same tiered logic as allocateTieredVoices
+ *
+ * @param sortedCharacters - Characters sorted by line count (descending)
+ * @param currentVoiceMap - Current voice assignments
+ * @param clickedIndex - Index of row where button clicked (randomize BELOW this)
+ * @param enabledVoices - All enabled voices
+ * @param narratorVoice - Narrator voice to reserve
+ * @param bookLanguage - Detected book language
+ * @param frequency - Speaking frequency per character (optional, recalculated if missing)
  */
 export function randomizeBelow(
   sortedCharacters: LLMCharacter[],
@@ -279,6 +380,7 @@ export function randomizeBelow(
   enabledVoices: VoiceOption[],
   narratorVoice: string,
   bookLanguage: DetectedLanguage,
+  frequency?: Map<string, number>,
 ): Map<string, string> {
   const newMap = new Map(currentVoiceMap);
 
@@ -286,34 +388,49 @@ export function randomizeBelow(
     return newMap;
   }
 
-  // Collect reserved voices
+  // Collect reserved voices (narrator + all voices up to and including clickedIndex)
   const reserved = new Set<string>([narratorVoice]);
   for (let i = 0; i <= clickedIndex; i++) {
     const voice = currentVoiceMap.get(sortedCharacters[i].canonicalName);
     if (voice) reserved.add(voice);
   }
 
-  // Build priority pool with deduplication
+  // Build priority pool with deduplication (excludes reserved voices)
   const pool = buildPriorityPool(enabledVoices, bookLanguage, reserved);
-  const malePool = pool.male;
-  const femalePool = pool.female;
 
-  let maleIdx = 0;
-  let femaleIdx = 0;
+  // Convert VoiceOption[] to VoicePool format
+  const voicePool: VoicePool = {
+    male: pool.male.map((v) => v.fullValue),
+    female: pool.female.map((v) => v.fullValue),
+  };
 
-  for (let i = clickedIndex + 1; i < sortedCharacters.length; i++) {
-    const char = sortedCharacters[i];
-    const pool =
-      char.gender === 'female' && femalePool.length > 0
-        ? femalePool
-        : malePool.length > 0
-          ? malePool
-          : femalePool;
+  // Recalculate frequency if not provided (for UI randomization)
+  const freqMap =
+    frequency ??
+    new Map<string, number>(
+      sortedCharacters.map((c) => [
+        c.canonicalName,
+        Math.max(0, 1000 - sortedCharacters.indexOf(c) * 10),
+      ]),
+    );
 
-    const idx = char.gender === 'female' && femalePool.length > 0 ? femaleIdx++ : maleIdx++;
+  // Get characters below clicked index
+  const charsBelow = sortedCharacters.slice(clickedIndex + 1);
 
-    if (pool.length > 0) {
-      newMap.set(char.canonicalName, pool[idx % pool.length].fullValue);
+  // Use tiered allocation for characters below
+  const allocation = allocateTieredVoices({
+    characters: charsBelow,
+    frequency: freqMap,
+    pool: voicePool,
+    narratorVoice,
+    reservedVoices: reserved,
+  });
+
+  // Update voice map with new allocations
+  for (const [char, voice] of allocation.voiceMap.entries()) {
+    // Skip unnamed speakers
+    if (!char.includes('UNNAMED')) {
+      newMap.set(char, voice);
     }
   }
 

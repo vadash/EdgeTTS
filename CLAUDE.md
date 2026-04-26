@@ -13,6 +13,10 @@ Local-first TTS web app converting books (EPUB/FB2/TXT) to audiobooks using Edge
 
 ## Gotchas
 
+- **PowerShell Compatibility**: This project runs on Windows. Avoid Unix-specific commands in Execute tool calls:
+  - Don't use: `tail`, `head`, `grep`, `find`, `|` (piping), `&&`, `||`, `$(...)`, backticks
+  - Use PowerShell equivalents: `Get-Content`, `Select-String`, `;` for chaining
+  - For npm scripts, prefer direct execution: `npm test -- --run` instead of `npm test -- --run 2>&1 | tail -50`
 - **Pre-Commit**: Never run `npm run check` manually (runs automatically via hooks). If it fails, fix errors and commit again.
 - **Filesystem API**: App writes directly to disk to prevent OOM. Use `withPermissionRetry` for ALL file operations to handle security context drops.
 - **Async Resilience**: Always use `withRetry` (which wraps `p-retry`) for network/WebSocket calls.

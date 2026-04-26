@@ -92,6 +92,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
       enabledVoices: enabledVoiceOptions,
       narratorVoice: settings.narratorVoice.value,
       bookLanguage: data.detectedLanguage.value,
+      frequency: lineCounts,
     });
     llm.setVoiceMap(newMap);
   };

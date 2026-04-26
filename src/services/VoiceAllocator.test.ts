@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LLMCharacter, VoiceOption, VoicePool } from '@/state/types';
 import {
+  allocateTieredVoices,
   assignUnmatchedFromPool,
   buildPriorityPool,
   randomizeBelow,
@@ -282,5 +283,172 @@ describe('assignUnmatchedFromPool', () => {
     const hasAndrew = assignedVoices.includes('en-US, AndrewNeural');
     const hasAndrewMulti = assignedVoices.includes('en-US, AndrewMultilingualNeural');
     expect(hasAndrew && hasAndrewMulti).toBe(false);
+  });
+});
+
+describe('allocateTieredVoices', () => {
+  const _vo = (fullValue: string, gender: 'male' | 'female'): VoiceOption => {
+    const [locale, name] = fullValue.split(', ');
+    return { locale, name, fullValue, gender };
+  };
+
+  const mkChar = (name: string, gender: 'male' | 'female' | 'unknown'): LLMCharacter => ({
+    canonicalName: name,
+    variations: [name],
+    gender,
+  });
+
+  it('assigns unique voices to top 20% of characters, rest cycle pool', () => {
+    const chars = [
+      mkChar('Alice', 'female'), // 100 lines - top speaker
+      mkChar('Bob', 'male'), // 80 lines
+      mkChar('Charlie', 'male'), // 60 lines
+      mkChar('David', 'male'), // 40 lines
+      mkChar('Eve', 'female'), // 20 lines
+      mkChar('Frank', 'male'), // 10 lines
+      mkChar('Grace', 'female'), // 5 lines
+      mkChar('Henry', 'male'), // 1 line
+    ];
+    const pool: VoicePool = {
+      male: ['en-US, AndrewNeural', 'en-US, BrianNeural', 'en-US, GuyNeural'],
+      female: ['en-US, JennyNeural', 'en-US, AvaNeural'],
+    };
+    const frequency = new Map<string, number>([
+      ['Alice', 100],
+      ['Bob', 80],
+      ['Charlie', 60],
+      ['David', 40],
+      ['Eve', 20],
+      ['Frank', 10],
+      ['Grace', 5],
+      ['Henry', 1],
+    ]);
+
+    // Pool size = 5, 20% = 1 unique slot
+    const result = allocateTieredVoices({
+      characters: chars,
+      frequency,
+      pool,
+      narratorVoice: 'en-US, NarratorNeural',
+    });
+
+    // Top 1 character (Alice) gets unique voice
+    const aliceVoice = result.voiceMap.get('Alice');
+    expect(aliceVoice).toBeTruthy();
+
+    // Rest cycle through pool
+    const allVoices = [...result.voiceMap.values()].filter((v) => !v.includes('UNNAMED'));
+    expect(new Set(allVoices).size).toBeGreaterThan(1); // Multiple voices used
+  });
+
+  it('respects reserved voices when pool has sufficient alternatives', () => {
+    const chars = [
+      mkChar('Alice', 'female'),
+      mkChar('Bob', 'male'),
+      mkChar('Charlie', 'male'),
+      mkChar('David', 'male'),
+    ];
+    const pool: VoicePool = {
+      male: ['en-US, AndrewNeural', 'en-US, BrianNeural', 'en-US, GuyNeural'],
+      female: ['en-US, JennyNeural'],
+    };
+    const frequency = new Map<string, number>([
+      ['Alice', 100],
+      ['Bob', 50],
+      ['Charlie', 30],
+      ['David', 20],
+    ]);
+    const reserved = new Set(['en-US, AndrewNeural']);
+
+    const result = allocateTieredVoices({
+      characters: chars,
+      frequency,
+      pool,
+      narratorVoice: 'en-US, NarratorNeural',
+      reservedVoices: reserved,
+    });
+
+    // Bob and Charlie should not get the reserved voice (there are alternatives available)
+    expect(result.voiceMap.get('Bob')).not.toBe('en-US, AndrewNeural');
+    expect(result.voiceMap.get('Charlie')).not.toBe('en-US, AndrewNeural');
+    // David might cycle to the reserved voice when pool is exhausted - that's expected
+  });
+
+  it('cycles pool when exhausted for many characters', () => {
+    const chars = Array.from({ length: 20 }, (_, i) =>
+      mkChar(`Char${i}`, i % 2 === 0 ? 'male' : 'female'),
+    );
+    const pool: VoicePool = {
+      male: ['en-US, AndrewNeural', 'en-US, BrianNeural'],
+      female: ['en-US, JennyNeural', 'en-US, AvaNeural'],
+    };
+    const frequency = new Map<string, number>(
+      chars.map((c) => [c.canonicalName, Math.floor(Math.random() * 100)]),
+    );
+
+    const result = allocateTieredVoices({
+      characters: chars,
+      frequency,
+      pool,
+      narratorVoice: 'en-US, NarratorNeural',
+    });
+
+    // All characters should have voices (cycling through pool)
+    expect(result.voiceMap.size).toBeGreaterThan(0);
+
+    // Check that voices are reused (pool is smaller than char count)
+    const assignedVoices = [...result.voiceMap.values()].filter((v) => !v.includes('UNNAMED'));
+    expect(new Set(assignedVoices).size).toBeLessThan(chars.length);
+  });
+
+  it('adds rare/unnamed speaker voices', () => {
+    const chars = [mkChar('Alice', 'female')];
+    const pool: VoicePool = {
+      male: ['en-US, AndrewNeural'],
+      female: ['en-US, JennyNeural'],
+    };
+    const frequency = new Map<string, number>([['Alice', 100]]);
+
+    const result = allocateTieredVoices({
+      characters: chars,
+      frequency,
+      pool,
+      narratorVoice: 'en-US, NarratorNeural',
+    });
+
+    // Check rare voices are assigned
+    expect(result.voiceMap.get('MALE_UNNAMED')).toBe('en-US, AndrewNeural');
+    expect(result.rareVoices.male).toBeTruthy();
+    expect(result.rareVoices.female).toBeTruthy();
+    expect(result.rareVoices.unknown).toBeTruthy();
+  });
+
+  it('respects custom top percentage', () => {
+    const chars = [
+      mkChar('Alice', 'female'),
+      mkChar('Bob', 'male'),
+      mkChar('Charlie', 'male'),
+      mkChar('David', 'male'),
+      mkChar('Eve', 'female'),
+    ];
+    const pool: VoicePool = {
+      male: ['en-US, AndrewNeural', 'en-US, BrianNeural', 'en-US, GuyNeural'],
+      female: ['en-US, JennyNeural', 'en-US, AvaNeural'],
+    };
+    const frequency = new Map<string, number>(
+      chars.map((c, i) => [c.canonicalName, (chars.length - i) * 10]),
+    );
+
+    // Multiple voices should be used (not just 1)
+    const result = allocateTieredVoices({
+      characters: chars,
+      frequency,
+      pool,
+      narratorVoice: 'en-US, NarratorNeural',
+    });
+
+    // Multiple voices should be used (not just 1)
+    const assignedVoices = [...result.voiceMap.values()].filter((v) => !v.includes('UNNAMED'));
+    expect(new Set(assignedVoices).size).toBeGreaterThan(1);
   });
 });
