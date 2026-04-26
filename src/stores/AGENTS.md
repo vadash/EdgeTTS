@@ -5,7 +5,8 @@ Global state mapped to UI via `@preact/signals`.
 ## Architecture
 
 - **Signal Stores**: `ConversionStore`, `LLMStore`, `SettingsStore`, `UISettingsStore` (export isolated `signal()` instances).
-- **Class Stores**: `DataStore`, `LanguageStore`, `LoggerStore` (wrap signals in classes).
+- **Class Stores**: `DataStore`, `LanguageStore` (wrap signals in classes).
+- **External**: `LoggerStore` lives in `src/services/Logger.ts` and is re-exported here.
 - **Context**: `StoreContext.tsx` bundles stores for React-like hooks (`useSettings()`, `useConversion()`).
 
 ## Gotchas

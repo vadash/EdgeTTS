@@ -28,5 +28,5 @@ Helper fns: `normalizeText`, `stripThinkingTags`, `stripMarkdownFences`.
 ## Gotchas
 
 - **Strict Structured Outputs**: Managed natively by Zod 4's `toJSONSchema({ target: 'draft-7' })`.
-- **Errors**: `LLMApiClient` MUST throw `RetriableError` so `withRetry` catches it. Use `getErrorMessage(e)`.
+- **Errors**: `LLMApiClient` MUST throw `RetriableError` so `withRetry` catches it.
 - **P-Retry context**: In `p-retry` 7.x, callbacks receive `{error, attemptNumber}`, NOT the raw error.
