@@ -88,7 +88,6 @@ export interface OrchestratorInput {
   eq: boolean;
   compressor: boolean;
   fadeIn: boolean;
-  stereoWidth: boolean;
   opusMinBitrate: number;
   opusMaxBitrate: number;
   opusCompressionLevel: number;
@@ -1096,7 +1095,6 @@ async function runTTSStage(
     eq: input.eq,
     compressor: input.compressor,
     fadeIn: input.fadeIn,
-    stereoWidth: input.stereoWidth,
     opusMinBitrate: input.opusMinBitrate,
     opusMaxBitrate: input.opusMaxBitrate,
     opusCompressionLevel: input.opusCompressionLevel,

@@ -197,24 +197,6 @@ export function AudioTab() {
         />
       </div>
 
-      {/* 7. Stereo Width */}
-      <div className="flex items-center justify-between p-4 bg-primary rounded-lg border border-border">
-        <div>
-          <div className="font-medium">
-            <Text id="settings.stereoWidth">Stereo Width</Text>
-          </div>
-          <div className="text-sm text-gray-400">
-            <Text id="settings.stereoWidthHint">
-              Pseudo-stereo for headphone comfort (doubles file size)
-            </Text>
-          </div>
-        </div>
-        <Toggle
-          checked={settings.stereoWidthEnabled.value}
-          onChange={(v) => settings.setStereoWidthEnabled(v)}
-        />
-      </div>
-
       {/* Silence Gap */}
       <div className="p-4 bg-primary rounded-lg border border-border">
         <div className="flex items-center justify-between mb-2">
@@ -277,9 +259,6 @@ export function AudioTab() {
             <span className="px-2 py-0.5 text-xs rounded bg-cyan-500/20 text-cyan-400">
               Fade-In
             </span>
-          )}
-          {settings.stereoWidthEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-pink-500/20 text-pink-400">Stereo</span>
           )}
         </div>
       </div>

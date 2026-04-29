@@ -10,7 +10,6 @@ describe('buildFilterChain', () => {
     eq: false,
     compressor: false,
     fadeIn: false,
-    stereoWidth: false,
   };
 
   it('returns empty string when all filters disabled', () => {
@@ -50,11 +49,6 @@ describe('buildFilterChain', () => {
   it('includes afade when fadeIn enabled', () => {
     const chain = buildFilterChain({ ...allOff, fadeIn: true });
     expect(chain).toContain('afade=t=in');
-  });
-
-  it('stereoWidth is disabled (removed from pipeline)', () => {
-    const chain = buildFilterChain({ ...allOff, stereoWidth: true });
-    expect(chain).toBe('');
   });
 
   it('chains multiple filters with commas', () => {

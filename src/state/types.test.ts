@@ -41,7 +41,6 @@ describe('AppSettings interface', () => {
       eqEnabled: true,
       compressorEnabled: true,
       fadeInEnabled: true,
-      stereoWidthEnabled: false,
       // New Opus settings
       opusPreset: AudioPreset.PC,
       opusMinBitrate: 24,

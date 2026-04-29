@@ -39,7 +39,6 @@ describe('SettingsStore', () => {
       expect(settings.value.eqEnabled).toBe(true);
       expect(settings.value.compressorEnabled).toBe(true);
       expect(settings.value.fadeInEnabled).toBe(true);
-      expect(settings.value.stereoWidthEnabled).toBe(false);
     });
 
     it('should have Opus encoding defaults', () => {

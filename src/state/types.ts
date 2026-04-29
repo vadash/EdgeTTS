@@ -60,7 +60,6 @@ export interface AppSettings {
   eqEnabled: boolean;
   compressorEnabled: boolean;
   fadeInEnabled: boolean;
-  stereoWidthEnabled: boolean;
   // Opus encoding settings
   opusPreset: AudioPreset;
   opusMinBitrate: number;

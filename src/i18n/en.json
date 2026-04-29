@@ -52,8 +52,6 @@
     "compressorHint": "Smooth out volume differences for consistent listening. Medium CPU cost",
     "fadeIn": "Fade-In",
     "fadeInHint": "Smooth 100ms fade-in to prevent clicks. Negligible CPU cost",
-    "stereoWidth": "Stereo Width",
-    "stereoWidthHint": "Pseudo-stereo for headphone comfort (doubles file size). ⚠️ High CPU cost on mobile",
     "opusEncoding": "Opus Encoding",
     "opusEncodingHint": "Quality vs speed tradeoff for Opus output",
     "preset": "Preset",

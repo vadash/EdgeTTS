@@ -121,7 +121,6 @@ export interface AudioProcessingOptions {
   eq: boolean;
   compressor: boolean;
   fadeIn: boolean;
-  stereoWidth: boolean;
   opusMinBitrate?: number;
   opusMaxBitrate?: number;
   opusCompressionLevel?: number;
@@ -135,7 +134,6 @@ export interface AudioProcessingConfig {
   eq: boolean;
   compressor: boolean;
   fadeIn: boolean;
-  stereoWidth: boolean;
   // Opus encoding settings (optional, uses defaults if not provided)
   opusMinBitrate?: number;
   opusMaxBitrate?: number;
@@ -386,7 +384,7 @@ export class FFmpegService {
         '-ar',
         String(defaultConfig.audio.sampleRate),
         '-ac',
-        config.stereoWidth ? '2' : '1',
+        '1',
         'output.opus',
       );
 

@@ -69,7 +69,6 @@ const defaultSettings: AppSettings = {
   eqEnabled: true,
   compressorEnabled: true,
   fadeInEnabled: true,
-  stereoWidthEnabled: false,
   opusPreset: 'pc' as AudioPreset,
   opusMinBitrate: 24,
   opusMaxBitrate: 48,
@@ -124,7 +123,6 @@ export const silenceGapMs = computed(() => settings.value.silenceGapMs);
 export const eqEnabled = computed(() => settings.value.eqEnabled);
 export const compressorEnabled = computed(() => settings.value.compressorEnabled);
 export const fadeInEnabled = computed(() => settings.value.fadeInEnabled);
-export const stereoWidthEnabled = computed(() => settings.value.stereoWidthEnabled);
 export const opusPreset = computed(() => settings.value.opusPreset);
 export const opusMinBitrate = computed(() => settings.value.opusMinBitrate);
 export const opusMaxBitrate = computed(() => settings.value.opusMaxBitrate);
@@ -205,10 +203,6 @@ export function setCompressorEnabled(value: boolean): void {
 
 export function setFadeInEnabled(value: boolean): void {
   settings.value = { ...settings.value, fadeInEnabled: value };
-}
-
-export function setStereoWidthEnabled(value: boolean): void {
-  settings.value = { ...settings.value, stereoWidthEnabled: value };
 }
 
 export function applyOpusPreset(preset: AudioPreset): void {

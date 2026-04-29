@@ -121,12 +121,10 @@ export {
   setRate,
   setSilenceGapMs,
   setSilenceRemovalEnabled,
-  setStereoWidthEnabled,
   setTtsThreads,
   settings,
   silenceGapMs,
   silenceRemovalEnabled,
-  stereoWidthEnabled,
   ttsThreads,
 } from './SettingsStore';
 export {

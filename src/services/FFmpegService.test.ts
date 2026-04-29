@@ -13,7 +13,6 @@ describe('AudioProcessingConfig', () => {
       eq: true,
       compressor: true,
       fadeIn: true,
-      stereoWidth: false,
       opusMinBitrate: 48,
       opusMaxBitrate: 64,
       opusCompressionLevel: 5,
@@ -32,7 +31,6 @@ describe('AudioProcessingConfig', () => {
       eq: false,
       compressor: false,
       fadeIn: false,
-      stereoWidth: false,
     };
     expect(config.opusMinBitrate).toBeUndefined();
   });
@@ -47,7 +45,6 @@ describe('AudioProcessingConfig', () => {
       eq: false,
       compressor: false,
       fadeIn: false,
-      stereoWidth: false,
     };
     const minBitrate = config.opusMinBitrate;
     expect(minBitrate).toBeUndefined();
@@ -80,7 +77,6 @@ describe('FFmpegService Opus integration', () => {
       eq: false,
       compressor: false,
       fadeIn: false,
-      stereoWidth: false,
       opusMinBitrate: 48,
       opusMaxBitrate: 64,
       opusCompressionLevel: 5,
@@ -137,7 +133,6 @@ describe('FFmpegService Opus integration', () => {
       eq: false,
       compressor: false,
       fadeIn: false,
-      stereoWidth: false,
       // No Opus settings - should use defaults
     };
 

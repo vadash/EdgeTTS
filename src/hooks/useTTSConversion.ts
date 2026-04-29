@@ -87,7 +87,6 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
     eq: s.eqEnabled,
     compressor: s.compressorEnabled,
     fadeIn: s.fadeInEnabled,
-    stereoWidth: s.stereoWidthEnabled,
     opusMinBitrate: s.opusMinBitrate,
     opusMaxBitrate: s.opusMaxBitrate,
     opusCompressionLevel: s.opusCompressionLevel,

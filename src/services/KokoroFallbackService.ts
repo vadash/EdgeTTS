@@ -155,7 +155,6 @@ export class KokoroFallbackService {
       eq: false,
       compressor: false,
       fadeIn: false,
-      stereoWidth: false,
     });
 
     this.resetInactivityTimer();

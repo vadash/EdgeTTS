@@ -35,7 +35,6 @@ export interface MergerConfig {
   eq: boolean;
   compressor: boolean;
   fadeIn: boolean;
-  stereoWidth: boolean;
   // Opus encoding settings
   opusMinBitrate?: number;
   opusMaxBitrate?: number;
@@ -252,7 +251,6 @@ export class AudioMerger {
         eq: this.config.eq,
         compressor: this.config.compressor,
         fadeIn: this.config.fadeIn,
-        stereoWidth: this.config.stereoWidth,
         opusMinBitrate: this.config.opusMinBitrate,
         opusMaxBitrate: this.config.opusMaxBitrate,
         opusCompressionLevel: this.config.opusCompressionLevel,
