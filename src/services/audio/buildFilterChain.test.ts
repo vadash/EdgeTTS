@@ -20,8 +20,8 @@ describe('buildFilterChain', () => {
   it('includes EQ filters when eq enabled', () => {
     const chain = buildFilterChain({ ...allOff, eq: true });
     expect(chain).toContain('highpass=f=60');
-    expect(chain).toContain('lowshelf=f=120:g=2');
-    expect(chain).toContain('equalizer=f=3000:t=q:w=1:g=-2');
+    expect(chain).toContain('equalizer=f=6000:t=q:w=2.5:g=-2');
+    expect(chain).toContain('lowpass=f=11000');
   });
 
   it('includes deesser when deEss enabled', () => {
@@ -34,9 +34,11 @@ describe('buildFilterChain', () => {
     expect(chain).toContain('silenceremove=');
   });
 
-  it('includes compand when compressor enabled', () => {
+  it('includes acompressor when compressor enabled', () => {
     const chain = buildFilterChain({ ...allOff, compressor: true });
-    expect(chain).toContain('compand=');
+    expect(chain).toContain('acompressor=');
+    expect(chain).toContain('threshold=0.12589');
+    expect(chain).toContain('ratio=4');
   });
 
   it('includes loudnorm and alimiter when normalization enabled', () => {
@@ -50,9 +52,9 @@ describe('buildFilterChain', () => {
     expect(chain).toContain('afade=t=in');
   });
 
-  it('includes aecho when stereoWidth enabled', () => {
+  it('stereoWidth is disabled (removed from pipeline)', () => {
     const chain = buildFilterChain({ ...allOff, stereoWidth: true });
-    expect(chain).toContain('aecho=');
+    expect(chain).toBe('');
   });
 
   it('chains multiple filters with commas', () => {

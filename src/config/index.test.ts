@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '@/config';
 
 describe('defaultConfig.audio', () => {
-  it('silenceThreshold should be -55', () => {
-    expect(defaultConfig.audio.silenceThreshold).toBe(-55);
+  it('silenceThreshold should be -40', () => {
+    expect(defaultConfig.audio.silenceThreshold).toBe(-40);
   });
 
   it('silenceStopDuration should be 0.3', () => {
