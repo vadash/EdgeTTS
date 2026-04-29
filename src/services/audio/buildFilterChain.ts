@@ -9,17 +9,32 @@ export function buildFilterChain(config: AudioProcessingConfig): string {
   const filters: string[] = [];
   const audio = defaultConfig.audio;
 
-  // 1. Highpass -- remove rumble
+  // 1. Clean & Shape (Correcting source before gain changes)
   if (config.eq) {
-    filters.push('highpass=f=60');
+    filters.push('highpass=f=80', 'equalizer=f=6000:t=q:w=2.5:g=-2');
   }
 
-  // 2. EQ -- tame harshness (narrower Q for precision)
-  if (config.eq) {
-    filters.push('equalizer=f=6000:t=q:w=2.5:g=-2');
+  // 2. De-Ess (Fix sibilance while signal is "natural" - before compression/normalization)
+  if (config.deEss) {
+    filters.push('deesser=i=0.25:m=0.4:f=0.5:s=0.4');
   }
 
-  // 3. Silence Removal (RMS detection)
+  // 3. Dynamics (Smooth out the speech)
+  if (config.compressor) {
+    filters.push('acompressor=threshold=0.12589:ratio=3:attack=5:release=150:makeup=1.0');
+  }
+
+  // 4. Standards (Loudnorm handles the heavy lifting - includes built-in true-peak limiting)
+  if (config.normalization) {
+    filters.push(
+      `loudnorm=` +
+        `I=${audio.normLufs}:` +
+        `LRA=${audio.normLra}:` +
+        `TP=${audio.normTruePeak}:`
+    );
+  }
+
+  // 5. Cleanup (Remove silence after gain is stabilized)
   if (config.silenceRemoval) {
     filters.push(
       `silenceremove=` +
@@ -33,38 +48,12 @@ export function buildFilterChain(config: AudioProcessingConfig): string {
     );
   }
 
-  // 4. Compressor -- smooth dynamics (using linear threshold value for -18dB)
-  if (config.compressor) {
-    filters.push('acompressor=threshold=0.12589:ratio=4:attack=5:release=80:makeup=1.0');
-  }
-
-  // 5. Normalization + 7. Limiter
-  if (config.normalization) {
-    filters.push(
-      `loudnorm=` +
-        `I=${audio.normLufs}:` +
-        `LRA=${audio.normLra}:` +
-        `TP=${audio.normTruePeak}:` +
-        `dual_mono=true`,
-    );
-  }
-
-  // 7. Limiter (safety limiter after normalization)
-  if (config.normalization) {
-    filters.push('alimiter=level_in=1:level_out=1:limit=0.95:attack=5:release=150');
-  }
-
-  // 6. De-Ess (after normalization, less lispiness)
-  if (config.deEss) {
-    filters.push('deesser=i=0.25:m=0.4:f=0.5:s=0.4');
-  }
-
-  // 8. Fade-In
+  // 6. Finishing
   if (config.fadeIn) {
     filters.push('afade=t=in:ss=0:d=0.1');
   }
 
-  // 9. Lowpass (gentle roll-off to help Opus encoder)
+  // 7. EQ
   if (config.eq) {
     filters.push('lowpass=f=11000');
   }

@@ -18,7 +18,7 @@ describe('buildFilterChain', () => {
 
   it('includes EQ filters when eq enabled', () => {
     const chain = buildFilterChain({ ...allOff, eq: true });
-    expect(chain).toContain('highpass=f=60');
+    expect(chain).toContain('highpass=f=80');
     expect(chain).toContain('equalizer=f=6000:t=q:w=2.5:g=-2');
     expect(chain).toContain('lowpass=f=11000');
   });
@@ -37,13 +37,12 @@ describe('buildFilterChain', () => {
     const chain = buildFilterChain({ ...allOff, compressor: true });
     expect(chain).toContain('acompressor=');
     expect(chain).toContain('threshold=0.12589');
-    expect(chain).toContain('ratio=4');
+    expect(chain).toContain('ratio=3');
   });
 
-  it('includes loudnorm and alimiter when normalization enabled', () => {
+  it('includes loudnorm when normalization enabled', () => {
     const chain = buildFilterChain({ ...allOff, normalization: true });
     expect(chain).toContain('loudnorm=');
-    expect(chain).toContain('alimiter=');
   });
 
   it('includes afade when fadeIn enabled', () => {
