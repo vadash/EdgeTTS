@@ -95,13 +95,13 @@ export const defaultConfig: AppConfig = {
     targetDurationMinutes: 15,
     tolerancePercent: 10,
     bytesPerMs: 12, // 96kbps = 12 bytes/ms
-    opusBitrate: 64,
+    opusBitrate: 32,
     opusCompression: 10,
     sampleRate: 24000,
-    normLufs: -18,
-    normLra: 6,
+    normLufs: -20,
+    normLra: 7,
     normTruePeak: -1.0,
-    silenceThreshold: -55,
+    silenceThreshold: -40,
     silenceStartPeriods: 1,
     silenceStartDuration: 0.75,
     silenceStopPeriods: -1, // Must be -1 (remove all trailing silence). Positive values truncate after N silence periods!

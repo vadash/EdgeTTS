@@ -9,36 +9,36 @@ export function buildFilterChain(config: AudioProcessingConfig): string {
   const filters: string[] = [];
   const audio = defaultConfig.audio;
 
-  // 1. EQ -- Broadcast Voice warmth & clarity
+  // 1. Highpass -- remove rumble
   if (config.eq) {
-    filters.push('highpass=f=60', 'lowshelf=f=120:g=2', 'equalizer=f=3000:t=q:w=1:g=-2');
+    filters.push('highpass=f=60');
   }
 
-  // 2. De-Ess
-  if (config.deEss) {
-    filters.push('deesser=i=0.4:m=0.5:f=0.5:s=0.5');
+  // 2. EQ -- tame harshness (narrower Q for precision)
+  if (config.eq) {
+    filters.push('equalizer=f=6000:t=q:w=2.5:g=-2');
   }
 
-  // 3. Silence Removal
+  // 3. Silence Removal (RMS detection)
   if (config.silenceRemoval) {
     filters.push(
       `silenceremove=` +
         `start_periods=${audio.silenceStartPeriods}:` +
         `start_silence=${audio.silenceStartDuration}:` +
         `start_threshold=${audio.silenceThreshold}dB:` +
-        `detection=peak:` +
+        `detection=rms:` +
         `stop_periods=${audio.silenceStopPeriods}:` +
         `stop_silence=${audio.silenceStopDuration}:` +
         `stop_threshold=${audio.silenceThreshold}dB`,
     );
   }
 
-  // 4. Compressor -- gentle vocal compression (3:1 ratio above -30dB)
+  // 4. Compressor -- smooth dynamics (using linear threshold value for -18dB)
   if (config.compressor) {
-    filters.push('compand=attacks=0.02:decays=0.2:points=-90/-90|-30/-30|0/-20:soft-knee=6:gain=0');
+    filters.push('acompressor=threshold=0.12589:ratio=4:attack=5:release=80:makeup=1.0');
   }
 
-  // 5. Normalization + 6. Limiter (auto with normalization)
+  // 5. Normalization + 7. Limiter
   if (config.normalization) {
     filters.push(
       `loudnorm=` +
@@ -47,20 +47,26 @@ export function buildFilterChain(config: AudioProcessingConfig): string {
         `TP=${audio.normTruePeak}:` +
         `dual_mono=true`,
     );
-    // Limiter always follows normalization
-    filters.push(
-      'alimiter=level_in=1:level_out=1:limit=0.95:attack=5:release=50:asc=0:asc_level=0',
-    );
   }
 
-  // 7. Fade-In
+  // 7. Limiter (safety limiter after normalization)
+  if (config.normalization) {
+    filters.push('alimiter=level_in=1:level_out=1:limit=0.95:attack=5:release=150');
+  }
+
+  // 6. De-Ess (after normalization, less lispiness)
+  if (config.deEss) {
+    filters.push('deesser=i=0.25:m=0.4:f=0.5:s=0.4');
+  }
+
+  // 8. Fade-In
   if (config.fadeIn) {
     filters.push('afade=t=in:ss=0:d=0.1');
   }
 
-  // 8. Stereo Width (pseudo-stereo)
-  if (config.stereoWidth) {
-    filters.push('aecho=0.8:0.88:10:0.3');
+  // 9. Lowpass (gentle roll-off to help Opus encoder)
+  if (config.eq) {
+    filters.push('lowpass=f=11000');
   }
 
   return filters.join(',');
