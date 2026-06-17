@@ -27,10 +27,7 @@ export function buildFilterChain(config: AudioProcessingConfig): string {
   // 4. Standards (Loudnorm handles the heavy lifting - includes built-in true-peak limiting)
   if (config.normalization) {
     filters.push(
-      `loudnorm=` +
-        `I=${audio.normLufs}:` +
-        `LRA=${audio.normLra}:` +
-        `TP=${audio.normTruePeak}:`
+      `loudnorm=` + `I=${audio.normLufs}:` + `LRA=${audio.normLra}:` + `TP=${audio.normTruePeak}:`,
     );
   }
 
