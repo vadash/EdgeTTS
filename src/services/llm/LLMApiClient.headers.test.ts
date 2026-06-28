@@ -5,53 +5,120 @@ import { LLMApiClient } from './LLMApiClient';
 // The OpenAI SDK passes our customFetch to its internal HTTP layer,
 // which eventually calls the real fetch (our mock).
 describe('LLMApiClient header handling', () => {
-  it('should copy all init headers (including Authorization) via new Headers(init?.headers)', async () => {
-    // Capture the fetch call made by our customFetch
+  function mockFetchAndCreateClient(opts?: { apiUrl?: string }) {
     const originalFetch = globalThis.fetch;
-    const capturedCalls: Array<{ url: string | URL | Request; init?: RequestInit }> = [];
-
-    // Mock global.fetch at the lowest level — customFetch calls this
-    globalThis.fetch = vi.fn(async (url, init) => {
-      capturedCalls.push({ url: url as string, init });
+    const mockFn = vi.fn(async (_url: any, _init: any) => {
       return new Response(JSON.stringify({}), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
-    }) as any;
+    });
+    globalThis.fetch = mockFn as any;
 
+    const client = new LLMApiClient({
+      apiKey: 'test-key',
+      apiUrl: opts?.apiUrl ?? 'https://api.test.com/v1',
+      model: 'test-model',
+    });
+
+    return {
+      client,
+      mockFn,
+      restore: () => {
+        globalThis.fetch = originalFetch;
+      },
+    };
+  }
+
+  async function triggerRequest(client: LLMApiClient) {
     try {
-      const client = new LLMApiClient({
-        apiKey: 'test-key',
-        apiUrl: 'https://api.test.com/v1',
-        model: 'test-model',
-      });
+      await client.testConnection();
+    } catch {
+      /* ignore */
+    }
+  }
 
-      // Trigger a request through testConnection which calls the OpenAI SDK
-      try {
-        await client.testConnection();
-      } catch {
-        // Ignore — we only care about the fetch call, not the response shape
-      }
+  function getCallHeaders(mockFn: any): Headers {
+    const call = mockFn.mock.calls[0];
+    return call[1]?.headers as Headers;
+  }
 
-      // Our customFetch should have been called, forwarding to global.fetch
-      expect(globalThis.fetch).toHaveBeenCalled();
-      const call = (globalThis.fetch as any).mock.calls[0];
-      const headers = call[1]?.headers;
-
-      // Should be a Headers instance
+  it('should preserve Authorization and Content-Type headers', async () => {
+    const { client, mockFn, restore } = mockFetchAndCreateClient();
+    try {
+      await triggerRequest(client);
+      const headers = getCallHeaders(mockFn);
       expect(headers).toBeInstanceOf(Headers);
-
-      // Should have Authorization copied from init.headers (OpenAI SDK sets this)
       expect(headers.get('Authorization')).toContain('test-key');
-
-      // Should have Content-Type set
       expect(headers.get('Content-Type')).toBe('application/json');
     } finally {
-      globalThis.fetch = originalFetch;
+      restore();
     }
   });
 
-  it('should not manually set User-Agent (browser controls it)', async () => {
+  it('should strip Referer and Origin headers', async () => {
+    const { client, mockFn, restore } = mockFetchAndCreateClient();
+    try {
+      await triggerRequest(client);
+      const headers = getCallHeaders(mockFn);
+      expect(headers.get('Referer')).toBeNull();
+      expect(headers.get('Origin')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  it('should strip X-Stainless-* telemetry headers', async () => {
+    const { client, mockFn, restore } = mockFetchAndCreateClient();
+    try {
+      await triggerRequest(client);
+      const headers = getCallHeaders(mockFn);
+      const stainlessHeaders: string[] = [];
+      headers.forEach((_v, k) => {
+        if (k.toLowerCase().startsWith('x-stainless-')) stainlessHeaders.push(k);
+      });
+      expect(stainlessHeaders).toEqual([]);
+    } finally {
+      restore();
+    }
+  });
+
+  it('should strip OpenAI-Organization and OpenAI-Project headers', async () => {
+    const { client, mockFn, restore } = mockFetchAndCreateClient();
+    try {
+      await triggerRequest(client);
+      const headers = getCallHeaders(mockFn);
+      expect(headers.get('OpenAI-Organization')).toBeNull();
+      expect(headers.get('OpenAI-Project')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  it('should strip User-Agent header', async () => {
+    const { client, mockFn, restore } = mockFetchAndCreateClient();
+    try {
+      await triggerRequest(client);
+      const headers = getCallHeaders(mockFn);
+      expect(headers.get('User-Agent')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  it('should not send credentials: include', async () => {
+    const { client, mockFn, restore } = mockFetchAndCreateClient();
+    try {
+      await triggerRequest(client);
+      const call = mockFn.mock.calls[0];
+      const init = call[1] as RequestInit;
+      expect(init.credentials).not.toBe('include');
+    } finally {
+      restore();
+    }
+  });
+
+  it('should handle headers passed as plain object', async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = vi.fn(async (_url, _init) => {
       return new Response(JSON.stringify({}), {
@@ -67,20 +134,10 @@ describe('LLMApiClient header handling', () => {
         model: 'test-model',
       });
 
-      try {
-        await client.testConnection();
-      } catch {
-        // Ignore
-      }
+      await triggerRequest(client);
 
-      const call = (globalThis.fetch as any).mock.calls[0];
-      const headers = call[1]?.headers as Headers;
-
-      // customFetch should NOT set User-Agent — it's a forbidden header
-      // that the browser controls. The SDK may set its own (e.g. "OpenAI/JS ...")
-      // but we should never inject a Chrome-style UA string.
-      const ua = headers.get('User-Agent');
-      expect(ua).not.toContain('Chrome/');
+      // At minimum, nothing should crash with any header format
+      expect(globalThis.fetch).toHaveBeenCalled();
     } finally {
       globalThis.fetch = originalFetch;
     }

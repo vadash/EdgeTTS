@@ -82,7 +82,8 @@ export class LLMApiClient {
     this.debugLogger = options.debugLogger;
     this.provider = detectProvider(options.apiUrl, options.model);
 
-    // Custom fetch that adds missing headers for browser->API requests.
+    // Custom fetch that adds essential headers and strips problematic ones
+    // for browser->API requests.
     // new Headers(init?.headers) copies ALL existing headers (including Authorization
     // set by the OpenAI SDK), so no manual per-header copy is needed.
     const customFetch: typeof fetch = async (url, init) => {
@@ -96,22 +97,45 @@ export class LLMApiClient {
       const isTestMode = typeof window === 'undefined' || typeof navigator === 'undefined';
 
       if (!isTestMode) {
-        // Browser mode - mimic headers a real browser sends for API calls.
-        // CF inspects header set/order; missing or wrong values trigger bot scoring.
+        // Browser mode — add headers that strict CORS servers accept.
         headers.set('Accept', 'application/json, text/event-stream');
         if (navigator.language) {
           headers.set('Accept-Language', `${navigator.language},en;q=0.9`);
         }
-        // Browsers always send their own origin, not the target's origin.
-        // Setting the API's origin here was a strong non-browser signal.
-        headers.set('Origin', window.location.origin);
-        headers.set('Referer', window.location.href);
+      }
+
+      // Strip headers that cause CORS preflight failures on strict servers
+      // (e.g. Gemini returns 403 if any unauthorized header appears in the
+      // preflight's Access-Control-Request-Headers). The Headers API is
+      // case-insensitive, so delete() works regardless of casing.
+      const stripped = [
+        'referer', // explicitly set here — becomes author request header in preflight
+        'origin', // forbidden header; browser sends its own, this set() is a no-op
+        'user-agent', // forbidden header; OpenAI SDK sets it but browser ignores
+        'openai-organization',
+        'openai-project',
+      ];
+      for (const name of stripped) {
+        headers.delete(name);
+      }
+      // Strip all X-Stainless-* telemetry headers injected by the OpenAI SDK.
+      // These are not in any provider's CORS allowlist and cause preflight 403s.
+      const keysToDelete: string[] = [];
+      headers.forEach((_value, key) => {
+        if (key.toLowerCase().startsWith('x-stainless-')) {
+          keysToDelete.push(key);
+        }
+      });
+      for (const key of keysToDelete) {
+        headers.delete(key);
       }
 
       return fetch(url, {
         ...init,
         headers,
-        credentials: 'include', // send cookies — CF may require them
+        // No credentials: 'include' — no LLM API returns
+        // Access-Control-Allow-Credentials: true, so including credentials
+        // would cause the browser to reject the response even if the preflight passes.
       });
     };
 
