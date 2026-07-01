@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { Button, Select, Slider, Toggle } from '@/components/common';
 import type { ReasoningLevel, StageConfig } from '@/stores/LLMStore';
@@ -41,11 +41,30 @@ export function StageConfigForm({
   onCopySettings,
 }: StageConfigFormProps) {
   const isReasoningEnabled = !!config.reasoning;
+  const corsErrorDetected = useRef(false);
 
   const handleReasoningChange = (e: Event) => {
     const value = (e.target as HTMLSelectElement).value;
     onChange('reasoning', value === 'off' ? null : (value as ReasoningLevel));
   };
+
+  // Auto-prefill CORS middleware URL when CORS error is detected and field is empty
+  useEffect(() => {
+    if (
+      testResult &&
+      !testResult.success &&
+      testResult.error?.startsWith('CORS Error') &&
+      !config.corsMiddleware?.trim()
+    ) {
+      if (!corsErrorDetected.current) {
+        corsErrorDetected.current = true;
+        onChange('corsMiddleware', 'http://localhost:8010/proxy');
+      }
+    }
+    if (!testResult || testResult.success) {
+      corsErrorDetected.current = false;
+    }
+  }, [testResult]);
 
   return (
     <div className="space-y-4">
@@ -159,7 +178,7 @@ export function StageConfigForm({
             onInput={(e) => onChange('corsMiddleware', (e.target as HTMLInputElement).value)}
             placeholder="http://localhost:8010/proxy"
           />
-          <CORSProxyHelp />
+          <CORSProxyHelp apiUrl={config.apiUrl} />
         </div>
 
         {/* QA Pass - only for Assign stage */}
@@ -214,7 +233,12 @@ export function StageConfigForm({
                 )}
               </>
             ) : (
-              testResult.error
+              <>
+                {testResult.error}
+                {testResult.error?.startsWith('CORS Error') && (
+                  <CORSInlineHelp apiUrl={config.apiUrl} />
+                )}
+              </>
             )}
           </div>
         )}
@@ -223,8 +247,9 @@ export function StageConfigForm({
   );
 }
 
-function CORSProxyHelp() {
+function CORSProxyHelp({ apiUrl }: { apiUrl?: string } = {}) {
   const [expanded, setExpanded] = useState(false);
+  const proxyUrl = apiUrl?.trim() || 'https://your-api.com';
 
   return (
     <div className="mt-1">
@@ -248,11 +273,9 @@ function CORSProxyHelp() {
             <p className="mt-1">Then restart PowerShell.</p>
           </div>
           <div>
-            <p className="text-gray-300 font-medium">
-              Step 2 - Run proxy (replace URL with your API):
-            </p>
-            <code className="block bg-primary/50 px-1 py-0.5 rounded text-accent mt-1">
-              npx local-cors-proxy --proxyUrl https://your-api.com --port 8010
+            <p className="text-gray-300 font-medium">Step 2 - Run proxy:</p>
+            <code className="block bg-primary/50 px-1 py-0.5 rounded text-accent mt-1 break-all">
+              npx local-cors-proxy --proxyUrl {proxyUrl} --port 8010
             </code>
           </div>
           <p>
@@ -261,8 +284,54 @@ function CORSProxyHelp() {
               http://localhost:8010/proxy
             </code>
           </p>
+          <details className="mt-2">
+            <summary className="cursor-pointer text-gray-400 hover:text-gray-300 select-none">
+              Show diagram
+            </summary>
+            <img
+              src="/cors-diagram.png"
+              alt="CORS proxy flow"
+              className="mt-2 rounded border border-gray-700 max-w-full"
+            />
+          </details>
         </div>
       )}
+    </div>
+  );
+}
+
+function CORSInlineHelp({ apiUrl }: { apiUrl: string }) {
+  const proxyUrl = apiUrl?.trim() || 'https://your-api.com';
+
+  return (
+    <div className="mt-2 p-2 bg-red-500/10 rounded text-xs text-gray-300 space-y-1 border border-red-500/20">
+      <p className="font-medium text-red-300">How to fix:</p>
+      <div>
+        <p>1. Install Node.js (skip if installed):</p>
+        <code className="block bg-primary/50 px-1 py-0.5 rounded text-accent mt-0.5">
+          winget install OpenJS.NodeJS.LTS
+        </code>
+      </div>
+      <div>
+        <p>2. Run proxy:</p>
+        <code className="block bg-primary/50 px-1 py-0.5 rounded text-accent mt-0.5 break-all">
+          npx local-cors-proxy --proxyUrl {proxyUrl} --port 8010
+        </code>
+      </div>
+      <p>
+        3. Set CORS Proxy to:{' '}
+        <code className="bg-primary/50 px-1 rounded text-accent">http://localhost:8010/proxy</code>
+      </p>
+      <details>
+        <summary className="cursor-pointer text-gray-400 hover:text-gray-300 select-none">
+          Show diagram
+        </summary>
+        <img
+          src="/cors-diagram.png"
+          alt="CORS proxy flow"
+          className="mt-1 rounded border border-red-500/20 max-w-full"
+        />
+      </details>
     </div>
   );
 }
