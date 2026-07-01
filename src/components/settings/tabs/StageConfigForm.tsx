@@ -289,7 +289,7 @@ function CORSProxyHelp({ apiUrl }: { apiUrl?: string } = {}) {
               Show diagram
             </summary>
             <img
-              src="/cors-diagram.png"
+              src="./cors-diagram.png"
               alt="CORS proxy flow"
               className="mt-2 rounded border border-gray-700 max-w-full"
             />
@@ -327,7 +327,7 @@ function CORSInlineHelp({ apiUrl }: { apiUrl: string }) {
           Show diagram
         </summary>
         <img
-          src="/cors-diagram.png"
+          src="./cors-diagram.png"
           alt="CORS proxy flow"
           className="mt-1 rounded border border-red-500/20 max-w-full"
         />

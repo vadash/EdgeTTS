@@ -73,6 +73,7 @@ export default (_env, argv) => {
         patterns: [
           { from: 'public/RU.lexx', to: 'RU.lexx' },
           { from: 'public/*.md', to: '[name][ext]' },
+          { from: 'public/cors-diagram.png', to: 'cors-diagram.png' },
           { from: 'node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.js', to: 'ffmpeg-core.js' },
           { from: 'node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm', to: 'ffmpeg-core.wasm' },
           { from: 'node_modules/onnxruntime-web/dist/*.wasm', to: '[name][ext]' },
