@@ -1,12 +1,15 @@
 Updated 29.06.26
 
-## 1 Gemini AI Studio
+!!! If you want really stable access for f2p models use **lite llm** fallback. Ask any LLM to help you setup it. Also helps with CORS error !!!
+https://www.google.com/search?udm=50&q=how+to+setup+litellm+local+instance+for+windows+to+access+free+LLM+providers
+
+## 1 Gemini AI Studio (works directly)
 
 [Register](https://aistudio.google.com/apikey) · Model: `gemma-4-31b-it`, Streaming is faster · Endpoint: `https://generativelanguage.googleapis.com/v1beta/openai/`
 
 OpenAI-compatible endpoint via Google AI Studio; free only without a billing account attached. Limits for gemma is 1500 RPD [ai.google](https://ai.google.dev/gemini-api/docs/openai)
 
-## 2 Nvidia NIM
+## 2 Nvidia NIM (needs CORS proxy)
 
 [Register](https://build.nvidia.com/explore/discover) · Model: `openai/gpt-oss-120b` or `nvidia/nemotron-3-super-120b-a12b` · Endpoint: `https://integrate.api.nvidia.com/v1`
 
@@ -49,5 +52,3 @@ Fully OpenAI-compatible endpoint; new accounts receive 1,000 free inference cred
 [Register](https://ollama.com)
 
 ---
-
-If you want really stable access for f2p models use **lite llm** fallback. Ask any LLM to help you setup it. Also helps with CORS error.
