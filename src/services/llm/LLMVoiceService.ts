@@ -110,6 +110,7 @@ export interface LLMVoiceServiceOptions {
   topP?: number;
   useVoting?: boolean;
   repeatPrompt?: boolean;
+  corsMiddleware?: string;
   maxConcurrentRequests?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
@@ -124,6 +125,7 @@ export interface LLMVoiceServiceOptions {
     temperature?: number;
     topP?: number;
     repeatPrompt?: boolean;
+    corsMiddleware?: string;
   };
 }
 
@@ -155,6 +157,7 @@ export class LLMVoiceService {
       temperature: options.temperature,
       topP: options.topP,
       maxTokens: defaultConfig.llm.maxTokens,
+      corsMiddleware: options.corsMiddleware,
       debugLogger,
       logger: options.logger,
     });
@@ -171,6 +174,7 @@ export class LLMVoiceService {
           temperature: mergeConfig.temperature ?? options.temperature,
           topP: mergeConfig.topP ?? options.topP,
           maxTokens: defaultConfig.llm.maxTokens,
+          corsMiddleware: mergeConfig.corsMiddleware ?? options.corsMiddleware,
           debugLogger,
           logger: options.logger,
         })
@@ -630,6 +634,7 @@ export class LLMVoiceService {
       temperature: temperature,
       topP: this.options.mergeConfig?.topP ?? this.options.topP,
       maxTokens: defaultConfig.llm.maxTokens,
+      corsMiddleware: this.options.mergeConfig?.corsMiddleware ?? this.options.corsMiddleware,
       debugLogger: this.apiClient.debugLogger, // share debugLogger
       logger: this.logger,
     });

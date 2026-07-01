@@ -32,6 +32,7 @@ export interface LLMApiClientOptions {
   temperature?: number;
   topP?: number;
   maxTokens?: number;
+  corsMiddleware?: string;
   debugLogger?: DebugLogger;
   logger?: ILogger;
 }
@@ -86,7 +87,21 @@ export class LLMApiClient {
     // for browser->API requests.
     // new Headers(init?.headers) copies ALL existing headers (including Authorization
     // set by the OpenAI SDK), so no manual per-header copy is needed.
+    const corsMiddleware = options.corsMiddleware?.trim() || '';
+    const apiBase = options.apiUrl.replace(/\/+$/, '');
+
     const customFetch: typeof fetch = async (url, init) => {
+      let fetchUrl = url as string | URL;
+
+      // Rewrite URL through CORS middleware if configured
+      if (corsMiddleware) {
+        const middlewareBase = corsMiddleware.replace(/\/+$/, '');
+        const urlStr = typeof fetchUrl === 'string' ? fetchUrl : fetchUrl.toString();
+        // Strip the API base from the request URL path
+        const afterBase = urlStr.replace(apiBase, '');
+        fetchUrl = middlewareBase + afterBase;
+      }
+
       const headers = new Headers(init?.headers);
 
       if (!headers.has('Content-Type')) {
@@ -130,7 +145,7 @@ export class LLMApiClient {
         headers.delete(key);
       }
 
-      return fetch(url, {
+      return fetch(fetchUrl, {
         ...init,
         headers,
         // No credentials: 'include' — no LLM API returns
@@ -252,7 +267,7 @@ export class LLMApiClient {
     }
     // CORS
     if (apiError.message?.includes('CORS') || apiError.message?.includes('cors')) {
-      return 'CORS Error - API does not allow browser requests';
+      return 'CORS Error - API does not allow browser requests. Start a local CORS proxy and set the proxy URL in Advanced Settings.';
     }
     // Generic Error object
     if (e instanceof Error) {

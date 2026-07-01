@@ -58,6 +58,7 @@ export interface StageLLMConfig {
   temperature?: number;
   topP?: number;
   repeatPrompt?: boolean;
+  corsMiddleware?: string;
 }
 
 /**
@@ -524,6 +525,7 @@ export async function runConversion(
         temperature: input.extractConfig.temperature,
         topP: input.extractConfig.topP,
         repeatPrompt: input.extractConfig.repeatPrompt,
+        corsMiddleware: input.extractConfig.corsMiddleware,
         maxConcurrentRequests: input.llmThreads,
         directoryHandle: input.directoryHandle,
         logger,
@@ -537,6 +539,7 @@ export async function runConversion(
           temperature: input.mergeConfig.temperature,
           topP: input.mergeConfig.topP,
           repeatPrompt: input.mergeConfig.repeatPrompt,
+          corsMiddleware: input.mergeConfig.corsMiddleware,
         },
       };
 
@@ -594,6 +597,7 @@ export async function runConversion(
         temperature: input.assignConfig.temperature,
         topP: input.assignConfig.topP,
         repeatPrompt: input.assignConfig.repeatPrompt,
+        corsMiddleware: input.assignConfig.corsMiddleware,
         useVoting: input.useVoting,
         maxConcurrentRequests: input.llmThreads,
         directoryHandle: input.directoryHandle,

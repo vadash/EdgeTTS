@@ -24,6 +24,7 @@ export interface StageConfig {
   temperature: number;
   topP: number;
   repeatPrompt: boolean;
+  corsMiddleware: string;
 }
 
 interface LLMSettings {
@@ -67,6 +68,7 @@ const defaultStageConfig: StageConfig = {
   temperature: 0.0,
   topP: 0.95,
   repeatPrompt: false,
+  corsMiddleware: '',
 };
 
 const defaultPersistedState: LLMSettings = {
@@ -223,6 +225,7 @@ export async function loadSettings(logStore: LoggerStore): Promise<void> {
             temperature: settings[stage].temperature ?? defaultStageConfig.temperature,
             topP: settings[stage].topP ?? defaultStageConfig.topP,
             repeatPrompt: settings[stage].repeatPrompt ?? defaultStageConfig.repeatPrompt,
+            corsMiddleware: settings[stage].corsMiddleware ?? defaultStageConfig.corsMiddleware,
           },
         };
       }

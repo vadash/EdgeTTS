@@ -1,3 +1,4 @@
+import { useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { Button, Select, Slider, Toggle } from '@/components/common';
 import type { ReasoningLevel, StageConfig } from '@/stores/LLMStore';
@@ -145,6 +146,22 @@ export function StageConfigForm({
           disabled={isReasoningEnabled}
         />
 
+        {/* CORS Proxy */}
+        <div className="space-y-1">
+          <label className="input-label" htmlFor="cors-proxy-input">
+            CORS Proxy
+          </label>
+          <input
+            id="cors-proxy-input"
+            type="text"
+            className="input-field"
+            value={config.corsMiddleware}
+            onInput={(e) => onChange('corsMiddleware', (e.target as HTMLInputElement).value)}
+            placeholder="http://localhost:8010/proxy"
+          />
+          <CORSProxyHelp />
+        </div>
+
         {/* QA Pass - only for Assign stage */}
         {showVoting && onVotingChange && (
           <Toggle
@@ -202,6 +219,50 @@ export function StageConfigForm({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function CORSProxyHelp() {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="text-xs text-gray-400 hover:text-gray-300 underline"
+      >
+        {expanded ? 'Hide setup instructions' : 'Show setup instructions'}
+      </button>
+      {expanded && (
+        <div className="mt-2 p-2 bg-primary/20 rounded text-xs text-gray-400 space-y-2">
+          <p>Some API providers block browser requests (no CORS headers). Use a local proxy:</p>
+          <div>
+            <p className="text-gray-300 font-medium">
+              Step 1 - Install Node.js (skip if installed):
+            </p>
+            <code className="block bg-primary/50 px-1 py-0.5 rounded text-accent mt-1">
+              winget install OpenJS.NodeJS.LTS
+            </code>
+            <p className="mt-1">Then restart PowerShell.</p>
+          </div>
+          <div>
+            <p className="text-gray-300 font-medium">
+              Step 2 - Run proxy (replace URL with your API):
+            </p>
+            <code className="block bg-primary/50 px-1 py-0.5 rounded text-accent mt-1">
+              npx local-cors-proxy --proxyUrl https://your-api.com --port 8010
+            </code>
+          </div>
+          <p>
+            Then set CORS Proxy to:{' '}
+            <code className="bg-primary/50 px-1 rounded text-accent">
+              http://localhost:8010/proxy
+            </code>
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -129,6 +129,7 @@ describe('LLMStore', () => {
         temperature: 0.5,
         topP: 0.9,
         repeatPrompt: false,
+        corsMiddleware: '',
       };
       setStageConfig('extract', config);
       expect(llm.value.extract).toEqual(config);

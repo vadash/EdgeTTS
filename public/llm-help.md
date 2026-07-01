@@ -15,6 +15,13 @@ OpenAI-compatible endpoint via Google AI Studio; free only without a billing acc
 
 Fully OpenAI-compatible endpoint; new accounts receive 1,000 free inference credits. Catalog includes DeepSeek, Llama, and Kimi variants. [ai-sdk](https://ai-sdk.dev/providers/openai-compatible-providers/nim)
 
+**CORS proxy setup** (run in PowerShell):
+```
+winget install OpenJS.NodeJS.LTS
+npx local-cors-proxy --proxyUrl https://integrate.api.nvidia.com --port 8010
+```
+Then set **CORS Proxy** in Advanced Settings to `http://localhost:8010/proxy`
+
 ## 3 Opencode
 
 [Register](https://opencode.ai/go) Good one

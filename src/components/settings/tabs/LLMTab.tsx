@@ -53,6 +53,7 @@ export function LLMTab() {
       apiUrl: config.apiUrl,
       model: config.model,
       narratorVoice: '',
+      corsMiddleware: config.corsMiddleware,
       logger,
     });
 
@@ -92,6 +93,7 @@ export function LLMTab() {
       llm.setStageField(target, 'temperature', sourceConfig.temperature);
       llm.setStageField(target, 'topP', sourceConfig.topP);
       llm.setStageField(target, 'repeatPrompt', sourceConfig.repeatPrompt);
+      llm.setStageField(target, 'corsMiddleware', sourceConfig.corsMiddleware);
     }
   };
 
