@@ -265,9 +265,35 @@ export class LLMApiClient {
     if (apiError.message?.includes('timeout') || apiError.message?.includes('Timeout')) {
       return 'Request Timeout - Server took too long to respond';
     }
-    // CORS
+    // CORS - check message directly or walk the cause chain.
+    // When the browser blocks a CORS preflight, fetch() throws a TypeError.
+    // The OpenAI SDK wraps it as APIConnectionError with the generic message
+    // "Connection error." — so we must inspect the cause chain for CORS indicators.
+    const corsErrorMessage =
+      'CORS Error - API does not allow browser requests. Start a local CORS proxy and set the proxy URL in Advanced Settings.';
     if (apiError.message?.includes('CORS') || apiError.message?.includes('cors')) {
-      return 'CORS Error - API does not allow browser requests. Start a local CORS proxy and set the proxy URL in Advanced Settings.';
+      return corsErrorMessage;
+    }
+    let cause: unknown = (apiError as { cause?: unknown }).cause;
+    while (cause) {
+      const c = cause as { message?: string; code?: string; cause?: unknown };
+      const msg = c.message?.toLowerCase() || '';
+      if (
+        msg.includes('cors') ||
+        msg.includes('blocked') ||
+        msg.includes('failed to fetch') ||
+        msg.includes('networkerror')
+      ) {
+        return corsErrorMessage;
+      }
+      cause = c.cause;
+    }
+    // SDK's generic "Connection error." with a TypeError cause = CORS failure in browser
+    if (
+      apiError.message === 'Connection error.' &&
+      (apiError as { cause?: unknown }).cause instanceof TypeError
+    ) {
+      return corsErrorMessage;
     }
     // Generic Error object
     if (e instanceof Error) {
