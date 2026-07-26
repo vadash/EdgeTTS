@@ -2,7 +2,21 @@
 
 Local-first TTS web app converting books (EPUB/FB2/TXT) to audiobooks using Edge TTS and LLMs.
 
-## Architecture
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Dev server (webpack) |
+| `npm run build` | Production build |
+| `npm test` | Unit tests (vitest) |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run check` | format + lint + typecheck + test (runs via pre-commit hook) |
+
+Real LLM integration test variants are documented in `src/test/AGENTS.md`.
+
+## Documentation Map
+
+Each major directory has its own `AGENTS.md` — read it before editing there:
 
 - `src/components/` - Preact + Tailwind UI
 - `src/config/prompts/` - LLM Prompt definitions & schemas
@@ -10,6 +24,8 @@ Local-first TTS web app converting books (EPUB/FB2/TXT) to audiobooks using Edge
 - `src/services/llm/` - LLM API clients, voting, and JSON repair
 - `src/stores/` - Global state via `@preact/signals`
 - `src/test/` - Mocks and test runners
+
+Deep-dive knowledge lives in `agent_docs/` (indexed in `agent_docs/README.md`); nested routers link to the relevant leaf.
 
 ## Gotchas
 
