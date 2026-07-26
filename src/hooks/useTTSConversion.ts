@@ -93,6 +93,7 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
     opusMinBitrate: s.opusMinBitrate,
     opusMaxBitrate: s.opusMaxBitrate,
     opusCompressionLevel: s.opusCompressionLevel,
+    mergeConcurrency: s.mergeConcurrency,
 
     directoryHandle: stores.data.directoryHandle.value,
     detectedLanguage: stores.data.detectLanguageFromContent().language,

@@ -92,6 +92,7 @@ export interface OrchestratorInput {
   opusMinBitrate: number;
   opusMaxBitrate: number;
   opusCompressionLevel: number;
+  mergeConcurrency: number;
 
   // Data
   directoryHandle: FileSystemDirectoryHandle | null;
@@ -1100,8 +1101,8 @@ async function runTTSStage(
     compressor: input.compressor,
     fadeIn: input.fadeIn,
     opusMinBitrate: input.opusMinBitrate,
-    opusMaxBitrate: input.opusMaxBitrate,
     opusCompressionLevel: input.opusCompressionLevel,
+    mergeConcurrency: input.mergeConcurrency,
     chunkStore: chunkStore,
   });
 

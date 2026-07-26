@@ -65,6 +65,7 @@ export interface AppSettings {
   opusMinBitrate: number;
   opusMaxBitrate: number;
   opusCompressionLevel: number;
+  mergeConcurrency: number;
 }
 
 export interface ProcessedBook {

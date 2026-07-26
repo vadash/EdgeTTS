@@ -35,6 +35,7 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
     opusMinBitrate: 24,
     opusMaxBitrate: 64,
     opusCompressionLevel: 10,
+    mergeConcurrency: 2,
     extractConfig: {
       apiKey: 'k',
       apiUrl: 'u',
@@ -83,8 +84,8 @@ function createMockStores(): Stores {
       compressorEnabled: { value: false },
       fadeInEnabled: { value: false },
       opusMinBitrate: { value: 24 },
-      opusMaxBitrate: { value: 64 },
       opusCompressionLevel: { value: 10 },
+      mergeConcurrency: { value: 2 },
     } as any,
     conversion: {
       startConversion: vi.fn(),

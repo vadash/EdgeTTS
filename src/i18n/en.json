@@ -66,6 +66,8 @@
     "maxBitrate": "Max Bitrate",
     "compressionLevel": "Compression Level",
     "compressionLevelHint": "10 = best quality (slow), 0 = fastest. Use 0-1 for very low-end hardware. ⚠️ Highest CPU cost on mobile",
+    "mergeConcurrency": "Parallel Encoding",
+    "mergeConcurrencyHint": "FFmpeg instances encoding parts simultaneously. 2 is a safe default; 3-4 only helps on 8+ core machines",
     "kbps": "kbps",
     "filterChain": "Processing Chain",
     "silenceGap": "Gap Between Chunks",

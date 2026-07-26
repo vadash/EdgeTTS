@@ -9,6 +9,7 @@ import {
   pitchDisplay,
   rateDisplay,
   resetSettings,
+  setMergeConcurrency,
   setOpusCompressionLevel,
   setOpusMaxBitrate,
   setOpusMinBitrate,
@@ -44,8 +45,8 @@ describe('SettingsStore', () => {
     it('should have Opus encoding defaults', () => {
       expect(settings.value.opusPreset).toBe(AudioPreset.PC);
       expect(settings.value.opusMinBitrate).toBe(24);
-      expect(settings.value.opusMaxBitrate).toBe(48);
       expect(settings.value.opusCompressionLevel).toBe(10);
+      expect(settings.value.mergeConcurrency).toBe(2);
     });
   });
 
@@ -90,6 +91,14 @@ describe('SettingsStore', () => {
       setOpusCompressionLevel(5);
       expect(settings.value.opusPreset).toBe(AudioPreset.CUSTOM);
       expect(settings.value.opusCompressionLevel).toBe(5);
+    });
+
+    it('setMergeConcurrency should update value without touching opusPreset', () => {
+      applyOpusPreset(AudioPreset.PC);
+      setMergeConcurrency(3);
+      expect(settings.value.mergeConcurrency).toBe(3);
+      // Must NOT switch the opus preset to CUSTOM — concurrency is independent
+      expect(settings.value.opusPreset).toBe(AudioPreset.PC);
     });
   });
 

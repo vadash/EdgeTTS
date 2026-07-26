@@ -73,6 +73,7 @@ const defaultSettings: AppSettings = {
   opusMinBitrate: 24,
   opusMaxBitrate: 48,
   opusCompressionLevel: 10,
+  mergeConcurrency: 2,
 };
 
 function loadFromStorage(): AppSettings {
@@ -127,6 +128,7 @@ export const opusPreset = computed(() => settings.value.opusPreset);
 export const opusMinBitrate = computed(() => settings.value.opusMinBitrate);
 export const opusMaxBitrate = computed(() => settings.value.opusMaxBitrate);
 export const opusCompressionLevel = computed(() => settings.value.opusCompressionLevel);
+export const mergeConcurrency = computed(() => settings.value.mergeConcurrency);
 
 // ============================================================================
 // Persistence Effect
@@ -240,6 +242,10 @@ export function setOpusCompressionLevel(value: number): void {
     opusPreset: 'custom' as AudioPreset,
     opusCompressionLevel: value,
   };
+}
+
+export function setMergeConcurrency(value: number): void {
+  settings.value = { ...settings.value, mergeConcurrency: value };
 }
 
 export function resetSettings(): void {

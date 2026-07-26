@@ -11,6 +11,17 @@ const CORE_KEY = 'ffmpeg-core.js';
 const WASM_KEY = 'ffmpeg-core.wasm';
 
 /**
+ * Shared FFmpeg core blob URLs, hoisted to module scope so that every
+ * FFmpegService instance — including AudioMerger's pool workers — reuses
+ * the same Blob URLs instead of re-fetching `ffmpeg-core.js`/`.wasm` per
+ * instance. Populated by the first successful load (any tier), reused by
+ * subsequent loads. Reset to null only when the in-memory tier fails to
+ * load (see tryLoadLocal), forcing a fresh fetch from the next tier.
+ */
+let sharedCachedCoreURL: string | null = null;
+let sharedCachedWasmURL: string | null = null;
+
+/**
  * Persistent cache for FFmpeg WASM blobs in IndexedDB.
  * Survives offline scenarios and app version changes that remove
  * the static files from the server.
@@ -153,10 +164,6 @@ export class FFmpegService {
   private operationCount = 0;
   private readonly MAX_OPERATIONS_BEFORE_REFRESH = 10;
 
-  // Cache blob URLs to avoid re-fetching from CDN on proactive refresh
-  private cachedCoreURL: string | null = null;
-  private cachedWasmURL: string | null = null;
-
   constructor(logger?: ILogger) {
     this.logger = logger;
   }
@@ -184,10 +191,10 @@ export class FFmpegService {
     });
 
     // 1. Reuse in-memory blob URLs if available (fastest path, no network)
-    if (this.cachedCoreURL && this.cachedWasmURL) {
+    if (sharedCachedCoreURL && sharedCachedWasmURL) {
       try {
         if (onProgress) onProgress('Reloading FFmpeg from cache...');
-        await ffmpeg.load({ coreURL: this.cachedCoreURL, wasmURL: this.cachedWasmURL });
+        await ffmpeg.load({ coreURL: sharedCachedCoreURL, wasmURL: sharedCachedWasmURL });
         this.ffmpeg = ffmpeg;
         this.loaded = true;
         this.loadError = null;
@@ -197,8 +204,8 @@ export class FFmpegService {
         this.logger?.warn('FFmpeg reload from cached blob URLs failed, trying IndexedDB', {
           error: err instanceof Error ? err.message : String(err),
         });
-        this.cachedCoreURL = null;
-        this.cachedWasmURL = null;
+        sharedCachedCoreURL = null;
+        sharedCachedWasmURL = null;
       }
     }
 
@@ -211,8 +218,8 @@ export class FFmpegService {
         this.ffmpeg = ffmpeg;
         this.loaded = true;
         this.loadError = null;
-        this.cachedCoreURL = cached.coreURL;
-        this.cachedWasmURL = cached.wasmURL;
+        sharedCachedCoreURL = cached.coreURL;
+        sharedCachedWasmURL = cached.wasmURL;
         if (onProgress) onProgress('FFmpeg reloaded from persistent cache');
         return true;
       }
@@ -242,8 +249,8 @@ export class FFmpegService {
       this.ffmpeg = ffmpeg;
       this.loaded = true;
       this.loadError = null;
-      this.cachedCoreURL = coreURL;
-      this.cachedWasmURL = wasmURL;
+      sharedCachedCoreURL = coreURL;
+      sharedCachedWasmURL = wasmURL;
 
       // Persist to IndexedDB for offline / version-change resilience
       await FFmpegBlobCache.store(coreBlob, wasmBlob);

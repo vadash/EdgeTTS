@@ -46,6 +46,7 @@ describe('AppSettings interface', () => {
       opusMinBitrate: 24,
       opusMaxBitrate: 48,
       opusCompressionLevel: 10,
+      mergeConcurrency: 2,
     } as AppSettings;
     expect(settings.opusPreset).toBe(AudioPreset.PC);
     expect(settings.opusMinBitrate).toBe(24);

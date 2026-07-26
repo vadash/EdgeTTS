@@ -39,8 +39,20 @@ export interface MergerConfig {
   opusMinBitrate?: number;
   opusMaxBitrate?: number;
   opusCompressionLevel?: number;
+  // Parallel encoding pool: optional FFmpegService factory (DI) and worker count.
+  // Absent/legacy config => sequential behavior (existing tests unaffected).
+  ffmpegFactory?: () => FFmpegService;
+  mergeConcurrency?: number;
   chunkStore?: ChunkStore | null;
 }
+
+/**
+ * Hard ceiling on parallel merge workers. The bundled `@ffmpeg/core` is
+ * single-threaded (1 core per instance); beyond 4 workers the main
+ * thread's ChunkStore I/O and cross-core contention erase the gains.
+ * Single place to raise the parallelism ceiling later.
+ */
+const MAX_MERGE_CONCURRENCY = 4;
 
 /**
  * AudioMerger - Implements IAudioMerger interface
@@ -203,6 +215,7 @@ export class AudioMerger {
    * Missing chunks are replaced with silence placeholders
    */
   private async mergeAudioGroupAsync(
+    ffmpegService: FFmpegService,
     audioMap: Map<number, string>,
     group: MergeGroup,
     totalGroups: number,
@@ -240,8 +253,7 @@ export class AudioMerger {
     // Check if ALL chunks are missing
     if (chunks.every((c) => c === null)) return null;
 
-    // Use FFmpeg for Opus encoding
-    const processedAudio = await this.ffmpegService.processAudio(
+    const processedAudio = await ffmpegService.processAudio(
       chunks,
       {
         silenceRemoval: this.config.silenceRemoval,
@@ -349,16 +361,14 @@ export class AudioMerger {
     }
 
     const groups = await this.calculateMergeGroups(audioMap, totalSentences, fileNames);
-    let savedCount = 0;
-    let skippedCount = 0;
 
+    // Pre-pass (sequential, cheap): check existing files, collect groups that need processing.
+    const pending: MergeGroup[] = [];
+    let skippedCount = 0;
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
-      const durationMin = Math.round(group.durationMs / 60000);
       const expectedFilename = this.generateGroupFilename(group, groups.length);
       const folderName = this.getFolderName(group);
-
-      // Check if file already exists
       const fileExists = await this.fileExistsWithContent(
         saveDirectoryHandle,
         expectedFilename,
@@ -369,22 +379,71 @@ export class AudioMerger {
         skippedCount++;
         continue;
       }
+      pending.push(group);
+    }
 
-      onProgress?.(
-        i + 1,
-        groups.length,
-        `Processing part ${i + 1}/${groups.length} (~${durationMin} min)`,
+    // Build the worker pool. The injected singleton is always worker[0] (keeps its
+    // existing lifecycle/refresh rules). Extra workers come from the factory; they're
+    // terminated in `finally` after the merge. If no factory, pool is just the
+    // singleton => concurrency 1 (existing tests unaffected).
+    const workerCount = Math.max(
+      1,
+      Math.min(this.config.mergeConcurrency ?? 1, MAX_MERGE_CONCURRENCY),
+    );
+    const workers: FFmpegService[] = [this.ffmpegService];
+    if (this.config.ffmpegFactory) {
+      const target = Math.min(workerCount, Math.max(pending.length, 1));
+      while (workers.length < target) {
+        workers.push(this.config.ffmpegFactory());
+      }
+    }
+
+    // Shared-index work queue: each worker pulls the next pending group off the front.
+    // The first rejection aborts Promise.all; in-flight groups on other workers may
+    // still complete and save — harmless because resume skips existing files.
+    let nextIdx = 0;
+    let completed = 0;
+    let savedCount = 0;
+
+    try {
+      await Promise.all(
+        workers.map(async (svc) => {
+          while (nextIdx < pending.length) {
+            const group = pending[nextIdx++];
+            const groupOrder = groups.indexOf(group) + 1;
+            const durationMin = Math.round(group.durationMs / 60000);
+            onProgress?.(
+              completed + 1,
+              groups.length,
+              `Processing part ${groupOrder}/${groups.length} (~${durationMin} min)`,
+            );
+
+            const merged = await this.mergeAudioGroupAsync(
+              svc,
+              audioMap,
+              group,
+              groups.length,
+              (msg) => onProgress?.(completed + 1, groups.length, msg),
+            );
+
+            if (merged) {
+              // Save immediately (preserves low-RAM save-as-you-go)
+              await this.saveToDirectory(merged, saveDirectoryHandle);
+              onProgress?.(completed + 1, groups.length, `Saved ${merged.filename}`);
+              savedCount++;
+            }
+            completed++;
+          }
+        }),
       );
-
-      const merged = await this.mergeAudioGroupAsync(audioMap, group, groups.length, (msg) =>
-        onProgress?.(i + 1, groups.length, msg),
-      );
-
-      if (merged) {
-        // Save immediately
-        await this.saveToDirectory(merged, saveDirectoryHandle);
-        onProgress?.(i + 1, groups.length, `Saved ${merged.filename}`);
-        savedCount++;
+    } finally {
+      // Terminate every pool worker EXCEPT the injected singleton.
+      for (let w = 1; w < workers.length; w++) {
+        try {
+          workers[w].terminate();
+        } catch {
+          // Ignore — best-effort cleanup
+        }
       }
     }
 

@@ -111,7 +111,10 @@ export function createWorkerPool(options: WorkerPoolOptions): TTSWorkerPool {
  * Create a new audio merger for a conversion
  */
 export function createAudioMerger(config: MergerConfig): AudioMerger {
-  return new AudioMerger(getFFmpeg(), config);
+  return new AudioMerger(getFFmpeg(), {
+    ...config,
+    ffmpegFactory: () => new FFmpegService(getLogger()),
+  });
 }
 
 // ============================================================================

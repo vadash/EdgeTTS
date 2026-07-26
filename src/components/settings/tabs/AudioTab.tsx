@@ -99,6 +99,28 @@ export function AudioTab() {
             <Text id="settings.compressionLevelHint" />
           </p>
         </div>
+
+        {/* Parallel Encoding Slider */}
+        <div>
+          <div className="flex justify-between text-sm">
+            <Text id="settings.mergeConcurrency">Parallel Encoding</Text>
+            <span className="font-mono">{settings.mergeConcurrency.value}</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="4"
+            step="1"
+            value={settings.mergeConcurrency.value}
+            onChange={(e) =>
+              settings.setMergeConcurrency(Number((e.target as HTMLInputElement).value))
+            }
+            className="w-full"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            <Text id="settings.mergeConcurrencyHint" />
+          </p>
+        </div>
       </div>
 
       {/* Audio processing settings */}

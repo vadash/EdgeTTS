@@ -9,7 +9,7 @@ The core conversion pipeline (Text -> LLM -> TTS -> Audio). Managed by stateless
 - **TTS**: `TTSWorkerPool` manages Edge TTS WebSockets. Scales concurrency via `LadderController`. Streams to disk.
 - **Voice Allocation**: `VoiceAllocator` provides tiered voice allocation with cycling pool support. `VoicePoolBuilder` constructs initial voice pools.
 - **Fallback**: `KokoroFallbackService` provides offline TTS fallback via Kokoro. `ReusableEdgeTTSService` manages persistent Edge TTS connections.
-- **Merge**: `AudioMerger` reads from `ChunkStore`, uses `FFmpegService` for EQ/compression/Opus encoding.
+- **Merge**: `AudioMerger` reads from `ChunkStore`, uses `FFmpegService` for EQ/compression/Opus encoding. Merge groups run on a parallel pool of N FFmpeg instances (see gotchas leaf).
 
 ## Detailed Gotchas
 
