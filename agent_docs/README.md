@@ -6,3 +6,4 @@ Leaf knowledge too detailed for the `AGENTS.md` routers. Read only the file matc
 - `services/ffmpeg-and-storage_gotchas.md` — ChunkStore streaming, FFmpeg reload tiers/leaks, session resume
 - `llm/json-repair_gotchas.md` — `safeParseJSON` 5-tier fallback pipeline and text helpers
 - `llm/pipelines_gotchas.md` — Voting consensus, Assign QA pass, frequency culling, Zod/p-retry specifics
+- `services/text-block-splitter_gotchas.md` — `Intl.Segmenter` sentence-splitting behavior, quoted speech, abbreviation handling, locale fallback

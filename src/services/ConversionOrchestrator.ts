@@ -547,7 +547,7 @@ export async function runConversion(
         },
       };
 
-      const blocks = textBlockSplitter.createExtractBlocks(text);
+      const blocks = textBlockSplitter.createExtractBlocks(text, input.detectedLanguage);
       report('character-extraction', 0, blocks.length, '=== LLM Pass 1: Character Extraction ===');
 
       llmService = llmServiceFactory.create(extractLLMOptions);
@@ -609,7 +609,7 @@ export async function runConversion(
         detectedLanguage: input.detectedLanguage,
       };
 
-      const assignBlocks = textBlockSplitter.createAssignBlocks(text);
+      const assignBlocks = textBlockSplitter.createAssignBlocks(text, input.detectedLanguage);
       report(
         'speaker-assignment',
         0,

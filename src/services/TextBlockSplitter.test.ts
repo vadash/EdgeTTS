@@ -504,4 +504,21 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       expect(result[result.length - 1]).toBe('Normal paragraph.');
     });
   });
+
+  describe('Intl.Segmenter — locale-aware splitting', () => {
+    it('splits CJK (Japanese) input into per-sentence segments using the ja locale', () => {
+      const text = 'これはペンです。それは本です。';
+      const result = splitter.splitIntoParagraphs(text, 'ja');
+
+      expect(result).toEqual(['これはペンです。', 'それは本です。']);
+    });
+
+    it('falls back to en for a non-constructible locale (invalid BCP-47) without throwing', () => {
+      // 'x' is rejected by Intl.Segmenter; getSegmenter catches and retries with 'en'.
+      const text = 'First sentence. Second sentence.';
+      const result = splitter.splitIntoParagraphs(text, 'x');
+
+      expect(result).toEqual(['First sentence.', 'Second sentence.']);
+    });
+  });
 });

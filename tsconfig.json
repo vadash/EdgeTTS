@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "isolatedModules": true,
-    "lib": ["DOM", "DOM.Iterable", "ES2021"],
+    "lib": ["DOM", "DOM.Iterable", "ES2021", "ES2022.Intl"],
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
     "strict": true,

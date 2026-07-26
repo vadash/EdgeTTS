@@ -72,6 +72,7 @@
     "filterChain": "Цепочка обработки",
     "silenceGap": "Пауза между чанками",
     "silenceGapHint": "Добавить тишину между аудиосегментами",
+    "previewProcessing": "Прослушать обработку звука",
     "dictionary": {
       "title": "Словарь",
       "label": "Реестр словаря",

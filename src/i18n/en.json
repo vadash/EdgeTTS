@@ -72,6 +72,7 @@
     "filterChain": "Processing Chain",
     "silenceGap": "Gap Between Chunks",
     "silenceGapHint": "Add silence between audio segments",
+    "previewProcessing": "Preview Audio Processing",
     "dictionary": {
       "title": "Dictionary",
       "label": "Dictionary register",

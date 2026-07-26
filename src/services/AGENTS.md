@@ -14,3 +14,4 @@ The core conversion pipeline (Text -> LLM -> TTS -> Audio). Managed by stateless
 
 - Modifying `TTSWorkerPool` lifecycle/retries → read `agent_docs/services/tts-worker-pool_gotchas.md`
 - Touching FFmpeg, ChunkStore, or crash recovery → read `agent_docs/services/ffmpeg-and-storage_gotchas.md`
+- Modifying `TextBlockSplitter` or sentence splitting → read `agent_docs/services/text-block-splitter_gotchas.md`

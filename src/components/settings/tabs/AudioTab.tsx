@@ -1,10 +1,12 @@
 import { Text } from 'preact-i18n';
 import { Button, Toggle } from '@/components/common';
+import { useAudioProcessingPreview } from '@/hooks/useAudioProcessingPreview';
 import { AUDIO_PRESETS } from '@/state/types';
 import { useConversion, useSettings } from '@/stores';
 
 export function AudioTab() {
   const settings = useSettings();
+  const audioPreview = useAudioProcessingPreview();
   const conversion = useConversion();
 
   return (
@@ -276,6 +278,43 @@ export function AudioTab() {
             <span className="px-2 py-0.5 text-xs rounded bg-cyan-500/20 text-cyan-400">
               Fade-In
             </span>
+          )}
+        </div>
+        <div className="mt-3 space-y-2">
+          <Button
+            className="w-full"
+            disabled={audioPreview.isPlaying || audioPreview.stage !== null}
+            onClick={() =>
+              audioPreview.play({
+                narratorVoice: settings.narratorVoice.value,
+                rate: settings.rate.value,
+                pitch: settings.pitch.value,
+                config: {
+                  eq: settings.eqEnabled.value,
+                  deEss: settings.deEssEnabled.value,
+                  silenceRemoval: settings.silenceRemovalEnabled.value,
+                  compressor: settings.compressorEnabled.value,
+                  normalization: settings.normalizationEnabled.value,
+                  fadeIn: settings.fadeInEnabled.value,
+                  silenceGapMs: 0,
+                },
+              })
+            }
+          >
+            {audioPreview.stage === null ? (
+              <>
+                🔊 <Text id="settings.previewProcessing">Preview Audio Processing</Text>
+              </>
+            ) : audioPreview.stage === 'tts' ? (
+              'Generating voice…'
+            ) : (
+              'Processing…'
+            )}
+          </Button>
+          {audioPreview.error && (
+            <div className="p-3 rounded-lg bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+              ⚠️ {audioPreview.error}
+            </div>
           )}
         </div>
       </div>

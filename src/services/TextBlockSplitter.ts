@@ -1,6 +1,25 @@
 import type { TextBlock } from '@/state/types';
 
 /**
+ * Cached Intl.Segmenter instances (expensive to construct — cache per locale).
+ * Sentence granularity; locale is passed from the splitter's public API.
+ * Falls back to 'en' if the requested locale is not a valid BCP-47 tag.
+ */
+const segmenterCache = new Map<string, Intl.Segmenter>();
+function getSegmenter(locale: string): Intl.Segmenter {
+  let seg = segmenterCache.get(locale);
+  if (!seg) {
+    try {
+      seg = new Intl.Segmenter(locale, { granularity: 'sentence' });
+    } catch {
+      seg = new Intl.Segmenter('en', { granularity: 'sentence' });
+    }
+    segmenterCache.set(locale, seg);
+  }
+  return seg;
+}
+
+/**
  * TextBlockSplitter - Splits text into sentences and blocks for LLM processing
  * Each line (\n) is split by sentence boundaries.
  */
@@ -16,7 +35,7 @@ export class TextBlockSplitter {
    * Split text into sentences (one per line, then by sentence boundaries).
    * Always splits into sentences to ensure proper LLM assignment and prevent TTS timeouts.
    */
-  splitIntoParagraphs(text: string): string[] {
+  splitIntoParagraphs(text: string, language: string = 'en'): string[] {
     const paragraphs: string[] = [];
     const lines = text.split('\n');
 
@@ -25,7 +44,7 @@ export class TextBlockSplitter {
       if (!trimmed) continue;
 
       // Always split by sentences to ensure proper LLM assignment and prevent TTS timeouts
-      const sentences = this.splitParagraphIntoSentences(trimmed);
+      const sentences = this.splitParagraphIntoSentences(trimmed, language);
       paragraphs.push(...sentences);
     }
 
@@ -38,91 +57,22 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Split a paragraph into sentences.
-   * Handles: .!?… and preserves abbreviations.
-   * Quote-aware: splits sentences even inside quoted text (TTS needs short segments).
-   * Handles missing spaces after punctuation (e.g. "calmly.Nilfgadi").
+   * Split a paragraph into sentences using Intl.Segmenter (sentence granularity).
+   * Abbreviations are handled per-locale natively — no hand-rolled list.
+   * Quote-aware: quoted speech is kept in one segment (over-long quotes are
+   * broken up later by splitLongSentences >300 chars).
    */
-  private splitParagraphIntoSentences(paragraph: string): string[] {
-    const sentences: string[] = [];
-    // Normalize line breaks within paragraph to spaces
+  private splitParagraphIntoSentences(paragraph: string, locale: string): string[] {
+    // Normalize line breaks within paragraph to spaces (same as the legacy parser)
     const text = paragraph.replace(/\n/g, ' ').replace(/\s+/g, ' ');
 
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      const next = text[i + 1] || '';
-      const next2 = text[i + 2] || '';
-
-      let justClosedQuote = false;
-      let isEllipsis = false;
-
-      // Track quote state (handle various quote characters)
-      if (char === '"') {
-        // Plain double quote: toggle state
-        inQuotes = !inQuotes;
-        if (!inQuotes) justClosedQuote = true;
-      } else if (char === '\u201C' || char === '\u00AB') {
-        // Opening curly quote or guillemet
-        inQuotes = true;
-      } else if (char === '\u201D' || char === '\u00BB') {
-        // Closing curly quote or guillemet
-        inQuotes = false;
-        justClosedQuote = true;
-      }
-
-      // Handle ellipsis
-      if (char === '.' && next === '.' && next2 === '.') {
-        current += '...';
-        i += 2;
-        isEllipsis = true;
-      } else {
-        current += char;
-      }
-
-      // Determine if we should split at this position
-      let shouldSplit = false;
-
-      // Split on sentence-ending punctuation (including inside quotes — TTS needs short sentences)
-      if (/[.!?…]/.test(char) || isEllipsis) {
-        shouldSplit = true;
-      } else if (justClosedQuote) {
-        // If quote just closed, check if the char before the quote was sentence-ending
-        const prevCharIdx = current.length - 2; // -1 for the quote char itself
-        if (prevCharIdx >= 0 && /[.!?…]/.test(current[prevCharIdx])) {
-          shouldSplit = true;
-        }
-      }
-
-      if (shouldSplit) {
-        const atEnd = i === text.length - 1;
-        const afterChar = text[i + 1] || '';
-        const beforeSpace = /\s/.test(afterChar);
-        // Detect missing spaces: e.g. "calmly.Nilfgadi" — next char is uppercase letter
-        const nextIsUpper =
-          afterChar.length > 0 &&
-          afterChar.toUpperCase() === afterChar &&
-          afterChar.toLowerCase() !== afterChar;
-        const beforeQuote = /["\u201C\u00AB]/.test(afterChar);
-
-        if ((atEnd || beforeSpace || nextIsUpper || beforeQuote) && !this.isAbbreviation(current)) {
-          const trimmed = current.trim();
-          if (trimmed && this.isPronounceable(trimmed)) {
-            sentences.push(trimmed);
-          }
-          current = '';
-        }
+    const sentences: string[] = [];
+    for (const { segment } of getSegmenter(locale).segment(text)) {
+      const trimmed = segment.trim();
+      if (trimmed && this.isPronounceable(trimmed)) {
+        sentences.push(trimmed);
       }
     }
-
-    // Add remaining text
-    const remaining = current.trim();
-    if (remaining && this.isPronounceable(remaining)) {
-      sentences.push(remaining);
-    }
-
     return sentences;
   }
 
@@ -239,15 +189,6 @@ export class TextBlockSplitter {
     }
 
     return result;
-  }
-
-  /**
-   * Check for common abbreviations (en/ru)
-   */
-  private isAbbreviation(text: string): boolean {
-    const t = text.trimEnd();
-    // Mr. Mrs. Dr. Prof. т.д. т.п. и т.д. г. гг.
-    return /\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|Inc|Ltd|т|п|д|г|гг|др|пр|ул|и)\.\s*$/i.test(t);
   }
 
   /**
@@ -394,16 +335,16 @@ export class TextBlockSplitter {
   /**
    * Create blocks for Extract (character extraction) - larger blocks
    */
-  createExtractBlocks(text: string): TextBlock[] {
-    const paragraphs = this.splitIntoParagraphs(text);
+  createExtractBlocks(text: string, language: string = 'en'): TextBlock[] {
+    const paragraphs = this.splitIntoParagraphs(text, language);
     return this.splitIntoBlocks(paragraphs, 16000);
   }
 
   /**
    * Create blocks for Assign (speaker assignment) - smaller blocks
    */
-  createAssignBlocks(text: string): TextBlock[] {
-    const paragraphs = this.splitIntoParagraphs(text);
+  createAssignBlocks(text: string, language: string = 'en'): TextBlock[] {
+    const paragraphs = this.splitIntoParagraphs(text, language);
     return this.splitIntoBlocks(paragraphs, 8000);
   }
 }
