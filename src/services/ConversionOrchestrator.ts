@@ -14,6 +14,7 @@ import type {
 import type { Stores } from '@/stores';
 import { updateProgress } from '@/stores/ConversionStore';
 import { withPermissionRetry } from '@/utils/retry';
+import { sanitizeFilename } from '@/utils/file';
 import type { AudioMerger } from './AudioMerger';
 import type { FFmpegService } from './FFmpegService';
 // Import concrete service classes
@@ -372,7 +373,7 @@ async function saveVoiceProfile(
   logger: ILogger,
 ): Promise<void> {
   try {
-    const bookName = extractBookName(fileNames);
+    const bookName = sanitizeFilename(extractBookName(fileNames));
     const fileName = `${bookName}.json`;
 
     await withPermissionRetry(directoryHandle, async () => {
@@ -393,8 +394,10 @@ async function saveVoiceProfile(
     });
 
     logger.info(`Saved voice mapping: ${bookName}/${fileName}`);
-  } catch {
-    logger.warn('Could not save voice mapping');
+  } catch (err) {
+    logger.warn('Could not save voice mapping', {
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
