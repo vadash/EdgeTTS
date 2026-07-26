@@ -235,24 +235,19 @@ export function AudioTab() {
               De-Ess
             </span>
           )}
-          {settings.silenceRemovalEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-green-500/20 text-green-400">
-              Silence
-            </span>
-          )}
           {settings.compressorEnabled.value && (
             <span className="px-2 py-0.5 text-xs rounded bg-yellow-500/20 text-yellow-400">
               Compress
             </span>
           )}
-          {settings.normalizationEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-orange-500/20 text-orange-400">
-              Normalize
+          {settings.silenceRemovalEnabled.value && (
+            <span className="px-2 py-0.5 text-xs rounded bg-green-500/20 text-green-400">
+              Silence
             </span>
           )}
           {settings.normalizationEnabled.value && (
             <span className="px-2 py-0.5 text-xs rounded bg-orange-500/20 text-orange-400">
-              Limiter
+              Normalize
             </span>
           )}
           {settings.fadeInEnabled.value && (

@@ -36,8 +36,8 @@ describe('SettingsStore', () => {
     });
 
     it('should have broadcast voice defaults', () => {
-      expect(settings.value.eqEnabled).toBe(true);
-      expect(settings.value.compressorEnabled).toBe(true);
+      expect(settings.value.eqEnabled).toBe(false);
+      expect(settings.value.compressorEnabled).toBe(false);
       expect(settings.value.fadeInEnabled).toBe(true);
     });
 
