@@ -8,7 +8,6 @@ import type { ChunkStore } from './ChunkStore';
 import { LadderController } from './LadderController';
 import type { ILogger } from './Logger';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
-import { KokoroFallbackService } from './KokoroFallbackService';
 
 export interface PoolTask {
   partIndex: number;
@@ -16,7 +15,6 @@ export interface PoolTask {
   filename: string;
   filenum: string;
   voice?: string;
-  gender?: 'male' | 'female' | 'unknown';
 }
 
 export interface WorkerPoolProgress {
@@ -78,9 +76,6 @@ export class TTSWorkerPool {
 
   // Failure logging
   private failureLogCounter = 0;
-
-  // Kokoro fallback for exhausted retries
-  private kokoroFallback = KokoroFallbackService.getInstance();
 
   // Options storage for access in tests
   public readonly options: WorkerPoolOptions;
@@ -365,53 +360,17 @@ export class TTSWorkerPool {
     this.queue.concurrency = this.ladder.getCurrentWorkers();
     this.options.onConcurrencyChange?.(this.queue.concurrency);
 
-    // Trigger Kokoro preload at attempt 2 (fire-and-forget, non-blocking)
-    if (attempt === 2) {
-      this.kokoroFallback.preload().catch((err) => {
-        this.logger?.warn(
-          `Kokoro preload failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      });
-    }
-
     // Check if we've exceeded max retries
     if (attempt > 5) {
       // Log the failure for debugging
       await this.logTTSFailure(task, error);
-
-      // Try Kokoro fallback before marking as permanently failed
-      this.logger?.info(
-        `Task ${task.partIndex}: Edge TTS failed 5 times. Attempting Kokoro fallback...`,
-      );
-
-      try {
-        const blob = await this.kokoroFallback.synthesize(task.text, task.gender ?? 'unknown');
-        const data = new Uint8Array(await blob.arrayBuffer());
-        await this.chunkStore!.writeChunk(task.partIndex, data);
-
-        // Cleanup retry state
-        this.retryCount.delete(task.partIndex);
-        this.processedCount++;
-
-        this.logger?.info(
-          `Task ${task.partIndex} synthesized via Kokoro fallback after 5 Edge TTS failures`,
-        );
-        return;
-      } catch (kokoroError) {
-        const kErrorMsg = kokoroError instanceof Error ? kokoroError.message : String(kokoroError);
-        this.logger?.warn(`Kokoro fallback failed for task ${task.partIndex}: ${kErrorMsg}`);
-
-        // Combine both errors so the UI shows the full picture
-        const origMsg = error instanceof Error ? error.message : String(error);
-        error = new Error(`EdgeTTS: ${origMsg} | Kokoro: ${kErrorMsg}`);
-      }
 
       // Permanent failure - already recorded above
       // Add to failed tasks
       this.failedTasks.add(task.partIndex);
       this.processedCount++;
 
-      // Call error callback with combined error
+      // Call error callback with the original error
       this.onTaskError?.(task.partIndex, error instanceof Error ? error : new Error(String(error)));
 
       this.logger?.error(

@@ -769,7 +769,6 @@ export async function runConversion(
         services,
         stores,
         chunkStore,
-        characters,
       );
     } else {
       // ==================== RESUME MODE - SKIP LLM ====================
@@ -818,7 +817,6 @@ export async function runConversion(
         services,
         stores,
         chunkStore,
-        characters,
       );
     }
 
@@ -858,7 +856,6 @@ async function runTTSStage(
   services: ConversionOrchestratorServices,
   _stores: Stores,
   chunkStore: ChunkStore,
-  characters: LLMCharacter[] = [],
 ): Promise<void> {
   const { logger, workerPoolFactory, audioMergerFactory, ffmpegService } = services;
 
@@ -871,23 +868,12 @@ async function runTTSStage(
   // ==================== TTS CONVERSION ====================
   checkCancelled(signal);
 
-  // Build speaker→gender map from characters for Kokoro fallback
-  const speakerGenderMap = new Map<string, 'male' | 'female' | 'unknown'>();
-  for (const ch of characters) {
-    speakerGenderMap.set(ch.canonicalName, ch.gender);
-    for (const v of ch.variations) {
-      speakerGenderMap.set(v, ch.gender);
-    }
-  }
-
   const chunks = assignments
     .filter((a) => /[\p{L}\p{N}]/u.test(a.text))
     .map((a, index) => ({
       text: a.text,
       voice: a.voiceId,
       partIndex: index,
-      speaker: a.speaker,
-      gender: speakerGenderMap.get(a.speaker),
     }));
 
   if (chunks.length === 0) {
@@ -1025,7 +1011,6 @@ async function runTTSStage(
             filename: filename,
             filenum: String(chunk.partIndex + 1).padStart(4, '0'),
             voice: chunk.voice,
-            gender: chunk.gender,
           };
         }),
       );
