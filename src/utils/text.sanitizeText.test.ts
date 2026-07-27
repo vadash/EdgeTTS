@@ -1,63 +1,6 @@
-/**
- * Tests for sanitizeText helper function.
- * This file redefines the function for testing since it's private in ConversionOrchestrator.ts.
- */
-
 import { describe, expect, it } from 'vitest';
 
-// Replicate the sanitizeText function from ConversionOrchestrator.ts
-function sanitizeText(text: string): string {
-  let result = text;
-
-  // 1. Markdown headers
-  result = result.replace(/^#{1,6}\s+/gm, '');
-
-  // 2. Markdown bold/italic (longest first)
-  result = result.replace(/\*{3}([^*]+)\*{3}/g, '$1');
-  result = result.replace(/\*{2}([^*]+)\*{2}/g, '$1');
-  result = result.replace(/\*([^*]+)\*/g, '$1');
-  result = result.replace(/_{3}([^_]+)_{3}/g, '$1');
-  result = result.replace(/_{2}([^_]+)_{2}/g, '$1');
-  result = result.replace(/_([^_]+)_/g, '$1');
-
-  // 3. Strikethrough
-  result = result.replace(/~~([^~]+)~~/g, '$1');
-
-  // 4. Inline code
-  result = result.replace(/`([^`]+)`/g, '$1');
-
-  // 5. HTML tags
-  result = result.replace(/<[^>]+>/g, '');
-
-  // 6. Decorative character runs (3+ consecutive identical characters) -> pause marker
-  // Handles: ___, ¯¯¯, ***, ~~~, ===, ---, •••, ···, ───, ═══
-  // IMPORTANT: Apply AFTER markdown stripping to avoid breaking patterns like **bold**
-  result = result.replace(/¯{3,}/g, '...');
-  result = result.replace(/_{3,}/g, '...');
-  result = result.replace(/\*{3,}/g, '...');
-  result = result.replace(/~{3,}/g, '...');
-  result = result.replace(/={3,}/g, '...');
-  result = result.replace(/-{3,}/g, '...');
-  result = result.replace(/•{3,}/g, '...');
-  result = result.replace(/·{3,}/g, '...');
-  result = result.replace(/─{3,}/g, '...');
-  result = result.replace(/═{3,}/g, '...');
-
-  // 7. Special Unicode
-  result = result.replace(/[\u200B-\u200D\uFEFF]/g, '');
-
-  // 8. Control characters (except newlines, tabs)
-  result = result.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-
-  // 9. Remaining special characters
-  result = result.replace(/[|\\^]/g, '');
-  result = result.replace(/&/g, ' and ');
-
-  // 10. Multiple spaces
-  result = result.replace(/ {2,}/g, ' ');
-
-  return result.trim();
-}
+import { sanitizeText } from './text';
 
 describe('sanitizeText', () => {
   describe('decorative character runs', () => {
