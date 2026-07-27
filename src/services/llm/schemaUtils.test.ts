@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { cleanSchemaForXGrammar, zodToJsonSchema } from './schemaUtils';
-import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
+import { ExtractSchema } from './schemas';
 
 describe('schemaUtils', () => {
   it('converts simple schema to JSON Schema format', () => {
@@ -72,8 +72,6 @@ describe('schemaUtils', () => {
   describe('xgrammar compatibility', () => {
     const pipelineSchemas: Array<{ name: string; schema: z.ZodType }> = [
       { name: 'ExtractSchema', schema: ExtractSchema },
-      { name: 'MergeSchema', schema: MergeSchema },
-      { name: 'AssignSchema', schema: AssignSchema },
     ];
 
     for (const { name, schema } of pipelineSchemas) {

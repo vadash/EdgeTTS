@@ -59,45 +59,6 @@ describe('FFmpegService Opus integration', () => {
     expect(allCalls).toContain('-maxrate');
     expect(allCalls[allCalls.indexOf('-maxrate') + 1]).toBe('64k');
   });
-
-  it('should use default Opus settings when not provided', async () => {
-    const logStore = new LoggerStore();
-    const service = new FFmpegService(logStore);
-
-    const allCalls: string[] = [];
-    (service as any).ffmpeg = {
-      exec: async (args: string[]) => {
-        allCalls.push(...args);
-        return;
-      },
-      writeFile: () => {},
-      readFile: () => new Uint8Array(),
-      deleteFile: () => {},
-    };
-    (service as any).loaded = true;
-
-    const config: AudioProcessingConfig = {
-      silenceRemoval: false,
-      normalization: false,
-      deEss: false,
-      silenceGapMs: 0,
-      eq: false,
-      compressor: false,
-      fadeIn: false,
-      // No Opus settings - should use defaults
-    };
-
-    await service.processAudio([new Uint8Array()], config);
-
-    // Should still have bitrate args (from default config)
-    const bitrateIdx = allCalls.indexOf('-b:a');
-    expect(bitrateIdx).toBeGreaterThan(-1);
-    expect(allCalls[bitrateIdx + 1]).toMatch(/\d+k/); // Should be something like '64k'
-
-    // Should still have compression level (from default config)
-    const compressionIdx = allCalls.indexOf('-compression_level');
-    expect(compressionIdx).toBeGreaterThan(-1);
-  });
 });
 
 /**

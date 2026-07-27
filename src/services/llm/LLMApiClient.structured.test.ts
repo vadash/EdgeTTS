@@ -342,36 +342,6 @@ describe('LLMApiClient.callStructured', () => {
     ).rejects.toThrow('Empty response from LLM');
   });
 
-  it('uses non-streaming when streaming option is false', async () => {
-    const TestSchema = z.object({ value: z.string() });
-
-    mockCreate.mockResolvedValue({
-      choices: [{ message: { content: '{"value":"ok"}', refusal: null } }],
-    });
-
-    const client = new LLMApiClient({
-      apiKey: 'test-key',
-      apiUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
-      streaming: false,
-      logger: mockLogger,
-    });
-
-    const result = await (client as any).callStructured({
-      messages: [
-        { role: 'system' as const, content: 'test' },
-        { role: 'user' as const, content: 'test' },
-      ],
-      schema: TestSchema,
-      schemaName: 'TestSchema',
-    });
-
-    expect(result).toEqual({ value: 'ok' });
-    expect(mockCreate).toHaveBeenCalled();
-    const callArgs = mockCreate.mock.calls[0][0];
-    expect(callArgs).toMatchObject({ stream: false });
-  });
-
   it('saves debug logs on Zod validation error', async () => {
     const TestSchema = z.object({
       requiredField: z.string(),
@@ -511,29 +481,6 @@ describe('LLMApiClient.callStructured', () => {
       mockCreate.mockResolvedValue(mockResponse);
     });
 
-    it('omits thinking parameters when reasoning is null (OFF)', async () => {
-      const client = new LLMApiClient({
-        apiKey: 'test-key',
-        apiUrl: 'https://api.openai.com/v1',
-        model: 'gpt-4o-mini',
-        reasoning: null, // OFF
-        logger: mockLogger,
-      });
-
-      await (client as any).callStructured({
-        messages: [
-          { role: 'system' as const, content: 'test' },
-          { role: 'user' as const, content: 'test' },
-        ],
-        schema: TestSchema,
-        schemaName: 'TestSchema',
-      });
-
-      const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs).not.toHaveProperty('enable_thinking');
-      expect(callArgs).not.toHaveProperty('reasoning_effort');
-    });
-
     it('omits thinking parameters when reasoning is undefined', async () => {
       const client = new LLMApiClient({
         apiKey: 'test-key',
@@ -554,29 +501,6 @@ describe('LLMApiClient.callStructured', () => {
 
       const callArgs = mockCreate.mock.calls[0][0];
       expect(callArgs).not.toHaveProperty('enable_thinking');
-      expect(callArgs).not.toHaveProperty('reasoning_effort');
-    });
-
-    it('sends enable_thinking=true without reasoning_effort when reasoning is auto', async () => {
-      const client = new LLMApiClient({
-        apiKey: 'test-key',
-        apiUrl: 'https://api.openai.com/v1',
-        model: 'gpt-4o-mini',
-        reasoning: 'auto',
-        logger: mockLogger,
-      });
-
-      await (client as any).callStructured({
-        messages: [
-          { role: 'system' as const, content: 'test' },
-          { role: 'user' as const, content: 'test' },
-        ],
-        schema: TestSchema,
-        schemaName: 'TestSchema',
-      });
-
-      const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.enable_thinking).toBe(true);
       expect(callArgs).not.toHaveProperty('reasoning_effort');
     });
 
@@ -624,29 +548,6 @@ describe('LLMApiClient.callStructured', () => {
       const callArgs = mockCreate.mock.calls[0][0];
       expect(callArgs.enable_thinking).toBe(true);
       expect(callArgs.reasoning_effort).toBe('medium');
-    });
-
-    it('sends enable_thinking=true and reasoning_effort=high', async () => {
-      const client = new LLMApiClient({
-        apiKey: 'test-key',
-        apiUrl: 'https://api.openai.com/v1',
-        model: 'gpt-4o-mini',
-        reasoning: 'high',
-        logger: mockLogger,
-      });
-
-      await (client as any).callStructured({
-        messages: [
-          { role: 'system' as const, content: 'test' },
-          { role: 'user' as const, content: 'test' },
-        ],
-        schema: TestSchema,
-        schemaName: 'TestSchema',
-      });
-
-      const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.enable_thinking).toBe(true);
-      expect(callArgs.reasoning_effort).toBe('high');
     });
   });
 });

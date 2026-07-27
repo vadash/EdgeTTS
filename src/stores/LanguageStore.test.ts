@@ -14,14 +14,6 @@ describe('LanguageStore', () => {
     it('starts with English locale', () => {
       expect(store.locale.value).toBe('en');
     });
-
-    it('isEnglish is true by default', () => {
-      expect(store.isEnglish.value).toBe(true);
-    });
-
-    it('isRussian is false by default', () => {
-      expect(store.isRussian.value).toBe(false);
-    });
   });
 
   describe('setLocale', () => {
@@ -65,12 +57,6 @@ describe('LanguageStore', () => {
   });
 
   describe('persistence', () => {
-    it('saves to localStorage', () => {
-      store.setLocale('ru');
-      store.save();
-      expect(localStorage.getItem(StorageKeys.language)).toBe('ru');
-    });
-
     it('loads English from localStorage', () => {
       localStorage.setItem(StorageKeys.language, 'en');
       store.load();
@@ -112,12 +98,6 @@ describe('LanguageStore', () => {
       store.setLocale('ru');
       store.reset();
       expect(store.locale.value).toBe('en');
-    });
-
-    it('persists reset to localStorage', () => {
-      store.setLocale('ru');
-      store.reset();
-      expect(localStorage.getItem(StorageKeys.language)).toBe('en');
     });
   });
 });

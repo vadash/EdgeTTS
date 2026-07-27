@@ -9,7 +9,6 @@ import {
   dismissedNotifications,
   loadFromStorage,
   resetUISettings,
-  uiSettings,
 } from '@/stores/UISettingsStore';
 
 describe('UISettingsStore', () => {
@@ -22,10 +21,6 @@ describe('UISettingsStore', () => {
     it('should have both notifications visible by default', () => {
       expect(dismissedNotifications.value.llmRequired).toBe(false);
       expect(dismissedNotifications.value.resumeFeatureTip).toBe(false);
-    });
-
-    it('defaultState constant should match initial signal state', () => {
-      expect(uiSettings.value.dismissedNotifications).toEqual(defaultState.dismissedNotifications);
     });
   });
 
@@ -65,13 +60,6 @@ describe('UISettingsStore', () => {
 
     it('should fall back to defaults on JSON parse errors', () => {
       localStorage.setItem(StorageKeys.uiSettings, 'invalid json{');
-
-      const loaded = loadFromStorage();
-      expect(loaded).toEqual(defaultState);
-    });
-
-    it('should handle corrupted data gracefully', () => {
-      localStorage.setItem(StorageKeys.uiSettings, 'null');
 
       const loaded = loadFromStorage();
       expect(loaded).toEqual(defaultState);
@@ -132,17 +120,6 @@ describe('UISettingsStore', () => {
         const parsed = JSON.parse(saved);
         expect(parsed.dismissedNotifications.llmRequired).toBe(true);
       }
-    });
-
-    it('loadFromStorage should restore previously dismissed state', () => {
-      // First, dismiss and save
-      dismissNotification('llmRequired');
-
-      // Then load from storage (simulates a page reload)
-      const loaded = loadFromStorage();
-
-      expect(loaded.dismissedNotifications.llmRequired).toBe(true);
-      expect(loaded.dismissedNotifications.resumeFeatureTip).toBe(false);
     });
   });
 

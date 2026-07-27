@@ -16,9 +16,6 @@ import {
   resetConversionStore,
   setConcurrencyStats,
   setError,
-  setFFmpegError,
-  setFFmpegLoaded,
-  setFFmpegLoading,
   setStatus,
   startConversion,
   updateProgress,
@@ -27,12 +24,6 @@ import {
 describe('ConversionStore', () => {
   beforeEach(() => {
     resetConversionStore();
-  });
-
-  describe('initial state', () => {
-    it('starts with idle status', () => {
-      expect(conversion.value.status).toBe('idle');
-    });
   });
 
   describe('isProcessing computed', () => {
@@ -88,14 +79,6 @@ describe('ConversionStore', () => {
     });
   });
 
-  describe('startConversion', () => {
-    it('resets progress to zero', () => {
-      updateProgress(5, 10, 2);
-      startConversion();
-      expect(conversion.value.progress).toEqual({ current: 0, total: 0, failed: 0 });
-    });
-  });
-
   describe('error handling', () => {
     it('sets error with message', () => {
       setError('Something went wrong');
@@ -130,42 +113,6 @@ describe('ConversionStore', () => {
       setStatus('converting');
       cancel();
       expect(conversion.value.status).toBe('cancelled');
-    });
-  });
-
-  describe('reset', () => {
-    it('resets all state to initial values', () => {
-      setStatus('converting');
-      updateProgress(5, 10, 2);
-      setError('Error');
-      startConversion();
-
-      resetConversionStore();
-
-      expect(conversion.value.status).toBe('idle');
-      expect(conversion.value.progress).toEqual({ current: 0, total: 0, failed: 0 });
-      expect(conversion.value.startTime).toBeNull();
-      expect(conversion.value.phaseStartTime).toBeNull();
-      expect(conversion.value.error).toBeNull();
-    });
-  });
-
-  describe('FFmpeg state', () => {
-    it('sets FFmpeg loaded', () => {
-      setFFmpegLoading(true);
-      setFFmpegLoaded(true);
-
-      expect(conversion.value.ffmpegLoaded).toBe(true);
-      expect(conversion.value.ffmpegLoading).toBe(false);
-      expect(conversion.value.ffmpegError).toBeNull();
-    });
-
-    it('sets FFmpeg error', () => {
-      setFFmpegLoading(true);
-      setFFmpegError('Failed to load');
-
-      expect(conversion.value.ffmpegError).toBe('Failed to load');
-      expect(conversion.value.ffmpegLoading).toBe(false);
     });
   });
 

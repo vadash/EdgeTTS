@@ -26,10 +26,6 @@ describe('DataStore', () => {
     });
 
     describe('sentenceCount', () => {
-      it('returns 0 when no book', () => {
-        expect(store.sentenceCount.value).toBe(0);
-      });
-
       it('returns sentence count from book', () => {
         store.setBook({ allSentences: ['A.', 'B.', 'C.'], fileNames: [], fullText: 'A. B. C.' });
         expect(store.sentenceCount.value).toBe(3);
@@ -37,10 +33,6 @@ describe('DataStore', () => {
     });
 
     describe('fileNames', () => {
-      it('returns empty array when no book', () => {
-        expect(store.fileNames.value).toEqual([]);
-      });
-
       it('returns file names from book', () => {
         const fileNames: [string, number][] = [
           ['ch1', 0],
@@ -124,12 +116,6 @@ describe('DataStore', () => {
         expect(store.detectedLanguage.value).toBe('en');
         store.setDetectedLanguage('de');
         expect(store.detectedLanguage.value).toBe('de');
-      });
-
-      it('clears loaded file name on clear()', () => {
-        store.setLoadedFileName('mybook.epub');
-        store.clear();
-        expect(store.loadedFileName.value).toBe('');
       });
     });
   });

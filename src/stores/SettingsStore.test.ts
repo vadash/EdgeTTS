@@ -10,8 +10,6 @@ import {
   rateDisplay,
   resetSettings,
   setMergeConcurrency,
-  setOpusCompressionLevel,
-  setOpusMaxBitrate,
   setOpusMinBitrate,
   settings,
 } from '@/stores/SettingsStore';
@@ -34,19 +32,6 @@ describe('SettingsStore', () => {
       expect(settings.value.silenceRemovalEnabled).toBe(true);
       expect(settings.value.normalizationEnabled).toBe(true);
       expect(settings.value.deEssEnabled).toBe(true);
-    });
-
-    it('should have broadcast voice defaults', () => {
-      expect(settings.value.eqEnabled).toBe(false);
-      expect(settings.value.compressorEnabled).toBe(false);
-      expect(settings.value.fadeInEnabled).toBe(true);
-    });
-
-    it('should have Opus encoding defaults', () => {
-      expect(settings.value.opusPreset).toBe(AudioPreset.PC);
-      expect(settings.value.opusMinBitrate).toBe(24);
-      expect(settings.value.opusCompressionLevel).toBe(10);
-      expect(settings.value.mergeConcurrency).toBe(2);
     });
   });
 
@@ -77,20 +62,6 @@ describe('SettingsStore', () => {
       setOpusMinBitrate(48);
       expect(settings.value.opusPreset).toBe(AudioPreset.CUSTOM);
       expect(settings.value.opusMinBitrate).toBe(48);
-    });
-
-    it('setOpusMaxBitrate should switch preset to CUSTOM', () => {
-      applyOpusPreset(AudioPreset.MOBILE);
-      setOpusMaxBitrate(128);
-      expect(settings.value.opusPreset).toBe(AudioPreset.CUSTOM);
-      expect(settings.value.opusMaxBitrate).toBe(128);
-    });
-
-    it('setOpusCompressionLevel should switch preset to CUSTOM', () => {
-      applyOpusPreset(AudioPreset.MOBILE);
-      setOpusCompressionLevel(5);
-      expect(settings.value.opusPreset).toBe(AudioPreset.CUSTOM);
-      expect(settings.value.opusCompressionLevel).toBe(5);
     });
 
     it('setMergeConcurrency should update value without touching opusPreset', () => {

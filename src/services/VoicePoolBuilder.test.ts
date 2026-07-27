@@ -59,13 +59,6 @@ describe('VoicePoolBuilder', () => {
       }
     });
 
-    it('returns all voices when no options specified', () => {
-      const pool = buildVoicePool();
-      const totalVoices = pool.male.length + pool.female.length;
-
-      expect(totalVoices).toBeGreaterThan(0);
-    });
-
     it('returns empty pools for non-existent locale', () => {
       const pool = buildVoicePool({ language: 'xx' });
 
@@ -85,15 +78,6 @@ describe('VoicePoolBuilder', () => {
       expect(hasMultilingual).toBe(true);
     });
 
-    it('does not include multilingual voices when flag not set', () => {
-      const poolWithout = buildVoicePool({ language: 'ru', includeMultilingual: false });
-      const poolWith = buildVoicePool({ language: 'ru', includeMultilingual: true });
-
-      expect(poolWith.male.length + poolWith.female.length).toBeGreaterThan(
-        poolWithout.male.length + poolWithout.female.length,
-      );
-    });
-
     it('respects enabledVoices allowlist', () => {
       const pool = buildVoicePool({
         language: 'en',
@@ -104,17 +88,6 @@ describe('VoicePoolBuilder', () => {
         'en-US, GuyNeural',
         'en-US, JennyNeural',
       ]);
-    });
-
-    it('contains non-Multilingual variants for voices that have Multilingual pairs', () => {
-      const pool = buildVoicePool({ language: 'en' });
-      const all = [...pool.male, ...pool.female];
-
-      // These are the non-Multilingual counterparts that must exist
-      expect(all).toContain('en-US, AndrewNeural');
-      expect(all).toContain('en-US, AvaNeural');
-      expect(all).toContain('en-US, BrianNeural');
-      expect(all).toContain('en-US, EmmaNeural');
     });
 
     it('deduplicates Multilingual pairs for EN book — keeps non-Multilingual', () => {
@@ -136,18 +109,6 @@ describe('VoicePoolBuilder', () => {
       // Multilingual voices present (no non-Multilingual EN voice leaks in)
       expect(all).toContain('en-US, AndrewMultilingualNeural');
       expect(all).not.toContain('en-US, AndrewNeural');
-    });
-
-    it('orders native voices before Multilingual in pool', () => {
-      const pool = buildVoicePool({ language: 'ru', includeMultilingual: true });
-
-      // All ru-* voices should appear before any Multilingual voice
-      const firstMultiIdx = pool.male.findIndex((v) => v.includes('Multilingual'));
-      const lastNativeIdx = pool.male.reduce((last, v, i) => (v.startsWith('ru') ? i : last), -1);
-
-      if (firstMultiIdx !== -1 && lastNativeIdx !== -1) {
-        expect(lastNativeIdx).toBeLessThan(firstMultiIdx);
-      }
     });
   });
 

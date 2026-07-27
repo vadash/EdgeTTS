@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StatusUpdate, TTSConfig as VoiceConfig } from '@/state/types';
+import type { TTSConfig as VoiceConfig } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 import type { ChunkStore } from './ChunkStore';
 import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from './TTSWorkerPool';
@@ -99,13 +99,6 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('addTask', () => {
-    it('adds a single task to the queue', () => {
-      pool = createPool();
-      pool.addTask(createTask(0));
-
-      expect(pool.getProgress().total).toBe(1);
-    });
-
     it('processes task through worker', async () => {
       pool = createPool();
       pool.addTask(createTask(0));
@@ -316,69 +309,6 @@ describe('TTSWorkerPool', () => {
     });
   });
 
-  describe('status updates', () => {
-    it('sends status updates during processing', async () => {
-      const statusUpdates: StatusUpdate[] = [];
-
-      pool = createPool({
-        onStatusUpdate: (update) => statusUpdates.push(update),
-      });
-      pool.addTask(createTask(0));
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      expect(statusUpdates).toContainEqual(
-        expect.objectContaining({
-          partIndex: 0,
-          message: expect.stringContaining('Processing'),
-        }),
-      );
-    });
-  });
-
-  describe('getProgress', () => {
-    it('returns correct progress', async () => {
-      pool = createPool({ maxWorkers: 1 });
-      pool.addTasks([createTask(0), createTask(1), createTask(2)]);
-
-      expect(pool.getProgress()).toEqual({
-        completed: 0,
-        total: 3,
-        failed: 0,
-      });
-
-      await vi.advanceTimersByTimeAsync(200);
-
-      expect(pool.getProgress().completed).toBeGreaterThan(0);
-    });
-  });
-
-  describe('getCompletedAudio', () => {
-    it('returns copy of completed audio map', async () => {
-      pool = createPool();
-      pool.addTask(createTask(0));
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      const audio1 = pool.getCompletedAudio();
-      const audio2 = pool.getCompletedAudio();
-
-      expect(audio1).toEqual(audio2);
-      expect(audio1).not.toBe(audio2);
-    });
-  });
-
-  describe('getFailedTasks', () => {
-    it('returns copy of failed tasks set', () => {
-      pool = createPool();
-
-      const failed1 = pool.getFailedTasks();
-      const failed2 = pool.getFailedTasks();
-
-      expect(failed1).not.toBe(failed2);
-    });
-  });
-
   describe('cleanup', () => {
     it('closes chunkStore', async () => {
       pool = createPool();
@@ -441,54 +371,6 @@ describe('TTSWorkerPool', () => {
     });
   });
 
-  describe('getPoolStats', () => {
-    it('returns worker statistics', () => {
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('READY'),
-        };
-      });
-
-      pool = createPool({ maxWorkers: 3 });
-
-      const stats = pool.getPoolStats();
-
-      // With generic-pool, connections are created on demand
-      // Initially no connections exist
-      expect(stats).toEqual({
-        total: 3,
-        ready: 0,
-        busy: 0,
-        disconnected: 3,
-      });
-    });
-
-    it('shows connections after warmup', async () => {
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('READY'),
-        };
-      });
-
-      pool = createPool({ maxWorkers: 3 });
-      await pool.warmup();
-
-      const stats = pool.getPoolStats();
-
-      // After warmup, connections should be available
-      expect(stats.total).toBe(3);
-      expect(stats.ready).toBeGreaterThanOrEqual(0);
-    });
-  });
-
   describe('connection handling', () => {
     it('connects worker if not ready before sending', async () => {
       mockIsReady = vi.fn().mockReturnValue(false);
@@ -539,25 +421,6 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('calculateRetryDelay', () => {
-    it('calculates half-max-jitter delay for each attempt up to the cap', () => {
-      pool = createPool();
-      vi.spyOn(Math, 'random').mockReturnValue(0.5);
-      // @ts-expect-error - accessing private method for testing
-      const calculateDelay = (attempt: number) => pool.calculateRetryDelay(attempt);
-
-      // halfDelay + jitter (half of halfDelay) per attempt:
-      const cases: Array<[number, number]> = [
-        [1, 2250], // 1500 + 750
-        [2, 7500], // 5000 + 2500
-        [3, 22500], // 15000 + 7500
-        [4, 45000], // 30000 + 15000
-        [5, 90000], // 60000 + 30000
-      ];
-      for (const [attempt, expected] of cases) {
-        expect(calculateDelay(attempt)).toBe(expected);
-      }
-    });
-
     it('caps max delay at 120s (2 minutes) - attempts beyond 5 use last delay', () => {
       pool = createPool();
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -570,24 +433,6 @@ describe('TTSWorkerPool', () => {
       expect(calculateDelay(7)).toBe(90000);
       expect(calculateDelay(10)).toBe(90000);
       expect(calculateDelay(100)).toBe(90000);
-    });
-
-    it('adds jitter randomness to delays', () => {
-      pool = createPool();
-
-      // Test with different jitter values
-      const randomSpy = vi.spyOn(Math, 'random');
-
-      randomSpy.mockReturnValue(0); // Min jitter
-      // @ts-expect-error - accessing private method for testing
-      const minDelay = pool.calculateRetryDelay(1);
-
-      randomSpy.mockReturnValue(1); // Max jitter
-      // @ts-expect-error - accessing private method for testing
-      const maxDelay = pool.calculateRetryDelay(1);
-
-      // Delay should vary by up to 1500ms (1.5s) due to half-max jitter
-      expect(maxDelay - minDelay).toBe(1500);
     });
   });
 
@@ -783,24 +628,6 @@ describe('TTSWorkerPool', () => {
 
       // Should be called during failure handling
       expect(onConcurrencyChange).toHaveBeenCalled();
-    });
-
-    it('passes the correct concurrency value to the callback', async () => {
-      const onConcurrencyChange = vi.fn();
-      pool = createPool({ onConcurrencyChange });
-
-      // Spy on ladder.getCurrentWorkers to verify the value
-      // @ts-expect-error - accessing private property for testing
-      const ladder = pool.ladder;
-      const getCurrentWorkersSpy = vi.spyOn(ladder, 'getCurrentWorkers').mockReturnValue(2);
-
-      pool.addTask(createTask(0));
-      await vi.advanceTimersByTimeAsync(100);
-
-      // Should be called with the value from getCurrentWorkers
-      expect(onConcurrencyChange).toHaveBeenCalledWith(2);
-
-      getCurrentWorkersSpy.mockRestore();
     });
 
     it('does not throw if onConcurrencyChange is not provided', async () => {

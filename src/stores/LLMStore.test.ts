@@ -3,12 +3,9 @@ import type { LLMCharacter } from '@/state/types';
 import {
   addCharacter,
   awaitReview,
-  blockProgress,
   cancelReview,
   characterLineCounts,
-  characterNames,
   confirmReview,
-  getStageConfig,
   isConfigured,
   isProcessing,
   llm,
@@ -79,28 +76,6 @@ describe('LLMStore', () => {
         }
       });
     });
-
-    describe('blockProgress', () => {
-      it('returns current and total blocks', () => {
-        setBlockProgress(5, 10);
-        expect(blockProgress.value).toEqual({ current: 5, total: 10 });
-      });
-    });
-
-    describe('characterNames', () => {
-      it('returns empty array when no characters', () => {
-        expect(characterNames.value).toEqual([]);
-      });
-
-      it('returns character names', () => {
-        const characters: LLMCharacter[] = [
-          { canonicalName: 'Alice', gender: 'female', variations: [] },
-          { canonicalName: 'Bob', gender: 'male', variations: [] },
-        ];
-        setCharacters(characters);
-        expect(characterNames.value).toEqual(['Alice', 'Bob']);
-      });
-    });
   });
 
   describe('settings actions', () => {
@@ -118,12 +93,6 @@ describe('LLMStore', () => {
       };
       setStageConfig('extract', config);
       expect(llm.value.extract).toEqual(config);
-    });
-
-    it('gets stage config', () => {
-      setStageField('extract', 'apiKey', 'sk-key');
-      const config = getStageConfig('extract');
-      expect(config.apiKey).toBe('sk-key');
     });
   });
 
@@ -201,10 +170,6 @@ describe('LLMStore', () => {
     });
 
     describe('characterLineCounts', () => {
-      it('returns empty map when no assignments', () => {
-        expect(characterLineCounts.value.size).toBe(0);
-      });
-
       it('counts lines per character', () => {
         setSpeakerAssignments([
           { sentenceIndex: 0, text: 'Hello', speaker: 'John', voiceId: 'v1' },

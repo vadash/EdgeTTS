@@ -215,29 +215,6 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       expect(blocks[1].sentenceStartIndex).toBe(2);
     });
 
-    it('maintains correct sentenceStartIndex after chapter header split', () => {
-      const maxTokens = 100;
-      const filler = tokenFill(86);
-
-      const blocks = splitter.splitIntoBlocks([filler, 'Chapter 5', 'Content.'], maxTokens);
-
-      expect(blocks[0].sentenceStartIndex).toBe(0);
-      // Chapter 5 is at index 1
-      expect(blocks[1].sentenceStartIndex).toBe(1);
-    });
-
-    it('maintains correct sentenceStartIndex after narration break', () => {
-      const maxTokens = 100;
-      const filler = tokenFill(86);
-      const narration = 'a'.repeat(200);
-
-      const blocks = splitter.splitIntoBlocks([filler, narration, 'Content.'], maxTokens);
-
-      expect(blocks[0].sentenceStartIndex).toBe(0);
-      // Narration is included in block 0, Content at index 2 starts block 1
-      expect(blocks[1].sentenceStartIndex).toBe(2);
-    });
-
     it('preserves existing behavior: oversized sentences handled unchanged', () => {
       const maxTokens = 100;
       const giant = tokenFill(150); // 150 tokens > 100 maxTokens

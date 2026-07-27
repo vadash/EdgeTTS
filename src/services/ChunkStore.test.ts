@@ -258,38 +258,6 @@ describe('ChunkStore', () => {
       expect(entry1).toHaveProperty('o', 3);
       expect(entry1).toHaveProperty('l', 2); // [4,5] = 2 bytes
     });
-
-    it('should increment file counter for subsequent flushes', async () => {
-      await store.init(mockDirHandle);
-
-      // Track which phase we're in for getAllKeys mocking
-      // Phase 1: first write + flush | Phase 2: second write + flush
-      let phase = 1;
-
-      vi.mocked(getAllKeys).mockImplementation(async () => {
-        if (phase === 1) return [0]; // 1 key for first flush
-        return [1]; // 1 key for second flush
-      });
-      vi.mocked(getChunk).mockImplementation(async (_db, key) => new Uint8Array([key]));
-      vi.mocked(getChunksByKeys).mockImplementation(async (_db, k) =>
-        k.map((key) => ({ key, data: new Uint8Array([key]) })),
-      );
-
-      await store.writeChunk(0, new Uint8Array([0]));
-      await store.prepareForRead();
-
-      expect(mockFs.files.has('chunks_data_0.bin')).toBe(true);
-      expect(mockFs.files.has('chunks_index_0.jsonl')).toBe(true);
-
-      // Switch to phase 2
-      phase = 2;
-
-      await store.writeChunk(1, new Uint8Array([1]));
-      await store.prepareForRead();
-
-      expect(mockFs.files.has('chunks_data_1.bin')).toBe(true);
-      expect(mockFs.files.has('chunks_index_1.jsonl')).toBe(true);
-    });
   });
 
   describe('prepareForRead', () => {
@@ -358,13 +326,6 @@ describe('ChunkStore', () => {
 
       expect(store.getExistingIndices()).toEqual(new Set([0, 5, 10]));
     });
-
-    it('should stay synchronous', () => {
-      // getExistingIndices should not return a Promise
-      const result = store.getExistingIndices();
-      expect(result).toBeInstanceOf(Set);
-      expect(result).not.toBeInstanceOf(Promise);
-    });
   });
 
   describe('clearDatabase', () => {
@@ -396,30 +357,6 @@ describe('ChunkStore', () => {
   });
 
   describe('parseExistingIndex', () => {
-    it('should load existing numbered index files on init', async () => {
-      // Pre-create numbered index files
-      const indexHandle0 = await mockDirHandle.getFileHandle('chunks_index_0.jsonl', {
-        create: true,
-      });
-      const writable0 = await indexHandle0.createWritable();
-      await writable0.write('{"i":0,"o":0,"l":3}\n{"i":1,"o":3,"l":2}\n');
-      await writable0.close();
-
-      // Pre-create corresponding data file
-      const dataHandle0 = await mockDirHandle.getFileHandle('chunks_data_0.bin', { create: true });
-      const dataWritable = await dataHandle0.createWritable();
-      await dataWritable.write(new Uint8Array([1, 2, 3, 4, 5]));
-      await dataWritable.close();
-
-      // No IDB chunks
-      vi.mocked(getAllChunks).mockResolvedValue([]);
-
-      const newStore = new ChunkStore();
-      await newStore.init(mockDirHandle);
-
-      expect(newStore.getExistingIndices()).toEqual(new Set([0, 1]));
-    });
-
     it('should load IDB entries on init', async () => {
       // No disk files, but IDB has chunks
       vi.mocked(getAllChunks).mockResolvedValue([

@@ -621,27 +621,6 @@ describe('assignVoicesTiered', () => {
   });
 });
 
-describe('Module exports', () => {
-  it('exports all required functions', async () => {
-    const module = await import('./VoiceProfile');
-
-    expect(typeof module.exportToProfile).toBe('function');
-    expect(typeof module.importProfile).toBe('function');
-    expect(typeof module.isCharacterVisible).toBe('function');
-    expect(typeof module.assignVoicesTiered).toBe('function');
-  });
-});
-
-describe('Module exports (moved utilities)', () => {
-  it('exports moved utility functions', async () => {
-    const module = await import('./VoiceProfile');
-
-    expect(typeof module.randomizeBelowVoices).toBe('function');
-    expect(typeof module.downloadJSON).toBe('function');
-    expect(typeof module.readJSONFile).toBe('function');
-  });
-});
-
 describe('randomizeBelowVoices', () => {
   const maleVoices: VoiceOption[] = [
     { locale: 'en-US', name: 'GuyNeural', fullValue: 'en-US, GuyNeural', gender: 'male' },

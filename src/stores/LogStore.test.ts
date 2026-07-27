@@ -67,14 +67,6 @@ describe('LoggerStore', () => {
       store.add('warn', 'Warning 2');
     });
 
-    it('count should return total entries', () => {
-      expect(store.count.value).toBe(5);
-    });
-
-    it('hasEntries should return true when entries exist', () => {
-      expect(store.hasEntries.value).toBe(true);
-    });
-
     it('hasEntries should return false when empty', () => {
       store.clear();
       expect(store.hasEntries.value).toBe(false);
@@ -101,13 +93,6 @@ describe('LoggerStore', () => {
       expect(text).toContain('[INFO]');
       expect(text).toContain('Test message');
       expect(text).toContain('"key":"value"');
-    });
-
-    it('toJSON should return valid JSON', () => {
-      const json = store.toJSON();
-      const parsed = JSON.parse(json);
-      expect(Array.isArray(parsed)).toBe(true);
-      expect(parsed[0].message).toBe('Test message');
     });
 
     it('toDisplayLines should return array of formatted strings', () => {

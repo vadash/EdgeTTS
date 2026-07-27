@@ -20,3 +20,4 @@ Vitest-based test suites.
 - **Real LLM Tests**: Require `test.config.local.ts` populated with real API keys (copy from `.example`).
 - **Local Storage**: Always call `localStorage.clear()` in `beforeEach()`.
 - **Trimming config type-shape describes**: A behavior test may reuse a config type name as a value annotation. `src/services/FFmpegService.test.ts` keeps an `AudioProcessingConfig`-typed local in its FFmpeg-arg assertions — when deleting the type-shape `describe`, keep the `type AudioProcessingConfig` import (typecheck breaks otherwise).
+- **Counting tests for audits**: Grep counts of `^\s*(it|test)\(` undercount runtime tests — `test.each`/`it.each` expand one source entry into many runtime tests. Cross-check audit arithmetic against the vitest summary line, not grep totals.
