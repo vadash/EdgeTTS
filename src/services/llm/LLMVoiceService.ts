@@ -23,6 +23,7 @@ import {
 } from './PromptStrategy';
 import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
 import { buildMergeConsensus } from './votingConsensus';
+import { needsQAPass } from './qaTrigger';
 import { runWithConcurrency } from './runWithConcurrency';
 
 /**
@@ -308,7 +309,7 @@ export class LLMVoiceService {
     const maxConcurrent =
       this.options.maxConcurrentRequests ?? defaultConfig.llm.maxConcurrentRequests;
     this.logger?.info(
-      `[Assign] Starting (${blocks.length} blocks, max ${maxConcurrent} concurrent${this.options.useVoting ? ', voting enabled' : ''})`,
+      `[Assign] Starting (${blocks.length} blocks, max ${maxConcurrent} concurrent${this.options.useVoting ? ', adaptive QA enabled' : ''})`,
     );
 
     this.abortController = new AbortController();
@@ -439,8 +440,11 @@ export class LLMVoiceService {
         );
       }
 
-      // Step 2: If useVoting is enabled, run QA pass
-      if (this.options.useVoting) {
+      // Step 2: If useVoting is enabled and the block is ambiguous, run QA pass
+      if (
+        this.options.useVoting &&
+        needsQAPass(block.sentences, draftMap, context.codeToName, characters)
+      ) {
         const qaMessages = buildQAPrompt(
           context.characters,
           context.nameToCode,
@@ -500,6 +504,11 @@ export class LLMVoiceService {
           relativeMap = draftMap;
         }
       } else {
+        if (this.options.useVoting) {
+          this.logger?.info(
+            `[assign] Block at ${block.sentenceStartIndex} skipped QA (unambiguous block)`,
+          );
+        }
         // No QA pass - use draft directly
         relativeMap = draftMap;
       }

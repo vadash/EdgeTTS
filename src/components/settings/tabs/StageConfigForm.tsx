@@ -187,7 +187,7 @@ export function StageConfigForm({
             checked={useVoting ?? false}
             onChange={onVotingChange}
             label="Enable QA Pass"
-            title="Runs a QA pass to catch vocative traps, missed action beats, and narration errors (2x API cost)"
+            title="Runs a QA pass to catch vocative traps, missed action beats, and narration errors (extra API cost only for ambiguous blocks)"
             disabled={isReasoningEnabled}
           />
         )}

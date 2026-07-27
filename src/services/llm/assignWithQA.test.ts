@@ -169,7 +169,7 @@ describe('LLMVoiceService - Assign with QA Pass', () => {
       {
         blockIndex: 0,
         sentenceStartIndex: 0,
-        sentences: ['"Hello," said Alice.', '"Hi," replied Bob.'],
+        sentences: ['"Hello Bob," said Alice.', '"Hi Alice," replied Bob.'],
       },
     ];
 
@@ -237,6 +237,66 @@ describe('LLMVoiceService - Assign with QA Pass', () => {
     // Should have made only 1 API call
     expect(mockCreate).toHaveBeenCalledTimes(1);
 
+    expect(result).toHaveLength(2);
+    expect(result[0].speaker).toBe('Alice');
+    expect(result[1].speaker).toBe('Bob');
+  });
+  it('skips QA pass on an unambiguous block even when useVoting is enabled', async () => {
+    const draftResponse = {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              reasoning: 'Direct assignment',
+              assignments: {
+                '0': 'A',
+                '1': 'B',
+              },
+            }),
+            refusal: null,
+          },
+        },
+      ],
+      model: 'gpt-4o-mini',
+    };
+
+    const openai = await import('openai');
+    const mockCreate = vi.fn().mockResolvedValue(draftResponse);
+    vi.mocked(openai.default).mockImplementation(function () {
+      return {
+        chat: {
+          completions: {
+            create: mockCreate,
+          },
+        },
+      } as any;
+    });
+
+    service = new LLMVoiceService({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      narratorVoice: 'narrator-voice',
+      useVoting: true,
+      logger: mockLogger,
+    });
+
+    // Each sentence mentions only its own assigned speaker, so the heuristic
+    // classifies the block as unambiguous and skips the QA pass.
+    const blocks: TextBlock[] = [
+      {
+        blockIndex: 0,
+        sentenceStartIndex: 0,
+        sentences: ['"Hello," said Alice.', '"Hi," replied Bob.'],
+      },
+    ];
+
+    const result = await service.assignSpeakers(blocks, new Map(), characters);
+
+    // Exactly one API call (draft only); the QA pass was skipped.
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+
+    // Speakers come straight from the draft.
     expect(result).toHaveLength(2);
     expect(result[0].speaker).toBe('Alice');
     expect(result[1].speaker).toBe('Bob');
