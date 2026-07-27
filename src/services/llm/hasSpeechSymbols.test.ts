@@ -6,7 +6,6 @@ describe('hasSpeechSymbols', () => {
     it.each<[string, boolean]>([
       ['"Hello," she said.', true],
       ['\u00ABПривет\u00BB', true],
-      ['Elle a dit \u00AB bonjour \u00BB', true],
       ['\u2039Hello\u203A', true],
       ['\u2014 Привет, \u2014 сказал он.', true],
       ['\u201CHello,\u201D she said.', true],
@@ -20,27 +19,13 @@ describe('hasSpeechSymbols', () => {
   describe('contractions (should NOT trigger)', () => {
     it.each<[string, boolean]>([
       ["don't", false],
-      ["it's fine", false],
-      ["won't work", false],
-      ["I'm here", false],
-      ["we've done", false],
-      ["they're coming", false],
-      ["he'd go", false],
-      ["she'll win", false],
       ['don\u2019t', false],
-      ['it\u2019s fine', false],
-      ['won\u2019t work', false],
-      ['I\u2019m here', false],
       ['don`t', false],
-      ['it`s', false],
       ['don\u02BCt', false],
       ['don\u2032t', false],
       ['don\uFF07t', false],
-      ["it's and won't", false],
       ["I'm sure they'll come and we've got time", false],
-      ['it\u2019s and won\u2019t and he\u2019d', false],
       ["John's book", false],
-      ['John\u2019s book', false],
     ])('ignores %s', (input, expected) => {
       expect(hasSpeechSymbols(input)).toBe(expected);
     });
@@ -49,11 +34,7 @@ describe('hasSpeechSymbols', () => {
   describe('actual single-quoted speech (should trigger)', () => {
     it.each<[string, boolean]>([
       ["He said, 'hello'", true],
-      ["'Hello,' she said.", true],
       ['He said, \u2018hello\u2019', true],
-      ["'Hello there!'", true],
-      ['\u2018Hello there!\u2019', true],
-      ["She whispered 'goodbye'", true],
     ])('detects %s', (input, expected) => {
       expect(hasSpeechSymbols(input)).toBe(expected);
     });

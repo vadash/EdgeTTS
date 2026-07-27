@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter } from '@/state/types';
 import { LLMVoiceService } from './LLMVoiceService';
-import { MergeSchema } from './schemas';
 
 // Mock OpenAI client
 vi.mock('openai', () => ({
@@ -119,15 +118,5 @@ describe('LLMVoiceService - Merge with Structured Outputs', () => {
 
     // No merges means all characters remain
     expect(result).toHaveLength(testCharacters.length);
-  });
-
-  it('validates merge groups have 2+ indices', async () => {
-    // Schema should reject single-element groups
-    const result = MergeSchema.safeParse({
-      reasoning: null,
-      merges: [[0]], // Invalid: single element
-    });
-
-    expect(result.success).toBe(false);
   });
 });

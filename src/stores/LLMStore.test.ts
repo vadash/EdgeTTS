@@ -48,50 +48,35 @@ describe('LLMStore', () => {
 
   describe('computed properties', () => {
     describe('isConfigured', () => {
-      it('returns false when no API key', () => {
+      it('reflects whether any stage has an API key set', () => {
+        // No API key → not configured
         expect(isConfigured.value).toBe(false);
-      });
-
-      it('returns true when extract API key is set', () => {
+        // Setting any one stage's key flips the gate on, for each stage
+        resetLLMStore();
         setStageField('extract', 'apiKey', 'sk-test-key');
         expect(isConfigured.value).toBe(true);
-      });
-
-      it('returns true when merge API key is set', () => {
+        resetLLMStore();
         setStageField('merge', 'apiKey', 'sk-test-key');
         expect(isConfigured.value).toBe(true);
-      });
-
-      it('returns true when assign API key is set', () => {
+        resetLLMStore();
         setStageField('assign', 'apiKey', 'sk-test-key');
         expect(isConfigured.value).toBe(true);
       });
     });
 
     describe('isProcessing', () => {
-      it('returns false for idle', () => {
-        setProcessingStatus('idle');
-        expect(isProcessing.value).toBe(false);
-      });
-
-      it('returns true for extract', () => {
-        setProcessingStatus('extracting');
-        expect(isProcessing.value).toBe(true);
-      });
-
-      it('returns true for assign', () => {
-        setProcessingStatus('assigning');
-        expect(isProcessing.value).toBe(true);
-      });
-
-      it('returns false for review', () => {
-        setProcessingStatus('review');
-        expect(isProcessing.value).toBe(false);
-      });
-
-      it('returns false for error', () => {
-        setProcessingStatus('error');
-        expect(isProcessing.value).toBe(false);
+      it('is true only while actively processing, false for idle/review/error', () => {
+        const cases: Array<[Parameters<typeof setProcessingStatus>[0], boolean]> = [
+          ['idle', false],
+          ['extracting', true],
+          ['assigning', true],
+          ['review', false],
+          ['error', false],
+        ];
+        for (const [status, expected] of cases) {
+          setProcessingStatus(status);
+          expect(isProcessing.value).toBe(expected);
+        }
       });
     });
 

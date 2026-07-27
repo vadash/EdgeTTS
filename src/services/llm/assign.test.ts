@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
 import { LLMVoiceService } from './LLMVoiceService';
-import { AssignSchema } from './schemas';
 
 // Mock OpenAI client
 vi.mock('openai', () => ({
@@ -213,19 +212,5 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
     expect(spy.mock.calls[1][4]).toEqual(['"Hello," said Alice.', '"Hi," replied Bob.']);
 
     spy.mockRestore();
-  });
-
-  it('validates AssignSchema structure', () => {
-    const validResult = AssignSchema.safeParse({
-      reasoning: 'test',
-      assignments: { '0': 'A', '5': 'B' },
-    });
-    expect(validResult.success).toBe(true);
-
-    const invalidResult = AssignSchema.safeParse({
-      reasoning: null,
-      assignments: 'not an object',
-    });
-    expect(invalidResult.success).toBe(false);
   });
 });

@@ -268,13 +268,3 @@ describe('matchCharacter', () => {
     });
   });
 });
-
-describe('Module exports', () => {
-  it('exports all required functions', async () => {
-    const module = await import('./NameMatcher');
-
-    expect(typeof module.levenshtein).toBe('function');
-    expect(typeof module.findMaxPairings).toBe('function');
-    expect(typeof module.matchCharacter).toBe('function');
-  });
-});

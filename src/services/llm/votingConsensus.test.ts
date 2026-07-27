@@ -2,36 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { buildMergeConsensus } from './votingConsensus';
 
 describe('buildMergeConsensus', () => {
-  it('builds consensus from multiple merge votes', () => {
-    // Simulate 3 votes that agree on merging indices 0 and 1
-    const votes: number[][][] = [
-      [[0, 1], [2]], // Vote 1: merge 0,1
-      [[0, 1], [2]], // Vote 2: merge 0,1
-      [[0, 1], [2]], // Vote 3: merge 0,1
+  it('builds consensus preserving successful, insufficient, and empty vote cases', () => {
+    // Successful consensus: 3 votes agree on merging 0 and 1
+    const consensusVotes: number[][][] = [
+      [[0, 1], [2]],
+      [[0, 1], [2]],
+      [[0, 1], [2]],
     ];
+    const consensus = buildMergeConsensus(consensusVotes);
+    expect(consensus).toHaveLength(1);
+    expect(consensus[0]).toContain(0);
+    expect(consensus[0]).toContain(1);
 
-    const result = buildMergeConsensus(votes);
-
-    expect(result).toHaveLength(1);
-    expect(result[0]).toContain(0);
-    expect(result[0]).toContain(1);
-  });
-
-  it('requires at least 2 votes for consensus', () => {
-    // Only 1 vote for merging, should not merge
-    const votes: number[][][] = [
+    // Insufficient votes: only 1 vote for merging, two votes against
+    const insufficientVotes: number[][][] = [
       [[0, 1], [2]],
       [[0], [1], [2]],
       [[0], [1], [2]],
     ];
+    expect(buildMergeConsensus(insufficientVotes)).toHaveLength(0);
 
-    const result = buildMergeConsensus(votes);
-
-    expect(result).toHaveLength(0);
-  });
-
-  it('handles empty votes', () => {
-    const result = buildMergeConsensus([]);
-    expect(result).toHaveLength(0);
+    // Empty votes
+    expect(buildMergeConsensus([])).toHaveLength(0);
   });
 });

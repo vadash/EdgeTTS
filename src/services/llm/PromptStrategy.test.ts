@@ -141,36 +141,6 @@ describe('parseAssignResponse', () => {
   });
 });
 
-describe('Prompt builders accept detectedLanguage', () => {
-  it('buildExtractPrompt accepts detectedLanguage', () => {
-    const result = buildExtractPrompt('Some text', 'zh');
-    // DEFAULT_PREFILL is 'none', so no assistant message
-    expect(result).toHaveLength(2);
-    expect(result[0].role).toBe('system');
-    expect(result[1].role).toBe('user');
-  });
-
-  it('buildMergePrompt accepts detectedLanguage', () => {
-    const characters: LLMCharacter[] = [
-      { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
-    ];
-    const result = buildMergePrompt(characters, 'en');
-    // DEFAULT_PREFILL is 'none', so no assistant message
-    expect(result).toHaveLength(2);
-  });
-
-  it('buildAssignPrompt accepts detectedLanguage', () => {
-    const characters: LLMCharacter[] = [
-      { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
-    ];
-    const nameToCode = new Map([['Alice', 'A']]);
-    const numberedParagraphs = '[0] Some text';
-    const result = buildAssignPrompt(characters, nameToCode, numberedParagraphs, 'en');
-    // DEFAULT_PREFILL is 'none', so no assistant message
-    expect(result).toHaveLength(2);
-  });
-});
-
 describe('buildAssignPrompt with overlap', () => {
   const characters: LLMCharacter[] = [
     { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },

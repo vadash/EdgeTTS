@@ -41,25 +41,20 @@ describe('LoggerStore', () => {
   });
 
   describe('convenience methods', () => {
-    it('info() should add info level entry', () => {
+    it('info/warn/error store entries; debug only logs to console', () => {
       store.info('Info message');
       expect(store.entries.value[0].level).toBe('info');
-    });
 
-    it('warn() should add warn level entry', () => {
       store.warn('Warning message');
-      expect(store.entries.value[0].level).toBe('warn');
-    });
+      expect(store.entries.value[1].level).toBe('warn');
 
-    it('error() should add error level entry', () => {
       store.error('Error message');
-      expect(store.entries.value[0].level).toBe('error');
-    });
+      expect(store.entries.value[2].level).toBe('error');
 
-    it('debug() should only log to console (not stored)', () => {
+      // debug() only logs to console; it must not add a stored entry
+      const beforeDebug = store.entries.value.length;
       store.debug('Debug message');
-      // debug() only logs to console, doesn't store entries
-      expect(store.entries.value).toHaveLength(0);
+      expect(store.entries.value).toHaveLength(beforeDebug);
     });
   });
 

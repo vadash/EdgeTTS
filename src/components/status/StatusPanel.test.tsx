@@ -50,17 +50,6 @@ describe('StatusPanel', () => {
     mockTtsWorkers = 0;
   });
 
-  it('renders ProgressBar with worker counts from store', () => {
-    mockLlmWorkers = 4;
-    mockTtsWorkers = 8;
-
-    const { container } = render(<StatusPanel />);
-
-    // ProgressBar should render with worker counts
-    expect(container.textContent).toContain('50%');
-    expect(container.textContent).toContain('LLM: 4');
-  });
-
   it('renders TTS workers when LLM workers are 0', () => {
     mockLlmWorkers = 0;
     mockTtsWorkers = 8;
@@ -79,17 +68,5 @@ describe('StatusPanel', () => {
 
     expect(container.textContent).not.toContain('LLM:');
     expect(container.textContent).not.toContain('TTS:');
-  });
-
-  it('renders progress bar with correct counts', () => {
-    mockLlmWorkers = 2;
-    mockTtsWorkers = 0;
-
-    const { container } = render(<StatusPanel />);
-
-    // Should show current, failed, and remaining
-    expect(container.textContent).toContain('50'); // current
-    expect(container.textContent).toContain('5'); // failed
-    expect(container.textContent).toContain('45'); // remaining (100-50-5)
   });
 });

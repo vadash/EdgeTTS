@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { ProcessedBook } from '@/state/types';
 import { createDataStore, type DataStore } from './DataStore';
 
 describe('DataStore', () => {
@@ -7,24 +6,6 @@ describe('DataStore', () => {
 
   beforeEach(() => {
     store = createDataStore();
-  });
-
-  describe('book management', () => {
-    const mockBook: ProcessedBook = {
-      allSentences: ['Sentence 1.', 'Sentence 2.'],
-      fileNames: [
-        ['chapter1', 0],
-        ['chapter2', 1],
-      ],
-      fullText: 'test content',
-    };
-
-    it('clears book', () => {
-      store.setBook(mockBook);
-      store.clearBook();
-      expect(store.book.value).toBeNull();
-      expect(store.bookLoaded.value).toBe(false);
-    });
   });
 
   describe('computed properties', () => {

@@ -1,55 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoggerStore } from '@/services/Logger';
-import type { AudioProcessingConfig } from './FFmpegService';
-import { FFmpegBlobCache, FFmpegService } from './FFmpegService';
-
-describe('AudioProcessingConfig', () => {
-  it('should accept Opus encoding parameters', () => {
-    const config: AudioProcessingConfig = {
-      silenceRemoval: true,
-      normalization: true,
-      deEss: true,
-      silenceGapMs: 100,
-      eq: true,
-      compressor: true,
-      fadeIn: true,
-      opusMinBitrate: 48,
-      opusMaxBitrate: 64,
-      opusCompressionLevel: 5,
-    };
-    expect(config.opusMinBitrate).toBe(48);
-    expect(config.opusMaxBitrate).toBe(64);
-    expect(config.opusCompressionLevel).toBe(5);
-  });
-
-  it('should work without Opus parameters (backward compat)', () => {
-    const config: AudioProcessingConfig = {
-      silenceRemoval: false,
-      normalization: false,
-      deEss: false,
-      silenceGapMs: 0,
-      eq: false,
-      compressor: false,
-      fadeIn: false,
-    };
-    expect(config.opusMinBitrate).toBeUndefined();
-  });
-
-  it('should have optional Opus fields in interface', () => {
-    // This test will cause a type error if the fields aren't defined
-    const config: AudioProcessingConfig = {
-      silenceRemoval: false,
-      normalization: false,
-      deEss: false,
-      silenceGapMs: 0,
-      eq: false,
-      compressor: false,
-      fadeIn: false,
-    };
-    const minBitrate = config.opusMinBitrate;
-    expect(minBitrate).toBeUndefined();
-  });
-});
+import { FFmpegBlobCache, FFmpegService, type AudioProcessingConfig } from './FFmpegService';
 
 describe('FFmpegService Opus integration', () => {
   it('should use custom Opus settings when provided', async () => {

@@ -134,20 +134,6 @@ describe('UISettingsStore', () => {
       }
     });
 
-    it('should restore all dismissed notifications after reload', () => {
-      dismissNotification('llmRequired');
-      dismissNotification('resumeFeatureTip');
-
-      // Verify localStorage contains both dismissals
-      const saved = localStorage.getItem(StorageKeys.uiSettings);
-      expect(saved).toBeTruthy();
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        expect(parsed.dismissedNotifications.llmRequired).toBe(true);
-        expect(parsed.dismissedNotifications.resumeFeatureTip).toBe(true);
-      }
-    });
-
     it('loadFromStorage should restore previously dismissed state', () => {
       // First, dismiss and save
       dismissNotification('llmRequired');

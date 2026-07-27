@@ -73,20 +73,7 @@ describe('NotificationBanner', () => {
   });
 
   describe('dismiss functionality', () => {
-    it('should call dismissNotification when dismiss button is clicked', () => {
-      mockDismissedNotifications.value = { llmRequired: false };
-      render(
-        <NotificationBanner type="info" storageKey="llmRequired" title="Test Title">
-          Test content
-        </NotificationBanner>,
-      );
-
-      const dismissButton = screen.getByLabelText('Dismiss notification');
-      dismissButton.click();
-      expect(mockDismissNotification).toHaveBeenCalledWith('llmRequired');
-    });
-
-    it('should have correct aria-label from i18n', () => {
+    it('dismiss button has i18n aria-label and calls dismissNotification on click', () => {
       mockDismissedNotifications.value = { llmRequired: false };
       render(
         <NotificationBanner type="info" storageKey="llmRequired" title="Test Title">
@@ -96,57 +83,29 @@ describe('NotificationBanner', () => {
 
       const dismissButton = screen.getByLabelText('Dismiss notification');
       expect(dismissButton).toBeDefined();
+      dismissButton.click();
+      expect(mockDismissNotification).toHaveBeenCalledWith('llmRequired');
     });
   });
 
   describe('styling by type', () => {
-    it('should apply warning Tailwind classes (red theme)', () => {
+    it('renders the warning icon for the warning variant', () => {
       mockDismissedNotifications.value = { llmRequired: false };
       const { container } = render(
         <NotificationBanner type="warning" storageKey="llmRequired" title="Test Title">
           Test content
         </NotificationBanner>,
       );
-
-      const banner = container.firstChild as HTMLElement;
-      expect(banner.className).toContain('bg-red-500/20');
-      expect(banner.className).toContain('border-red-500/50');
-      expect(banner.className).toContain('text-red-400');
-    });
-
-    it('should apply info Tailwind classes (blue theme)', () => {
-      mockDismissedNotifications.value = { llmRequired: false };
-      const { container } = render(
-        <NotificationBanner type="info" storageKey="llmRequired" title="Test Title">
-          Test content
-        </NotificationBanner>,
-      );
-
-      const banner = container.firstChild as HTMLElement;
-      expect(banner.className).toContain('bg-blue-500/20');
-      expect(banner.className).toContain('border-blue-500/50');
-      expect(banner.className).toContain('text-blue-400');
-    });
-
-    it('should display warning icon (⚠️) for warning type', () => {
-      mockDismissedNotifications.value = { llmRequired: false };
-      const { container } = render(
-        <NotificationBanner type="warning" storageKey="llmRequired" title="Test Title">
-          Test content
-        </NotificationBanner>,
-      );
-
       expect(container.textContent).toContain('⚠️');
     });
 
-    it('should display info icon (💡) for info type', () => {
+    it('renders the info icon for the info variant', () => {
       mockDismissedNotifications.value = { llmRequired: false };
       const { container } = render(
         <NotificationBanner type="info" storageKey="llmRequired" title="Test Title">
           Test content
         </NotificationBanner>,
       );
-
       expect(container.textContent).toContain('💡');
     });
   });

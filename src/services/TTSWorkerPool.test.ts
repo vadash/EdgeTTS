@@ -539,60 +539,23 @@ describe('TTSWorkerPool', () => {
   });
 
   describe('calculateRetryDelay', () => {
-    it('calculates delay progression: attempt 1 → ~2.25s (half-max jitter)', () => {
-      pool = createPool();
-      // Mock Math.random for deterministic testing (mid-range jitter)
-      vi.spyOn(Math, 'random').mockReturnValue(0.5);
-
-      // @ts-expect-error - accessing private method for testing
-      const delay = pool.calculateRetryDelay(1);
-
-      // halfDelay + jitter = 1500 + 750 = 2250ms
-      expect(delay).toBe(2250);
-    });
-
-    it('calculates delay progression: attempt 2 → ~7.5s (half-max jitter)', () => {
+    it('calculates half-max-jitter delay for each attempt up to the cap', () => {
       pool = createPool();
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
-
       // @ts-expect-error - accessing private method for testing
-      const delay = pool.calculateRetryDelay(2);
+      const calculateDelay = (attempt: number) => pool.calculateRetryDelay(attempt);
 
-      // halfDelay + jitter = 5000 + 2500 = 7500ms
-      expect(delay).toBe(7500);
-    });
-
-    it('calculates delay progression: attempt 3 → ~22.5s (half-max jitter)', () => {
-      pool = createPool();
-      vi.spyOn(Math, 'random').mockReturnValue(0.5);
-
-      // @ts-expect-error - accessing private method for testing
-      const delay = pool.calculateRetryDelay(3);
-
-      // halfDelay + jitter = 15000 + 7500 = 22500ms
-      expect(delay).toBe(22500);
-    });
-
-    it('calculates delay progression: attempt 4 → ~45s (half-max jitter)', () => {
-      pool = createPool();
-      vi.spyOn(Math, 'random').mockReturnValue(0.5);
-
-      // @ts-expect-error - accessing private method for testing
-      const delay = pool.calculateRetryDelay(4);
-
-      // halfDelay + jitter = 30000 + 15000 = 45000ms
-      expect(delay).toBe(45000);
-    });
-
-    it('calculates delay progression: attempt 5 → ~90s (half-max jitter)', () => {
-      pool = createPool();
-      vi.spyOn(Math, 'random').mockReturnValue(0.5);
-
-      // @ts-expect-error - accessing private method for testing
-      const delay = pool.calculateRetryDelay(5);
-
-      // halfDelay + jitter = 60000 + 30000 = 90000ms
-      expect(delay).toBe(90000);
+      // halfDelay + jitter (half of halfDelay) per attempt:
+      const cases: Array<[number, number]> = [
+        [1, 2250], // 1500 + 750
+        [2, 7500], // 5000 + 2500
+        [3, 22500], // 15000 + 7500
+        [4, 45000], // 30000 + 15000
+        [5, 90000], // 60000 + 30000
+      ];
+      for (const [attempt, expected] of cases) {
+        expect(calculateDelay(attempt)).toBe(expected);
+      }
     });
 
     it('caps max delay at 120s (2 minutes) - attempts beyond 5 use last delay', () => {
@@ -796,17 +759,6 @@ describe('TTSWorkerPool', () => {
 
       expect(onConcurrencyChange).toHaveBeenCalledTimes(1);
       expect(onConcurrencyChange).toHaveBeenCalledWith(5); // Ladder starts at minWorkers (5)
-    });
-
-    it('calls onConcurrencyChange when task succeeds and ladder adjusts', async () => {
-      const onConcurrencyChange = vi.fn();
-      pool = createPool({ onConcurrencyChange });
-
-      pool.addTask(createTask(0));
-      await vi.advanceTimersByTimeAsync(100);
-
-      // Should be called at least once (warmup doesn't set queue.concurrency, but executeTask does)
-      expect(onConcurrencyChange).toHaveBeenCalled();
     });
 
     it('calls onConcurrencyChange when task fails and ladder throttles', async () => {

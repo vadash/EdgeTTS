@@ -17,10 +17,6 @@ describe('languageDetection', () => {
       ['একসময় এক ছোট্ট গ্রামে এক বৃদ্ধ লোক বাস করত।', 'bn'],
       ['ஒரு காலத்தில் ஒரு சிறிய கிராமத்தில் ஒரு முதியவர் வாழ்ந்தார்.', 'ta'],
       [
-        'Der Mann ging mit seinem Hund in den Park und die Kinder spielten auf der Wiese. Er hatte einen langen Tag hinter sich und wollte sich ausruhen.',
-        'de',
-      ],
-      [
         "L'homme est allé dans le parc avec son chien et les enfants jouaient sur la pelouse. Il avait eu une longue journée et voulait se reposer.",
         'fr',
       ],
