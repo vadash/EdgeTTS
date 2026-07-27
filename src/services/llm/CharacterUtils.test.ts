@@ -111,4 +111,25 @@ describe('cullByFrequency', () => {
 
     expect(result).toHaveLength(0);
   });
+
+  it('does not count substring matches inside other words', () => {
+    // "eva" appears 3x inside "evaluation" but only 2x standalone → below threshold 3
+    const text = 'evaluation evaluates evaluation eva eva';
+    const characters = [makeChar('Eva', ['Eva'])];
+
+    const result = cullByFrequency(characters, text.toLowerCase(), 3);
+
+    expect(result).toHaveLength(0);
+  });
+
+  it('counts standalone mentions beside substring matches', () => {
+    // 3 standalone "eva" survive the cull even though "evaluation" still present
+    const text = 'evaluation evaluates evaluation eva eva eva';
+    const characters = [makeChar('Eva', ['Eva'])];
+
+    const result = cullByFrequency(characters, text.toLowerCase(), 3);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].canonicalName).toBe('Eva');
+  });
 });

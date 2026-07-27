@@ -27,6 +27,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
   const preview = useVoicePreview();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [mergeTarget, setMergeTarget] = useState<Record<string, string>>({});
 
   const characters = llm.detectedCharacters.value;
   const voiceMap = llm.characterVoiceMap.value;
@@ -95,6 +96,25 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
       frequency: lineCounts,
     });
     llm.setVoiceMap(newMap);
+  };
+
+  // Merge the `dropName` character into `keepName`: keep's name/gender/voice survive,
+  // drop's variations plus its canonicalName are appended (deduped). Indexes resolve
+  // against the unsorted detectedCharacters array, NOT sortedCharacters display order.
+  const handleMerge = (keepName: string, dropName: string) => {
+    const all = llm.detectedCharacters.value;
+    const keepIdx = all.findIndex((c) => c.canonicalName === keepName);
+    const dropIdx = all.findIndex((c) => c.canonicalName === dropName);
+    if (keepIdx < 0 || dropIdx < 0 || keepIdx === dropIdx) return;
+    const keep = all[keepIdx];
+    const drop = all[dropIdx];
+    llm.updateCharacter(keepIdx, {
+      variations: [...new Set([...keep.variations, ...drop.variations, drop.canonicalName])],
+    });
+    llm.removeCharacter(dropIdx);
+    llm.removeVoiceMapping(dropName);
+    setMergeTarget((prev) => ({ ...prev, [keepName]: '' }));
+    logs.info(`Merged "${dropName}" into "${keepName}"`);
   };
 
   const handleImportClick = () => {
@@ -223,6 +243,25 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
                       <span className="ml-2 text-xs text-gray-400 bg-surface-alt px-1.5 py-0.5 rounded">
                         {lineCounts.get(char.canonicalName) ?? 0}
                       </span>
+                      <select
+                        className="select-field text-xs ml-2"
+                        value={mergeTarget[char.canonicalName] ?? ''}
+                        onChange={(e) => {
+                          const target = (e.target as HTMLSelectElement).value;
+                          if (target) handleMerge(target, char.canonicalName);
+                        }}
+                        title="Merge this character into another"
+                        aria-label={`Merge ${char.canonicalName} into...`}
+                      >
+                        <option value="">Merge into…</option>
+                        {sortedCharacters
+                          .filter((c) => c.canonicalName !== char.canonicalName)
+                          .map((c) => (
+                            <option key={c.canonicalName} value={c.canonicalName}>
+                              {c.canonicalName}
+                            </option>
+                          ))}
+                      </select>
                     </td>
                     <td className="py-2 pr-2">
                       <select

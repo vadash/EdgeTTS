@@ -1,7 +1,8 @@
 import { useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { convertFileToTxt } from '@/services/FileConverter';
-import { useData, useLogs } from '@/stores';
+import { useData, useLogs, settings, setNarratorVoice } from '@/stores';
+import voices from '@/components/VoiceSelector/voices';
 
 // Extract unique 2-letter language codes from supported voices
 const AVAILABLE_LOCALES = [
@@ -81,6 +82,18 @@ const AVAILABLE_LOCALES = [
   'zh',
   'zu',
 ];
+
+/**
+ * Swap the narrator voice to a native voice for the detected book language.
+ * Skips when the current narrator already matches the language (locale prefix equality),
+ * or when detection confidence is low — callers must guard on `confidence !== 'low'`.
+ */
+function syncNarratorVoiceWithLanguage(lang: string): void {
+  const current = settings.value.narratorVoice;
+  if (current.split('-')[0] === lang) return;
+  const match = voices.find((v) => v.locale.startsWith(lang) && !v.name.includes('Multilingual'));
+  if (match) setNarratorVoice(match.fullValue);
+}
 
 function LanguageBadge() {
   const dataStore = useData();
@@ -169,6 +182,7 @@ export function FileDropZone() {
 
       // Detect language from loaded content
       const result = dataStore.detectLanguageFromContent();
+      if (result.confidence !== 'low') syncNarratorVoiceWithLanguage(result.language);
 
       // Store the display filename
       const displayName =
@@ -262,6 +276,7 @@ export function FileDropZone() {
 
       // Detect language from loaded content
       const result = dataStore.detectLanguageFromContent();
+      if (result.confidence !== 'low') syncNarratorVoiceWithLanguage(result.language);
 
       // Store the display filename
       const displayName =

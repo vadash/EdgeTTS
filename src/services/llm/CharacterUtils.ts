@@ -130,9 +130,18 @@ export function countSpeakingFrequency(assignments: SpeakerAssignment[]): Map<st
   return frequency;
 }
 
+const BEFORE_NAME = '(?<![\\p{L}\\p{N}])';
+const AFTER_NAME = '(?![\\p{L}\\p{N}])';
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Cull characters whose name variations appear fewer than threshold times in the text.
  * Removes hallucinated and ultra-minor characters before the expensive LLM merge step.
+ * Matches whole words only (Unicode word boundaries) so substrings inside other words
+ * do not inflate the count — e.g. "Eva" no longer matches "evaluation".
  */
 export function cullByFrequency(
   characters: LLMCharacter[],
@@ -145,18 +154,12 @@ export function cullByFrequency(
     for (const variation of char.variations) {
       if (variation.length < 3) continue;
 
-      const needle = variation.toLowerCase();
-      let pos = 0;
-
-      while (true) {
-        pos = fullText.indexOf(needle, pos);
-        if (pos >= 0) {
-          totalMentions++;
-          pos += needle.length;
-        } else {
-          break;
-        }
-      }
+      const pattern = new RegExp(
+        `${BEFORE_NAME}${escapeRegExp(variation.toLowerCase())}${AFTER_NAME}`,
+        'gu',
+      );
+      const matches = fullText.match(pattern);
+      if (matches) totalMentions += matches.length;
     }
 
     return totalMentions >= threshold;

@@ -11,6 +11,7 @@ API orchestration and strict structured JSON parsing.
 ## Gotchas
 
 - **Errors**: `LLMApiClient` MUST throw `RetriableError` so `withRetry` catches it.
+- **No `as any`**: `callStructured` builds the request as `StructuredRequestBody` (an `Omit<ChatCompletionCreateParamsNonStreaming,'stream'>` plus vendor extensions `enable_thinking`/`reasoning_effort`) and casts only at the two `chat.completions.create` call sites via `as unknown as ChatCompletionCreateParams(Non)Streaming`. Do NOT reintroduce `as any` — the biome override for this file was deliberately removed; `noExplicitAny` must stay clean. If a new vendor key is needed, add it to `StructuredRequestBody` rather than casting the whole object.
 
 ## Detailed Gotchas
 

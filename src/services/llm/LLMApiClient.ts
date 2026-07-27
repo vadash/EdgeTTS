@@ -9,6 +9,16 @@ import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
 
 type ChatCompletion = OpenAIType.Chat.Completions.ChatCompletion;
 type ChatCompletionChunk = OpenAIType.Chat.Completions.ChatCompletionChunk;
+type ChatCompletionCreateParamsNonStreaming =
+  OpenAIType.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
+type ChatCompletionCreateParamsStreaming =
+  OpenAIType.Chat.Completions.ChatCompletionCreateParamsStreaming;
+
+/** Request body: OpenAI params plus OpenAI-compatible vendor extensions (thinking/reasoning). */
+type StructuredRequestBody = Omit<ChatCompletionCreateParamsNonStreaming, 'stream'> & {
+  enable_thinking?: boolean;
+  reasoning_effort?: 'high' | 'medium' | 'low';
+};
 
 type ResponseFormat =
   | { type: 'text' }
@@ -52,7 +62,7 @@ function detectProvider(apiUrl: string, model: string): 'mistral' | 'openai' | '
 /**
  * Apply provider-specific fixes to request body
  */
-function applyProviderFixes(requestBody: Record<string, unknown>, provider: string): void {
+function applyProviderFixes(requestBody: StructuredRequestBody, provider: string): void {
   if (provider === 'mistral') {
     // Mistral requires top_p=1 when temperature=0 (greedy sampling)
     // Safest to just not send top_p at all
@@ -317,27 +327,24 @@ export class LLMApiClient {
   async callStructured<T>({ messages, schema, schemaName }: StructuredCallOptions<T>): Promise<T> {
     const useStreaming = this.options.streaming ?? false;
 
-    const requestBody: Record<string, unknown> = {
+    const requestBody: StructuredRequestBody = {
       model: this.options.model,
       messages,
-      stream: useStreaming,
       response_format: zodToJsonSchema(schema, schemaName),
     };
 
     if (this.options.maxTokens) {
       requestBody.max_tokens = this.options.maxTokens;
     }
-
-    // Only add thinking/reasoning parameters when explicitly enabled
-    // When reasoning is null or undefined (OFF), omit the parameters entirely for OpenAI-compatible APIs
+    // Only add thinking/reasoning parameters when explicitly enabled.
+    // When reasoning is null or undefined (OFF), omit the parameters entirely for OpenAI-compatible APIs.
     if (this.options.reasoning != null) {
-      (requestBody as Record<string, unknown>).enable_thinking = true;
+      requestBody.enable_thinking = true;
       // OpenAI-compatible APIs use reasoning_effort for level specification
       if (this.options.reasoning !== 'auto') {
-        (requestBody as Record<string, unknown>).reasoning_effort = this.options.reasoning;
+        requestBody.reasoning_effort = this.options.reasoning;
       }
     }
-
     applyProviderFixes(requestBody, this.provider);
 
     this.logger?.info(`[structured] API call starting (streaming: ${useStreaming})...`);
@@ -350,7 +357,7 @@ export class LLMApiClient {
         const streamResult = await this.client.chat.completions.create({
           ...requestBody,
           stream: true,
-        } as any);
+        } as unknown as ChatCompletionCreateParamsStreaming);
 
         const stream = streamResult as unknown as AsyncIterable<ChatCompletionChunk>;
 
@@ -393,8 +400,7 @@ export class LLMApiClient {
         response = await this.client.chat.completions.create({
           ...requestBody,
           stream: false,
-        } as any);
-        response = response as ChatCompletion;
+        } as unknown as ChatCompletionCreateParamsNonStreaming);
       } catch (error) {
         throw new RetriableError(
           `LLM API call failed: ${(error as Error).message}`,

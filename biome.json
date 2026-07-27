@@ -82,16 +82,6 @@
           }
         }
       }
-    },
-    {
-      "includes": ["src/services/llm/LLMApiClient.ts"],
-      "linter": {
-        "rules": {
-          "suspicious": {
-            "noExplicitAny": "off"
-          }
-        }
-      }
     }
   ]
 }

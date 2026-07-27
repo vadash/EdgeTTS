@@ -1,6 +1,6 @@
 {
   "name": "edge-tts-web",
-  "version": "8.0.0",
+  "version": "9.0.0",
   "type": "module",
   "description": "Edge TTS Web Application - Text to Speech converter",
   "scripts": {
