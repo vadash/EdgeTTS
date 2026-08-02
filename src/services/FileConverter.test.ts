@@ -92,13 +92,90 @@ describe('FileConverter', () => {
       expect(result).toContain('Chapter one content.');
     });
 
-    it('throws when toc.ncx missing', async () => {
+    it('extracts content without toc.ncx via OPF spine (EPUB 3)', async () => {
       const zip = new JSZip();
-      zip.file('OEBPS/content.xhtml', '<html><body>Content</body></html>');
+
+      zip.file('mimetype', 'application/epub+zip');
+      zip.file(
+        'META-INF/container.xml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`,
+      );
+      zip.file(
+        'OEBPS/content.opf',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Regressor</dc:title>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="ch1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ch2" href="chapter2.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="ch1"/>
+    <itemref idref="ch2"/>
+  </spine>
+</package>`,
+      );
+      zip.file(
+        'OEBPS/nav.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <body><nav epub:type="toc"><ol><li><a href="chapter1.xhtml">Ch1</a></li><li><a href="chapter2.xhtml">Ch2</a></li></ol></nav></body>
+</html>`,
+      );
+      zip.file(
+        'OEBPS/chapter1.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <body><p>Chapter one content.</p></body>
+</html>`,
+      );
+      zip.file(
+        'OEBPS/chapter2.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <body><p>Chapter two content.</p></body>
+</html>`,
+      );
 
       const epubData = await zip.generateAsync({ type: 'arraybuffer' });
+      const result = await convertEpubToTxt(epubData);
 
-      await expect(convertEpubToTxt(epubData)).rejects.toThrow('Could not find toc.ncx in EPUB');
+      expect(result).toContain('Chapter one content.');
+      expect(result).toContain('Chapter two content.');
+      // Reading order follows the spine, not the nav document or filename.
+      expect(result.indexOf('Chapter one content.')).toBeLessThan(
+        result.indexOf('Chapter two content.'),
+      );
+    });
+
+    it('extracts content when both toc.ncx and OPF spine are missing', async () => {
+      const zip = new JSZip();
+      zip.file(
+        'OEBPS/chapter2.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Second content.</p></body></html>`,
+      );
+      zip.file(
+        'OEBPS/chapter10.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><body><p>Tenth content.</p></body></html>`,
+      );
+
+      const epubData = await zip.generateAsync({ type: 'arraybuffer' });
+      const result = await convertEpubToTxt(epubData);
+
+      // Numeric-aware path order puts chapter2 before chapter10.
+      expect(result).toContain('Second content.');
+      expect(result).toContain('Tenth content.');
+      expect(result.indexOf('Second content.')).toBeLessThan(result.indexOf('Tenth content.'));
     });
 
     it('handles multiple chapters', async () => {
