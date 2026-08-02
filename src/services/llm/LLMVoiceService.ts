@@ -22,6 +22,7 @@ import {
   buildMergePrompt,
 } from './PromptStrategy';
 import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
+import type { StructuredCallOptions } from './schemaUtils';
 import { buildMergeConsensus } from './votingConsensus';
 import { runWithConcurrency } from './runWithConcurrency';
 
@@ -86,14 +87,7 @@ const OVERLAP_SIZE = 10;
  */
 const LLM_DELAY_MS = 1000;
 
-/**
- * Default retry counts for each operation
- */
-const RETRY_CONFIG = {
-  extract: Infinity, // Extract: keep retrying until valid
-  merge: 3, // Merge: 3 retries per vote attempt
-  assign: 3, // Assign: 3 retries per block attempt
-} as const;
+const DEFAULT_MAX_RETRIES = 3;
 
 /**
  * Options for creating LLM service instances
@@ -111,6 +105,7 @@ export interface LLMVoiceServiceOptions {
   useVoting?: boolean;
   repeatPrompt?: boolean;
   corsMiddleware?: string;
+  maxRetries?: number;
   maxConcurrentRequests?: number;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
@@ -125,7 +120,21 @@ export interface LLMVoiceServiceOptions {
     temperature?: number;
     topP?: number;
     repeatPrompt?: boolean;
+    maxRetries?: number;
     corsMiddleware?: string;
+  };
+  /** Optional backup model — used when this stage exhausts maxRetries */
+  backupConfig?: {
+    apiKey: string;
+    apiUrl: string;
+    model: string;
+    streaming?: boolean;
+    reasoning?: 'auto' | 'high' | 'medium' | 'low' | null;
+    temperature?: number;
+    topP?: number;
+    repeatPrompt?: boolean;
+    corsMiddleware?: string;
+    maxRetries?: number;
   };
 }
 
@@ -134,11 +143,12 @@ export interface LLMVoiceServiceOptions {
  */
 export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
-  private apiClient: LLMApiClient;
+  public apiClient: LLMApiClient;
   public mergeApiClient: LLMApiClient;
+  public backupApiClient: LLMApiClient | null;
   private abortController: AbortController | null = null;
   private logger: ILogger;
-  private detectedLanguage: string; // NEW - store for prompt building
+  private detectedLanguage!: string; // Store for prompt building
 
   constructor(options: LLMVoiceServiceOptions) {
     if (!options.logger) {
@@ -146,8 +156,22 @@ export class LLMVoiceService {
     }
     this.options = options;
     this.logger = options.logger;
-    this.detectedLanguage = options.detectedLanguage ?? 'en'; // NEW - default to English
     const debugLogger = new DebugLogger(options.directoryHandle, options.logger);
+    this.backupApiClient = options.backupConfig
+      ? new LLMApiClient({
+          apiKey: options.backupConfig.apiKey,
+          apiUrl: options.backupConfig.apiUrl,
+          model: options.backupConfig.model,
+          streaming: options.backupConfig.streaming ?? options.streaming,
+          reasoning: options.backupConfig.reasoning ?? options.reasoning,
+          temperature: options.backupConfig.temperature ?? options.temperature,
+          topP: options.backupConfig.topP ?? options.topP,
+          maxTokens: defaultConfig.llm.maxTokens,
+          corsMiddleware: options.backupConfig.corsMiddleware ?? options.corsMiddleware,
+          debugLogger,
+          logger: options.logger,
+        })
+      : null;
     this.apiClient = new LLMApiClient({
       apiKey: options.apiKey,
       apiUrl: options.apiUrl,
@@ -191,6 +215,51 @@ export class LLMVoiceService {
     }
   }
 
+  /**
+   * Call structured endpoint with retry and optional backup fallback.
+   * Retries the primary client up to maxRetries; on exhaustion, if a backup
+   * model is configured and the signal isn't aborted, retries on the backup
+   * client with its own maxRetries. Pass callArgs so the backup client can
+   * re-issue the same request against a different LLMApiClient.
+   */
+  private async callWithBackup<T>(
+    stage: 'extract' | 'merge' | 'assign',
+    primaryClient: LLMApiClient,
+    callArgs: StructuredCallOptions<T>,
+    signal: AbortSignal | undefined,
+    onRetry: (attempt: number, error: unknown) => void,
+  ): Promise<T> {
+    const maxRetries =
+      stage === 'merge'
+        ? (this.options.mergeConfig?.maxRetries ?? DEFAULT_MAX_RETRIES)
+        : (this.options.maxRetries ?? DEFAULT_MAX_RETRIES);
+
+    try {
+      return await withRetry(() => primaryClient.callStructured(callArgs), {
+        maxRetries,
+        signal,
+        onRetry,
+      });
+    } catch (error) {
+      // Don't fall back if aborted, or no backup configured
+      if (signal?.aborted || !this.backupApiClient) throw error;
+
+      this.logger?.warn(
+        `[${stage}] Primary model exhausted ${maxRetries} retries, falling back to backup model (${this.options.backupConfig?.model})`,
+      );
+
+      const backupRetries = this.options.backupConfig?.maxRetries ?? DEFAULT_MAX_RETRIES;
+      return withRetry(() => this.backupApiClient!.callStructured(callArgs), {
+        maxRetries: backupRetries,
+        signal,
+        onRetry: (attempt, err) => {
+          this.logger?.warn(
+            `[${stage}] Backup retry ${attempt}/${backupRetries}: ${getErrorMessage(err)}`,
+          );
+        },
+      });
+    }
+  }
   /**
    * Extract: Extract characters from text blocks using structured outputs
    */
@@ -270,23 +339,20 @@ export class LLMVoiceService {
       this.detectedLanguage,
       this.options.repeatPrompt ?? false,
     );
-
-    const response = await withRetry(
-      () =>
-        this.apiClient.callStructured({
-          messages: extractMessages,
-          schema: ExtractSchema,
-          schemaName: 'ExtractSchema',
-          signal: controller.signal,
-        }),
+    const response = await this.callWithBackup(
+      'extract',
+      this.apiClient,
       {
-        maxRetries: RETRY_CONFIG.extract,
+        messages: extractMessages,
+        schema: ExtractSchema,
+        schemaName: 'ExtractSchema',
         signal: controller.signal,
-        onRetry: (attempt, error) => {
-          this.logger?.warn(
-            `[Extract] Block ${index + 1}/${total} retry ${attempt}: ${getErrorMessage(error)}`,
-          );
-        },
+      },
+      controller.signal,
+      (attempt, error) => {
+        this.logger?.warn(
+          `[Extract] Block ${index + 1}/${total} retry ${attempt}: ${getErrorMessage(error)}`,
+        );
       },
     );
 
@@ -402,22 +468,20 @@ export class LLMVoiceService {
 
     try {
       // Step 1: Always run the initial Assign call
-      const draftResponse = await withRetry(
-        () =>
-          this.apiClient.callStructured({
-            messages: assignMessages,
-            schema: AssignSchema,
-            schemaName: 'AssignSchema',
-            signal: this.abortController?.signal,
-          }),
+      const draftResponse = await this.callWithBackup(
+        'assign',
+        this.apiClient,
         {
-          maxRetries: RETRY_CONFIG.assign,
+          messages: assignMessages,
+          schema: AssignSchema,
+          schemaName: 'AssignSchema',
           signal: this.abortController?.signal,
-          onRetry: (attempt, error) => {
-            this.logger?.warn(
-              `[assign] Block at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`,
-            );
-          },
+        },
+        this.abortController?.signal,
+        (attempt, error) => {
+          this.logger?.warn(
+            `[assign] Block at ${block.sentenceStartIndex} retry ${attempt}: ${getErrorMessage(error)}`,
+          );
         },
       );
 
@@ -452,22 +516,20 @@ export class LLMVoiceService {
         );
 
         try {
-          const qaResponse = await withRetry(
-            () =>
-              this.apiClient.callStructured({
-                messages: qaMessages,
-                schema: AssignSchema,
-                schemaName: 'AssignSchema',
-                signal: this.abortController?.signal,
-              }),
+          const qaResponse = await this.callWithBackup(
+            'assign',
+            this.apiClient,
             {
-              maxRetries: RETRY_CONFIG.assign,
+              messages: qaMessages,
+              schema: AssignSchema,
+              schemaName: 'AssignSchema',
               signal: this.abortController?.signal,
-              onRetry: (attempt, error) => {
-                this.logger?.warn(
-                  `[assign] QA pass at ${block.sentenceStartIndex} retry ${attempt}/${RETRY_CONFIG.assign}: ${getErrorMessage(error)}`,
-                );
-              },
+            },
+            this.abortController?.signal,
+            (attempt, error) => {
+              this.logger?.warn(
+                `[assign] QA pass at ${block.sentenceStartIndex} retry ${attempt}: ${getErrorMessage(error)}`,
+              );
             },
           );
 
@@ -505,7 +567,7 @@ export class LLMVoiceService {
       }
     } catch (_e) {
       this.logger?.warn(
-        `[assign] Block at ${block.sentenceStartIndex} failed after ${RETRY_CONFIG.assign} retries, using default voice for ${block.sentences.length} sentences`,
+        `[assign] Block at ${block.sentenceStartIndex} failed after all retries, using default voice for ${block.sentences.length} sentences`,
       );
       return block.sentences.map((text, i) => ({
         sentenceIndex: block.sentenceStartIndex + i,
@@ -640,22 +702,20 @@ export class LLMVoiceService {
     });
 
     try {
-      const response = await withRetry(
-        () =>
-          client.callStructured({
-            messages: mergeMessages,
-            schema: MergeSchema,
-            schemaName: 'MergeSchema',
-            signal: this.abortController?.signal,
-          }),
+      const response = await this.callWithBackup(
+        'merge',
+        client,
         {
-          maxRetries: RETRY_CONFIG.merge,
+          messages: mergeMessages,
+          schema: MergeSchema,
+          schemaName: 'MergeSchema',
           signal: this.abortController?.signal,
-          onRetry: (attempt, error) => {
-            this.logger?.warn(
-              `[Merge] Retry ${attempt}/${RETRY_CONFIG.merge} (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`,
-            );
-          },
+        },
+        this.abortController?.signal,
+        (attempt, error) => {
+          this.logger?.warn(
+            `[Merge] Retry ${attempt} (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`,
+          );
         },
       );
 
@@ -671,7 +731,7 @@ export class LLMVoiceService {
       return response.merges;
     } catch (error) {
       this.logger?.warn(
-        `[Merge] Vote failed after ${RETRY_CONFIG.merge} retries (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`,
+        `[Merge] Vote failed after all retries (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`,
       );
       return null;
     }

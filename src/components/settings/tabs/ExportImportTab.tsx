@@ -11,6 +11,7 @@ interface StageExportConfig {
   streaming: boolean;
   reasoning: string | null;
   temperature: number;
+  maxRetries: number;
   topP: number;
 }
 
@@ -21,6 +22,7 @@ interface ExportData {
     extract: StageExportConfig;
     merge: StageExportConfig;
     assign: StageExportConfig;
+    backup: StageExportConfig;
     useVoting: boolean;
   };
   dictionary: string[];
@@ -45,6 +47,7 @@ export function ExportImportTab() {
       streaming: config.streaming,
       reasoning: config.reasoning,
       temperature: config.temperature,
+      maxRetries: config.maxRetries,
       topP: config.topP,
     };
   };
@@ -57,6 +60,7 @@ export function ExportImportTab() {
         extract: exportStageConfig('extract'),
         merge: exportStageConfig('merge'),
         assign: exportStageConfig('assign'),
+        backup: exportStageConfig('backup'),
         useVoting: llm.useVoting.value,
       },
       dictionary: data.dictionaryRaw.value,
@@ -88,6 +92,7 @@ export function ExportImportTab() {
       );
     if (config.temperature !== undefined)
       llm.setStageField(stage, 'temperature', config.temperature);
+    if (config.maxRetries !== undefined) llm.setStageField(stage, 'maxRetries', config.maxRetries);
     if (config.topP !== undefined) llm.setStageField(stage, 'topP', config.topP);
   };
 
@@ -125,6 +130,7 @@ export function ExportImportTab() {
         importStageConfig('extract', importData.llm.extract);
         importStageConfig('merge', importData.llm.merge);
         importStageConfig('assign', importData.llm.assign);
+        importStageConfig('backup', importData.llm.backup);
         if (importData.llm.useVoting !== undefined) {
           llm.setUseVoting(importData.llm.useVoting);
         }

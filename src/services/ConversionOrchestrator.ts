@@ -61,6 +61,7 @@ export interface StageLLMConfig {
   topP?: number;
   repeatPrompt?: boolean;
   corsMiddleware?: string;
+  maxRetries?: number;
 }
 
 /**
@@ -73,6 +74,7 @@ export interface OrchestratorInput {
   extractConfig: StageLLMConfig;
   mergeConfig: StageLLMConfig;
   assignConfig: StageLLMConfig;
+  backupConfig: StageLLMConfig;
   useVoting: boolean;
 
   // Settings
@@ -477,7 +479,7 @@ export async function runConversion(
         temperature: input.extractConfig.temperature,
         topP: input.extractConfig.topP,
         repeatPrompt: input.extractConfig.repeatPrompt,
-        corsMiddleware: input.extractConfig.corsMiddleware,
+        maxRetries: input.extractConfig.maxRetries,
         maxConcurrentRequests: input.llmThreads,
         directoryHandle: input.directoryHandle,
         logger,
@@ -491,7 +493,19 @@ export async function runConversion(
           temperature: input.mergeConfig.temperature,
           topP: input.mergeConfig.topP,
           repeatPrompt: input.mergeConfig.repeatPrompt,
-          corsMiddleware: input.mergeConfig.corsMiddleware,
+          maxRetries: input.mergeConfig.maxRetries,
+        },
+        backupConfig: {
+          apiKey: input.backupConfig.apiKey,
+          apiUrl: input.backupConfig.apiUrl,
+          model: input.backupConfig.model,
+          streaming: input.backupConfig.streaming,
+          reasoning: input.backupConfig.reasoning,
+          temperature: input.backupConfig.temperature,
+          topP: input.backupConfig.topP,
+          repeatPrompt: input.backupConfig.repeatPrompt,
+          corsMiddleware: input.backupConfig.corsMiddleware,
+          maxRetries: input.backupConfig.maxRetries,
         },
       };
 
@@ -549,12 +563,24 @@ export async function runConversion(
         temperature: input.assignConfig.temperature,
         topP: input.assignConfig.topP,
         repeatPrompt: input.assignConfig.repeatPrompt,
-        corsMiddleware: input.assignConfig.corsMiddleware,
+        maxRetries: input.assignConfig.maxRetries,
         useVoting: input.useVoting,
         maxConcurrentRequests: input.llmThreads,
         directoryHandle: input.directoryHandle,
         logger,
         detectedLanguage: input.detectedLanguage,
+        backupConfig: {
+          apiKey: input.backupConfig.apiKey,
+          apiUrl: input.backupConfig.apiUrl,
+          model: input.backupConfig.model,
+          streaming: input.backupConfig.streaming,
+          reasoning: input.backupConfig.reasoning,
+          temperature: input.backupConfig.temperature,
+          topP: input.backupConfig.topP,
+          repeatPrompt: input.backupConfig.repeatPrompt,
+          corsMiddleware: input.backupConfig.corsMiddleware,
+          maxRetries: input.backupConfig.maxRetries,
+        },
       };
 
       const assignBlocks = textBlockSplitter.createAssignBlocks(text, input.detectedLanguage);

@@ -13,7 +13,7 @@ import type { LLMCharacter, SpeakerAssignment, VoiceProfileFile } from '@/state/
 
 export type LLMProcessingStatus = 'idle' | 'extracting' | 'review' | 'assigning' | 'error';
 export type ReasoningLevel = 'auto' | 'high' | 'medium' | 'low';
-export type LLMStage = 'extract' | 'merge' | 'assign';
+export type LLMStage = 'extract' | 'merge' | 'assign' | 'backup';
 
 export interface StageConfig {
   apiKey: string;
@@ -25,6 +25,8 @@ export interface StageConfig {
   topP: number;
   repeatPrompt: boolean;
   corsMiddleware: string;
+  /** Retry attempts for this stage before giving up (backup model takes over) */
+  maxRetries: number;
 }
 
 interface LLMSettings {
@@ -32,6 +34,7 @@ interface LLMSettings {
   extract: StageConfig;
   merge: StageConfig;
   assign: StageConfig;
+  backup: StageConfig;
 }
 
 interface LLMState {
@@ -40,6 +43,7 @@ interface LLMState {
   extract: StageConfig;
   merge: StageConfig;
   assign: StageConfig;
+  backup: StageConfig;
 
   // Processing state (not persisted)
   processingStatus: LLMProcessingStatus;
@@ -69,6 +73,7 @@ const defaultStageConfig: StageConfig = {
   topP: 0.95,
   repeatPrompt: false,
   corsMiddleware: '',
+  maxRetries: 3,
 };
 
 const defaultPersistedState: LLMSettings = {
@@ -76,6 +81,7 @@ const defaultPersistedState: LLMSettings = {
   extract: { ...defaultStageConfig },
   merge: { ...defaultStageConfig },
   assign: { ...defaultStageConfig },
+  backup: { ...defaultStageConfig },
 };
 
 const defaultTransientState = {
@@ -114,6 +120,7 @@ export const error = computed(() => llm.value.error);
 export const extract = computed(() => llm.value.extract);
 export const merge = computed(() => llm.value.merge);
 export const assign = computed(() => llm.value.assign);
+export const backup = computed(() => llm.value.backup);
 export const useVoting = computed(() => llm.value.useVoting);
 
 // Review promise resolvers (not persisted)
@@ -172,10 +179,11 @@ async function saveSettings(): Promise<void> {
   _savePending = true;
 
   try {
-    const [extractKey, mergeKey, assignKey] = await Promise.all([
+    const [extractKey, mergeKey, assignKey, backupKey] = await Promise.all([
       encryptValue(llm.value.extract.apiKey),
       encryptValue(llm.value.merge.apiKey),
       encryptValue(llm.value.assign.apiKey),
+      encryptValue(llm.value.backup.apiKey),
     ]);
 
     const settings: LLMSettings = {
@@ -183,6 +191,7 @@ async function saveSettings(): Promise<void> {
       extract: { ...llm.value.extract, apiKey: extractKey },
       merge: { ...llm.value.merge, apiKey: mergeKey },
       assign: { ...llm.value.assign, apiKey: assignKey },
+      backup: { ...llm.value.backup, apiKey: backupKey },
     };
     localStorage.setItem(StorageKeys.llmSettings, JSON.stringify(settings));
   } finally {
@@ -211,7 +220,7 @@ export async function loadSettings(logStore: LoggerStore): Promise<void> {
       useVoting: settings.useVoting ?? defaultPersistedState.useVoting,
     };
 
-    for (const stage of ['extract', 'merge', 'assign'] as const) {
+    for (const stage of ['extract', 'merge', 'assign', 'backup'] as const) {
       if (settings[stage]) {
         const decryptedKey = await decryptValue(settings[stage].apiKey ?? '', logStore);
         llm.value = {
@@ -226,6 +235,7 @@ export async function loadSettings(logStore: LoggerStore): Promise<void> {
             topP: settings[stage].topP ?? defaultStageConfig.topP,
             repeatPrompt: settings[stage].repeatPrompt ?? defaultStageConfig.repeatPrompt,
             corsMiddleware: settings[stage].corsMiddleware ?? defaultStageConfig.corsMiddleware,
+            maxRetries: settings[stage].maxRetries ?? defaultStageConfig.maxRetries,
           },
         };
       }

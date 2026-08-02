@@ -43,6 +43,7 @@ export * as LLMStoreModule from './LLMStore';
 export {
   addCharacter,
   assign,
+  backup,
   awaitReview,
   cancelReview,
   // Computed values

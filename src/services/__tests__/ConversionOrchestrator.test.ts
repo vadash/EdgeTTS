@@ -60,6 +60,14 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
       temperature: 0,
       topP: 1,
     },
+    backupConfig: {
+      apiKey: 'k',
+      apiUrl: 'u',
+      model: 'm',
+      streaming: false,
+      temperature: 0,
+      topP: 1,
+    },
     ...overrides,
   };
 }

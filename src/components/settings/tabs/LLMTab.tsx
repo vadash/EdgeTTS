@@ -12,6 +12,7 @@ const stageTabs = [
   { id: 'extract', label: 'Extract', icon: '1️⃣' },
   { id: 'merge', label: 'Merge', icon: '2️⃣' },
   { id: 'assign', label: 'Assign', icon: '3️⃣' },
+  { id: 'backup', label: 'Backup', icon: '4️⃣' },
 ];
 
 type TestState = Record<
@@ -26,6 +27,7 @@ const initialTestState: TestState = {
   extract: { testing: false, result: null },
   merge: { testing: false, result: null },
   assign: { testing: false, result: null },
+  backup: { testing: false, result: null },
 };
 
 export function LLMTab() {
@@ -82,7 +84,7 @@ export function LLMTab() {
 
   const handleCopySettings = (sourceStage: LLMStage) => {
     const sourceConfig = llm[sourceStage].value;
-    const targetStages = ['extract', 'merge', 'assign'].filter<LLMStage>(
+    const targetStages = ['extract', 'merge', 'assign', 'backup'].filter<LLMStage>(
       (s): s is LLMStage => s !== sourceStage,
     );
 
@@ -93,7 +95,7 @@ export function LLMTab() {
       llm.setStageField(target, 'temperature', sourceConfig.temperature);
       llm.setStageField(target, 'topP', sourceConfig.topP);
       llm.setStageField(target, 'repeatPrompt', sourceConfig.repeatPrompt);
-      llm.setStageField(target, 'corsMiddleware', sourceConfig.corsMiddleware);
+      llm.setStageField(target, 'maxRetries', sourceConfig.maxRetries);
     }
   };
 
@@ -139,6 +141,10 @@ export function LLMTab() {
         </p>
         <p>
           <strong>Assign:</strong> <Text id="llm.assignDesc">Assigns speakers to sentences</Text>
+        </p>
+        <p>
+          <strong>Backup:</strong>{' '}
+          <Text id="llm.backupDesc">Used when any stage model exhausts its max retries</Text>
         </p>
       </div>
 
@@ -230,6 +236,9 @@ export function LLMTab() {
             </TabPanel>
             <TabPanel id="assign" activeTab={activeTab}>
               {renderStageForm('assign')}
+            </TabPanel>
+            <TabPanel id="backup" activeTab={activeTab}>
+              {renderStageForm('backup')}
             </TabPanel>
           </>
         )}

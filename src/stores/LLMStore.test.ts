@@ -89,6 +89,7 @@ describe('LLMStore', () => {
         temperature: 0.5,
         topP: 0.9,
         repeatPrompt: false,
+        maxRetries: 3,
         corsMiddleware: '',
       };
       setStageConfig('extract', config);

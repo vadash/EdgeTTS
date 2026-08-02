@@ -164,6 +164,27 @@ export function StageConfigForm({
           formatValue={(v) => v.toFixed(2)}
           disabled={isReasoningEnabled}
         />
+        {/* Max Retries */}
+        <div className="space-y-1">
+          <label className="input-label" htmlFor="max-retries-input">
+            <Text id="llm.maxRetries">Max Retries</Text>
+          </label>
+          <input
+            id="max-retries-input"
+            type="number"
+            className="input-field"
+            min={1}
+            max={50}
+            step={1}
+            value={config.maxRetries}
+            onInput={(e) =>
+              onChange(
+                'maxRetries',
+                Math.max(1, Math.min(50, Number((e.target as HTMLInputElement).value) || 1)),
+              )
+            }
+          />
+        </div>
 
         {/* CORS Proxy */}
         <div className="space-y-1">

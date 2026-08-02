@@ -49,6 +49,7 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
       temperature: l.extract.temperature,
       topP: l.extract.topP,
       repeatPrompt: l.extract.repeatPrompt,
+      maxRetries: l.extract.maxRetries,
       corsMiddleware: l.extract.corsMiddleware,
     },
     mergeConfig: {
@@ -60,6 +61,7 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
       temperature: l.merge.temperature,
       topP: l.merge.topP,
       repeatPrompt: l.merge.repeatPrompt,
+      maxRetries: l.merge.maxRetries,
       corsMiddleware: l.merge.corsMiddleware,
     },
     assignConfig: {
@@ -71,7 +73,20 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
       temperature: l.assign.temperature,
       topP: l.assign.topP,
       repeatPrompt: l.assign.repeatPrompt,
+      maxRetries: l.assign.maxRetries,
       corsMiddleware: l.assign.corsMiddleware,
+    },
+    backupConfig: {
+      apiKey: l.backup.apiKey,
+      apiUrl: l.backup.apiUrl,
+      model: l.backup.model,
+      streaming: l.backup.streaming,
+      reasoning: l.backup.reasoning,
+      temperature: l.backup.temperature,
+      topP: l.backup.topP,
+      repeatPrompt: l.backup.repeatPrompt,
+      corsMiddleware: l.backup.corsMiddleware,
+      maxRetries: l.backup.maxRetries,
     },
     useVoting: l.useVoting,
 
