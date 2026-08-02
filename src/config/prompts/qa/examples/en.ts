@@ -7,8 +7,8 @@ export const qaExamplesEN: PromptExample[] = [
   {
     label: '(EN/VocativeTrapCorrection)',
     input: `[Speaker Codes]:
-- A = John [male]
-- B = Guard [unknown]
+- A3F1 = John [male]
+- B2C4 = Guard [unknown]
 
 [Numbered Paragraphs]:
 [0] "Halt!" the guard shouted.
@@ -19,25 +19,25 @@ export const qaExamplesEN: PromptExample[] = [
 {
   "reasoning": "0 is Guard. 1 is John asking. 2 is John showing papers.",
   "assignments": {
-    "0": "B",
-    "1": "A",
-    "2": "A"
+    "0": "B2C4",
+    "1": "A3F1",
+    "2": "A3F1"
   }
 }`,
     output: `{
-  "reasoning": "2: voc trap, John=listener→B (was A).",
+  "reasoning": "2: voc trap, John=listener→B2C4 (was A3F1).",
   "assignments": {
-    "0": "B",
-    "1": "A",
-    "2": "B"
+    "0": "B2C4",
+    "1": "A3F1",
+    "2": "B2C4"
   }
 }`,
   },
   {
     label: '(EN/MissedActionBeat)',
     input: `[Speaker Codes]:
-- A = Mary [female]
-- B = Protagonist [unknown]
+- C7D2 = Mary [female]
+- E5F8 = Protagonist [unknown]
 
 [Numbered Paragraphs]:
 [0] "Hello there." Mary smiled.
@@ -47,23 +47,23 @@ export const qaExamplesEN: PromptExample[] = [
 {
   "reasoning": "Both quotes are from Mary.",
   "assignments": {
-    "0": "A",
-    "1": "A"
+    "0": "C7D2",
+    "1": "C7D2"
   }
 }`,
     output: `{
-  "reasoning": "0: beat 'Mary smiled' after quote→not Mary. Protag spoke→B (was A).",
+  "reasoning": "0: beat 'Mary smiled' after quote→not Mary. Protag spoke→E5F8 (was C7D2).",
   "assignments": {
-    "0": "B",
-    "1": "A"
+    "0": "E5F8",
+    "1": "C7D2"
   }
 }`,
   },
   {
     label: '(EN/RemovedNarrationAndAddedMissing)',
     input: `[Speaker Codes]:
-- A = Kira [female]
-- B = System [female]
+- 1B4A = Kira [female]
+- 8F3C = System [female]
 
 [Numbered Paragraphs]:
 [0] The dungeon door creaked open.
@@ -75,16 +75,16 @@ export const qaExamplesEN: PromptExample[] = [
 {
   "reasoning": "0 is narration, 1 is System, 2 is Kira, 3 is narration",
   "assignments": {
-    "0": "A",
-    "1": "B",
-    "2": "A"
+    "0": "1B4A",
+    "1": "8F3C",
+    "2": "1B4A"
   }
 }`,
     output: `{
-  "reasoning": "0: door narr, rm (was A). 1: sys→B ok. 2: Kira→A ok.",
+  "reasoning": "0: door narr, rm (was 1B4A). 1: sys→8F3C ok. 2: Kira→1B4A ok.",
   "assignments": {
-    "1": "B",
-    "2": "A"
+    "1": "8F3C",
+    "2": "1B4A"
   }
 }`,
   },

@@ -8,9 +8,9 @@ export const assignExamplesEN: PromptExample[] = [
   {
     label: '(EN/Simple)',
     input: `[Speaker Codes]:
-- A = John [male]
-- B = Mary [female]
-- C = System [female]
+- A3F1 = John [male]
+- B2C4 = Mary [female]
+- C9D2 = System [female]
 
 [Numbered Paragraphs]:
 [0] John walked into the room.
@@ -18,20 +18,20 @@ export const assignExamplesEN: PromptExample[] = [
 [2] "I'm right here," Mary said.
 [3] [Quest Updated]`,
     output: `{
-  "reasoning": "0: narr. 1: John→A. 2: Mary→B. 3: sys→C.",
+  "reasoning": "0: narr. 1: John→A3F1. 2: Mary→B2C4. 3: sys→C9D2.",
   "assignments": {
-    "1": "A",
-    "2": "B",
-    "3": "C"
+    "1": "A3F1",
+    "2": "B2C4",
+    "3": "C9D2"
   }
 }`,
   },
   {
     label: '(EN/VocativeTrap)',
     input: `[Speaker Codes]:
-- A = Protagonist [male]
-- B = Guard [unknown]
-- C = Captain [male]
+- F7E3 = Protagonist [male]
+- D1A5 = Guard [unknown]
+- E8B9 = Captain [male]
 
 [Numbered Paragraphs]:
 [0] "Halt!" the guard shouted.
@@ -39,21 +39,21 @@ export const assignExamplesEN: PromptExample[] = [
 [2] "Show your papers, Captain," the guard ordered.
 [3] "Of course."`,
     output: `{
-  "reasoning": "0: guard→B. 1: 'I'→A. 2: guard→B, Captain voc. 3: guard cont→B.",
+  "reasoning": "0: guard→D1A5. 1: 'I'→F7E3. 2: guard→D1A5, Captain voc. 3: guard cont→D1A5.",
   "assignments": {
-    "0": "B",
-    "1": "A",
-    "2": "B",
-    "3": "B"
+    "0": "D1A5",
+    "1": "F7E3",
+    "2": "D1A5",
+    "3": "D1A5"
   }
 }`,
   },
   {
     label: '(EN/FirstPersonContext)',
     input: `[Speaker Codes]:
-- A = Protagonist [female]
-- B = Marcus [male]
-- C = Elena [female]
+- 5C2A = Protagonist [female]
+- 7F4D = Marcus [male]
+- 3E8B = Elena [female]
 
 [Numbered Paragraphs]:
 [0] I stared at the notification.
@@ -62,20 +62,20 @@ export const assignExamplesEN: PromptExample[] = [
 [3] Elena sighed. "We need to tell the others."
 [4] "Agreed," I said.`,
     output: `{
-  "reasoning": "1: 'I'→A. 2: Marcus beat→B. 3: Elena beat→C. 4: 'I said'→A.",
+  "reasoning": "1: 'I'→5C2A. 2: Marcus beat→7F4D. 3: Elena beat→3E8B. 4: 'I said'→5C2A.",
   "assignments": {
-    "1": "A",
-    "2": "B",
-    "3": "C",
-    "4": "A"
+    "1": "5C2A",
+    "2": "7F4D",
+    "3": "3E8B",
+    "4": "5C2A"
   }
 }`,
   },
   {
     label: '(EN/SystemAndMixed)',
     input: `[Speaker Codes]:
-- A = Kira [female]
-- B = System [female]
+- 9A1F = Kira [female]
+- 4B6C = System [female]
 
 [Numbered Paragraphs]:
 [0] The dungeon door creaked open.
@@ -85,20 +85,20 @@ export const assignExamplesEN: PromptExample[] = [
 [4] [Warning: Enemy Level 15 -- Retreat Recommended]
 [5] "Not today." She drew her blade.`,
     output: `{
-  "reasoning": "1: sys→B. 2: Kira tag→A. 3: narr. 4: sys→B. 5: 'She'=Kira beat→A.",
+  "reasoning": "1: sys→4B6C. 2: Kira tag→9A1F. 3: narr. 4: sys→4B6C. 5: 'She'=Kira beat→9A1F.",
   "assignments": {
-    "1": "B",
-    "2": "A",
-    "4": "B",
-    "5": "A"
+    "1": "4B6C",
+    "2": "9A1F",
+    "4": "4B6C",
+    "5": "9A1F"
   }
 }`,
   },
   {
     label: '(EN/DialogueWithLongNarration)',
     input: `[Speaker Codes]:
-- A = Professor Viridian [male]
-- B = Mirian [female]
+- 6D3E = Professor Viridian [male]
+- 2A9F = Mirian [female]
 
 [Numbered Paragraphs]:
 [0] "Observe," Professor Viridian said. He put on a heavy steel gauntlet plated with glowing runes, which looked ridiculous on his thin boney frame. He then reached through the magic barrier and plucked a single leaf.
@@ -106,10 +106,10 @@ export const assignExamplesEN: PromptExample[] = [
 [2] "Observe, the golden crown," the professor said, "hence regal cordyline. Wear proper protective gear, or you're likely to lose your arm."
 [3] Mirian could feel the heat even from the second row. The golden light spun in a circle, crackling with energy.`,
     output: `{
-  "reasoning": "0: Viridian tag→A. 1: narr. 2: professor=Viridian tag→A. 3: narr.",
+  "reasoning": "0: Viridian tag→6D3E. 1: narr. 2: professor=Viridian tag→6D3E. 3: narr.",
   "assignments": {
-    "0": "A",
-    "2": "A"
+    "0": "6D3E",
+    "2": "6D3E"
   }
 }`,
   },

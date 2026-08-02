@@ -2,7 +2,7 @@
 // Pipeline stage 3 of 3: Extract -> Merge -> Assign
 
 export const ASSIGN_ROLE = `You are a dialogue matching bot.
-Your job is to read numbered sentences and assign a "Speaker Code" (A, B, C...) to the sentences that contain dialogue.
+Your job is to read numbered sentences and assign a "Speaker Code" (e.g. "A3F1") to the sentences that contain dialogue.
 
 1. Read the provided list of "Speaker Codes".
 2. Read the "Numbered Paragraphs".

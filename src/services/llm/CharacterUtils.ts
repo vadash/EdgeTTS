@@ -5,40 +5,67 @@ export interface CodeMapping {
   codeToName: Map<string, string>;
 }
 
-const CODES = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz';
+/**
+ * Length of each speaker code in hex characters (e.g. "A3F1" = 4 chars).
+ * Mirrors oh-my-pi's hashline snapshot tag format for compact, opaque tokens.
+ */
+export const SPEAKER_CODE_LENGTH = 4;
+
+const UNNAMED_SPEAKERS = ['MALE_UNNAMED', 'FEMALE_UNNAMED', 'UNKNOWN_UNNAMED'] as const;
 
 /**
- * Build code mapping for characters (A-Z, 0-9, a-z = 62 codes)
+ * Generate a single random uppercase hex code of {@link SPEAKER_CODE_LENGTH} chars.
+ * Uses crypto.getRandomValues for cryptographic-quality randomness available in
+ * both browser and Node.js environments.
+ */
+function randomHexCode(): string {
+  const buf = new Uint16Array(1);
+  crypto.getRandomValues(buf);
+  return (buf[0] & 0xffff).toString(16).padStart(SPEAKER_CODE_LENGTH, '0').toUpperCase();
+}
+
+/**
+ * Draw `count` mutually-unique random hex codes, rejecting collisions.
+ * With 65 536 possible values and typical book character counts (<30), redraws
+ * are rare and the loop terminates quickly.
+ */
+function generateUniqueHexCodes(count: number): string[] {
+  const codes: string[] = [];
+  const used = new Set<string>();
+  while (codes.length < count) {
+    const code = randomHexCode();
+    if (!used.has(code)) {
+      used.add(code);
+      codes.push(code);
+    }
+  }
+  return codes;
+}
+
+/**
+ * Build code mapping for characters using random 4-hex codes (e.g. "A3F1").
+ * Random codes prevent LLMs from falling into positional routines where the
+ * same character always receives the same code across different books.
  */
 export function buildCodeMapping(characters: LLMCharacter[]): CodeMapping {
   return buildCodeMappingFromNames(characters.map((c) => c.canonicalName));
 }
 
 /**
- * Build code mapping from character names (adds unnamed speaker codes at the end)
+ * Build code mapping from character names using random 4-hex codes.
+ * Also adds MALE_UNNAMED, FEMALE_UNNAMED, and UNKNOWN_UNNAMED codes.
+ * Each call produces a fresh random mapping — the same character list
+ * yields different codes across invocations.
  */
 export function buildCodeMappingFromNames(names: string[]): CodeMapping {
+  const allNames = [...names, ...UNNAMED_SPEAKERS];
+  const codes = generateUniqueHexCodes(allNames.length);
+
   const nameToCode = new Map<string, string>();
   const codeToName = new Map<string, string>();
-
-  names.forEach((name, i) => {
-    const code = i < CODES.length ? CODES[i] : `X${i}`;
-    nameToCode.set(name, code);
-    codeToName.set(code, name);
-  });
-
-  // Add unnamed speaker codes dynamically after character codes
-  const nextIndex = names.length;
-  const unnamedCodes = [
-    { name: 'MALE_UNNAMED', index: nextIndex },
-    { name: 'FEMALE_UNNAMED', index: nextIndex + 1 },
-    { name: 'UNKNOWN_UNNAMED', index: nextIndex + 2 },
-  ];
-
-  for (const { name, index } of unnamedCodes) {
-    const code = index < CODES.length ? CODES[index] : `X${index}`;
-    nameToCode.set(name, code);
-    codeToName.set(code, name);
+  for (let i = 0; i < allNames.length; i++) {
+    nameToCode.set(allNames[i], codes[i]);
+    codeToName.set(codes[i], allNames[i]);
   }
 
   return { nameToCode, codeToName };

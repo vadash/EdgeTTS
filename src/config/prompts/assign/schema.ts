@@ -11,5 +11,5 @@ export const ASSIGN_SCHEMA_TEXT = `{
 
 CRITICAL FORMAT RULES:
 - The keys in "assignments" MUST be the exact paragraph numbers (as strings, e.g., "0", "1", "4").
-- The values MUST be the Speaker Letter Codes (e.g., "A", "B", "C"). NEVER use the character's full name.
+- The values MUST be the 4-character Speaker Codes provided in <speaker_codes> (e.g., "A3F1", "B2C4"). NEVER use the character's full name.
 - ONLY include paragraph numbers that actually have dialogue, thoughts, or system messages. Omit narration paragraphs entirely.`;

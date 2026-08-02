@@ -81,13 +81,19 @@ describe('parseMergeResponse', () => {
 
 describe('parseAssignResponse', () => {
   const codeToName = new Map([
-    ['A', 'Erick'],
-    ['B', 'Jane'],
-    ['C', 'System'],
+    ['A3F1', 'Erick'],
+    ['B2C4', 'Jane'],
+    ['C9D2', 'System'],
+  ]);
+  const nameToCode = new Map([
+    ['Erick', 'A3F1'],
+    ['Jane', 'B2C4'],
+    ['System', 'C9D2'],
+    ['UNKNOWN_UNNAMED', 'D5E7'],
   ]);
   const context = {
     characters: [],
-    nameToCode: new Map(),
+    nameToCode,
     codeToName,
     numberedParagraphs: '',
     sentenceCount: 10,
@@ -96,25 +102,25 @@ describe('parseAssignResponse', () => {
   it('parses valid sparse JSON assign response', () => {
     const response = {
       reasoning: null,
-      assignments: { '0': 'A', '1': 'B', '2': 'A', '3': 'C' },
+      assignments: { '0': 'A3F1', '1': 'B2C4', '2': 'A3F1', '3': 'C9D2' },
     };
     const result = parseAssignResponse(response, context);
-    // The speakerMap stores codes (A, B, C), not names
-    expect(result.speakerMap.get(0)).toBe('A');
-    expect(result.speakerMap.get(1)).toBe('B');
-    expect(result.speakerMap.get(2)).toBe('A');
-    expect(result.speakerMap.get(3)).toBe('C');
+    // The speakerMap stores codes (A3F1, B2C4, C9D2), not names
+    expect(result.speakerMap.get(0)).toBe('A3F1');
+    expect(result.speakerMap.get(1)).toBe('B2C4');
+    expect(result.speakerMap.get(2)).toBe('A3F1');
+    expect(result.speakerMap.get(3)).toBe('C9D2');
   });
 
   it('falls back to UNKNOWN_UNNAMED for invalid character codes', () => {
     const response = {
       reasoning: null,
-      assignments: { '0': 'A', '1': 'INVALID', '2': 'C' },
+      assignments: { '0': 'A3F1', '1': 'INVALID', '2': 'C9D2' },
     };
     const result = parseAssignResponse(response, context);
-    expect(result.speakerMap.get(0)).toBe('A');
-    expect(result.speakerMap.get(1)).toBe('3'); // Invalid code falls back to hardcoded '3'
-    expect(result.speakerMap.get(2)).toBe('C');
+    expect(result.speakerMap.get(0)).toBe('A3F1');
+    expect(result.speakerMap.get(1)).toBe('D5E7'); // Invalid code falls back to UNKNOWN_UNNAMED
+    expect(result.speakerMap.get(2)).toBe('C9D2');
   });
 
   it('handles empty assignments', () => {
@@ -129,12 +135,12 @@ describe('parseAssignResponse', () => {
   it('handles sparse indices', () => {
     const response = {
       reasoning: null,
-      assignments: { '0': 'A', '5': 'B', '10': 'C' },
+      assignments: { '0': 'A3F1', '5': 'B2C4', '10': 'C9D2' },
     };
     const result = parseAssignResponse(response, context);
-    expect(result.speakerMap.get(0)).toBe('A');
-    expect(result.speakerMap.get(5)).toBe('B');
-    expect(result.speakerMap.get(10)).toBe('C');
+    expect(result.speakerMap.get(0)).toBe('A3F1');
+    expect(result.speakerMap.get(5)).toBe('B2C4');
+    expect(result.speakerMap.get(10)).toBe('C9D2');
     expect(result.speakerMap.get(1)).toBeUndefined();
   });
 });
@@ -143,7 +149,7 @@ describe('buildAssignPrompt with overlap', () => {
   const characters: LLMCharacter[] = [
     { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
   ];
-  const nameToCode = new Map([['Alice', 'A']]);
+  const nameToCode = new Map([['Alice', 'A3F1']]);
   const numberedParagraphs = '[0] Some text';
 
   it('injects overlap sentences with negative indices when provided', () => {
@@ -237,10 +243,11 @@ describe('fallback: unmapped codes', () => {
     expect(result.speakerMap.get(1)).toBe('3'); // Falls back to UNKNOWN_UNNAMED
   });
 
-  it('should fallback to code "3" when UNKNOWN_UNNAMED not in maps', () => {
-    const context = createContext({ John: '1' }); // No UNKNOWN_UNNAMED defined
-    const response = { assignments: { '0': '999' }, reasoning: null };
+  it('should skip unknown codes when UNKNOWN_UNNAMED not in maps', () => {
+    const context = createContext({ John: 'F1A2' }); // No UNKNOWN_UNNAMED defined
+    const response = { assignments: { '0': '9999' }, reasoning: null };
     const result = parseAssignResponse(response, context);
-    expect(result.speakerMap.get(0)).toBe('3'); // Hardcoded fallback
+    // No UNKNOWN_UNNAMED to fall back to — entry is skipped, downstream defaults to narrator
+    expect(result.speakerMap.get(0)).toBeUndefined();
   });
 });

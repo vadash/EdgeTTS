@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { LLMCharacter } from '@/state/types';
-import { cullByFrequency } from './CharacterUtils';
+import {
+  SPEAKER_CODE_LENGTH,
+  buildCodeMapping,
+  buildCodeMappingFromNames,
+  cullByFrequency,
+} from './CharacterUtils';
 
 function makeChar(
   name: string,
@@ -131,5 +136,59 @@ describe('cullByFrequency', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].canonicalName).toBe('Eva');
+  });
+});
+
+describe('buildCodeMappingFromNames', () => {
+  it('produces 4-char uppercase hex codes', () => {
+    const { nameToCode } = buildCodeMappingFromNames(['Alice']);
+    const code = nameToCode.get('Alice')!;
+    expect(code).toMatch(/^[0-9A-F]{4}$/);
+    expect(code.length).toBe(SPEAKER_CODE_LENGTH);
+  });
+
+  it('assigns unique codes to every name (no collisions)', () => {
+    const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank'];
+    const { nameToCode } = buildCodeMappingFromNames(names);
+    const codes = Array.from(nameToCode.values());
+    expect(new Set(codes).size).toBe(codes.length);
+  });
+
+  it('includes unnamed speaker codes', () => {
+    const { nameToCode, codeToName } = buildCodeMappingFromNames(['Alice']);
+    expect(nameToCode.has('MALE_UNNAMED')).toBe(true);
+    expect(nameToCode.has('FEMALE_UNNAMED')).toBe(true);
+    expect(nameToCode.has('UNKNOWN_UNNAMED')).toBe(true);
+    // All unnamed codes must be unique 4-hex
+    for (const name of ['MALE_UNNAMED', 'FEMALE_UNNAMED', 'UNKNOWN_UNNAMED']) {
+      expect(nameToCode.get(name)).toMatch(/^[0-9A-F]{4}$/);
+    }
+    // Reverse lookup works
+    for (const [name, code] of nameToCode) {
+      expect(codeToName.get(code)).toBe(name);
+    }
+  });
+
+  it('produces decorrelated codes across calls with identical input', () => {
+    // The core contract: same character list must NOT produce the same codes.
+    // This prevents the LLM from falling into positional routines.
+    const names = ['Alice', 'Bob', 'Charlie'];
+    const codes1 = Array.from(buildCodeMappingFromNames(names).nameToCode.values());
+    const codes2 = Array.from(buildCodeMappingFromNames(names).nameToCode.values());
+    // With 65536^3 possible code-sets, an exact collision is astronomically
+    // unlikely (probability ~1/2^48). At least one code must differ.
+    const allMatch = codes1.every((c, i) => c === codes2[i]);
+    expect(allMatch).toBe(false);
+  });
+});
+
+describe('buildCodeMapping', () => {
+  it('wraps character names into the same random mapping', () => {
+    const chars = [makeChar('Alice', ['Alice']), makeChar('Bob', ['Bob'])];
+    const { nameToCode, codeToName } = buildCodeMapping(chars);
+    expect(nameToCode.has('Alice')).toBe(true);
+    expect(nameToCode.has('Bob')).toBe(true);
+    expect(codeToName.get(nameToCode.get('Alice')!)).toBe('Alice');
+    expect(codeToName.get(nameToCode.get('Bob')!)).toBe('Bob');
   });
 });

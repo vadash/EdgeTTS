@@ -3,6 +3,30 @@ import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
 import { LLMVoiceService } from './LLMVoiceService';
 
+// Mock buildCodeMapping to return deterministic codes matching mock LLM responses
+vi.mock('./CharacterUtils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./CharacterUtils')>();
+  return {
+    ...actual,
+    buildCodeMapping: (characters: LLMCharacter[]) => {
+      const nameToCode = new Map<string, string>();
+      const codeToName = new Map<string, string>();
+      const allNames = [
+        ...characters.map((c) => c.canonicalName),
+        'MALE_UNNAMED',
+        'FEMALE_UNNAMED',
+        'UNKNOWN_UNNAMED',
+      ];
+      const codes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+      allNames.forEach((name, i) => {
+        nameToCode.set(name, codes[i] ?? `X${i}`);
+        codeToName.set(codes[i] ?? `X${i}`, name);
+      });
+      return { nameToCode, codeToName };
+    },
+  };
+});
+
 // Mock OpenAI client
 vi.mock('openai', () => ({
   default: vi.fn().mockImplementation(function () {

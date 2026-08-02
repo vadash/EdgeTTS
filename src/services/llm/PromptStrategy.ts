@@ -53,14 +53,14 @@ export function parseMergeResponse(response: unknown): MergeResponse {
 export function parseAssignResponse(response: unknown, context: AssignContext): AssignResult {
   const parsed = AssignSchema.parse(response);
 
-  const unknownCode = context.nameToCode.get('UNKNOWN_UNNAMED') || '3';
+  const unknownCode = context.nameToCode.get('UNKNOWN_UNNAMED');
 
   const speakerMap = new Map<number, string>();
   for (const [key, code] of Object.entries(parsed.assignments)) {
     const index = parseInt(key, 10);
     if (context.codeToName.has(code)) {
       speakerMap.set(index, code);
-    } else {
+    } else if (unknownCode !== undefined) {
       speakerMap.set(index, unknownCode);
     }
   }
