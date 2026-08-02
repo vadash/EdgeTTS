@@ -28,16 +28,16 @@ function makeService(withBackup: boolean) {
       : undefined,
   });
 }
-// callWithBackup is private; expose it for testing
-type CallWithBackup = <T>(
-  stage: 'extract',
+// callWithStageBackup is private; expose it for testing
+type CallWithStageBackup = <T>(
+  stage: 'extract' | 'assign',
   client: unknown,
   args: unknown,
   signal: AbortSignal | undefined,
   onRetry: (a: number, e: unknown) => void,
 ) => Promise<T>;
-const getCallWithBackup = (s: LLMVoiceService): CallWithBackup =>
-  (s as unknown as { callWithBackup: CallWithBackup }).callWithBackup.bind(s);
+const getCallWithStageBackup = (s: LLMVoiceService): CallWithStageBackup =>
+  (s as unknown as { callWithStageBackup: CallWithStageBackup }).callWithStageBackup.bind(s);
 
 describe('LLMVoiceService - Backup fallback', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -51,7 +51,7 @@ describe('LLMVoiceService - Backup fallback', () => {
       characters: [{ canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }],
     } as never);
 
-    const result = await getCallWithBackup(service)(
+    const result = await getCallWithStageBackup(service)(
       'extract',
       service.apiClient,
       { messages: [], schema: {}, schemaName: 'Test' },
@@ -76,7 +76,7 @@ describe('LLMVoiceService - Backup fallback', () => {
     expect(service.backupApiClient).toBeNull();
 
     await expect(
-      getCallWithBackup(service)(
+      getCallWithStageBackup(service)(
         'extract',
         service.apiClient,
         { messages: [], schema: {}, schemaName: 'Test' },
@@ -100,7 +100,7 @@ describe('LLMVoiceService - Backup fallback', () => {
     controller.abort();
 
     await expect(
-      getCallWithBackup(service)(
+      getCallWithStageBackup(service)(
         'extract',
         service.apiClient,
         { messages: [], schema: {}, schemaName: 'Test' },

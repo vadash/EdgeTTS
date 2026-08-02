@@ -148,7 +148,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
     expect(result[0].canonicalName).toBe('Narrator');
   });
 
-  it('throws on refusal during extract', async () => {
+  it('skips block on refusal during extract (no backup)', async () => {
     const mockResponse = {
       choices: [
         {
@@ -188,6 +188,10 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
       },
     ];
 
-    await expect(service.extractCharacters(blocks)).rejects.toThrow('LLM refused');
+    const result = await service.extractCharacters(blocks);
+    expect(result).toEqual([]); // refusal skips the block, no throw
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('failed after all retries, skipping'),
+    );
   });
 });

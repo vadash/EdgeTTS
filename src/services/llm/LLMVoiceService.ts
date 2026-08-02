@@ -218,23 +218,23 @@ export class LLMVoiceService {
   }
 
   /**
-   * Call structured endpoint with retry and optional backup fallback.
-   * Retries the primary client up to maxRetries; on exhaustion, if a backup
-   * model is configured and the signal isn't aborted, retries on the backup
-   * client with its own maxRetries. Pass callArgs so the backup client can
-   * re-issue the same request against a different LLMApiClient.
+   * Call structured endpoint for a splittable stage (extract/assign): retry main
+   * up to the user-set maxRetries, then fall back to the backup model with its own
+   * maxRetries. If main + backup both exhaust, throw so the per-block handler can
+   * degrade (extract skips the block, assign falls back to narrator).
+   *
+   * ponytail: merge deliberately does NOT use this path — it never falls back to
+   * the backup model and retries on the merge client alone until mergeVoteCount
+   * results are gathered (see callMerge).
    */
-  private async callWithBackup<T>(
-    stage: 'extract' | 'merge' | 'assign',
+  private async callWithStageBackup<T>(
+    stage: 'extract' | 'assign',
     primaryClient: LLMApiClient,
     callArgs: StructuredCallOptions<T>,
     signal: AbortSignal | undefined,
     onRetry: (attempt: number, error: unknown) => void,
   ): Promise<T> {
-    const maxRetries =
-      stage === 'merge'
-        ? (this.options.mergeConfig?.maxRetries ?? DEFAULT_MAX_RETRIES)
-        : (this.options.maxRetries ?? DEFAULT_MAX_RETRIES);
+    const maxRetries = this.options.maxRetries ?? DEFAULT_MAX_RETRIES;
 
     try {
       return await withRetry(() => primaryClient.callStructured(callArgs), {
@@ -261,6 +261,24 @@ export class LLMVoiceService {
         },
       });
     }
+  }
+
+  /**
+   * Merge retry: infinity retries on the merge client alone, never the backup
+   * model. The caller loops until mergeVoteCount successful results are gathered,
+   * then builds consensus via union filter.
+   */
+  private async callMerge<T>(
+    primaryClient: LLMApiClient,
+    callArgs: StructuredCallOptions<T>,
+    signal: AbortSignal | undefined,
+    onRetry: (attempt: number, error: unknown) => void,
+  ): Promise<T> {
+    return withRetry(() => primaryClient.callStructured(callArgs), {
+      maxRetries: Infinity, // ponytail: caller caps collection at mergeVoteCount
+      signal,
+      onRetry,
+    });
   }
   /**
    * Extract: Extract characters from text blocks using structured outputs
@@ -340,27 +358,35 @@ export class LLMVoiceService {
       this.detectedLanguage,
       this.options.repeatPrompt ?? false,
     );
-    const response = await this.callWithBackup(
-      'extract',
-      this.apiClient,
-      {
-        messages: extractMessages,
-        schema: ExtractSchema,
-        schemaName: 'ExtractSchema',
-        signal: controller.signal,
-      },
-      controller.signal,
-      (attempt, error) => {
-        this.logger?.warn(
-          `[Extract] Block ${index + 1}/${total} retry ${attempt}: ${getErrorMessage(error)}`,
-        );
-      },
-    );
+    try {
+      const response = await this.callWithStageBackup(
+        'extract',
+        this.apiClient,
+        {
+          messages: extractMessages,
+          schema: ExtractSchema,
+          schemaName: 'ExtractSchema',
+          signal: controller.signal,
+        },
+        controller.signal,
+        (attempt, error) => {
+          this.logger?.warn(
+            `[Extract] Block ${index + 1}/${total} retry ${attempt}: ${getErrorMessage(error)}`,
+          );
+        },
+      );
 
-    // Collect debug log for first block only
-    const debugLog = index === 0 ? { messages: extractMessages, response } : undefined;
-
-    return { characters: response.characters, debugLog };
+      // Collect debug log for first block only
+      const debugLog = index === 0 ? { messages: extractMessages, response } : undefined;
+      return { characters: response.characters, debugLog };
+    } catch (error) {
+      // Cancellation propagates — never swallow an abort.
+      if (controller.signal.aborted) throw error;
+      // Character usually spans more than one block: skip a block that fails
+      // main + backup rather than aborting the whole extract pass.
+      this.logger?.warn(`[Extract] Block ${index + 1}/${total} failed after all retries, skipping`);
+      return { characters: [] };
+    }
   }
 
   /**
@@ -470,7 +496,7 @@ export class LLMVoiceService {
 
     try {
       // Step 1: Always run the initial Assign call
-      const draftResponse = await this.callWithBackup(
+      const draftResponse = await this.callWithStageBackup(
         'assign',
         this.apiClient,
         {
@@ -518,7 +544,7 @@ export class LLMVoiceService {
         );
 
         try {
-          const qaResponse = await this.callWithBackup(
+          const qaResponse = await this.callWithStageBackup(
             'assign',
             this.apiClient,
             {
@@ -702,10 +728,8 @@ export class LLMVoiceService {
       debugLogger: this.apiClient.debugLogger, // share debugLogger
       logger: this.logger,
     });
-
     try {
-      const response = await this.callWithBackup(
-        'merge',
+      const response = await this.callMerge(
         client,
         {
           messages: mergeMessages,
