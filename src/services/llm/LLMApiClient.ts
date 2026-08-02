@@ -5,6 +5,7 @@ import { RetriableError } from '@/errors';
 import { safeParseJSON } from '@/utils/text';
 import type { ILogger } from '../Logger';
 import type { DebugLogger } from './DebugLogger';
+import { noteError, noteSuccess, waitTurn } from './rateLimitGate';
 import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
 
 type ChatCompletion = OpenAIType.Chat.Completions.ChatCompletion;
@@ -324,7 +325,12 @@ export class LLMApiClient {
    * @returns Parsed and validated result matching the schema
    * @throws Error if LLM refuses or returns empty response
    */
-  async callStructured<T>({ messages, schema, schemaName }: StructuredCallOptions<T>): Promise<T> {
+  async callStructured<T>({
+    messages,
+    schema,
+    schemaName,
+    signal,
+  }: StructuredCallOptions<T>): Promise<T> {
     const useStreaming = this.options.streaming ?? false;
 
     const requestBody: StructuredRequestBody = {
@@ -349,77 +355,94 @@ export class LLMApiClient {
 
     this.logger?.info(`[structured] API call starting (streaming: ${useStreaming})...`);
 
+    // Park while the rate-limit governor holds; checked per attempt since this
+    // method is the retry body invoked by withRetry. signal is forwarded so a
+    // user-driven cancel isn't blocked for minutes behind a cooldown.
+    await waitTurn(signal);
+
     let content: string;
 
-    if (useStreaming) {
-      // Streaming path: accumulate SSE chunks
-      try {
-        const streamResult = await this.client.chat.completions.create({
-          ...requestBody,
-          stream: true,
-        } as unknown as ChatCompletionCreateParamsStreaming);
-
-        const stream = streamResult as unknown as AsyncIterable<ChatCompletionChunk>;
-
-        let accumulated = '';
-        let finishReason: string | null = null;
-
+    try {
+      if (useStreaming) {
+        // Streaming path: accumulate SSE chunks
         try {
-          for await (const chunk of stream) {
-            const delta = chunk.choices[0]?.delta;
-            if (delta?.content) {
-              accumulated += delta.content;
+          const streamResult = await this.client.chat.completions.create({
+            ...requestBody,
+            stream: true,
+          } as unknown as ChatCompletionCreateParamsStreaming);
+
+          const stream = streamResult as unknown as AsyncIterable<ChatCompletionChunk>;
+
+          let accumulated = '';
+          let finishReason: string | null = null;
+
+          try {
+            for await (const chunk of stream) {
+              const delta = chunk.choices[0]?.delta;
+              if (delta?.content) {
+                accumulated += delta.content;
+              }
+              if (chunk.choices[0]?.finish_reason) {
+                finishReason = chunk.choices[0].finish_reason;
+              }
             }
-            if (chunk.choices[0]?.finish_reason) {
-              finishReason = chunk.choices[0].finish_reason;
-            }
+          } catch (error) {
+            throw new RetriableError(
+              `Streaming failed: ${(error as Error).message}`,
+              error as Error,
+            );
           }
+
+          if (finishReason === 'content_filter') {
+            throw new RetriableError('Response refused by content filter');
+          }
+
+          if (!accumulated) {
+            throw new RetriableError('Empty response from LLM');
+          }
+
+          content = accumulated;
         } catch (error) {
-          throw new RetriableError(`Streaming failed: ${(error as Error).message}`, error as Error);
+          throw new RetriableError(
+            `LLM API call failed: ${(error as Error).message}`,
+            error as Error,
+          );
+        }
+      } else {
+        // Non-streaming path
+        let response: ChatCompletion;
+        try {
+          response = await this.client.chat.completions.create({
+            ...requestBody,
+            stream: false,
+          } as unknown as ChatCompletionCreateParamsNonStreaming);
+        } catch (error) {
+          throw new RetriableError(
+            `LLM API call failed: ${(error as Error).message}`,
+            error as Error,
+          );
         }
 
-        if (finishReason === 'content_filter') {
-          throw new RetriableError('Response refused by content filter');
+        const message = response.choices[0]?.message;
+
+        if (message?.refusal) {
+          throw new RetriableError(`LLM refused: ${message.refusal}`);
         }
 
-        if (!accumulated) {
+        if (!message?.content) {
           throw new RetriableError('Empty response from LLM');
         }
 
-        content = accumulated;
-      } catch (error) {
-        throw new RetriableError(
-          `LLM API call failed: ${(error as Error).message}`,
-          error as Error,
-        );
+        content = message.content;
       }
-    } else {
-      // Non-streaming path
-      let response: ChatCompletion;
-      try {
-        response = await this.client.chat.completions.create({
-          ...requestBody,
-          stream: false,
-        } as unknown as ChatCompletionCreateParamsNonStreaming);
-      } catch (error) {
-        throw new RetriableError(
-          `LLM API call failed: ${(error as Error).message}`,
-          error as Error,
-        );
-      }
-
-      const message = response.choices[0]?.message;
-
-      if (message?.refusal) {
-        throw new RetriableError(`LLM refused: ${message.refusal}`);
-      }
-
-      if (!message?.content) {
-        throw new RetriableError('Empty response from LLM');
-      }
-
-      content = message.content;
+    } catch (error) {
+      // 429 trips the gate so parallel workers stop hammering the closed
+      // circuit; other errors keep their existing behavior.
+      noteError(error, this.logger);
+      throw error;
     }
+
+    noteSuccess(this.logger);
 
     this.logger?.info(`[structured] API call completed (${content.length} chars)`);
 

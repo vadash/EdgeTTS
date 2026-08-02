@@ -1,3 +1,5 @@
+import { getCooldownRemainingMs } from '@/services/llm/rateLimitGate';
+
 // Network retry utilities with exponential backoff
 
 import pRetry, { AbortError } from 'p-retry';
@@ -45,8 +47,14 @@ export async function withRetry<T>(
     },
     {
       retries,
-      minTimeout: baseDelay,
-      maxTimeout: maxDelay,
+      // When a 429 cooldown is in flight, the rate-limit gate inside the
+      // operation already waited the provider's full deadline; p-retry must
+      // not stack its own backoff on top — its timers are capped at maxDelay
+      // (60s) and would only delay the next attempt pointlessly. Zero the
+      // timers so the gate owns the wait and the retry resumes the instant
+      // the cooldown releases.
+      minTimeout: getCooldownRemainingMs() > 0 ? 0 : baseDelay,
+      maxTimeout: getCooldownRemainingMs() > 0 ? 0 : maxDelay,
       factor: 2, // Exponential backoff factor
       randomize: true, // Adds jitter to prevent thundering herd
       signal,

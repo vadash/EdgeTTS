@@ -1,5 +1,7 @@
 import PQueue from 'p-queue';
 
+import { getLimit, onLimitChange } from './rateLimitGate';
+
 export interface ConcurrencyOptions {
   /** Maximum number of tasks to run concurrently */
   concurrency: number;
@@ -13,6 +15,11 @@ export interface ConcurrencyOptions {
  * Runs an array of async task thunks with controlled concurrency.
  * Tasks are started based on the concurrency limit, and results are
  * returned in the same order as the input tasks.
+ *
+ * Concurrency is the min of the configured ceiling and the global rate-limit
+ * gate (`rateLimitGate`): a provider 429 collapses the gate to 1 and parks new
+ * starts until the cooldown elapses; as clean calls stack up the gate climbs
+ * back toward the configured ceiling, and the queue resyncs live.
  *
  * @param tasks - Array of functions that return promises
  * @param options - Concurrency configuration
@@ -35,8 +42,17 @@ export async function runWithConcurrency<T>(
     throw new Error('Operation cancelled');
   }
 
-  // Create queue with concurrency limit
-  const queue = new PQueue({ concurrency });
+  // ponytail: min over config and the global rate-limit gate. When a 429
+  // collapses the gate to 1, the queue drains to a single in-flight call and
+  // holds new starts until the cooldown elapses; as clean calls stack up the
+  // gate climbs back toward the configured ceiling.
+  const effective = Math.min(concurrency, getLimit());
+  const queue = new PQueue({ concurrency: effective });
+
+  // Re-sync live as the gate reacts to 429s and recoveries.
+  const off = onLimitChange((next) => {
+    queue.concurrency = Math.max(1, Math.min(concurrency, next));
+  });
 
   // Track completion count for progress reporting
   let completedCount = 0;
@@ -63,5 +79,9 @@ export async function runWithConcurrency<T>(
 
   // Wait for all tasks to complete
   // Promise.all preserves order and rejects on first error
-  return Promise.all(wrappedTasks);
+  try {
+    return await Promise.all(wrappedTasks);
+  } finally {
+    off();
+  }
 }

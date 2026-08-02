@@ -17,3 +17,4 @@ API orchestration and strict structured JSON parsing.
 
 - Changing JSON parsing/repair (`safeParseJSON`) → read `agent_docs/llm/json-repair_gotchas.md`
 - Changing voting, QA pass, or culling → read `agent_docs/llm/pipelines_gotchas.md`
+- Changing 429 / rate-limit handling, worker concurrency, or retry backoff → read `agent_docs/llm/rate-limit_gotchas.md`
