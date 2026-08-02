@@ -107,6 +107,8 @@ export interface LLMVoiceServiceOptions {
   corsMiddleware?: string;
   maxRetries?: number;
   maxConcurrentRequests?: number;
+  /** Live effective LLM concurrency as the rate-limit gate reacts. */
+  onConcurrencyChange?: (effective: number) => void;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
   detectedLanguage?: string; // NEW - for auto prefill selection
@@ -276,12 +278,11 @@ export class LLMVoiceService {
     const tasks = blocks.map(
       (block, i) => () => this.extractBlock(block, i, blocks.length, controller),
     );
-
-    // Run tasks with concurrency control
     const responses = await runWithConcurrency(tasks, {
       concurrency: this.options.maxConcurrentRequests ?? 2,
       signal: controller.signal,
       onProgress: (completed, total) => onProgress?.(completed, total),
+      onConcurrencyChange: this.options.onConcurrencyChange,
     });
 
     // Collect all characters
@@ -417,6 +418,7 @@ export class LLMVoiceService {
       concurrency: maxConcurrent,
       signal: this.abortController.signal,
       onProgress,
+      onConcurrencyChange: this.options.onConcurrencyChange,
     });
 
     // Flatten and sort by sentence index

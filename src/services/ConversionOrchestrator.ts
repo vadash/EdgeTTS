@@ -468,6 +468,7 @@ export async function runConversion(
 
       // Set initial LLM concurrency before starting LLM stage
       conversion.setConcurrencyStats(input.llmThreads, 0);
+      const setLlmConcurrency = (effective: number) => conversion.setConcurrencyStats(effective, 0);
 
       const extractLLMOptions: LLMServiceFactoryOptions = {
         apiKey: input.extractConfig.apiKey,
@@ -481,6 +482,7 @@ export async function runConversion(
         repeatPrompt: input.extractConfig.repeatPrompt,
         maxRetries: input.extractConfig.maxRetries,
         maxConcurrentRequests: input.llmThreads,
+        onConcurrencyChange: setLlmConcurrency,
         directoryHandle: input.directoryHandle,
         logger,
         detectedLanguage: input.detectedLanguage,
@@ -563,9 +565,8 @@ export async function runConversion(
         temperature: input.assignConfig.temperature,
         topP: input.assignConfig.topP,
         repeatPrompt: input.assignConfig.repeatPrompt,
-        maxRetries: input.assignConfig.maxRetries,
-        useVoting: input.useVoting,
         maxConcurrentRequests: input.llmThreads,
+        onConcurrencyChange: setLlmConcurrency,
         directoryHandle: input.directoryHandle,
         logger,
         detectedLanguage: input.detectedLanguage,

@@ -1,6 +1,6 @@
 import PQueue from 'p-queue';
 
-import { getLimit, onLimitChange } from './rateLimitGate';
+import { getLimit, onLimitChange, setCeiling } from './rateLimitGate';
 
 export interface ConcurrencyOptions {
   /** Maximum number of tasks to run concurrently */
@@ -9,6 +9,8 @@ export interface ConcurrencyOptions {
   signal: AbortSignal | null;
   /** Callback called after each task completes with (completed, total) */
   onProgress?: (completed: number, total: number) => void;
+  /** Live effective concurrency (`min(concurrency, gate)`) as the gate reacts. */
+  onConcurrencyChange?: (effective: number) => void;
 }
 
 /**
@@ -30,7 +32,7 @@ export async function runWithConcurrency<T>(
   tasks: Array<() => Promise<T>>,
   options: ConcurrencyOptions,
 ): Promise<T[]> {
-  const { concurrency, signal, onProgress } = options;
+  const { concurrency, signal, onProgress, onConcurrencyChange } = options;
 
   // Handle empty task array
   if (tasks.length === 0) {
@@ -46,13 +48,19 @@ export async function runWithConcurrency<T>(
   // collapses the gate to 1, the queue drains to a single in-flight call and
   // holds new starts until the cooldown elapses; as clean calls stack up the
   // gate climbs back toward the configured ceiling.
+  setCeiling(concurrency);
   const effective = Math.min(concurrency, getLimit());
   const queue = new PQueue({ concurrency: effective });
 
-  // Re-sync live as the gate reacts to 429s and recoveries.
+  // Re-sync live as the gate reacts to 429s and recoveries. The effective
+  // value is what both the queue and any status badge must display, so the
+  // badge subscribes here instead of reading the configured ceiling once.
   const off = onLimitChange((next) => {
-    queue.concurrency = Math.max(1, Math.min(concurrency, next));
+    const live = Math.max(1, Math.min(concurrency, next));
+    queue.concurrency = live;
+    onConcurrencyChange?.(live);
   });
+  onConcurrencyChange?.(Math.max(1, effective));
 
   // Track completion count for progress reporting
   let completedCount = 0;

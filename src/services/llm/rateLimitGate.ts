@@ -9,7 +9,8 @@ import type { ILogger } from '../Logger';
  *
  *  1. Collapse concurrency to 1 immediately.
  *  2. Park every caller until the server's own deadline (+1s safety margin).
- *  3. Resume single-file, then climb back up one slot per success streak.
+ *  3. Resume single-file, then climb back one slot per clean call, stopping at
+ *     the configured ceiling (`setCeiling`, i.e. the user's LLM threads).
  *
  * ponytail: one process-global gate, not keyed per provider/pool. A conversion
  * talks to a single upstream at a time; add a `Map<poolKey, state>` only if
@@ -23,14 +24,30 @@ const DEFAULT_COOLDOWN_MS = 60_000;
 /** Guard against a bogus/hostile Retry-After wedging the app indefinitely. */
 const MAX_COOLDOWN_MS = 10 * 60_000;
 /** Consecutive successes required before opening one more slot. */
-const SUCCESSES_PER_STEP = 3;
-/** Climb ceiling; above any realistic configured concurrency = "unrestricted". */
-const MAX_LIMIT = 32;
+const SUCCESSES_PER_STEP = 1;
+/** Ceiling used before a caller declares the configured one. */
+const DEFAULT_CEILING = 32;
 
 let cooldownUntil = 0;
 let limit = Number.POSITIVE_INFINITY;
+let ceiling = DEFAULT_CEILING;
 let successStreak = 0;
 const listeners = new Set<(limit: number) => void>();
+
+/**
+ * Declare the configured concurrency ceiling so recovery stops there instead of
+ * climbing into headroom the caller will clamp away anyway — which logged
+ * "raised to 19" while the queue was still pinned at the configured 15.
+ */
+export function setCeiling(next: number): void {
+  const clipped = Math.max(1, Math.trunc(next));
+  ceiling = clipped;
+  // If a recovery left us above the new (lower) ceiling, snap down now rather
+  // than burning a success streak on a climb that can't land in the queue.
+  if (Number.isFinite(limit) && limit > clipped) {
+    setLimit(clipped);
+  }
+}
 
 /** Current allowed concurrency. `Infinity` until the first 429 is seen. */
 export function getLimit(): number {
@@ -61,6 +78,7 @@ export function resetRateLimitGate(): void {
   cooldownUntil = 0;
   successStreak = 0;
   limit = Number.POSITIVE_INFINITY;
+  ceiling = DEFAULT_CEILING;
   listeners.clear();
 }
 
@@ -173,8 +191,8 @@ export function noteSuccess(logger?: ILogger): void {
   successStreak++;
   if (successStreak < SUCCESSES_PER_STEP) return;
   successStreak = 0;
-  if (limit >= MAX_LIMIT) return;
-  setLimit(limit + 1);
+  if (limit >= ceiling) return;
+  setLimit(Math.min(limit + 1, ceiling));
   logger?.info(`[ratelimit] recovered — concurrency raised to ${limit}`);
 }
 

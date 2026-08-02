@@ -10,6 +10,7 @@ import {
   onLimitChange,
   parseRetryAfterMs,
   resetRateLimitGate,
+  setCeiling,
   waitTurn,
 } from './rateLimitGate';
 
@@ -95,18 +96,29 @@ describe('rateLimitGate', (t) => {
     // 10 min + 1s, not 99 min
     expect(getCooldownRemainingMs()).toBeLessThanOrEqual(10 * 60_000 + 1000);
   });
-
-  t('climbs one slot per three successes after a 429', () => {
+  t('climbs one slot per clean call after a 429', () => {
     noteRateLimit(0); // -> limit 1
     expect(getLimit()).toBe(1);
     noteSuccess();
-    noteSuccess();
-    noteSuccess();
     expect(getLimit()).toBe(2);
     noteSuccess();
-    noteSuccess();
-    noteSuccess();
     expect(getLimit()).toBe(3);
+  });
+
+  t('recovers to the configured ceiling and stops', () => {
+    setCeiling(15);
+    noteRateLimit(0); // -> limit 1
+    for (let i = 0; i < 20; i++) noteSuccess();
+    expect(getLimit()).toBe(15);
+  });
+
+  t('setCeiling snaps a live limit above the new ceiling down', () => {
+    setCeiling(32);
+    noteRateLimit(0);
+    for (let i = 0; i < 10; i++) noteSuccess(); // -> limit 11
+    expect(getLimit()).toBe(11);
+    setCeiling(5);
+    expect(getLimit()).toBe(5);
   });
 
   t('successes are ignored while unrestricted', () => {
@@ -119,10 +131,7 @@ describe('rateLimitGate', (t) => {
   t('successes reset the streak on a subsequent 429', () => {
     noteRateLimit(1_000);
     noteSuccess();
-    noteSuccess();
     noteRateLimit(1_000); // streak reset
-    noteSuccess();
-    noteSuccess();
     noteSuccess();
     expect(getLimit()).toBe(2);
   });
@@ -132,8 +141,6 @@ describe('rateLimitGate', (t) => {
     onLimitChange(listener);
     noteRateLimit(1_000);
     expect(listener).toHaveBeenLastCalledWith(1);
-    noteSuccess();
-    noteSuccess();
     noteSuccess();
     expect(listener).toHaveBeenLastCalledWith(2);
   });
