@@ -42,9 +42,7 @@ export function buildFilterChain(config: AudioProcessingConfig): string {
 
   // 5. Normalization (Loudnorm handles the heavy lifting - includes built-in true-peak limiting)
   if (config.normalization) {
-    filters.push(
-      `loudnorm=` + `I=${audio.normLufs}:` + `LRA=${audio.normLra}:` + `TP=${audio.normTruePeak}:`,
-    );
+    filters.push(`loudnorm=I=${audio.normLufs}:LRA=${audio.normLra}:TP=${audio.normTruePeak}:`);
   }
 
   // 6. Fade-In

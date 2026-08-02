@@ -3,8 +3,6 @@ import type { LLMCharacter } from '@/state/types';
 import type { AssignContext } from './PromptStrategy';
 import {
   buildAssignPrompt,
-  buildExtractPrompt,
-  buildMergePrompt,
   parseAssignResponse,
   parseExtractResponse,
   parseMergeResponse,
