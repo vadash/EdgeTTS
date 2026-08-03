@@ -362,6 +362,28 @@ export function allocateTiered(
 }
 
 /**
+ * Shuffle voices in place within priority tiers.
+ *
+ * Tier order (native non-Multilingual before Multilingual) is a hard guarantee of
+ * `buildPriorityPool`, so shuffling must happen *inside* each tier — never across
+ * them, or a book would get a Multilingual voice while a native one sat unused.
+ */
+function shuffleWithinTiers(pool: VoiceOption[]): VoiceOption[] {
+  const native: VoiceOption[] = [];
+  const multilingual: VoiceOption[] = [];
+  for (const voice of pool) {
+    (voice.name.includes('Multilingual') ? multilingual : native).push(voice);
+  }
+  for (const tier of [native, multilingual]) {
+    for (let i = tier.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tier[i], tier[j]] = [tier[j], tier[i]];
+    }
+  }
+  return [...native, ...multilingual];
+}
+
+/**
  * Randomize allocations for characters below a given index
  * Uses the same tiered logic as allocateTieredVoices
  *
@@ -372,6 +394,10 @@ export function allocateTiered(
  * @param narratorVoice - Narrator voice to reserve
  * @param bookLanguage - Detected book language
  * @param frequency - Speaking frequency per character (optional, recalculated if missing)
+ * @param shuffle - Randomize pool order within priority tiers. Without this the
+ *   allocation is fully deterministic: reserving rows 0..clickedIndex strips exactly
+ *   the voices they consumed off the front of the pool, so every row below is handed
+ *   back the voice it already had and the operation looks like a no-op.
  */
 export function randomizeBelow(
   sortedCharacters: LLMCharacter[],
@@ -381,6 +407,7 @@ export function randomizeBelow(
   narratorVoice: string,
   bookLanguage: DetectedLanguage,
   frequency?: Map<string, number>,
+  shuffle = false,
 ): Map<string, string> {
   const newMap = new Map(currentVoiceMap);
 
@@ -400,8 +427,8 @@ export function randomizeBelow(
 
   // Convert VoiceOption[] to VoicePool format
   const voicePool: VoicePool = {
-    male: pool.male.map((v) => v.fullValue),
-    female: pool.female.map((v) => v.fullValue),
+    male: (shuffle ? shuffleWithinTiers(pool.male) : pool.male).map((v) => v.fullValue),
+    female: (shuffle ? shuffleWithinTiers(pool.female) : pool.female).map((v) => v.fullValue),
   };
 
   // Recalculate frequency if not provided (for UI randomization)

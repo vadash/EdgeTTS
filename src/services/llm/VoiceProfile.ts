@@ -188,6 +188,8 @@ export interface RandomizeBelowParams {
   bookLanguage: DetectedLanguage;
   /** Optional speaking frequency per character (name -> line count) */
   frequency?: Map<string, number>;
+  /** Randomize pool order within priority tiers (UI reroll); default deterministic */
+  shuffle?: boolean;
 }
 
 /**
@@ -203,6 +205,7 @@ export function randomizeBelowVoices(params: RandomizeBelowParams): Map<string, 
     params.narratorVoice,
     params.bookLanguage,
     params.frequency,
+    params.shuffle,
   );
 }
 

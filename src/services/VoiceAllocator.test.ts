@@ -204,6 +204,90 @@ describe('randomizeBelow', () => {
     // At most one of the pair should be assigned
     expect(hasAndrew && hasAndrewMulti).toBe(false);
   });
+
+  it('shuffle=true produces different ordering across runs (statistical)', () => {
+    // With enough voices, the probability of getting the same order 10 times
+    // in a row is astronomically low (1/n! per run).
+    const chars = [
+      mkChar('A', 'male'),
+      mkChar('B', 'male'),
+      mkChar('C', 'male'),
+      mkChar('D', 'male'),
+    ];
+    const enabledVoices = [
+      vo('en-US, AndrewNeural', 'male'),
+      vo('en-US, BrianNeural', 'male'),
+      vo('en-US, GuyNeural', 'male'),
+      vo('en-US, TonyNeural', 'male'),
+      vo('en-US, DavisNeural', 'male'),
+    ];
+    const currentMap = new Map<string, string>();
+    const first = randomizeBelow(
+      chars,
+      currentMap,
+      -1,
+      enabledVoices,
+      'narrator',
+      'en',
+      undefined,
+      true,
+    );
+    const firstOrder = [first.get('A'), first.get('B'), first.get('C'), first.get('D')].join(',');
+
+    let sawDifferent = false;
+    for (let i = 0; i < 20; i++) {
+      const run = randomizeBelow(
+        chars,
+        currentMap,
+        -1,
+        enabledVoices,
+        'narrator',
+        'en',
+        undefined,
+        true,
+      );
+      const order = [run.get('A'), run.get('B'), run.get('C'), run.get('D')].join(',');
+      if (order !== firstOrder) {
+        sawDifferent = true;
+        break;
+      }
+    }
+    expect(sawDifferent).toBe(true);
+  });
+
+  it('shuffle=true never assigns Multilingual before native for same locale', () => {
+    const chars = [mkChar('A', 'male'), mkChar('B', 'male'), mkChar('C', 'male')];
+    const enabledVoices = [
+      vo('en-US, AndrewNeural', 'male'),
+      vo('en-US, AndrewMultilingualNeural', 'male'),
+      vo('en-US, BrianNeural', 'male'),
+      vo('en-US, BrianMultilingualNeural', 'male'),
+      vo('en-US, GuyNeural', 'male'),
+    ];
+    const currentMap = new Map<string, string>();
+
+    for (let i = 0; i < 30; i++) {
+      const result = randomizeBelow(
+        chars,
+        currentMap,
+        -1,
+        enabledVoices,
+        'narrator',
+        'en',
+        undefined,
+        true,
+      );
+      const assigned = [result.get('A')!, result.get('B')!, result.get('C')!];
+      const firstMultiIdx = assigned.findIndex((v) => v.includes('Multilingual'));
+      const lastNativeIdx = assigned.reduce(
+        (last, v, idx) => (!v.includes('Multilingual') ? idx : last),
+        -1,
+      );
+      if (firstMultiIdx !== -1 && lastNativeIdx !== -1) {
+        expect(lastNativeIdx).toBeLessThan(firstMultiIdx);
+      }
+    }
+  });
 });
 
 describe('assignUnmatchedFromPool', () => {

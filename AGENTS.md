@@ -34,6 +34,7 @@ Deep-dive knowledge lives in `agent_docs/` (indexed in `agent_docs/README.md`); 
   - Use PowerShell equivalents: `Get-Content`, `Select-String`, `;` for chaining
   - For npm scripts, prefer direct execution: `npm test -- --run` instead of `npm test -- --run 2>&1 | tail -50`
 - **Pre-Commit**: Never run `npm run check` manually (runs automatically via hooks). If it fails, fix errors and commit again.
+- **No Auto Smoke Tests**: Never start the dev server to smoke test a change. `npm run dev` is a batch file that the agent harness cannot spawn on Windows, and browser verification is the user's call, not the agent's. Verify with `npm run typecheck` and `npm test -- --run`, then hand the UI check back to the user.
 - **Filesystem API**: App writes directly to disk to prevent OOM. Use `withPermissionRetry` for ALL file operations to handle security context drops.
 - **Async Resilience**: Always use `withRetry` (which wraps `p-retry`) for network/WebSocket calls.
 - **KeepAwake**: Active conversions use AudioContext, Web Locks, and Screen Wake Lock to prevent background tab throttling.

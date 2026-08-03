@@ -11,6 +11,7 @@ import { importProfile, randomizeBelowVoices, readJSONFile } from '@/services/ll
 import { assignUnmatchedFromPool } from '@/services/VoiceAllocator';
 import type { VoiceProfileFile } from '@/state/types';
 import { useData, useLLM, useLogs, useSettings } from '@/stores';
+import { VoicePicker } from './VoicePicker';
 
 interface VoiceReviewModalProps {
   onConfirm: () => void;
@@ -94,6 +95,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
       narratorVoice: settings.narratorVoice.value,
       bookLanguage: data.detectedLanguage.value,
       frequency: lineCounts,
+      shuffle: true,
     });
     llm.setVoiceMap(newMap);
   };
@@ -167,12 +169,6 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
     input.value = '';
   };
 
-  // Get short voice name for display
-  const shortVoiceName = (fullValue: string) => {
-    // "en-US, JennyNeural" -> "en-US-JennyNeural"
-    return fullValue.replace(', ', '-');
-  };
-
   // Gender symbol
   const genderSymbol = (gender: 'male' | 'female' | 'unknown') => {
     switch (gender) {
@@ -187,7 +183,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-surface border border-border rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div className="bg-surface border border-border rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-lg font-semibold">
@@ -235,16 +231,27 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
             <tbody>
               {sortedCharacters.map((char, index) => {
                 const currentVoice = voiceMap.get(char.canonicalName) ?? '';
+
+                // Build used-above map: voices assigned to rows 0..index-1
+                const usedAbove = new Map<string, string>();
+                for (let i = 0; i < index; i++) {
+                  const v = voiceMap.get(sortedCharacters[i].canonicalName);
+                  if (v) usedAbove.set(v, sortedCharacters[i].canonicalName);
+                }
+
                 return (
                   <tr key={char.canonicalName} className="border-b border-border/50">
-                    <td className="py-2 pr-2">
-                      <span className="font-medium">{char.canonicalName}</span>
-                      <span className="ml-2 text-gray-500">{genderSymbol(char.gender)}</span>
-                      <span className="ml-2 text-xs text-gray-400 bg-surface-alt px-1.5 py-0.5 rounded">
-                        {lineCounts.get(char.canonicalName) ?? 0}
-                      </span>
+                    {/* Character column: name/gender/count on line 1, merge select on line 2 */}
+                    <td className="py-2 pr-2 align-bottom">
+                      <div className="flex items-baseline gap-1.5 mb-1">
+                        <span className="font-medium">{char.canonicalName}</span>
+                        <span className="text-gray-500 text-xs">{genderSymbol(char.gender)}</span>
+                        <span className="text-xs text-gray-400 bg-surface-alt px-1.5 py-0.5 rounded">
+                          {lineCounts.get(char.canonicalName) ?? 0}
+                        </span>
+                      </div>
                       <select
-                        className="select-field text-xs ml-2"
+                        className="select-field text-xs w-full"
                         value={mergeTarget[char.canonicalName] ?? ''}
                         onChange={(e) => {
                           const target = (e.target as HTMLSelectElement).value;
@@ -263,53 +270,39 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
                           ))}
                       </select>
                     </td>
-                    <td className="py-2 pr-2">
-                      <select
-                        className="select-field w-full text-sm"
+                    {/* Voice column: VoicePicker aligned to merge-select baseline */}
+                    <td className="py-2 pr-2 align-bottom">
+                      <VoicePicker
                         value={currentVoice}
-                        onChange={(e) =>
-                          handleVoiceChange(
-                            char.canonicalName,
-                            (e.target as HTMLSelectElement).value,
-                          )
-                        }
-                      >
-                        <optgroup label="Male">
-                          {maleVoices.map((v) => (
-                            <option key={v.fullValue} value={v.fullValue}>
-                              {shortVoiceName(v.fullValue)}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Female">
-                          {femaleVoices.map((v) => (
-                            <option key={v.fullValue} value={v.fullValue}>
-                              {shortVoiceName(v.fullValue)}
-                            </option>
-                          ))}
-                        </optgroup>
-                      </select>
+                        maleVoices={maleVoices}
+                        femaleVoices={femaleVoices}
+                        usedAbove={usedAbove}
+                        onChange={(v) => handleVoiceChange(char.canonicalName, v)}
+                      />
                     </td>
-                    <td className="py-2">
-                      <button
-                        type="button"
-                        className="btn btn-sm px-2"
-                        onClick={() => handlePlayPreview(currentVoice)}
-                        disabled={preview.isPlaying && preview.currentVoiceId === currentVoice}
-                        aria-label={`Preview voice for ${char.canonicalName}`}
-                      >
-                        {preview.isPlaying && preview.currentVoiceId === currentVoice ? '...' : '▶'}
-                      </button>
-                    </td>
-                    <td className="py-2">
-                      <button
-                        type="button"
-                        className="btn btn-sm px-2"
-                        onClick={() => handleRandomizeBelow(index)}
-                        title="Randomize voices below"
-                      >
-                        🎲↓
-                      </button>
+                    {/* Play + Dice buttons, aligned to bottom */}
+                    <td className="py-2 align-bottom">
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          className="btn btn-sm px-2"
+                          onClick={() => handlePlayPreview(currentVoice)}
+                          disabled={preview.isPlaying && preview.currentVoiceId === currentVoice}
+                          aria-label={`Preview voice for ${char.canonicalName}`}
+                        >
+                          {preview.isPlaying && preview.currentVoiceId === currentVoice
+                            ? '...'
+                            : '▶'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm px-2"
+                          onClick={() => handleRandomizeBelow(index)}
+                          title="Randomize voices below"
+                        >
+                          🎲↓
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
