@@ -1,17 +1,24 @@
 # Core Services
 
-The core conversion pipeline (Text -> LLM -> TTS -> Audio). Managed by stateless `ConversionOrchestrator.ts`.
+The conversion pipeline, driven by a stateless orchestrator.
 
-## Architecture
+## Stages
 
-- **Split**: `TextBlockSplitter` parses text by natural scene breaks.
-- **LLM**: `LLMVoiceService` orchestrates Extract -> Merge -> Assign API passes.
-- **TTS**: `TTSWorkerPool` manages Edge TTS WebSockets via `ReusableEdgeTTSService` (persistent connections). Scales concurrency via `LadderController`. Streams to disk. Chunks that fail 5 retries are marked permanently failed (no offline fallback).
-- **Voice Allocation**: `VoiceAllocator` provides tiered voice allocation with cycling pool support. `VoicePoolBuilder` constructs initial voice pools. Allocation is deterministic by design: the pool is priority-ordered and picks are always first-available. A "reroll below row N" therefore returns the identical assignment unless the pool order is explicitly shuffled — reserving the rows above strips exactly the voices they consumed off the front of the pool, so the rows below land on the same voices again. Any shuffle must stay within priority tiers (native before Multilingual), or a book gets a Multilingual voice while a native one sits unused.
-- **Merge**: `AudioMerger` reads from `ChunkStore`, uses `FFmpegService` for EQ/compression/Opus encoding. Merge groups run on a parallel pool of N FFmpeg instances (see gotchas leaf).
+- Split: parse text into blocks at natural scene breaks.
+- LLM: run extract, then merge, then assign passes.
+- TTS: a worker pool drives persistent Edge TTS sockets and streams audio to disk.
+- Merge: read stored chunks and encode the final audio with FFmpeg.
+
+## Rules
+
+- TTS concurrency scales through the ladder controller. Do not set it directly.
+- A chunk that exhausts its retries is permanently failed. There is no offline fallback.
+- Voice allocation is deterministic. The pool is priority-ordered and picks the first free voice.
+- Rerolling a subset returns the same voices unless the pool order is shuffled explicitly.
+- A shuffle must stay inside its priority tier, so a native voice is never passed over for a multilingual one.
 
 ## Detailed Gotchas
 
-- Modifying `TTSWorkerPool` lifecycle/retries → read `agent_docs/services/tts-worker-pool_gotchas.md`
-- Touching FFmpeg, ChunkStore, or crash recovery → read `agent_docs/services/ffmpeg-and-storage_gotchas.md`
-- Modifying `TextBlockSplitter` or sentence splitting → read `agent_docs/services/text-block-splitter_gotchas.md`
+- Changing pool lifecycle, retries, or cancellation → read `../../agent_docs/services/tts-worker-pool_gotchas.md`.
+- Changing FFmpeg, chunk storage, or crash recovery → read `../../agent_docs/services/ffmpeg-and-storage_gotchas.md`.
+- Changing sentence splitting or block sizes → read `../../agent_docs/services/text-block-splitter_gotchas.md`.

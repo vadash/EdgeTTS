@@ -1,11 +1,33 @@
 # TextBlockSplitter Gotchas
 
-Sentence-splitting behavior for `src/services/TextBlockSplitter.ts`. The splitter uses native `Intl.Segmenter` (sentence granularity) — no hand-rolled parser, no abbreviation list, no fallback path.
+The splitter uses the native sentence segmenter. There is no hand-written parser, no abbreviation list, and no alternative path.
 
-- **`Intl.Segmenter` splits inside quoted speech.** Despite being "sentence-aware", it segments on `.`/`!`/`?` boundaries **even inside `"…"`, `«…»`, or curly quotes**. The old parser split quotes too, so this behavior is preserved — but do NOT assume quotes keep multi-sentence speech together. Over-long quoted segments are still broken up downstream by `splitLongSentences` (>300 chars, comma/structural split) and `forceSplitLongParagraphs` (>2000 chars, hard cut).
-- **`Intl.Segmenter` does NOT keep abbreviations joined.** Input like `"She asked Mr. Smith for the report. He agreed."` segments into `["She asked Mr.", "Smith for the report.", "He agreed."]` — the `Mr.` period is treated as a sentence boundary. The legacy `isAbbreviation` regex list was deleted deliberately; per-locale abbreviation handling is NOT what V8's `Intl.Segmenter` provides here. If a caller depends on abbreviations staying joined, that contract changed.
-- **Invalid BCP-47 locale fallback.** `getSegmenter(locale)` wraps `new Intl.Segmenter(locale, …)` in try/catch and retries with `'en'` on throw. Note V8 silently accepts some malformed tags (e.g. `'not-a-real-locale-x-42'` parses fine) while rejecting others (`'x'`, `''`, `'und-x'`, `'zh_'` all throw `RangeError: invalid language tag`). The fallback is real but only fires for the throwing subset.
-- **Segmenters are cached per locale** at module scope (`segmenterCache: Map<string, Intl.Segmenter>`) because construction is expensive. The cache key is the raw locale string, including the fallback `'en'` entry. Do not clear it; entries are small and live for the page lifetime.
-- **Public API carries `language` (default `'en'`)**: `splitIntoParagraphs`, `createExtractBlocks`, `createAssignBlocks` all take an optional second `language` arg threaded into `splitParagraphIntoSentences`. The only production callers passing a real locale are the two in `ConversionOrchestrator` (`input.detectedLanguage`); tests and `llm-test-helpers.ts` rely on the `'en'` default. `tsconfig.json` `lib` must include `"ES2022.Intl"` or `Intl.Segmenter` won't typecheck.
-- **Block sizes come from config, and `maxTokens` is required.** `createExtractBlocks`/`createAssignBlocks` read `defaultConfig.llm.extractBlockTokens` (8000) and `assignBlockTokens` (4000). Both used to be hardcoded `16000`/`8000` in the factory methods while the config values sat unread, so blocks were larger than intended and a single extract call could reach ~16.5K input tokens — enough to blow a free backup model's context. `splitIntoBlocks(sentences, maxTokens)` no longer has a `= 16000` default: every caller must state its limit, so a missing argument is a compile error instead of a silent fallback to the largest possible block. Change the limits in `src/config/index.ts`, never in the factory methods.
-- **Integration tests derive their fixture size from those config values.** The three tests in `Integration: createAssignBlocks and createExtractBlocks` need filler long enough to fill block 0 to the limit *and* push block 1 past its 85% `WARNING_THRESHOLD`, because `getBreakPriority` is only consulted above that threshold — below it a `***` divider or `Chapter 10` header is ordinary content and no semantic break happens. They compute `repeat()` counts from `defaultConfig.llm.*BlockTokens` instead of hardcoding, so tuning a limit doesn't silently turn these into no-ops.
+## Segmenter behavior
+
+- The segmenter splits on sentence punctuation even inside quotation marks of any style.
+- Do not assume quoted speech stays in one segment.
+- Long segments are cut downstream: first by a comma and structure split, then by a hard character cut.
+- The segmenter does not keep abbreviations joined. A title followed by a period starts a new sentence.
+- Callers must not depend on abbreviations staying joined.
+
+## Locale handling
+
+- An invalid locale tag falls back to English.
+- The runtime accepts some malformed tags without error, so the fallback fires only for tags that throw.
+- Segmenters are cached per locale at module scope, because construction is expensive.
+- The cache key is the raw locale string. Do not clear the cache. Entries are small.
+- The type library must include the ES2022 internationalization types, or the segmenter fails typecheck.
+
+## Public API
+
+- The paragraph and block factory functions take an optional language argument. It defaults to English.
+- Only the orchestrator passes a real detected locale. Tests and helpers use the default.
+
+## Block sizes
+
+- Block token limits come from the central config, one value for extract and one for assign.
+- The split function has no default token limit. Every caller must state its limit.
+- Change limits in the config only. Never hardcode them in the factory functions.
+- Oversized extract blocks can exceed the context window of a small backup model.
+- Block-boundary tests must derive fixture sizes from the config values, not from hardcoded numbers.
+- Semantic break priority applies only above a fill threshold. Below it, dividers and headers are ordinary text.

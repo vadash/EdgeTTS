@@ -1,11 +1,39 @@
 # LLM Pipeline Gotchas
 
-Advanced passes and API-client specifics for `src/services/llm/`.
+Advanced passes and client behavior for the LLM services.
 
-- **Consensus Merge**: 5 votes with random temperatures (0.1-0.7). Pairs in >=2 votes get merged (Union-Find in `votingConsensus.ts`).
-- **QA Pass (Assign)**: If `useVoting` enabled, runs Assign (draft) -> QA (correction). Falls back to draft if QA fails. QA retries the PRIMARY model only — it never falls back to the backup model, so the backup 2-way split only ever activates for extract and the assign draft.
-- **Frequency Culling**: `cullByFrequency()` filters characters with <3 mentions BEFORE the LLM merge step. Counting uses Unicode word-boundary regex (`BEFORE_NAME`/`AFTER_NAME` lookarounds, `gu` flag, no `i` — callers lowercase `fullText`) so substring matches inside other words do NOT inflate counts (e.g. "Eva" won't match "evaluation"). The constants and `escapeRegExp` live in `CharacterUtils.ts`; variations <3 chars are skipped (pinned by tests).
-- **Strict Structured Outputs**: Managed natively by Zod 4's `toJSONSchema({ target: 'draft-7' })`. Schemas in `schemas.ts` are non-strict: extra keys silently ignored, missing keys default to `null`.
-- **P-Retry context**: In `p-retry`, callbacks receive `{error, attemptNumber}`, NOT the raw error.
-- **Per-stage retry/fallback**: extract and assign retry the primary model up to the user-set per-stage limit, then fall back to the backup model (its own limit) — but only if the request is not already aborted; an abort never triggers the backup. On backup fallback, extract and the assign draft **2-way split** the block: two half-blocks are sent to the backup model separately (the primary is never split — it always receives the full block), then merged (extract concatenates the character lists from both halves; assign re-indexes the second half from zero and shifts its keys back by the first-half length on merge). A single-line block can't split and replays whole. If either half exhausts the backup, the rejection propagates to the per-block degrade handler. **Merge is deliberately different**: it never falls back to the backup model. It retries the merge client indefinitely so the outer 5-vote loop can gather five results, then runs Union-Find consensus. Because merge retry is unbounded, a *persistently* failing merge stage hangs rather than skipping — only an abort signal breaks it. Designing a bounded merge retry is on the table if that risk is unwanted.
-- **Per-block degrade on exhaustion**: when extract exhausts main+backup, the block is skipped (empty characters) — safe because a book character spans multiple blocks, so a single block's absence heals upstream. When assign exhausts main+backup, every sentence in the block falls back to the narrator voice. Neither stage aborts the whole conversion.
+## Voting and passes
+
+- Consensus uses 5 votes at random temperatures. Pairs seen in 2 or more votes merge by Union-Find.
+- With voting on, Assign runs a draft pass then a QA correction pass. A failed QA falls back to the draft.
+- QA retries the primary model only. It never uses the backup model.
+
+## Character culling
+
+- Characters with fewer than 3 mentions are removed before the LLM merge step.
+- Mention counting uses word boundaries, so a name inside a longer word does not add to the count.
+- Counting is case-sensitive. Callers must lowercase the text first.
+- Name variations shorter than 3 characters are skipped.
+
+## Schemas
+
+- Structured output schemas are generated from Zod to draft-7 JSON Schema.
+- Schemas are non-strict. Extra keys are ignored and missing keys become null.
+- Retry callbacks receive an object with the error and attempt number, not the raw error.
+
+## Retry and fallback
+
+- Extract and Assign retry the primary model to the per-stage limit, then fall back to the backup model.
+- An aborted request never falls back to the backup model.
+- On backup fallback, Extract and the Assign draft split the block in two halves and send them separately.
+- The primary model always receives the full block. It is never split.
+- Merging halves concatenates Extract results. Assign re-indexes the second half and shifts its keys.
+- A single-line block cannot split. It is replayed whole.
+- Merge never falls back to the backup model. It retries the same client until abort.
+- Unbounded merge retry means a permanently failing merge stage hangs instead of skipping.
+
+## Degrade on exhaustion
+
+- If Extract exhausts both models, the block yields no characters. Other blocks cover the same character.
+- If Assign exhausts both models, every sentence in the block uses the narrator voice.
+- Neither case aborts the conversion.

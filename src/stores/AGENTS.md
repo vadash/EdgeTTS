@@ -1,18 +1,18 @@
 # State Management
 
-Global state mapped to UI via `@preact/signals`.
+Global state bound to the UI with signals.
 
-## Architecture
+## Layout
 
-- **Signal Stores**: `ConversionStore`, `LLMStore`, `SettingsStore`, `UISettingsStore` (export isolated `signal()` instances).
-- **Class Stores**: `DataStore`, `LanguageStore` (wrap signals in classes).
-- **External**: `LoggerStore` lives in `src/services/Logger.ts` and is re-exported here.
-- **Context**: `StoreContext.tsx` bundles stores for React-like hooks (`useSettings()`, `useConversion()`).
+- Signal stores export isolated signals for conversion, LLM, settings, and UI settings.
+- Two stores wrap their signals in classes, for data and language.
+- The logger store lives with the services and is re-exported here.
+- A context module bundles the stores for hook access.
 
-## Gotchas
+## Rules
 
-- **Mutation**: Always mutate state via exported setter functions (e.g., `setProcessingStatus()`). Do NOT mutate `.value` from UI.
-- **Derived State**: Favor `computed()` for derived values (`isProcessing`, `progressPercent`).
-- **Persistence**: `localStorage` keys are centralized in `src/config/storage.ts`.
-- **UI Persistence**: Use the `loadFromStorage()` merge pattern for schema migrations on UI settings.
-- **Security**: LLM API keys MUST be encrypted via `SecureStorage.ts` (IndexedDB non-extractable AES-GCM keys) before saving.
+- Change state through the exported setter functions. Never assign to a signal value from the UI.
+- Prefer computed signals for derived values.
+- All storage keys are centralized in the config. Do not inline a key string.
+- UI settings load through a merge helper, which also handles schema changes.
+- LLM API keys must be encrypted with the secure storage module before saving.

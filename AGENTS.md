@@ -1,40 +1,40 @@
 # Edge TTS Web
 
-Local-first TTS web app converting books (EPUB/FB2/TXT) to audiobooks using Edge TTS and LLMs.
+Local-first web app that converts books to audiobooks. It uses Edge TTS for speech and LLMs for character voice assignment. Input formats are EPUB, FB2, and TXT.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Dev server (webpack) |
+| `npm run dev` | Dev server |
 | `npm run build` | Production build |
-| `npm test` | Unit tests (vitest) |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run check` | format + lint + typecheck + test (runs via pre-commit hook) |
+| `npm test -- --run` | Unit tests |
+| `npm run typecheck` | Type check only |
+| `npm run check` | Format, lint, typecheck, test. Runs from the pre-commit hook |
 
-Real LLM integration test variants are documented in `src/test/AGENTS.md`.
+## Boundaries
+
+- This project runs on Windows. Use PowerShell syntax in commands. Avoid Unix-only tools and pipes.
+- Never run the combined check manually. The pre-commit hook runs it. Fix reported errors and commit again.
+- Never start the dev server to test a change. Verify with typecheck and unit tests, then hand the UI check to the user.
+- Wrap every file system call in the permission retry helper. The browser can drop the security context at any time.
+- Wrap every network and socket call in the retry helper.
+- API keys must be encrypted before storage. Never write a key as plain text.
+
+## Architecture
+
+The conversion pipeline has four stages: split text, assign voices with an LLM, synthesize speech, merge audio.
+Active conversions hold wake locks and an audio context, to stop background tab throttling.
 
 ## Documentation Map
 
-Each major directory has its own `AGENTS.md` — read it before editing there:
+Read the router for a directory before you edit inside it.
 
-- `src/components/` - Preact + Tailwind UI
-- `src/config/prompts/` - LLM Prompt definitions & schemas
-- `src/services/` - Core conversion pipeline (Split -> LLM -> TTS -> Merge)
-- `src/services/llm/` - LLM API clients, voting, and JSON repair
-- `src/stores/` - Global state via `@preact/signals`
-- `src/test/` - Mocks and test runners
+- `src/components/AGENTS.md` — UI components.
+- `src/config/prompts/AGENTS.md` — LLM prompt definitions and schemas.
+- `src/services/AGENTS.md` — Conversion pipeline.
+- `src/services/llm/AGENTS.md` — LLM clients, voting, JSON parsing.
+- `src/stores/AGENTS.md` — Global state.
+- `src/test/AGENTS.md` — Mocks and test runners.
 
-Deep-dive knowledge lives in `agent_docs/` (indexed in `agent_docs/README.md`); nested routers link to the relevant leaf.
-
-## Gotchas
-
-- **PowerShell Compatibility**: This project runs on Windows. Avoid Unix-specific commands in Execute tool calls:
-  - Don't use: `tail`, `head`, `grep`, `find`, `|` (piping), `&&`, `||`, `$(...)`, backticks
-  - Use PowerShell equivalents: `Get-Content`, `Select-String`, `;` for chaining
-  - For npm scripts, prefer direct execution: `npm test -- --run` instead of `npm test -- --run 2>&1 | tail -50`
-- **Pre-Commit**: Never run `npm run check` manually (runs automatically via hooks). If it fails, fix errors and commit again.
-- **No Auto Smoke Tests**: Never start the dev server to smoke test a change. `npm run dev` is a batch file that the agent harness cannot spawn on Windows, and browser verification is the user's call, not the agent's. Verify with `npm run typecheck` and `npm test -- --run`, then hand the UI check back to the user.
-- **Filesystem API**: App writes directly to disk to prevent OOM. Use `withPermissionRetry` for ALL file operations to handle security context drops.
-- **Async Resilience**: Always use `withRetry` (which wraps `p-retry`) for network/WebSocket calls.
-- **KeepAwake**: Active conversions use AudioContext, Web Locks, and Screen Wake Lock to prevent background tab throttling.
+Deep knowledge lives in `agent_docs/`, indexed in `agent_docs/agent_docs.md`. Routers link to the matching leaf.

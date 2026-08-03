@@ -1,17 +1,17 @@
 # UI Components
 
-Preact + Tailwind CSS functional components.
+Preact functional components with Tailwind styling.
 
-## Code Style
+## Conventions
 
-- **Framework**: Preact functional components
-- **Styling**: Tailwind CSS (dark mode via `dark:` classes, colors in `tailwind.config.js`)
-- **I18n**: Use `preact-i18n` (`<Text id="key.name">Default</Text>`)
-- **Routing**: Hash-based via `src/router` (`useRoute()`, `navigate('route')`)
+- Dark mode uses the Tailwind dark variant. Colors live in the Tailwind config.
+- All user-facing text goes through the i18n component with a key and a default.
+- Routing is hash-based, through the router module hook and navigate helper.
 
-## Gotchas
+## Rules
 
-- **Signals**: Pass signals directly to components. Do NOT unwrap (`.value`) in JSX unless interpolating strings/primitives.
-- **Performance**: Local-first app. Avoid heavy render computations; favor `computed` signals for derived state.
-- **State Segregation**: Use `useState` for transient UI state (dropdowns); use global stores for persistent/shared state.
-- **Notifications**: Use `NotificationBanner` tied to `dismissedNotifications[storageKey]` from `UISettingsStore.ts`.
+- Pass signals into components without unwrapping. Unwrap only when interpolating into a string.
+- Keep render work light. Move derived values into computed signals.
+- Use local component state for transient UI, such as an open dropdown.
+- Use global stores for state that persists or is shared.
+- Dismissible notices use the shared banner, keyed by a stored dismissal flag.

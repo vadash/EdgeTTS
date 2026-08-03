@@ -1,20 +1,21 @@
 # LLM Services
 
-API orchestration and strict structured JSON parsing.
+API orchestration and structured JSON parsing.
 
-## Architecture
+## Layout
 
-- `LLMApiClient.ts`: Raw API caller with custom browser headers. Uses `callStructured<T>()`.
-- `schemas.ts`: Zod 4 non-strict schemas.
-- `votingConsensus.ts`: 5-way Union-Find consensus logic.
+- The API client sends structured completion requests with custom browser headers.
+- Zod schemas define the expected response shape. They are non-strict.
+- The consensus module merges multiple votes with Union-Find.
 
-## Gotchas
+## Rules
 
-- **Errors**: `LLMApiClient` MUST throw `RetriableError` so `withRetry` catches it.
-- **No `as any`**: `callStructured` builds the request as `StructuredRequestBody` (an `Omit<ChatCompletionCreateParamsNonStreaming,'stream'>` plus vendor extensions `enable_thinking`/`reasoning_effort`) and casts only at the two `chat.completions.create` call sites via `as unknown as ChatCompletionCreateParams(Non)Streaming`. Do NOT reintroduce `as any` — the biome override for this file was deliberately removed; `noExplicitAny` must stay clean. If a new vendor key is needed, add it to `StructuredRequestBody` rather than casting the whole object.
+- The API client must throw the retriable error type, or the retry helper ignores the failure.
+- The request body has a dedicated type that includes vendor extensions. Cast only at the client call site.
+- Never use an untyped cast for the whole request. Add new vendor keys to the request type instead.
 
 ## Detailed Gotchas
 
-- Changing JSON parsing/repair (`safeParseJSON`) → read `agent_docs/llm/json-repair_gotchas.md`
-- Changing voting, QA pass, culling, backup model fallback, or per-stage retry → read `agent_docs/llm/pipelines_gotchas.md`
-- Changing 429 / rate-limit handling, worker concurrency, or retry backoff → read `agent_docs/llm/rate-limit_gotchas.md`
+- Changing JSON parsing or repair → read `../../../agent_docs/llm/json-repair_gotchas.md`.
+- Changing voting, QA pass, culling, or model fallback → read `../../../agent_docs/llm/pipelines_gotchas.md`.
+- Changing rate-limit handling, concurrency, or backoff → read `../../../agent_docs/llm/rate-limit_gotchas.md`.
