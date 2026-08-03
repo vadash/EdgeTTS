@@ -109,8 +109,8 @@ export const defaultConfig: AppConfig = {
   },
 
   llm: {
-    extractBlockTokens: 4000, // Free models love to reason for same amount of tokens
-    assignBlockTokens: 2000, // Assign is hard job so we send less
+    extractBlockTokens: 8000, // Free models love to reason for same amount of tokens
+    assignBlockTokens: 4000, // Assign is hard job so we send less
     maxConcurrentRequests: 2,
     maxTokens: 8000,
     maxAssignRetries: 3,

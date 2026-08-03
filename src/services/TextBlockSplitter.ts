@@ -239,7 +239,7 @@ export class TextBlockSplitter {
    * Split sentences into blocks for LLM processing.
    * Prefers semantic scene breaks over arbitrary token-limit cuts.
    */
-  splitIntoBlocks(sentences: string[], maxTokens: number = 16000): TextBlock[] {
+  splitIntoBlocks(sentences: string[], maxTokens: number): TextBlock[] {
     const blocks: TextBlock[] = [];
     let currentBlock: string[] = [];
     let currentTokens = 0;
