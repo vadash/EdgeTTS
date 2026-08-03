@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import { LLMVoiceService } from '../llm/LLMVoiceService';
+import type { AssignContext } from '../llm/PromptStrategy';
+import type { LLMCharacter, TextBlock } from '@/state/types';
+import type { StructuredCallOptions } from '../llm/schemaUtils';
+import extractFixture from '../../test/fixtures/llm-real-data/extract_request.json';
+import assignFixture from '../../test/fixtures/llm-real-data/assign_request.json';
 
 vi.mock('openai', () => ({ default: vi.fn() }));
 
@@ -11,13 +16,14 @@ const mockLogger: ILogger = {
   debug: vi.fn(),
 };
 
-function makeService(withBackup: boolean) {
+function makeService(withBackup: boolean, useVoting = false) {
   return new LLMVoiceService({
     apiKey: 'primary-key',
     apiUrl: 'https://api.openai.com/v1',
     model: 'gpt-4o-mini',
     narratorVoice: 'narrator',
     logger: mockLogger,
+    useVoting,
     backupConfig: withBackup
       ? {
           apiKey: 'backup-key',
@@ -111,5 +117,114 @@ describe('LLMVoiceService - Backup fallback', () => {
 
     // Backup should never be called because the signal was already aborted
     expect(backupSpy).not.toHaveBeenCalled();
+  });
+
+  it('splits a real extract block into two backup calls and merges characters', async () => {
+    const service = makeService(true);
+    const realText = extractFixture.messages
+      .find((m) => m.role === 'user')!
+      .content.match(/<input_text>\n([\s\S]*?)<\/input_text>/)![1];
+    const captured: string[] = [];
+    vi
+      .spyOn(service.backupApiClient!, 'callStructured')
+      .mockImplementation((args: StructuredCallOptions<unknown>) => {
+        const body = args.messages.map((m) => m.content).join('\n');
+        captured.push(body.match(/<input_text>\n([\s\S]*?)<\/input_text>/)?.[1] ?? '');
+        return Promise.resolve({
+          characters: [{ canonicalName: 'Bob', variations: ['Bob'], gender: 'male' }],
+          reasoning: null,
+        });
+      }) as never;
+
+    const split = (
+      service as unknown as {
+        extractBackupSplit: (t: string, s?: AbortSignal) => Promise<{ characters: unknown[] }>;
+      }
+    ).extractBackupSplit.bind(service);
+
+    const result = await split(realText);
+
+    expect(service.backupApiClient!.callStructured).toHaveBeenCalledTimes(2);
+    // Halves partition the original block: no overlap, no loss.
+    const total = realText.split('\n').filter((l) => l.length > 0).length;
+    const h0 = captured[0].split('\n').filter((l) => l.length > 0).length;
+    const h1 = captured[1].split('\n').filter((l) => l.length > 0).length;
+    expect(h0 + h1).toBe(total);
+    expect(h0).toBeGreaterThan(0);
+    expect(h1).toBeGreaterThan(0);
+    // Characters from both halves concatenate.
+    expect(result.characters).toHaveLength(2);
+  });
+
+  it('splits real assign paragraphs: renumbers second half, offsets keys back on merge', async () => {
+    const service = makeService(true);
+    const realParagraphs = assignFixture.messages
+      .find((m) => m.role === 'user')!
+      .content.match(/<numbered_paragraphs>\n([\s\S]*?)<\/numbered_paragraphs>/)![1];
+    vi
+      .spyOn(service.backupApiClient!, 'callStructured')
+      .mockImplementation((args: StructuredCallOptions<unknown>) => {
+        const body = args.messages.map((m) => m.content).join('\n');
+        // First half keeps the original [0] line; second half is renumbered to [0].
+        const isFirstHalf = body.includes('[0] Story written by Sinnoa');
+        return Promise.resolve({
+          assignments: { '0': isFirstHalf ? 'A' : 'B' },
+          reasoning: null,
+        });
+      }) as never;
+
+    const context: AssignContext = {
+      characters: [],
+      nameToCode: new Map<string, string>(),
+      codeToName: new Map<string, string>(),
+      numberedParagraphs: realParagraphs,
+      sentenceCount: 0,
+    };
+    const split = (
+      service as unknown as {
+        assignBackupSplit: (
+          c: AssignContext,
+          o: string[] | undefined,
+          s?: AbortSignal,
+        ) => Promise<{ assignments: Record<string, string> }>;
+      }
+    ).assignBackupSplit.bind(service);
+
+    const result = await split(context, undefined);
+
+    expect(service.backupApiClient!.callStructured).toHaveBeenCalledTimes(2);
+    // First-half [0] -> 'A'. Second-half renumbered [0] -> 'B', shifted by first-half count.
+    expect(result.assignments['0']).toBe('A');
+    const offset = Math.ceil(realParagraphs.split('\n').length / 2);
+    expect(result.assignments[String(offset)]).toBe('B');
+  });
+
+  it('QA pass retries the primary only and never falls back to the backup model', async () => {
+    const service = makeService(true, true); // backup configured + voting enabled
+    const characters: LLMCharacter[] = [
+      { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
+    ];
+    let callCount = 0;
+    // Draft (call 1) succeeds on primary; every later call (QA) fails on primary.
+    vi.spyOn(service.apiClient, 'callStructured').mockImplementation((() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({ assignments: { '0': 'A' }, reasoning: null });
+      }
+      return Promise.reject(new Error('QA down'));
+    }) as never);
+    const backupSpy = vi.spyOn(service.backupApiClient!, 'callStructured');
+
+    const blocks: TextBlock[] = [
+      { blockIndex: 0, sentenceStartIndex: 0, sentences: ['"Hi," said Alice.'] },
+    ];
+
+    const result = await service.assignSpeakers(blocks, new Map(), characters);
+
+    // QA must never touch the backup model — only the primary is retried.
+    expect(backupSpy).not.toHaveBeenCalled();
+    // Draft ran, then QA was attempted on the primary (and failed there).
+    expect(callCount).toBeGreaterThan(1);
+    expect(result).toHaveLength(1);
   });
 });

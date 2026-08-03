@@ -21,7 +21,13 @@ import {
   buildExtractPrompt,
   buildMergePrompt,
 } from './PromptStrategy';
-import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
+import {
+  AssignSchema,
+  ExtractSchema,
+  MergeSchema,
+  type AssignResponse,
+  type ExtractResponse,
+} from './schemas';
 import type { StructuredCallOptions } from './schemaUtils';
 import { buildMergeConsensus } from './votingConsensus';
 import { runWithConcurrency } from './runWithConcurrency';
@@ -223,6 +229,10 @@ export class LLMVoiceService {
    * maxRetries. If main + backup both exhaust, throw so the per-block handler can
    * degrade (extract skips the block, assign falls back to narrator).
    *
+   * When `backup` is provided, it replaces the default "replay identical callArgs"
+   * fallback — used by extract/assign to send two half-blocks to the backup model
+   * (2-way split) instead of the full 8k/4k-token block. Primary stays whole.
+   *
    * ponytail: merge deliberately does NOT use this path — it never falls back to
    * the backup model and retries on the merge client alone until mergeVoteCount
    * results are gathered (see callMerge).
@@ -233,6 +243,7 @@ export class LLMVoiceService {
     callArgs: StructuredCallOptions<T>,
     signal: AbortSignal | undefined,
     onRetry: (attempt: number, error: unknown) => void,
+    backup?: () => Promise<T>,
   ): Promise<T> {
     const maxRetries = this.options.maxRetries ?? DEFAULT_MAX_RETRIES;
 
@@ -250,6 +261,10 @@ export class LLMVoiceService {
         `[${stage}] Primary model exhausted ${maxRetries} retries, falling back to backup model (${this.options.backupConfig?.model})`,
       );
 
+      // Custom backup path (2-way split) when provided; otherwise replay the
+      // identical callArgs against the backup client.
+      if (backup) return backup();
+
       const backupRetries = this.options.backupConfig?.maxRetries ?? DEFAULT_MAX_RETRIES;
       return withRetry(() => this.backupApiClient!.callStructured(callArgs), {
         maxRetries: backupRetries,
@@ -261,6 +276,127 @@ export class LLMVoiceService {
         },
       });
     }
+  }
+
+  /**
+   * Backup-only 2-way split for extract: when the primary exhausts retries on a
+   * full block, split the block in half and send each half to the backup model
+   * separately, then concatenate the characters. A single-line block can't be
+   * split — the whole block is replayed. Primary is never split.
+   *
+   * ponytail: if either half exhausts the backup, the rejection propagates so
+   * extractBlock's per-block degrade handler skips the block (a character spans
+   * multiple blocks, so one block's absence heals upstream).
+   */
+  private async extractBackupSplit(
+    blockText: string,
+    signal: AbortSignal | undefined,
+  ): Promise<ExtractResponse> {
+    const backupRetries = this.options.backupConfig?.maxRetries ?? DEFAULT_MAX_RETRIES;
+    const lines = blockText.split('\n');
+    const mid = Math.ceil(lines.length / 2);
+    // Drop empty halves so a 1-line block just replays the whole block.
+    const halves = [lines.slice(0, mid), lines.slice(mid)].filter((h) => h.length > 0);
+
+    const callHalf = (text: string) => {
+      const messages = buildExtractPrompt(
+        text,
+        this.detectedLanguage,
+        this.options.repeatPrompt ?? false,
+      );
+      return withRetry(
+        () =>
+          this.backupApiClient!.callStructured({
+            messages,
+            schema: ExtractSchema,
+            schemaName: 'ExtractSchema',
+            signal,
+          }),
+        {
+          maxRetries: backupRetries,
+          signal,
+          onRetry: (attempt, err) => {
+            this.logger?.warn(
+              `[extract] Backup split retry ${attempt}/${backupRetries}: ${getErrorMessage(err)}`,
+            );
+          },
+        },
+      );
+    };
+
+    const responses = await Promise.all(halves.map((h) => callHalf(h.join('\n'))));
+    return { characters: responses.flatMap((r) => r.characters), reasoning: null };
+  }
+
+  /**
+   * Backup-only 2-way split for assign: when the primary exhausts retries on a
+   * full block, split the numbered paragraphs in half, renumber the second
+   * half from [0], and offset its returned keys back by the first-half length
+   * on merge. A single-line block replays whole. Primary is never split.
+   *
+   * ponytail: if either half exhausts the backup, the rejection propagates so
+   * processAssignBlock's per-block degrade handler falls back to narrator for
+   * every sentence in the block.
+   */
+  private async assignBackupSplit(
+    context: AssignContext,
+    overlapSentences: string[] | undefined,
+    signal: AbortSignal | undefined,
+  ): Promise<AssignResponse> {
+    const backupRetries = this.options.backupConfig?.maxRetries ?? DEFAULT_MAX_RETRIES;
+    const lines = context.numberedParagraphs.split('\n');
+    const mid = Math.ceil(lines.length / 2);
+    const firstLines = lines.slice(0, mid);
+    const secondLines = lines.slice(mid).filter((l) => l.length > 0);
+    const offset = firstLines.length;
+
+    const callHalf = (numberedParagraphs: string) => {
+      const messages = buildAssignPrompt(
+        context.characters,
+        context.nameToCode,
+        numberedParagraphs,
+        this.detectedLanguage,
+        overlapSentences,
+        this.options.repeatPrompt ?? false,
+      );
+      return withRetry(
+        () =>
+          this.backupApiClient!.callStructured({
+            messages,
+            schema: AssignSchema,
+            schemaName: 'AssignSchema',
+            signal,
+          }),
+        {
+          maxRetries: backupRetries,
+          signal,
+          onRetry: (attempt, err) => {
+            this.logger?.warn(
+              `[assign] Backup split retry ${attempt}/${backupRetries}: ${getErrorMessage(err)}`,
+            );
+          },
+        },
+      );
+    };
+
+    // No second half (1-line block): replay whole block.
+    if (secondLines.length === 0) {
+      return callHalf(context.numberedParagraphs);
+    }
+
+    // Renumber second half from [0]; offset its returned keys back on merge.
+    const firstText = firstLines.join('\n');
+    const secondRenumbered = secondLines
+      .map((line, i) => line.replace(/^\[\d+\]/, `[${i}]`))
+      .join('\n');
+
+    const [first, second] = await Promise.all([callHalf(firstText), callHalf(secondRenumbered)]);
+
+    const merged: Record<string, string> = { ...first.assignments };
+    for (const [key, code] of Object.entries(second.assignments)) {
+      merged[String(parseInt(key, 10) + offset)] = code;
+    }
+    return { assignments: merged, reasoning: null };
   }
 
   /**
@@ -374,6 +510,7 @@ export class LLMVoiceService {
             `[Extract] Block ${index + 1}/${total} retry ${attempt}: ${getErrorMessage(error)}`,
           );
         },
+        () => this.extractBackupSplit(blockText, controller.signal),
       );
 
       // Collect debug log for first block only
@@ -511,6 +648,7 @@ export class LLMVoiceService {
             `[assign] Block at ${block.sentenceStartIndex} retry ${attempt}: ${getErrorMessage(error)}`,
           );
         },
+        () => this.assignBackupSplit(context, overlapSentences, this.abortController?.signal),
       );
 
       // Convert draft response to Map
@@ -544,20 +682,24 @@ export class LLMVoiceService {
         );
 
         try {
-          const qaResponse = await this.callWithStageBackup(
-            'assign',
-            this.apiClient,
+          // QA retries the PRIMARY only — backup split never activates here. On
+          // exhaustion the catch below falls back to draft (DRY with voting-off).
+          const qaResponse = await withRetry(
+            () =>
+              this.apiClient.callStructured({
+                messages: qaMessages,
+                schema: AssignSchema,
+                schemaName: 'AssignSchema',
+                signal: this.abortController?.signal,
+              }),
             {
-              messages: qaMessages,
-              schema: AssignSchema,
-              schemaName: 'AssignSchema',
+              maxRetries: this.options.maxRetries ?? DEFAULT_MAX_RETRIES,
               signal: this.abortController?.signal,
-            },
-            this.abortController?.signal,
-            (attempt, error) => {
-              this.logger?.warn(
-                `[assign] QA pass at ${block.sentenceStartIndex} retry ${attempt}: ${getErrorMessage(error)}`,
-              );
+              onRetry: (attempt, error) => {
+                this.logger?.warn(
+                  `[assign] QA pass at ${block.sentenceStartIndex} retry ${attempt}: ${getErrorMessage(error)}`,
+                );
+              },
             },
           );
 
