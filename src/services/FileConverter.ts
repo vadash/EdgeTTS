@@ -71,6 +71,8 @@ function resolveHref(baseDir: string, href: string): string {
 /**
  * Content documents in reading order from the OPF spine.
  * The spine is mandatory in both EPUB 2 and EPUB 3, unlike the deprecated toc.ncx.
+ * The navigation document is skipped: a table of contents is a list of chapter
+ * titles, useless as spoken audio.
  */
 async function spineDocuments(
   index: Map<string, JSZip.JSZipObject>,
@@ -90,18 +92,22 @@ async function spineDocuments(
   const baseDir = dirOf(opfPath);
 
   const manifest = new Map<string, string>();
+  const navIds = new Set<string>();
   const items = opf.getElementsByTagNameNS('*', 'item');
   for (let i = 0; i < items.length; i++) {
     const id = items[i].getAttribute('id');
     const href = items[i].getAttribute('href');
-    if (id && href) manifest.set(id, href);
+    if (!id || !href) continue;
+    manifest.set(id, href);
+    if ((items[i].getAttribute('properties') ?? '').split(/\s+/).includes('nav')) navIds.add(id);
   }
 
   const documents: JSZip.JSZipObject[] = [];
   const itemrefs = opf.getElementsByTagNameNS('*', 'itemref');
   for (let i = 0; i < itemrefs.length; i++) {
     const idref = itemrefs[i].getAttribute('idref');
-    const href = idref ? manifest.get(idref) : undefined;
+    if (!idref || navIds.has(idref)) continue;
+    const href = manifest.get(idref);
     if (!href) continue;
     const entry = lookup(index, resolveHref(baseDir, href));
     if (entry) documents.push(entry);
@@ -156,7 +162,12 @@ async function extractBodyText(entry: JSZip.JSZipObject, parser: DOMParser): Pro
     // Not well-formed XML (or no XHTML namespace): retry with the lenient HTML parser.
     body = parser.parseFromString(raw, 'text/html').getElementsByTagName('body')[0];
   }
-  if (!body) return '';
+  // Skip a navigation document: a bare table of contents is useless as audio.
+  const tocNav = body.getElementsByTagNameNS(XHTML_NS, 'nav');
+  for (let i = 0; i < tocNav.length; i++) {
+    const type = tocNav[i].getAttributeNS('http://www.idpf.org/2007/ops', 'type');
+    if (type?.split(/\s+/).includes('toc')) return '';
+  }
 
   let text = '';
   for (const node of Array.from(body.childNodes)) {

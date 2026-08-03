@@ -218,6 +218,82 @@ describe('FileConverter', () => {
       expect(result).toContain('Chapter 1');
       expect(result).toContain('Chapter 2');
     });
+    it('excludes the navigation document from the spine', async () => {
+      const zip = new JSZip();
+
+      zip.file('mimetype', 'application/epub+zip');
+      zip.file(
+        'META-INF/container.xml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`,
+      );
+      zip.file(
+        'OEBPS/content.opf',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Regressor</dc:title>
+  </metadata>
+  <manifest>
+    <item id="chaplist" href="chaplist.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="ch1" href="chapter1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="chaplist"/>
+    <itemref idref="ch1"/>
+  </spine>
+</package>`,
+      );
+      zip.file(
+        'OEBPS/chaplist.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <body><nav epub:type="toc"><ol><li><a href="chapter1.xhtml">Chapter 1 - The Partner I</a></li></ol></nav></body>
+</html>`,
+      );
+      zip.file(
+        'OEBPS/chapter1.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <body><p>Chapter one content.</p></body>
+</html>`,
+      );
+
+      const epubData = await zip.generateAsync({ type: 'arraybuffer' });
+      const result = await convertEpubToTxt(epubData);
+
+      expect(result).toContain('Chapter one content.');
+      expect(result).not.toContain('Chapter 1 - The Partner I');
+    });
+
+    it('excludes a toc nav document in the fallback html sweep', async () => {
+      // No container.xml / OPF: forces the htmlDocuments() last-resort sweep.
+      const zip = new JSZip();
+      zip.file(
+        'OEBPS/nav.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+  <body><nav epub:type="toc"><ol><li><a href="chapter1.xhtml">Ch1</a></li></ol></nav></body>
+</html>`,
+      );
+      zip.file(
+        'OEBPS/chapter1.xhtml',
+        `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <body><p>Chapter one content.</p></body>
+</html>`,
+      );
+
+      const epubData = await zip.generateAsync({ type: 'arraybuffer' });
+      const result = await convertEpubToTxt(epubData);
+
+      expect(result).toContain('Chapter one content.');
+      expect(result).not.toContain('Ch1');
+    });
   });
 
   describe('convertZipToTxt', () => {
