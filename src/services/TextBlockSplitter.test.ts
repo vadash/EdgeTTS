@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { defaultConfig } from '@/config';
 import { TextBlockSplitter } from './TextBlockSplitter';
 
 // Helper: create a string that estimates to exactly N tokens (4 chars per token)
@@ -319,11 +320,12 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
   });
 
   describe('Integration: createAssignBlocks and createExtractBlocks', () => {
-    it('createAssignBlocks (8k) splits at scene divider in full text', () => {
-      // 8k maxTokens, 85% threshold = 6800 tokens.
-      // Each paragraph "Normal story text." = 19 chars = 5 tokens.
-      // Block 0 fills to 1600 paragraphs (8000 tokens). Block 1 needs >1360 paragraphs.
-      const beforeDivider = 'Normal story text.\n'.repeat(3000);
+    it('createAssignBlocks splits at scene divider in full text', () => {
+      // Each paragraph "Normal story text." = 19 chars = 5 tokens. Fill block 0 to
+      // the limit and block 1 past its 85% threshold, so the divider is a break.
+      const beforeDivider = 'Normal story text.\n'.repeat(
+        Math.ceil((defaultConfig.llm.assignBlockTokens / 5) * 1.9),
+      );
       const text = `${beforeDivider}\n***\nNew scene after the break.`;
 
       const blocks = splitter.createAssignBlocks(text);
@@ -338,10 +340,10 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       expect(lastBlock.sentences).toContain('New scene after the break.');
     });
 
-    it('createExtractBlocks (16k) splits at scene divider in full text', () => {
-      // 16k maxTokens, 85% threshold = 13600 tokens.
-      // Block 0 fills to 3200 paragraphs (16000 tokens). Block 1 needs >2720 paragraphs.
-      const beforeDivider = 'Normal story text.\n'.repeat(6200);
+    it('createExtractBlocks splits at scene divider in full text', () => {
+      const beforeDivider = 'Normal story text.\n'.repeat(
+        Math.ceil((defaultConfig.llm.extractBlockTokens / 5) * 1.9),
+      );
       const text = `${beforeDivider}\n***\nNew scene after the break.`;
 
       const blocks = splitter.createExtractBlocks(text);
@@ -354,10 +356,11 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
 
     it('createAssignBlocks respects chapter headers as block boundaries', () => {
-      // 8k maxTokens, 85% threshold = 6800 tokens.
-      // "Story text here." = 16 chars = 4 tokens. Block 0 = 2000 paragraphs.
-      // Block 1 needs >1700 paragraphs (>6800 tokens) before "Chapter 10".
-      const beforeChapter = 'Story text here.\n'.repeat(3800);
+      // "Story text here." = 16 chars = 4 tokens. Fill block 0 to the limit and
+      // block 1 past its 85% threshold, so "Chapter 10" triggers a header break.
+      const beforeChapter = 'Story text here.\n'.repeat(
+        Math.ceil((defaultConfig.llm.assignBlockTokens / 4) * 1.9),
+      );
       const text = `${beforeChapter}\nChapter 10\nThe tenth chapter content.`;
 
       const blocks = splitter.createAssignBlocks(text);

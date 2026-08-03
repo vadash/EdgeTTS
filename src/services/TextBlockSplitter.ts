@@ -1,3 +1,4 @@
+import { defaultConfig } from '@/config';
 import type { TextBlock } from '@/state/types';
 
 /**
@@ -337,7 +338,7 @@ export class TextBlockSplitter {
    */
   createExtractBlocks(text: string, language: string = 'en'): TextBlock[] {
     const paragraphs = this.splitIntoParagraphs(text, language);
-    return this.splitIntoBlocks(paragraphs, 16000);
+    return this.splitIntoBlocks(paragraphs, defaultConfig.llm.extractBlockTokens);
   }
 
   /**
@@ -345,7 +346,7 @@ export class TextBlockSplitter {
    */
   createAssignBlocks(text: string, language: string = 'en'): TextBlock[] {
     const paragraphs = this.splitIntoParagraphs(text, language);
-    return this.splitIntoBlocks(paragraphs, 8000);
+    return this.splitIntoBlocks(paragraphs, defaultConfig.llm.assignBlockTokens);
   }
 }
 
