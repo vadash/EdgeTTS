@@ -4,7 +4,8 @@ Advanced passes and client behavior for the LLM services.
 
 ## Voting and passes
 
-- Consensus uses 5 votes at random temperatures. Pairs seen in 2 or more votes merge by Union-Find.
+- Each merge vote runs at a distinct temperature. A failed vote is replaced by a fresh temperature, not retried at the same value.
+- Pairs seen in 2 or more of the gathered votes merge by Union-Find.
 - With voting on, Assign runs a draft pass then a QA correction pass. A failed QA falls back to the draft.
 - QA retries the primary model only. It never uses the backup model.
 
@@ -30,8 +31,8 @@ Advanced passes and client behavior for the LLM services.
 - Merging halves concatenates Extract results. Assign re-indexes the second half and shifts its keys.
 
 - A single-line block cannot split. It is replayed whole.
-- Merge never falls back to the backup model. It retries the same client until abort.
-- Unbounded merge retry means a permanently failing merge stage hangs instead of skipping.
+- Merge never falls back to the backup model. Each attempt retries the merge client up to the per-stage retry limit.
+- A fully failed attempt is replaced by a fresh temperature in the vote pool. A merge stage that fails all attempts exhausts its temperature budget and returns the original characters.
 
 ## Reasoning models
 

@@ -30,6 +30,7 @@ import {
 } from './schemas';
 import type { StructuredCallOptions } from './schemaUtils';
 import { buildMergeConsensus } from './votingConsensus';
+import { collectVotes, spreadTemps } from './collectVotes';
 import { runWithConcurrency } from './runWithConcurrency';
 
 /**
@@ -87,11 +88,6 @@ export const hasSpeechSymbols = (text: string): boolean => {
  * Number of sentences from the previous block to pass as overlap context
  */
 const OVERLAP_SIZE = 10;
-
-/**
- * Delay between LLM API calls (ms)
- */
-const LLM_DELAY_MS = 1000;
 
 const DEFAULT_MAX_RETRIES = 3;
 
@@ -234,8 +230,9 @@ export class LLMVoiceService {
    * (2-way split) instead of the full 8k/4k-token block. Primary stays whole.
    *
    * ponytail: merge deliberately does NOT use this path — it never falls back to
-   * the backup model and retries on the merge client alone until mergeVoteCount
-   * results are gathered (see callMerge).
+   * the backup model. The vote pool (`collectVotes`) replaces a failed attempt
+   * with a fresh temperature, and each attempt retries the merge client up to
+   * `maxMergeRetries` via `callMerge` (see `mergeCharactersWithLLM`).
    */
   private async callWithStageBackup<T>(
     stage: 'extract' | 'assign',
@@ -400,9 +397,11 @@ export class LLMVoiceService {
   }
 
   /**
-   * Merge retry: infinity retries on the merge client alone, never the backup
-   * model. The caller loops until mergeVoteCount successful results are gathered,
-   * then builds consensus via union filter.
+   * Merge attempt: bounded transport-level retry on the merge client only
+   * (never the backup model). The vote pool replaces a fully failed attempt
+   * with a fresh temperature, so each attempt retries only transient
+   * transport errors up to `maxMergeRetries` — then gives the slot back so a
+   * consistently failing temperature stops wasting the budget.
    */
   private async callMerge<T>(
     primaryClient: LLMApiClient,
@@ -411,7 +410,7 @@ export class LLMVoiceService {
     onRetry: (attempt: number, error: unknown) => void,
   ): Promise<T> {
     return withRetry(() => primaryClient.callStructured(callArgs), {
-      maxRetries: Infinity, // ponytail: caller caps collection at mergeVoteCount
+      maxRetries: this.options.mergeConfig?.maxRetries ?? defaultConfig.llm.maxMergeRetries,
       signal,
       onRetry,
     });
@@ -765,9 +764,12 @@ export class LLMVoiceService {
   }
 
   /**
-   * LLM-based character merge using 5-way voting with consensus
-   * 1. Run merge 5x with random temperatures (0.0-1.0)
-   * 2. Build consensus from all votes (pairs with >=2 votes)
+   * LLM-based character merge using voting with consensus.
+   *
+   * `need` votes fire concurrently at distinct temperatures, each with a
+   * safety margin of replacement temps so a timed-out attempt is replaced by
+   * a fresh temperature instead of retried at the same value. Consensus merges
+   * pairs that survive >=2 of the gathered votes.
    */
   private async mergeCharactersWithLLM(
     characters: LLMCharacter[],
@@ -780,41 +782,39 @@ export class LLMVoiceService {
       return characters;
     }
 
-    // 5-way voting merge with random temperatures
+    // ponytail: parallel = need + 2 safety. A failed vote is replaced by a
+    // fresh unused temperature rather than retried at the same value. Revisit
+    // if the observed failure rate makes a fixed margin wasteful or starved.
+    const parallel = Math.min(mergeVoteCount + 2, mergeVoteCount * 3);
+    const temps = spreadTemps(mergeVoteCount * 3);
+
     this.logger?.info(
-      `[Merge] Starting ${mergeVoteCount}-way voting merge with ${characters.length} characters`,
+      `[Merge] Starting ${mergeVoteCount}-way voting merge with ${characters.length} characters (parallel ${Math.min(parallel, temps.length)})`,
     );
-    const votes: number[][][] = [];
 
-    for (let i = 0; i < mergeVoteCount; i++) {
-      if (this.abortController?.signal.aborted) {
-        throw new Error('Operation cancelled');
-      }
-
-      const temp = 0.1 + Math.round(Math.random() * 6) / 10; // Random temperature 0.1-0.7, rounded to 0.1
-      onProgress?.(
-        i + 1,
-        mergeVoteCount,
-        `Merge vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)})...`,
-      );
-
-      const mergeGroups = await this.singleMerge(characters, temp, onProgress, i);
-      if (mergeGroups !== null) {
-        votes.push(mergeGroups);
-        this.logger?.info(
-          `[Merge] Vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)}): ${mergeGroups.length} merges`,
+    const votes = await collectVotes<number[][]>({
+      need: mergeVoteCount,
+      parallel,
+      temps,
+      signal: this.abortController?.signal,
+      run: (temp) => this.singleMerge(characters, temp, onProgress),
+      onSettled: (ok, temp, count) => {
+        onProgress?.(
+          count,
+          mergeVoteCount,
+          `Merge vote ${count}/${mergeVoteCount} (temp=${temp.toFixed(2)})${ok ? '' : ' failed, replacing'}`,
         );
-      } else {
-        this.logger?.warn(
-          `[Merge] Vote ${i + 1}/${mergeVoteCount} (temp=${temp.toFixed(2)}) failed, skipping`,
-        );
-      }
-
-      // Small delay between votes to avoid rate limits
-      if (i < mergeVoteCount - 1) {
-        await new Promise((resolve) => setTimeout(resolve, LLM_DELAY_MS));
-      }
-    }
+        if (ok) {
+          this.logger?.info(
+            `[Merge] Vote ${count}/${mergeVoteCount} succeeded (temp=${temp.toFixed(2)})`,
+          );
+        } else {
+          this.logger?.warn(
+            `[Merge] Vote failed (temp=${temp.toFixed(2)}), replacing with a fresh temperature`,
+          );
+        }
+      },
+    });
 
     // Need at least 1 successful vote
     if (votes.length === 0) {
@@ -844,7 +844,6 @@ export class LLMVoiceService {
     characters: LLMCharacter[],
     temperature: number,
     _onProgress?: ProgressCallback,
-    voteIndex?: number, // track which vote this is
   ): Promise<number[][] | null> {
     this.logger?.info(
       `[Merge] Single merge: ${characters.length} characters (temp=${temperature.toFixed(2)})`,
@@ -888,14 +887,13 @@ export class LLMVoiceService {
       );
 
       // Save first merge phase log
-      if (voteIndex === 0) {
-        await this.apiClient.debugLogger?.savePhaseLog(
-          'merge',
-          { messages: mergeMessages },
-          response,
-        );
-      }
-
+      // savePhaseLog self-dedups to the first call per phase (DebugLogger),
+      // so a safe always-call here captures the first successful merge vote.
+      await this.apiClient.debugLogger?.savePhaseLog(
+        'merge',
+        { messages: mergeMessages },
+        response,
+      );
       return response.merges;
     } catch (error) {
       this.logger?.warn(
