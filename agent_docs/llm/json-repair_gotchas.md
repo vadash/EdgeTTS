@@ -6,7 +6,8 @@ Model JSON output is unreliable. The shared parse helper in the text utilities a
 - Tier 2: extract fenced JSON blocks, then run the repair library.
 - Tier 3: structural recovery. Wraps a bare root array and flattens assignment forms.
 - Tier 4: aggressive scrub. Removes string concatenation that the model invented.
-- Tier 5: throw a retriable error.
 
 - Companion helpers normalize whitespace and strip thinking tags and Markdown fences.
 - Keep the tier order. Later tiers are lossy and must not run before the safe ones.
+
+- If the cleaned text has no brace or bracket, the parser rejects it before any repair tier. This prevents the repair library from inventing a wrong object from prose.

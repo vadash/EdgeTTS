@@ -420,6 +420,18 @@ export function safeParseJSON<T>(
   // Strip markdown fences EARLY
   text = stripMarkdownFences(text);
 
+  // No JSON delimiters anywhere => the model returned prose, not structured
+  // output. Bailing here avoids jsonrepair fabricating a plausible-but-wrong
+  // object (e.g. characters: ["Mary","John"]) out of plain English, which
+  // surfaces downstream as a confusing Zod "expected object, received string".
+  if (!text.includes('{') && !text.includes('[')) {
+    const error = new Error(
+      `Model returned no JSON (got ${text.length} chars of prose): "${text.slice(0, 120).replace(/\s+/g, ' ')}…"`,
+    );
+    const context = { tier: 0, originalLength, error };
+    onError?.(context);
+    return { success: false, error, errorContext: context };
+  }
   // === Tier 1: Native Parse ===
   try {
     const parsed = JSON.parse(text);

@@ -550,4 +550,262 @@ describe('LLMApiClient.callStructured', () => {
       expect(callArgs.reasoning_effort).toBe('medium');
     });
   });
+
+  describe('reasoning-off suppression', () => {
+    const TestSchema = z.object({ value: z.string() });
+    const mockResponse = {
+      choices: [{ message: { content: '{"value":"ok"}', refusal: null } }],
+    };
+
+    beforeEach(() => {
+      mockCreate.mockResolvedValue(mockResponse);
+    });
+
+    it('sends chat_template_kwargs and /no_think when reasoning is null', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'http://100.68.220.59:8088/v1',
+        model: 'nvidia/nemotron-3-super-120b-a12b',
+        reasoning: null,
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [
+          { role: 'system' as const, content: 'Extract speakers.' },
+          { role: 'user' as const, content: 'John said hi.' },
+        ],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.chat_template_kwargs).toEqual({ enable_thinking: false });
+      expect(callArgs.enable_thinking).toBeUndefined();
+      expect(callArgs.reasoning_effort).toBeUndefined();
+      // /no_think appended to both system and user
+      expect(callArgs.messages[0].content).toMatch(/\/no_think$/);
+      expect(callArgs.messages[1].content).toMatch(/\/no_think$/);
+    });
+
+    it('does NOT suppress thinking when reasoning is on', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'http://100.68.220.59:8088/v1',
+        model: 'nvidia/nemotron-3-super-120b-a12b',
+        reasoning: 'low',
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [
+          { role: 'system' as const, content: 'Extract.' },
+          { role: 'user' as const, content: 'test' },
+        ],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.chat_template_kwargs).toBeUndefined();
+      expect(callArgs.enable_thinking).toBe(true);
+      expect(callArgs.messages[0].content).not.toMatch(/\/no_think/);
+    });
+
+    it('suppresses thinking when reasoning is undefined (default off)', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'http://example.com/v1',
+        model: 'qwen3',
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [{ role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.chat_template_kwargs).toEqual({ enable_thinking: false });
+      expect(callArgs.messages[0].content).toMatch(/\/no_think$/);
+    });
+  });
+
+  describe('sampling parameters', () => {
+    const TestSchema = z.object({ value: z.string() });
+    const mockResponse = {
+      choices: [{ message: { content: '{"value":"ok"}', refusal: null } }],
+    };
+
+    beforeEach(() => {
+      mockCreate.mockResolvedValue(mockResponse);
+    });
+
+    it('wires temperature and top_p into request body', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        temperature: 0.3,
+        topP: 0.9,
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [{ role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.temperature).toBe(0.3);
+      expect(callArgs.top_p).toBe(0.9);
+    });
+
+    it('omits temperature and top_p when not set', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        logger: mockLogger,
+      });
+
+      await (client as any).callStructured({
+        messages: [{ role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs).not.toHaveProperty('temperature');
+      expect(callArgs).not.toHaveProperty('top_p');
+    });
+  });
+
+  describe('reasoning-channel fallback', () => {
+    const TestSchema = z.object({ value: z.string() });
+
+    it('falls back to reasoning when content is empty (streaming)', async () => {
+      const chunks = [
+        { choices: [{ delta: { reasoning: '{"val' }, finish_reason: null }] },
+        { choices: [{ delta: { reasoning: 'ue":"fallback"}' }, finish_reason: 'stop' }] },
+      ];
+
+      const asyncIterable = {
+        [Symbol.asyncIterator]: () => {
+          let i = 0;
+          return {
+            next: async () =>
+              i < chunks.length
+                ? { value: chunks[i++], done: false }
+                : { value: undefined, done: true },
+          };
+        },
+      };
+
+      mockCreate.mockResolvedValue(asyncIterable);
+
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'nemotron',
+        streaming: true,
+        logger: mockLogger,
+      });
+
+      const result = await (client as any).callStructured({
+        messages: [{ role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      expect(result).toEqual({ value: 'fallback' });
+    });
+
+    it('does not mix reasoning into content when content is present (streaming)', async () => {
+      const chunks = [
+        {
+          choices: [
+            { delta: { reasoning: 'chain of thought', content: '{"val' }, finish_reason: null },
+          ],
+        },
+        { choices: [{ delta: { content: 'ue":"ok"}' }, finish_reason: 'stop' }] },
+      ];
+
+      const asyncIterable = {
+        [Symbol.asyncIterator]: () => {
+          let i = 0;
+          return {
+            next: async () =>
+              i < chunks.length
+                ? { value: chunks[i++], done: false }
+                : { value: undefined, done: true },
+          };
+        },
+      };
+
+      mockCreate.mockResolvedValue(asyncIterable);
+
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'nemotron',
+        streaming: true,
+        logger: mockLogger,
+      });
+
+      const result = await (client as any).callStructured({
+        messages: [{ role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      expect(result).toEqual({ value: 'ok' });
+    });
+
+    it('falls back to reasoning_content when content is empty (non-streaming)', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          { message: { content: null, reasoning_content: '{"value":"ns"}', refusal: null } },
+        ],
+      });
+
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'nemotron',
+        logger: mockLogger,
+      });
+
+      const result = await (client as any).callStructured({
+        messages: [{ role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      expect(result).toEqual({ value: 'ns' });
+    });
+
+    it('throws empty response when neither content nor reasoning present (non-streaming)', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: null, refusal: null } }],
+      });
+
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'nemotron',
+        logger: mockLogger,
+      });
+
+      await expect(
+        (client as any).callStructured({
+          messages: [{ role: 'user' as const, content: 'test' }],
+          schema: TestSchema,
+          schemaName: 'TestSchema',
+        }),
+      ).rejects.toThrow('Empty response from LLM');
+    });
+  });
 });

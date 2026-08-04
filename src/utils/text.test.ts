@@ -378,4 +378,17 @@ Step 1: John speaks.
       expect(result.data.characters).toHaveLength(1);
     }
   });
+
+  it('short-circuits with honest error when response has no JSON delimiters', () => {
+    const prose =
+      'I need to analyze the text and extract all speakers. Let me go through ' +
+      'paragraph by paragraph. First we see Mary asking a question, then John responds.';
+    const result = safeParseJSON(prose, { schema: ExtractSchema });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error?.message).toMatch(/no JSON/i);
+      // Must NOT be a Zod invalid_type error about characters
+      expect(result.error?.message).not.toMatch(/expected object, received string/);
+    }
+  });
 });

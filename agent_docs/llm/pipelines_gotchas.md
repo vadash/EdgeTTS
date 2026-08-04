@@ -28,9 +28,15 @@ Advanced passes and client behavior for the LLM services.
 - On backup fallback, Extract and the Assign draft split the block in two halves and send them separately.
 - The primary model always receives the full block. It is never split.
 - Merging halves concatenates Extract results. Assign re-indexes the second half and shifts its keys.
+
 - A single-line block cannot split. It is replayed whole.
 - Merge never falls back to the backup model. It retries the same client until abort.
 - Unbounded merge retry means a permanently failing merge stage hangs instead of skipping.
+
+## Reasoning models
+
+- When reasoning is off, the client sends the template kwarg and an inline marker to suppress thinking. Thinking-by-default models that reason through the whole budget never emit JSON otherwise.
+- The streaming path reads reasoning on a separate buffer. When the payload arrives in reasoning and content is empty, the parser falls back to reasoning rather than rejecting the response.
 
 ## Degrade on exhaustion
 

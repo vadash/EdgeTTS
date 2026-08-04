@@ -19,6 +19,7 @@ type ChatCompletionCreateParamsStreaming =
 type StructuredRequestBody = Omit<ChatCompletionCreateParamsNonStreaming, 'stream'> & {
   enable_thinking?: boolean;
   reasoning_effort?: 'high' | 'medium' | 'low';
+  chat_template_kwargs?: { enable_thinking: boolean };
 };
 
 type ResponseFormat =
@@ -76,6 +77,24 @@ function applyProviderFixes(requestBody: StructuredRequestBody, provider: string
       requestBody.response_format = { type: 'json_object' };
     }
   }
+}
+
+/**
+ * Reasoning kill switch for thinking-by-default models (Nemotron, Qwen3).
+ * The template kwarg alone is not honoured by every proxy, so the inline
+ * marker is appended to system and user turns as a belt-and-braces fallback.
+ */
+function disableThinking(requestBody: StructuredRequestBody): void {
+  requestBody.chat_template_kwargs = { enable_thinking: false };
+  requestBody.messages = requestBody.messages.map((message) => {
+    if (
+      (message.role === 'system' || message.role === 'user') &&
+      typeof message.content === 'string'
+    ) {
+      return { ...message, content: `${message.content}\n\n/no_think` };
+    }
+    return message;
+  });
 }
 
 /**
@@ -170,7 +189,7 @@ export class LLMApiClient {
       baseURL: options.apiUrl,
       dangerouslyAllowBrowser: true,
       maxRetries: 0, // We handle retries ourselves
-      timeout: 180000, // 3 minute timeout
+      timeout: 240000, // 4 minutes — large prompts on slow local models exceed 3
       fetch: customFetch,
     });
   }
@@ -342,14 +361,24 @@ export class LLMApiClient {
     if (this.options.maxTokens) {
       requestBody.max_tokens = this.options.maxTokens;
     }
+    if (this.options.temperature !== undefined) {
+      requestBody.temperature = this.options.temperature;
+    }
+    if (this.options.topP !== undefined) {
+      requestBody.top_p = this.options.topP;
+    }
     // Only add thinking/reasoning parameters when explicitly enabled.
-    // When reasoning is null or undefined (OFF), omit the parameters entirely for OpenAI-compatible APIs.
+    // When reasoning is null or undefined (OFF), actively suppress thinking:
+    // models that reason by default otherwise burn the whole token budget on
+    // prose and never emit the JSON payload.
     if (this.options.reasoning != null) {
       requestBody.enable_thinking = true;
       // OpenAI-compatible APIs use reasoning_effort for level specification
       if (this.options.reasoning !== 'auto') {
         requestBody.reasoning_effort = this.options.reasoning;
       }
+    } else {
+      disableThinking(requestBody);
     }
     applyProviderFixes(requestBody, this.provider);
 
@@ -374,13 +403,24 @@ export class LLMApiClient {
           const stream = streamResult as unknown as AsyncIterable<ChatCompletionChunk>;
 
           let accumulated = '';
+          let reasoningAccumulated = '';
           let finishReason: string | null = null;
 
           try {
             for await (const chunk of stream) {
-              const delta = chunk.choices[0]?.delta;
+              const delta = chunk.choices[0]?.delta as
+                | { content?: string | null; reasoning?: string; reasoning_content?: string }
+                | undefined;
               if (delta?.content) {
                 accumulated += delta.content;
+              }
+              // Reasoning never joins the payload buffer: mixing chain-of-thought
+              // into content is what makes schema parsing fail downstream.
+              if (delta?.reasoning) {
+                reasoningAccumulated += delta.reasoning;
+              }
+              if (delta?.reasoning_content) {
+                reasoningAccumulated += delta.reasoning_content;
               }
               if (chunk.choices[0]?.finish_reason) {
                 finishReason = chunk.choices[0].finish_reason;
@@ -395,6 +435,13 @@ export class LLMApiClient {
 
           if (finishReason === 'content_filter') {
             throw new RetriableError('Response refused by content filter');
+          }
+
+          // Some OpenAI-compatible proxies emit the whole payload on the
+          // reasoning channel and leave content empty. Prefer content, but fall
+          // back rather than discarding a response that may still hold the JSON.
+          if (!accumulated.trim() && reasoningAccumulated.trim()) {
+            accumulated = reasoningAccumulated;
           }
 
           if (!accumulated) {
@@ -423,17 +470,29 @@ export class LLMApiClient {
           );
         }
 
-        const message = response.choices[0]?.message;
+        const message = response.choices[0]?.message as
+          | {
+              content?: string | null;
+              reasoning?: string;
+              reasoning_content?: string;
+              refusal?: string;
+            }
+          | undefined;
 
         if (message?.refusal) {
           throw new RetriableError(`LLM refused: ${message.refusal}`);
         }
 
-        if (!message?.content) {
+        // Mirror the streaming fallback: some proxies emit the payload on the
+        // reasoning channel and leave content empty.
+        const reasoningContent = message?.reasoning || message?.reasoning_content || '';
+        if (!message?.content && reasoningContent.trim()) {
+          content = reasoningContent;
+        } else if (message?.content) {
+          content = message.content;
+        } else {
           throw new RetriableError('Empty response from LLM');
         }
-
-        content = message.content;
       }
     } catch (error) {
       // 429 trips the gate so parallel workers stop hammering the closed
