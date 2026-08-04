@@ -8,6 +8,8 @@
   --color-accent-hover: #0b5ed7;
   --color-accent-glow: rgba(13, 110, 253, 0.3);
   --color-border: #404040;
+  --color-surface: #252525;
+  --color-surface-alt: #333333;
 
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: Consolas, Monaco, "Courier New", monospace;

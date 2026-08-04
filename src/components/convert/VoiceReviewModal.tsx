@@ -90,7 +90,7 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
     const newMap = randomizeBelowVoices({
       sortedCharacters,
       currentVoiceMap: voiceMap,
-      clickedIndex,
+      clickedIndex: clickedIndex - 1,
       enabledVoices: enabledVoiceOptions,
       narratorVoice: settings.narratorVoice.value,
       bookLanguage: data.detectedLanguage.value,

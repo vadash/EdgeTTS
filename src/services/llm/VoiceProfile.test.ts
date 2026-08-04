@@ -697,7 +697,7 @@ describe('randomizeBelowVoices', () => {
     expect(result.get('Bob')).toBe('en-US, DavisNeural');
   });
 
-  it('cycles through voices when more characters than voices', () => {
+  it('reserves 80% unique, cycles the 20% tail for overflow', () => {
     const limitedVoices: VoiceOption[] = [
       { locale: 'en-US', name: 'GuyNeural', fullValue: 'en-US, GuyNeural', gender: 'male' },
       { locale: 'en-US', name: 'DavisNeural', fullValue: 'en-US, DavisNeural', gender: 'male' },
@@ -724,11 +724,77 @@ describe('randomizeBelowVoices', () => {
 
     const result = randomizeBelowVoices(params);
 
-    // Should cycle in input order: Guy, Davis, Guy, Davis
-    expect(result.get('Bob')).toBe('en-US, GuyNeural');
-    expect(result.get('Charlie')).toBe('en-US, DavisNeural');
-    expect(result.get('Dan')).toBe('en-US, GuyNeural');
-    expect(result.get('Eve')).toBe('en-US, DavisNeural');
+    // 2-voice pool: 80% cut rounds up to 2, split forces unique=[Guy], shared=[Davis].
+    expect(result.get('Bob')).toBe('en-US, GuyNeural'); // unique slot
+    // Dan and Eve must come from the shared tail — repeats allowed, never re-uses the unique.
+    expect(['en-US, GuyNeural', 'en-US, DavisNeural']).toContain(result.get('Charlie'));
+    expect(['en-US, GuyNeural', 'en-US, DavisNeural']).toContain(result.get('Dan'));
+    expect(['en-US, GuyNeural', 'en-US, DavisNeural']).toContain(result.get('Eve'));
+  });
+
+  it('with 10 voices and 10 chars, the top 80% (8) get distinct voices; tail comes from shared 20%', () => {
+    const voices: VoiceOption[] = Array.from({ length: 10 }, (_, i) => ({
+      locale: 'en-US',
+      name: `M${i}Neural`,
+      fullValue: `en-US, M${i}Neural`,
+      gender: 'male',
+    }));
+    const chars: LLMCharacter[] = [
+      { canonicalName: 'Narrator', variations: [], gender: 'male' },
+      ...Array.from({ length: 10 }, (_, i) => ({
+        canonicalName: `C${i}`,
+        variations: [],
+        gender: 'male' as const,
+      })),
+    ];
+    const currentMap = new Map([['Narrator', 'en-US, NarratorNeural']]);
+
+    const result = randomizeBelowVoices({
+      sortedCharacters: chars,
+      currentVoiceMap: currentMap,
+      clickedIndex: -1,
+      enabledVoices: voices,
+      narratorVoice: 'en-US, NarratorNeural',
+      bookLanguage: 'en',
+    });
+
+    const assigned = chars.slice(1).map((c) => result.get(c.canonicalName)!);
+    expect(new Set(assigned).size).toBe(9); // 9 unique + 1-voice shared tail
+    expect(assigned.every((v) => v.startsWith('en-US, M'))).toBe(true);
+    expect(assigned.every((v) => v !== 'en-US, NarratorNeural')).toBe(true);
+  });
+
+  it('top speakers get the reserved unique half, the tail only re-uses the shared 20%', () => {
+    const voices: VoiceOption[] = Array.from({ length: 10 }, (_, i) => ({
+      locale: 'en-US',
+      name: `M${i}Neural`,
+      fullValue: `en-US, M${i}Neural`,
+      gender: 'male',
+    }));
+    const chars: LLMCharacter[] = [
+      { canonicalName: 'Narrator', variations: [], gender: 'male' },
+      ...Array.from({ length: 13 }, (_, i) => ({
+        canonicalName: `C${i}`,
+        variations: [],
+        gender: 'male' as const,
+      })),
+    ];
+    const currentMap = new Map([['Narrator', 'en-US, NarratorNeural']]);
+
+    const result = randomizeBelowVoices({
+      sortedCharacters: chars,
+      currentVoiceMap: currentMap,
+      clickedIndex: -1,
+      enabledVoices: voices,
+      narratorVoice: 'en-US, NarratorNeural',
+      bookLanguage: 'en',
+    });
+
+    const top = chars.slice(1, 9).map((c) => result.get(c.canonicalName)!); // 8 unique slots
+    const tail = chars.slice(9).map((c) => result.get(c.canonicalName)!); // 5 overflow
+    expect(new Set(top).size).toBe(8); // top 8 all distinct
+    // Tail voices may repeat but must come from the pool, not the narrator.
+    expect(tail.every((v) => v.startsWith('en-US, M'))).toBe(true);
   });
 
   it('falls back to other gender when pool is empty', () => {
@@ -756,6 +822,49 @@ describe('randomizeBelowVoices', () => {
 
     // Female Alice gets male voice since no female voices available
     expect(result.get('Alice')).toBe('en-US, GuyNeural');
+  });
+
+  it('matches voice gender: females get female voices, males get male, only unknown borrows across', () => {
+    const genderedVoices: VoiceOption[] = [
+      ...Array.from({ length: 4 }, (_, i) => ({
+        locale: 'en-US',
+        name: `M${i}Neural`,
+        fullValue: `en-US, M${i}Neural`,
+        gender: 'male' as const,
+      })),
+      ...Array.from({ length: 4 }, (_, i) => ({
+        locale: 'en-US',
+        name: `F${i}Neural`,
+        fullValue: `en-US, F${i}Neural`,
+        gender: 'female' as const,
+      })),
+    ];
+    const chars: LLMCharacter[] = [
+      { canonicalName: 'Narrator', variations: [], gender: 'male' },
+      { canonicalName: 'Alice', variations: [], gender: 'female' },
+      { canonicalName: 'Bob', variations: [], gender: 'male' },
+      { canonicalName: 'Carol', variations: [], gender: 'female' },
+      { canonicalName: 'Dan', variations: [], gender: 'male' },
+      { canonicalName: 'Group', variations: [], gender: 'unknown' },
+    ];
+    const currentMap = new Map([['Narrator', 'OTHER']]);
+
+    const result = randomizeBelowVoices({
+      sortedCharacters: chars,
+      currentVoiceMap: currentMap,
+      clickedIndex: -1,
+      enabledVoices: genderedVoices,
+      narratorVoice: 'OTHER',
+      bookLanguage: 'en',
+    });
+
+    expect(result.get('Alice')).toContain('F');
+    expect(result.get('Carol')).toContain('F');
+    expect(result.get('Bob')).toContain('M');
+    expect(result.get('Dan')).toContain('M');
+    // unknown just gets *some* pool voice, never narrator, never empty
+    expect(result.get('Group')).toMatch(/^en-US, [MF]/);
+    expect(result.get('Group')).not.toBe('OTHER');
   });
 
   it('does nothing when clicked on last row', () => {

@@ -7,6 +7,7 @@ Leaf knowledge that is too detailed for the routers. Read only the file that mat
 - `services/tts-worker-pool_gotchas.md` — TTS socket pool lifecycle, retries, cancellation.
 - `services/ffmpeg-and-storage_gotchas.md` — Chunk streaming, FFmpeg reload tiers, filter order, merge pool.
 - `services/text-block-splitter_gotchas.md` — Sentence segmentation, locale fallback, block token limits.
+- `services/voice-allocation_gotchas.md` — 80/20 unique-vs-shared pool split, gender routing, reroll invariance.
 
 ## LLM
 

@@ -100,30 +100,30 @@ export function VoicePicker({
       {open && (
         <div
           role="listbox"
-          className="absolute z-50 left-0 top-full mt-1 w-80 max-h-72 overflow-y-auto bg-surface border border-border rounded-lg shadow-xl p-3 flex flex-col gap-3"
+          className="absolute z-50 left-0 top-full mt-1 w-[34rem] max-h-72 overflow-y-auto bg-surface border border-border rounded-lg shadow-xl p-3 grid grid-cols-2 gap-3"
         >
-          {/* Male row */}
+          {/* Male column */}
           {maleVoices.length > 0 && (
             <div>
               <div className="text-xs text-gray-400 font-medium mb-1.5 uppercase tracking-wide">
                 Male
               </div>
-              <div className="flex flex-wrap gap-1">{maleVoices.map(renderChip)}</div>
+              <div className="flex flex-col gap-1">{maleVoices.map(renderChip)}</div>
             </div>
           )}
 
-          {/* Female row */}
+          {/* Female column */}
           {femaleVoices.length > 0 && (
             <div>
               <div className="text-xs text-gray-400 font-medium mb-1.5 uppercase tracking-wide">
                 Female
               </div>
-              <div className="flex flex-wrap gap-1">{femaleVoices.map(renderChip)}</div>
+              <div className="flex flex-col gap-1">{femaleVoices.map(renderChip)}</div>
             </div>
           )}
 
           {maleVoices.length === 0 && femaleVoices.length === 0 && (
-            <p className="text-xs text-gray-400 text-center py-2">No voices available</p>
+            <p className="col-span-2 text-xs text-gray-400 text-center py-2">No voices available</p>
           )}
         </div>
       )}

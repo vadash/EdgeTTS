@@ -52,14 +52,24 @@ export function buildPriorityPool(
   };
 }
 
+/** Share of each gender pool reserved for unique 1:1 assignment; the tail round-robins. */
+const UNIQUE_POOL_RATIO = 0.8;
+
 /**
- * Tracks used voices during allocation
+ * Tracks used voices during allocation.
+ *
+ * Each gender pool is split once at construction: the first 80% are unique slots,
+ * handed out one per character, and the remaining 20% is a shared tail that cycles
+ * and may repeat. Callers sort characters by line count, so the top speakers reach
+ * the unique slice first.
  */
 export class VoicePoolTracker {
   private used: Set<string> = new Set();
   private pool: VoicePool;
   public narratorVoice: string;
   private cycleCounters = { male: 0, female: 0 };
+  private unique: { male: string[]; female: string[] };
+  private shared: { male: string[]; female: string[] };
 
   constructor(pool: VoicePool, narratorVoice: string, reserved: Set<string> = new Set()) {
     this.pool = pool;
@@ -68,57 +78,63 @@ export class VoicePoolTracker {
     for (const v of reserved) {
       this.used.add(v);
     }
+
+    const split = (voices: string[]) => {
+      const free = voices.filter((v) => !this.used.has(v));
+      const cut = Math.ceil(free.length * UNIQUE_POOL_RATIO);
+      // Tail must never be empty while voices exist, or the round-robin has nothing to cycle.
+      return cut >= free.length
+        ? [free.slice(0, -1), free.slice(-1)]
+        : [free.slice(0, cut), free.slice(cut)];
+    };
+    const [uniqueMale, sharedMale] = split(pool.male);
+    const [uniqueFemale, sharedFemale] = split(pool.female);
+    this.unique = { male: uniqueMale, female: uniqueFemale };
+    this.shared = { male: sharedMale, female: sharedFemale };
   }
 
   /**
-   * Pick an unused voice for the given gender
-   * Reuses voices if pool exhausted
+   * Pick a voice for the given gender: an unused one from the 80% unique slice,
+   * else cycle the shared 20% tail (repeats allowed).
    */
   pickVoice(gender: 'male' | 'female' | 'unknown'): string {
-    let pool: string[];
+    const key = this.poolKey(gender);
 
-    if (gender === 'male') {
-      pool = this.pool.male;
-    } else if (gender === 'female') {
-      pool = this.pool.female;
-    } else {
-      // For unknown, balance between pools
-      const maleUsed = this.countUsedIn(this.pool.male);
-      const femaleUsed = this.countUsedIn(this.pool.female);
-      pool = maleUsed <= femaleUsed ? this.pool.male : this.pool.female;
+    const free = this.unique[key].find((v) => !this.used.has(v));
+    if (free) {
+      this.used.add(free);
+      return free;
     }
 
-    // Find unused voice
-    const available = pool.filter((v) => !this.used.has(v));
-    if (available.length > 0) {
-      const voice = available[0];
-      this.used.add(voice);
-      return voice;
-    }
-
-    // Fallback: if pool is empty, try the other gender
-    if (pool.length === 0) {
-      const otherPool = gender === 'male' ? this.pool.female : this.pool.male;
-      if (otherPool.length > 0) {
-        const otherAvailable = otherPool.filter((v) => !this.used.has(v));
-        if (otherAvailable.length > 0) {
-          const voice = otherAvailable[0];
-          this.used.add(voice);
-          return voice;
-        }
+    // No voices at all for this gender: borrow the other pool rather than return nothing.
+    if (this.pool[key].length === 0) {
+      const other = key === 'male' ? 'female' : 'male';
+      const borrowed = this.unique[other].find((v) => !this.used.has(v));
+      if (borrowed) {
+        this.used.add(borrowed);
+        return borrowed;
       }
+      return this.cycle(other);
     }
 
-    // Fallback: cycle through pool (reuse)
-    const genderKey = gender === 'female' ? 'female' : 'male';
-    if (pool.length > 0) {
-      const voice = pool[this.cycleCounters[genderKey] % pool.length];
-      this.cycleCounters[genderKey]++;
-      return voice;
-    }
+    return this.cycle(key);
+  }
 
-    // Last resort: if no voices available at all, return empty string
-    return '';
+  /** Round-robin over the shared tail, falling back to the whole pool if it is empty. */
+  private cycle(key: 'male' | 'female'): string {
+    const tail = this.shared[key].length > 0 ? this.shared[key] : this.pool[key];
+    if (tail.length === 0) return '';
+    const voice = tail[this.cycleCounters[key] % tail.length];
+    this.cycleCounters[key]++;
+    return voice;
+  }
+
+  /** Unknown gender takes whatever pool is least used, so it never starves a gendered one. */
+  private poolKey(gender: 'male' | 'female' | 'unknown'): 'male' | 'female' {
+    if (gender !== 'unknown') return gender;
+    return this.countUsedIn(this.pool.male) <= this.countUsedIn(this.pool.female)
+      ? 'male'
+      : 'female';
   }
 
   /**
