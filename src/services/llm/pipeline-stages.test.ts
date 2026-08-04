@@ -266,7 +266,9 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
 
     expect(result).toEqual(chars); // consensus with no votes returns the input
     expect(service.backupApiClient!.callStructured).not.toHaveBeenCalled();
-    expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('All 5 votes failed'));
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Only 0/5 votes survived'),
+    );
   });
 
   it('merge: every successful vote uses MergeSchema; union filter runs after gather', async () => {

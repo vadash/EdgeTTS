@@ -20,7 +20,7 @@ describe('collectVotes', () => {
     let live = 0;
     let peakLive = 0;
 
-    const run = vi.fn(async (temp: number) => {
+    const run = vi.fn(async (temp: number, _signal: AbortSignal) => {
       live++;
       peakLive = Math.max(peakLive, live);
       seen.push(temp);
@@ -58,7 +58,9 @@ describe('collectVotes', () => {
   it('returns all successes when budget runs out before need is met', async () => {
     // Temps 0 and 1 fail; 3 and 4 succeed. need=5 but budget has only 2 winners.
     const failTemps = new Set([0, 1]);
-    const run = vi.fn(async (temp: number) => (failTemps.has(temp) ? null : [temp]));
+    const run = vi.fn(async (temp: number, _signal: AbortSignal) =>
+      failTemps.has(temp) ? null : [temp],
+    );
     const pending = collectVotes({
       need: 5,
       parallel: 2,
@@ -86,6 +88,42 @@ describe('collectVotes', () => {
     const results = await collectVotes({ need: 0, parallel: 2, temps: [0, 1], run });
     expect(results).toEqual([]);
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it('aborts surplus attempts once the quota fills', async () => {
+    // need=2, parallel=4. The first two temps resolve fast and succeed; the
+    // rest hang until their signal aborts. Without the abort, collectVotes
+    // would hang waiting for the never-resolving losers.
+    const temps = [0, 1, 2, 3];
+    const abortedTemps: number[] = [];
+
+    const run = vi.fn(async (temp: number, signal: AbortSignal) => {
+      if (temp < 2) {
+        // Winner: yield a microtask so the worker loop re-checks the quota
+        // between attempts, then succeed.
+        await Promise.resolve();
+        return [temp];
+      }
+      // Loser: never resolves on its own — must be aborted.
+      return new Promise<number[] | null>((resolve) => {
+        if (signal.aborted) return resolve(null);
+        signal.addEventListener('abort', () => resolve(null), { once: true });
+      }).then(() => {
+        abortedTemps.push(temp);
+        return null;
+      });
+    });
+
+    const results = await collectVotes<number[]>({
+      need: 2,
+      parallel: 4,
+      temps,
+      run,
+    });
+
+    expect(results).toEqual([[0], [1]]);
+    // Losers were actually aborted, not left dangling.
+    expect(abortedTemps.sort((a, b) => a - b)).toEqual([2, 3]);
   });
 });
 

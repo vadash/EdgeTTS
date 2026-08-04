@@ -397,25 +397,6 @@ export class LLMVoiceService {
   }
 
   /**
-   * Merge attempt: bounded transport-level retry on the merge client only
-   * (never the backup model). The vote pool replaces a fully failed attempt
-   * with a fresh temperature, so each attempt retries only transient
-   * transport errors up to `maxMergeRetries` — then gives the slot back so a
-   * consistently failing temperature stops wasting the budget.
-   */
-  private async callMerge<T>(
-    primaryClient: LLMApiClient,
-    callArgs: StructuredCallOptions<T>,
-    signal: AbortSignal | undefined,
-    onRetry: (attempt: number, error: unknown) => void,
-  ): Promise<T> {
-    return withRetry(() => primaryClient.callStructured(callArgs), {
-      maxRetries: this.options.mergeConfig?.maxRetries ?? defaultConfig.llm.maxMergeRetries,
-      signal,
-      onRetry,
-    });
-  }
-  /**
    * Extract: Extract characters from text blocks using structured outputs
    */
   async extractCharacters(
@@ -782,11 +763,15 @@ export class LLMVoiceService {
       return characters;
     }
 
-    // ponytail: parallel = need + 2 safety. A failed vote is replaced by a
-    // fresh unused temperature rather than retried at the same value. Revisit
-    // if the observed failure rate makes a fixed margin wasteful or starved.
-    const parallel = Math.min(mergeVoteCount + 2, mergeVoteCount * 3);
-    const temps = spreadTemps(mergeVoteCount * 3);
+    // ponytail: one request per temperature, no same-temp retry. The budget
+    // is need × (1 + maxRetries) — the user's maxRetries setting now sizes
+    // how many replacement temperatures a dead attempt buys instead of how
+    // many times the same dead temperature is re-sent. Capped at 60 because
+    // spreadTemps collides above that on the 0.1-0.7 range.
+    const maxRetries = this.options.mergeConfig?.maxRetries ?? defaultConfig.llm.maxMergeRetries;
+    const budget = Math.min(60, mergeVoteCount * (1 + maxRetries));
+    const parallel = Math.min(mergeVoteCount, budget);
+    const temps = spreadTemps(budget);
 
     this.logger?.info(
       `[Merge] Starting ${mergeVoteCount}-way voting merge with ${characters.length} characters (parallel ${Math.min(parallel, temps.length)})`,
@@ -797,7 +782,7 @@ export class LLMVoiceService {
       parallel,
       temps,
       signal: this.abortController?.signal,
-      run: (temp) => this.singleMerge(characters, temp, onProgress),
+      run: (temp, signal) => this.singleMerge(characters, temp, signal),
       onSettled: (ok, temp, count) => {
         onProgress?.(
           count,
@@ -816,10 +801,12 @@ export class LLMVoiceService {
       },
     });
 
-    // Need at least 1 successful vote
-    if (votes.length === 0) {
+    // One surviving vote can only produce zero-merge consensus (the threshold
+    // is 2), so a thin result is useless to merge AND built from the single
+    // most error-prone attempt. Bail honestly instead of running a no-op.
+    if (votes.length < 2) {
       this.logger?.error(
-        `[Merge] All ${mergeVoteCount} votes failed, returning original characters`,
+        `[Merge] Only ${votes.length}/${mergeVoteCount} votes survived — consensus needs 2, returning original characters`,
       );
       return characters;
     }
@@ -838,12 +825,16 @@ export class LLMVoiceService {
   }
 
   /**
-   * Single merge operation with specified temperature using structured outputs
+   * Single merge operation with specified temperature using structured outputs.
+   * `signal` is the vote-pool controller: aborted once the quota fills, so this
+   * request stops mid-flight instead of running to a 4-min timeout nobody reads.
+   * One request per temperature — no same-temp retry, the vote pool replaces a
+   * failed attempt with a fresh unused temperature.
    */
   private async singleMerge(
     characters: LLMCharacter[],
     temperature: number,
-    _onProgress?: ProgressCallback,
+    signal: AbortSignal,
   ): Promise<number[][] | null> {
     this.logger?.info(
       `[Merge] Single merge: ${characters.length} characters (temp=${temperature.toFixed(2)})`,
@@ -870,21 +861,12 @@ export class LLMVoiceService {
       logger: this.logger,
     });
     try {
-      const response = await this.callMerge(
-        client,
-        {
-          messages: mergeMessages,
-          schema: MergeSchema,
-          schemaName: 'MergeSchema',
-          signal: this.abortController?.signal,
-        },
-        this.abortController?.signal,
-        (attempt, error) => {
-          this.logger?.warn(
-            `[Merge] Retry ${attempt} (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`,
-          );
-        },
-      );
+      const response = await client.callStructured({
+        messages: mergeMessages,
+        schema: MergeSchema,
+        schemaName: 'MergeSchema',
+        signal,
+      });
 
       // Save first merge phase log
       // savePhaseLog self-dedups to the first call per phase (DebugLogger),
@@ -897,7 +879,7 @@ export class LLMVoiceService {
       return response.merges;
     } catch (error) {
       this.logger?.warn(
-        `[Merge] Vote failed after all retries (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`,
+        `[Merge] Vote failed (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`,
       );
       return null;
     }

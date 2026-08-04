@@ -8,6 +8,10 @@
  * value to succeed. Here a failure is replaced by an unused temperature from
  * the budget, so the pool stays busy until `need` votes land.
  *
+ * Once the quota fills, every still-running attempt is aborted: their results
+ * would be dropped anyway, and leaving them in flight burns wall clock and
+ * provider quota (which is what earns the next 429).
+ *
  * The rate-limit gate is not wired in here on purpose: `LLMApiClient`
  * already calls `waitTurn` per request, so a 429 parks every in-flight
  * attempt for the provider's cooldown.
@@ -20,8 +24,8 @@ export interface CollectVotesOptions<T> {
   parallel: number;
   /** Distinct temperatures to draw from — also the attempt budget. */
   temps: number[];
-  /** One attempt. Returns null (or throws) on failure. */
-  run: (temp: number) => Promise<T | null>;
+  /** One attempt. Returns null (or throws) on failure. Aborted once `need` lands. */
+  run: (temp: number, signal: AbortSignal) => Promise<T | null>;
   signal?: AbortSignal | null;
   /** Called as each attempt settles, with the running success count. */
   onSettled?: (ok: boolean, temp: number, collected: number) => void;
@@ -45,6 +49,12 @@ export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<
   const queue = [...temps];
   const results: T[] = [];
 
+  // Cancels surplus attempts when the quota fills; also relays a caller abort
+  // so `run` implementations only need to watch one signal.
+  const pool = new AbortController();
+  const relay = () => pool.abort();
+  signal?.addEventListener('abort', relay, { once: true });
+
   const worker = async (): Promise<void> => {
     while (results.length < need) {
       if (signal?.aborted) {
@@ -57,7 +67,7 @@ export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<
 
       let value: T | null = null;
       try {
-        value = await run(temp);
+        value = await run(temp, pool.signal);
       } catch {
         value = null; // the caller logs; the pool only cares ok/failed
       }
@@ -69,13 +79,20 @@ export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<
       }
       if (value !== null) {
         results.push(value);
+        if (results.length >= need) {
+          pool.abort(); // stop the losers; their results are unusable now
+        }
       }
       onSettled?.(value !== null, temp, results.length);
     }
   };
 
   const workers = Math.max(1, Math.min(parallel, temps.length));
-  await Promise.all(Array.from({ length: workers }, () => worker()));
+  try {
+    await Promise.all(Array.from({ length: workers }, () => worker()));
+  } finally {
+    signal?.removeEventListener('abort', relay);
+  }
 
   return results.slice(0, need);
 }

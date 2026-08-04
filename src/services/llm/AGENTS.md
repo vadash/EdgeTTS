@@ -7,7 +7,7 @@ API orchestration and structured JSON parsing.
 - The API client sends structured completion requests with custom browser headers.
 - Zod schemas define the expected response shape. They are non-strict.
 - The consensus module merges multiple votes with Union-Find.
-- The vote pool fires the configured vote count concurrently at distinct temperatures. A failed vote is replaced by a fresh temperature, not retried at the same value.
+- The vote pool fires the configured vote count concurrently at distinct temperatures. One request per temperature — no same-temp retry. Surplus attempts are aborted once the quota fills; a failed attempt is replaced by a fresh temperature.
 
 ## Rules
 
