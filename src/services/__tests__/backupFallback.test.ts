@@ -94,6 +94,47 @@ describe('LLMVoiceService - Backup fallback', () => {
     expect(service.apiClient.callStructured).toHaveBeenCalledTimes(1);
   });
 
+  it('falls back to backup when primary maxRetries is 0 (one try, then backup)', async () => {
+    const service = new LLMVoiceService({
+      apiKey: 'primary-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      narratorVoice: 'narrator',
+      logger: mockLogger,
+      maxRetries: 0,
+      backupConfig: {
+        apiKey: 'backup-key',
+        apiUrl: 'https://backup.api.com/v1',
+        model: 'backup-model',
+        maxRetries: 0,
+      },
+    });
+
+    // Primary rejects once; backup succeeds.
+    vi.spyOn(service.apiClient, 'callStructured').mockRejectedValue(new Error('boom'));
+    vi.spyOn(service.backupApiClient!, 'callStructured').mockResolvedValue({
+      characters: [{ canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }],
+    } as never);
+
+    const result = await getCallWithStageBackup(service)(
+      'extract',
+      service.apiClient,
+      { messages: [], schema: {}, schemaName: 'Test' },
+      undefined,
+      () => {},
+    );
+
+    expect(result).toEqual({
+      characters: [{ canonicalName: 'Alice', variations: ['Alice'], gender: 'female' }],
+    });
+    // Primary got its single attempt, then the backup model took over.
+    expect(service.apiClient.callStructured).toHaveBeenCalledTimes(1);
+    expect(service.backupApiClient!.callStructured).toHaveBeenCalledTimes(1);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('falling back to backup model (backup-model)'),
+    );
+  });
+
   it('does not fall back when signal is already aborted', async () => {
     const service = makeService(true);
 

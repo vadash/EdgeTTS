@@ -20,6 +20,8 @@ export interface TestResult {
 interface StageConfigFormProps {
   config: StageConfig;
   onChange: <K extends keyof StageConfig>(field: K, value: StageConfig[K]) => void;
+  /** True only for the merge stage — relabels Max Retries as a vote-budget hint. */
+  isMerge?: boolean;
   showVoting?: boolean;
   useVoting?: boolean;
   onVotingChange?: (value: boolean) => void;
@@ -32,6 +34,7 @@ interface StageConfigFormProps {
 export function StageConfigForm({
   config,
   onChange,
+  isMerge,
   showVoting,
   useVoting,
   onVotingChange,
@@ -164,26 +167,42 @@ export function StageConfigForm({
           formatValue={(v) => v.toFixed(2)}
           disabled={isReasoningEnabled}
         />
-        {/* Max Retries */}
+        {/* Max Retries — p-retry semantics: attempts AFTER the first, so 0 = one call.
+            Merge doesn't retry at all; there the value sizes the replacement-temperature
+            budget for the vote pool (see LLMVoiceService.mergeCharactersWithLLM). */}
         <div className="space-y-1">
           <label className="input-label" htmlFor="max-retries-input">
-            <Text id="llm.maxRetries">Max Retries</Text>
+            {isMerge ? (
+              <Text id="llm.mergeAttempts">Extra Vote Attempts</Text>
+            ) : (
+              <Text id="llm.maxRetries">Max Retries</Text>
+            )}
           </label>
           <input
             id="max-retries-input"
             type="number"
             className="input-field"
-            min={1}
+            min={0}
             max={50}
             step={1}
             value={config.maxRetries}
-            onInput={(e) =>
-              onChange(
-                'maxRetries',
-                Math.max(1, Math.min(50, Number((e.target as HTMLInputElement).value) || 1)),
-              )
-            }
+            onInput={(e) => {
+              const n = Number((e.target as HTMLInputElement).value);
+              onChange('maxRetries', Number.isFinite(n) ? Math.max(0, Math.min(50, n)) : 0);
+            }}
           />
+          <p className="text-xs text-gray-400">
+            {isMerge ? (
+              <Text id="llm.mergeAttemptsHint">
+                Merge always collects 5 votes. This buys replacement attempts for failed votes:
+                budget = 5 x (1 + value). 0 = no replacements.
+              </Text>
+            ) : (
+              <Text id="llm.maxRetriesHint">
+                Attempts after the first. 0 = one try, then the backup model takes over.
+              </Text>
+            )}
+          </p>
         </div>
 
         {/* CORS Proxy */}

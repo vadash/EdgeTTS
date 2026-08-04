@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
+import { LLMApiClient } from './LLMApiClient';
 import { LLMVoiceService } from './LLMVoiceService';
 import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
 import type { StructuredCallOptions } from './schemaUtils';
@@ -301,5 +302,38 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
       expect(c.schemaName).toBe('MergeSchema');
     }
     expect(service.backupApiClient!.callStructured).not.toHaveBeenCalled();
+  });
+
+  it('merge: maxRetries=0 means no replacement budget — exactly 5 vote attempts', async () => {
+    service = new LLMVoiceService({
+      ...baseOpts,
+      mergeConfig: {
+        apiKey: 'merge-key',
+        apiUrl: 'https://merge.api.com/v1',
+        model: 'merge-model',
+        maxRetries: 0,
+      },
+      backupConfig: { ...backupOpts },
+    });
+    // singleMerge builds a fresh LLMApiClient per vote, so the instance spy
+    // (mockMerge on service.mergeApiClient) does not intercept it. Patch the
+    // prototype so every vote is counted and resolved from one place.
+    const protoSpy = vi
+      .spyOn(LLMApiClient.prototype, 'callStructured')
+      .mockResolvedValue(MERGE_OK as never);
+
+    const chars: LLMCharacter[] = [
+      { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
+      { canonicalName: 'Alicia', variations: ['Alicia'], gender: 'female' },
+    ];
+    const typed = service as unknown as {
+      mergeCharactersWithLLM: (c: LLMCharacter[]) => Promise<LLMCharacter[]>;
+    };
+    await typed.mergeCharactersWithLLM(chars);
+
+    // budget = 5 × (1 + 0) = 5 temps; every vote succeeds, so exactly 5 calls
+    // — no replacement budget, no retries.
+    expect(protoSpy).toHaveBeenCalledTimes(5);
+    protoSpy.mockRestore();
   });
 });

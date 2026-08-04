@@ -231,8 +231,8 @@ export class LLMVoiceService {
    *
    * ponytail: merge deliberately does NOT use this path — it never falls back to
    * the backup model. The vote pool (`collectVotes`) replaces a failed attempt
-   * with a fresh temperature, and each attempt retries the merge client up to
-   * `maxMergeRetries` via `callMerge` (see `mergeCharactersWithLLM`).
+   * with a fresh temperature; `mergeConfig.maxRetries` sizes that replacement
+   * budget, not retries of the same call (see `mergeCharactersWithLLM`).
    */
   private async callWithStageBackup<T>(
     stage: 'extract' | 'assign',

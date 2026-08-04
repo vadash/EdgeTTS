@@ -105,6 +105,7 @@ export function LLMTab() {
       <StageConfigForm
         config={llm[stage].value}
         onChange={(field, value) => handleStageFieldChange(stage, field, value)}
+        isMerge={stage === 'merge'}
         showVoting={stage === 'assign'}
         useVoting={stage === 'assign' ? llm.useVoting.value : undefined}
         onVotingChange={stage === 'assign' ? (v) => llm.setUseVoting(v) : undefined}

@@ -109,7 +109,10 @@
     "useVotingDesc": "Review and correct speaker assignments with a second LLM pass",
     "useVotingHint": "Runs a QA pass to catch vocative traps, missed action beats, and narration errors (2x API cost)",
     "promptRepetition": "Prompt Repetition",
-    "promptRepetitionDesc": "Duplicates user prompt for improved LLM accuracy. Adds ~20-30% processing time."
+    "promptRepetitionDesc": "Duplicates user prompt for improved LLM accuracy. Adds ~20-30% processing time.",
+    "mergeAttempts": "Extra Vote Attempts",
+    "mergeAttemptsHint": "Merge always collects 5 votes. This buys replacement attempts for failed votes: budget = 5 × (1 + value). 0 = no replacements.",
+    "maxRetriesHint": "Attempts after the first. 0 = one try, then the backup model takes over."
   },
   "files": {
     "dictionary": "Dictionary",

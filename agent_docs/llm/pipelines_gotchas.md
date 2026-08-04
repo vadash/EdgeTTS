@@ -27,6 +27,8 @@ Advanced passes and client behavior for the LLM services.
 
 - Extract and Assign retry the primary model to the per-stage limit, then fall back to the backup model.
 - An aborted request never falls back to the backup model.
+- The max-retries setting counts attempts after the first, p-retry style. Zero is valid: one call, then the backup model takes over.
+- Extract and Assign permit zero retries in the settings UI. The per-stage loop and the store pass the value through unchanged.
 - On backup fallback, Extract and the Assign draft split the block in two halves and send them separately.
 - The primary model always receives the full block. It is never split.
 - Merging halves concatenates Extract results. Assign re-indexes the second half and shifts its keys.

@@ -50,7 +50,7 @@ export interface LLMConfig {
   maxTokens: number;
   /** Maximum retries for assign blocks before fallback to default voice */
   maxAssignRetries: number;
-  /** Maximum retries for each merge vote before skipping */
+  /** Replacement-temperature budget for failed merge votes (does not retry; the vote pool replaces a failed attempt with a fresh temperature). */
   maxMergeRetries: number;
   /** Number of merge votes for consensus */
   mergeVoteCount: number;
