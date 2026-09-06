@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { LLMApiClient } from './LLMApiClient';
+import { resetRateLimitGate } from './rateLimitGate';
 
 // Mock OpenAI client factory
 const mockCreate = vi.fn();
@@ -27,6 +28,9 @@ describe('LLMApiClient.callStructured', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate.mockClear();
+    // The gate is process-global: a mocked network failure parks every later
+    // test in waitTurn for the cooldown unless it is reset here.
+    resetRateLimitGate();
   });
 
   it('parses valid structured response', async () => {

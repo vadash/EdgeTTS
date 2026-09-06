@@ -495,8 +495,8 @@ export class LLMApiClient {
         }
       }
     } catch (error) {
-      // 429 trips the gate so parallel workers stop hammering the closed
-      // circuit; other errors keep their existing behavior.
+      // A 429 or network outage trips the gate so parallel workers stop
+      // hammering the dead circuit; other errors keep their existing behavior.
       noteError(error, this.logger);
       throw error;
     }

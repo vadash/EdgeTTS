@@ -11,6 +11,10 @@ A 429 status, or a rate-limit payload at any status, triggers all of these:
 - After the wait, concurrency climbs one slot per clean call, up to the configured ceiling.
 - A new 429 collapses concurrency to 1 again.
 
+- A network-down failure (failed fetch, refused connection, gateway 502/503/504) also trips the gate, for the default one-minute cooldown.
+- The first attempt after a network-down cooldown is the recovery probe. A failure re-trips for another minute.
+- Request timeouts and data-quality errors do not trip the gate.
+
 The gate state is process-global. It is not keyed per provider. A conversion uses one upstream at a time.
 
 ## Rules to keep

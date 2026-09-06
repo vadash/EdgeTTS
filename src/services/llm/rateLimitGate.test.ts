@@ -255,4 +255,16 @@ describe('rateLimitGate', (t) => {
     expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
     expect(getCooldownRemainingMs()).toBe(0);
   });
+  t('noteError trips the gate on network-down errors for a 1-minute probe', () => {
+    noteError(new Error('LLM API call failed: 502 failed to execute HTTP request to provider API'));
+    expect(getLimit()).toBe(1);
+    expect(getCooldownRemainingMs()).toBeGreaterThan(60_000);
+  });
+
+  t('noteError ignores timeouts and data-quality errors', () => {
+    noteError(new Error('Request timed out.'));
+    noteError(new Error('Empty response from LLM'));
+    expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
+    expect(getCooldownRemainingMs()).toBe(0);
+  });
 });

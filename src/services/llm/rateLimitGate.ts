@@ -23,6 +23,9 @@ const SAFETY_MARGIN_MS = 1000;
 const DEFAULT_COOLDOWN_MS = 60_000;
 /** Guard against a bogus/hostile Retry-After wedging the app indefinitely. */
 const MAX_COOLDOWN_MS = 10 * 60_000;
+/** Transport-level failure wording: outage, DNS, refused/blocked connection, gateway down. */
+const NETWORK_DOWN =
+  /\b50[234]\b|failed to execute http request|failed to fetch|fetch failed|networkerror|network error|load failed|internet disconnected/i;
 /** Consecutive successes required before opening one more slot. */
 const SUCCESSES_PER_STEP = 1;
 /** Ceiling used before a caller declares the configured one. */
@@ -157,10 +160,22 @@ export function isRateLimitError(error: unknown): boolean {
   });
 }
 
-/** Inspect a failure and trip the gate when it is a rate limit. */
+/**
+ * Detect a transport-level failure where the request never got a real provider
+ * answer (local internet down, DNS, gateway 502/503/504). Parked the same way
+ * as a 429, with the default one-minute cooldown acting as the probe interval.
+ */
+export function isNetworkDownError(error: unknown): boolean {
+  return collectMessages(error).some((message) => NETWORK_DOWN.test(message));
+}
+
+/** Inspect a failure and trip the gate on a rate limit or a network outage. */
 export function noteError(error: unknown, logger?: ILogger): void {
-  if (!isRateLimitError(error)) return;
-  noteRateLimit(parseRetryAfterMs(error), logger);
+  if (isRateLimitError(error)) {
+    noteRateLimit(parseRetryAfterMs(error), logger);
+    return;
+  }
+  if (isNetworkDownError(error)) noteRateLimit(null, logger, 'network down');
 }
 
 /**
@@ -168,7 +183,11 @@ export function noteError(error: unknown, logger?: ILogger): void {
  * deadline. Never shortens an active cooldown, so overlapping 429s from a
  * fan-out converge on the longest deadline instead of racing it down.
  */
-export function noteRateLimit(retryAfterMs: number | null, logger?: ILogger): void {
+export function noteRateLimit(
+  retryAfterMs: number | null,
+  logger?: ILogger,
+  reason = '429 from provider',
+): void {
   const requested = retryAfterMs && retryAfterMs > 0 ? retryAfterMs : DEFAULT_COOLDOWN_MS;
   const waitMs = Math.min(requested, MAX_COOLDOWN_MS) + SAFETY_MARGIN_MS;
   const deadline = Date.now() + waitMs;
@@ -181,7 +200,7 @@ export function noteRateLimit(retryAfterMs: number | null, logger?: ILogger): vo
   if (deadline <= cooldownUntil) return;
   cooldownUntil = deadline;
   logger?.warn(
-    `[ratelimit] 429 from provider — concurrency dropped to 1, pausing ${Math.round(waitMs / 1000)}s`,
+    `[ratelimit] ${reason} — concurrency dropped to 1, pausing ${Math.round(waitMs / 1000)}s`,
   );
 }
 
