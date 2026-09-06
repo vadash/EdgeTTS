@@ -2,7 +2,7 @@ import { computed, signal } from '@preact/signals';
 import { useMemo, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { Button, Toggle } from '@/components/common';
-import voices from '@/components/VoiceSelector/voices';
+import voices, { groupVoicesForLanguage, isMultilingual } from '@/components/VoiceSelector/voices';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
 import { useSettings } from '@/stores';
 
@@ -127,7 +127,7 @@ export function VoicePoolTab() {
   const locales = useMemo(() => {
     const unique = new Set(voices.map((v) => v.locale.split('-')[0]));
     // Add multilingual category if there are multilingual voices
-    const hasMultilingual = voices.some((v) => v.name.includes('Multilingual'));
+    const hasMultilingual = voices.some(isMultilingual);
     if (hasMultilingual) {
       unique.add('multilingual');
     }
@@ -165,19 +165,8 @@ export function VoicePoolTab() {
     return result;
   }, []);
 
-  // Filter voices for narrator selection based on detected language, with separator
-  const narratorVoices = useMemo(() => {
-    const multilingual = voices.filter((v) => v.name.includes('Multilingual'));
-    const russian = voices.filter(
-      (v) => v.locale.startsWith('ru') && !v.name.includes('Multilingual'),
-    );
-    // Return with separator marker between groups
-    return [
-      ...multilingual.map((v) => ({ ...v, isSeparator: false })),
-      { fullValue: '---', name: '---', locale: '---', gender: 'male' as const, isSeparator: true },
-      ...russian.map((v) => ({ ...v, isSeparator: false })),
-    ];
-  }, []);
+  // Narrator voices: multilingual group, separator, then Russian voices
+  const narratorVoices = useMemo(() => groupVoicesForLanguage(voices, 'ru'), []);
 
   // Filter voices for pool list
   const filteredVoices = useMemo(() => {
@@ -189,10 +178,10 @@ export function VoicePoolTab() {
 
       let matchesLocale = localeFilter === 'all';
       if (localeFilter === 'multilingual') {
-        matchesLocale = v.name.includes('Multilingual');
+        matchesLocale = isMultilingual(v);
       } else if (localeFilter !== 'all') {
         // For regular locales, exclude multilingual voices
-        matchesLocale = v.locale.startsWith(localeFilter) && !v.name.includes('Multilingual');
+        matchesLocale = v.locale.startsWith(localeFilter) && !isMultilingual(v);
       }
 
       return matchesSearch && matchesLocale;

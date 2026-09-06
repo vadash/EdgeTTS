@@ -411,4 +411,27 @@ export const availableLocales: readonly string[] = [
   ...new Set(voices.map((voice) => voice.locale.split('-')[0])),
 ].sort();
 
+/** True for Multilingual variant voices (e.g., 'en-US, AndrewMultilingualNeural'). */
+export function isMultilingual(voice: VoiceOption): boolean {
+  return voice.name.includes('Multilingual');
+}
+
+/** A real voice or the disabled separator pseudo-entry in a grouped list. */
+export type GroupedVoice = VoiceOption & { isSeparator: boolean };
+
+/**
+ * Group voices for a language picker: every Multilingual voice first, then a
+ * disabled separator entry, then the voices whose locale starts with `language`.
+ * Entry order and separator shape are part of the rendered UI contract.
+ */
+export function groupVoicesForLanguage(all: VoiceOption[], language: string): GroupedVoice[] {
+  return [
+    ...all.filter(isMultilingual).map((v) => ({ ...v, isSeparator: false })),
+    { fullValue: '---', name: '---', locale: '---', gender: 'male', isSeparator: true },
+    ...all
+      .filter((v) => v.locale.startsWith(language) && !isMultilingual(v))
+      .map((v) => ({ ...v, isSeparator: false })),
+  ];
+}
+
 export default voices;

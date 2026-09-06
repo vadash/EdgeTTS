@@ -1,6 +1,6 @@
 import { computed, signal } from '@preact/signals';
 import { Text } from 'preact-i18n';
-import voices from '@/components/VoiceSelector/voices';
+import voices, { groupVoicesForLanguage } from '@/components/VoiceSelector/voices';
 import { SAMPLE_PHRASES } from '@/hooks/useAudioPreview';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
 import { patchSettings, settings, useData } from '@/stores';
@@ -13,19 +13,10 @@ export function QuickVoiceSelect() {
   const data = useData();
   const preview = useVoicePreview();
 
-  // Filter voices based on detected language, with separator between groups
-  const filteredVoices = computed(() => {
-    const lang = data.detectedLanguage.value;
-    const multilingual = voices.filter((v) => v.name.includes('Multilingual'));
-    const langVoices = voices.filter(
-      (v) => v.locale.startsWith(lang) && !v.name.includes('Multilingual'),
-    );
-    return [
-      ...multilingual.map((v) => ({ ...v, isSeparator: false })),
-      { fullValue: '---', name: '---', locale: '---', gender: 'male' as const, isSeparator: true },
-      ...langVoices.map((v) => ({ ...v, isSeparator: false })),
-    ];
-  });
+  // Multilingual voices first, separator, then voices for the detected language
+  const filteredVoices = computed(() =>
+    groupVoicesForLanguage(voices, data.detectedLanguage.value),
+  );
 
   const playVoiceSample = () => {
     preview.play(samplePhrase.value, settings.value.narratorVoice, {
