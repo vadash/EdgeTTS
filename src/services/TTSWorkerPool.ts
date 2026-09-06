@@ -9,6 +9,9 @@ import { LadderController } from './LadderController';
 import type { ILogger } from './Logger';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 
+// Maximum retry attempts per task before permanent failure
+const MAX_TTS_RETRIES = 5;
+
 export interface PoolTask {
   partIndex: number;
   text: string;
@@ -361,7 +364,7 @@ export class TTSWorkerPool {
     this.options.onConcurrencyChange?.(this.queue.concurrency);
 
     // Check if we've exceeded max retries
-    if (attempt > 5) {
+    if (attempt > MAX_TTS_RETRIES) {
       // Log the failure for debugging
       await this.logTTSFailure(task, error);
 
@@ -374,7 +377,7 @@ export class TTSWorkerPool {
       this.onTaskError?.(task.partIndex, error instanceof Error ? error : new Error(String(error)));
 
       this.logger?.error(
-        `Task ${task.partIndex} failed permanently after 5 attempts`,
+        `Task ${task.partIndex} failed permanently after ${MAX_TTS_RETRIES} attempts`,
         error as Error,
       );
 
@@ -394,7 +397,7 @@ export class TTSWorkerPool {
     });
 
     this.logger?.warn(
-      `Task ${task.partIndex} failed (attempt ${attempt}/5). Retrying in ${Math.round(delay / 1000)}s`,
+      `Task ${task.partIndex} failed (attempt ${attempt}/${MAX_TTS_RETRIES}). Retrying in ${Math.round(delay / 1000)}s`,
     );
 
     // Schedule retry with setTimeout
@@ -458,7 +461,7 @@ export class TTSWorkerPool {
         partIndex: task.partIndex,
         text: task.text,
         errorMessage,
-        retryCount: 5,
+        retryCount: MAX_TTS_RETRIES,
         timestamp: new Date().toISOString(),
       };
 
@@ -473,9 +476,9 @@ export class TTSWorkerPool {
   }
 
   /**
-   * Cleanup - close chunkStore and drain connection pool
+   * Shared teardown: remove network listeners and cancel pending retry timers
    */
-  async cleanup(): Promise<void> {
+  private teardown(): void {
     // Remove network event listeners
     if (typeof window !== 'undefined') {
       if (this.handleOnline) window.removeEventListener('online', this.handleOnline);
@@ -488,6 +491,13 @@ export class TTSWorkerPool {
     }
     this.retryTimers.clear();
     this.retryCount.clear();
+  }
+
+  /**
+   * Cleanup - close chunkStore and drain connection pool
+   */
+  async cleanup(): Promise<void> {
+    this.teardown();
 
     // Drain and clear the connection pool
     try {
@@ -509,18 +519,7 @@ export class TTSWorkerPool {
   }
 
   clear(): void {
-    // Remove network event listeners
-    if (typeof window !== 'undefined') {
-      if (this.handleOnline) window.removeEventListener('online', this.handleOnline);
-      if (this.handleOffline) window.removeEventListener('offline', this.handleOffline);
-    }
-
-    // Clear pending retry timers to prevent ghost tasks from waking after cancellation
-    for (const timer of this.retryTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.retryTimers.clear();
-    this.retryCount.clear();
+    this.teardown();
 
     // Clear the p-queue
     this.queue.clear();
