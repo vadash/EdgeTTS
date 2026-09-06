@@ -1,5 +1,5 @@
 import { Text } from 'preact-i18n';
-import { Button, Slider, Toggle } from '@/components/common';
+import { Button, Callout, Slider, Toggle } from '@/components/common';
 import { useAudioProcessingPreview } from '@/hooks/useAudioProcessingPreview';
 import { AUDIO_PRESETS } from '@/state/types';
 import { useSettings } from '@/stores';
@@ -265,11 +265,7 @@ export function AudioTab() {
               'Processing…'
             )}
           </Button>
-          {audioPreview.error && (
-            <div className="p-3 rounded-lg bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-              ⚠️ {audioPreview.error}
-            </div>
-          )}
+          {audioPreview.error && <Callout tone="warning">⚠️ {audioPreview.error}</Callout>}
         </div>
       </div>
 

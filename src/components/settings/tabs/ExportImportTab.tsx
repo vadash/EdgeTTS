@@ -1,6 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import { Button } from '@/components/common';
+import { Button, Callout } from '@/components/common';
 import { STAGE_EXPORT_FIELDS, type AppSettings, type StageConfig } from '@/state/types';
 import { useData, useLLM, useLogs, useSettings } from '@/stores';
 import { downloadFile } from '@/utils/file';
@@ -200,15 +200,9 @@ export function ExportImportTab() {
 
       {/* Status Message */}
       {lastAction && (
-        <div
-          className={`p-3 rounded-lg ${
-            lastAction.type === 'success'
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'bg-red-500/20 text-red-400 border border-red-500/30'
-          }`}
-        >
+        <Callout tone={lastAction.type}>
           {lastAction.type === 'success' ? '✅' : '❌'} {lastAction.message}
-        </div>
+        </Callout>
       )}
     </div>
   );

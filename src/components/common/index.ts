@@ -1,4 +1,5 @@
 export { Button } from './Button';
+export { Callout } from './Callout';
 export { MarkdownContent } from './MarkdownContent';
 export { Modal } from './Modal';
 export { NotificationBanner } from './NotificationBanner';

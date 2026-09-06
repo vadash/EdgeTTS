@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import { Button, Select, Slider, Toggle } from '@/components/common';
+import { Button, Callout, Select, Slider, Toggle } from '@/components/common';
 import type { ReasoningLevel, StageConfig } from '@/state/types';
 
 const reasoningOptions = [
@@ -257,13 +257,7 @@ export function StageConfigForm({
 
         {/* Test Result */}
         {testResult && (
-          <div
-            className={`p-3 rounded-lg ${
-              testResult.success
-                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                : 'bg-red-500/20 text-red-400 border border-red-500/30'
-            }`}
-          >
+          <Callout tone={testResult.success ? 'success' : 'error'}>
             {testResult.success ? (
               <>
                 <Text id="llm.connectionSuccess">Connection successful!</Text>
@@ -279,7 +273,7 @@ export function StageConfigForm({
                 )}
               </>
             )}
-          </div>
+          </Callout>
         )}
       </div>
     </div>
