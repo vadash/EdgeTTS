@@ -145,48 +145,10 @@ export class AppError extends Error {
   }
 
   /**
-   * Check if error is retriable
-   */
-  isRetriable(): boolean {
-    const retriableCodes: ErrorCode[] = [
-      'TTS_WEBSOCKET_FAILED',
-      'TTS_WEBSOCKET_CLOSED',
-      'TTS_TIMEOUT',
-      'LLM_API_ERROR',
-      'LLM_TIMEOUT',
-      'LLM_RATE_LIMITED',
-      'FFMPEG_LOAD_FAILED',
-    ];
-    return retriableCodes.includes(this.code);
-  }
-
-  /**
    * Check if error is a cancellation
    */
   isCancellation(): boolean {
     return this.code === 'CONVERSION_CANCELLED';
-  }
-
-  /**
-   * Convert to JSON for logging/serialization
-   */
-  toJSON(): object {
-    return {
-      name: this.name,
-      code: this.code,
-      message: this.message,
-      cause: this.cause?.message,
-      context: this.context,
-      timestamp: this.timestamp.toISOString(),
-      stack: this.stack,
-    };
-  }
-
-  /**
-   * Get user-friendly message
-   */
-  getUserMessage(): string {
-    return errorMessages[this.code];
   }
 }
 
@@ -195,75 +157,10 @@ export class AppError extends Error {
 // ============================================================================
 
 /**
- * Create TTS WebSocket error
- */
-export function ttsWebSocketError(cause?: Error): AppError {
-  return AppError.fromCode('TTS_WEBSOCKET_FAILED', cause);
-}
-
-/**
- * Create TTS timeout error
- */
-export function ttsTimeoutError(partIndex?: number): AppError {
-  return AppError.fromCode('TTS_TIMEOUT', undefined, { partIndex });
-}
-
-/**
- * Create TTS empty response error
- */
-export function ttsEmptyResponseError(partIndex?: number): AppError {
-  return AppError.fromCode('TTS_EMPTY_RESPONSE', undefined, { partIndex });
-}
-
-/**
- * Create LLM API error
- */
-export function llmApiError(status: number, message: string): AppError {
-  return new AppError('LLM_API_ERROR', `API error ${status}: ${message}`, undefined, { status });
-}
-
-/**
- * Create LLM validation error
- */
-export function llmValidationError(errors: string[]): AppError {
-  return new AppError('LLM_VALIDATION_ERROR', errors.join('; '), undefined, { errors });
-}
-
-/**
- * Create FFmpeg load error
- */
-export function ffmpegLoadError(cause?: Error): AppError {
-  return AppError.fromCode('FFMPEG_LOAD_FAILED', cause);
-}
-
-/**
- * Create FFmpeg process error
- */
-export function ffmpegProcessError(cause?: Error): AppError {
-  return AppError.fromCode('FFMPEG_PROCESS_ERROR', cause);
-}
-
-/**
- * Create file system error
- */
-export function fileSystemError(operation: string, cause?: Error): AppError {
-  return new AppError('FILE_SYSTEM_ERROR', `File operation failed: ${operation}`, cause, {
-    operation,
-  });
-}
-
-/**
  * Create file permission error
  */
 export function filePermissionError(path?: string): AppError {
   return AppError.fromCode('FILE_PERMISSION_DENIED', undefined, { path });
-}
-
-/**
- * Create conversion cancelled error
- */
-export function conversionCancelledError(): AppError {
-  return AppError.fromCode('CONVERSION_CANCELLED');
 }
 
 /**
@@ -315,13 +212,6 @@ export function isRetriableError(error: unknown): boolean {
  */
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
-}
-
-/**
- * Check if error has a specific code
- */
-export function hasErrorCode(error: unknown, code: ErrorCode): boolean {
-  return isAppError(error) && error.code === code;
 }
 
 /**
