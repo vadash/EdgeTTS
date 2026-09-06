@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { MarkdownContent } from '@/components/common';
 
 interface MarkdownViewProps {
   file: string;
@@ -49,9 +50,7 @@ export function MarkdownView({ file, title }: MarkdownViewProps) {
       <div className="flex-1 bg-primary-secondary rounded-lg border border-border p-6 overflow-auto">
         <h1 className="text-xl font-bold text-white mb-4">{title}</h1>
         <div className="prose prose-invert prose-sm max-w-none">
-          <pre className="whitespace-pre-wrap text-gray-300 text-sm leading-relaxed font-sans">
-            {content}
-          </pre>
+          <MarkdownContent text={content} />
         </div>
       </div>
     </div>
