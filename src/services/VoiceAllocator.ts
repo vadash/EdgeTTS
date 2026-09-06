@@ -5,7 +5,6 @@
 
 import type { LLMCharacter, SpeakerAssignment, VoiceOption, VoicePool } from '@/state/types';
 import type { DetectedLanguage } from '@/utils/languageDetection';
-import { countSpeakingFrequency } from './llm/CharacterUtils';
 import { deduplicateVariants } from './VoicePoolBuilder';
 
 /**
@@ -275,74 +274,6 @@ export function allocateTieredVoices(options: TieredAllocationOptions): VoiceAll
     voiceMap,
     rareVoices,
     uniqueCount: tracker.getUsed().size - 1, // Exclude narrator
-  };
-}
-
-/**
- * Frequency-based voice allocation
- * Top N characters get unique voices, remaining share rare voices
- * Used after speaker assignment when we have frequency data
- *
- * @deprecated Use allocateTieredVoices instead for better voice distribution
- */
-export function allocateByFrequency(
-  characters: LLMCharacter[],
-  assignments: SpeakerAssignment[],
-  options: VoiceAllocationOptions,
-): VoiceAllocation {
-  const tracker = new VoicePoolTracker(options.pool, options.narratorVoice, options.reservedVoices);
-  const voiceMap = new Map<string, string>();
-
-  // Count speaking frequency
-  const frequency = countSpeakingFrequency(assignments);
-
-  // Calculate slots: total pool - narrator - 3 rare voices
-  const poolSize = options.pool.male.length + options.pool.female.length;
-  const uniqueSlots = Math.max(0, poolSize - 1 - 3);
-
-  // Sort by frequency (descending)
-  const sorted = [...characters].sort((a, b) => {
-    const freqA = frequency.get(a.canonicalName) ?? 0;
-    const freqB = frequency.get(b.canonicalName) ?? 0;
-    return freqB - freqA;
-  });
-
-  // Top N get unique voices
-  for (let i = 0; i < Math.min(sorted.length, uniqueSlots); i++) {
-    const char = sorted[i];
-    const voice = tracker.pickVoice(char.gender);
-    voiceMap.set(char.canonicalName, voice);
-
-    for (const variation of char.variations) {
-      voiceMap.set(variation, voice);
-    }
-  }
-
-  // Rest share rare voices
-  const rareVoices = {
-    male: tracker.pickVoice('male'),
-    female: tracker.pickVoice('female'),
-    unknown: tracker.pickVoice('unknown'),
-  };
-
-  for (let i = uniqueSlots; i < sorted.length; i++) {
-    const char = sorted[i];
-    const voice = rareVoices[char.gender] ?? rareVoices.unknown;
-    voiceMap.set(char.canonicalName, voice);
-
-    for (const variation of char.variations) {
-      voiceMap.set(variation, voice);
-    }
-  }
-
-  voiceMap.set('MALE_UNNAMED', rareVoices.male);
-  voiceMap.set('FEMALE_UNNAMED', rareVoices.female);
-  voiceMap.set('UNKNOWN_UNNAMED', rareVoices.unknown);
-
-  return {
-    voiceMap,
-    rareVoices,
-    uniqueCount: tracker.getUsed().size - 1,
   };
 }
 

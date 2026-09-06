@@ -2,6 +2,7 @@
 // Consolidated logger with LogStore integration
 
 import { computed, signal } from '@preact/signals';
+import { formatHMS } from '@/utils/time';
 
 export type LogLevel = 'info' | 'warn' | 'error';
 
@@ -38,11 +39,7 @@ function generateLogId(): string {
  * Format duration in ms to HH:MM:SS
  */
 function formatElapsedTime(startTime: number): string {
-  const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  const hours = Math.floor(elapsed / 3600);
-  const minutes = Math.floor((elapsed % 3600) / 60);
-  const seconds = elapsed % 60;
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  return formatHMS(Math.floor((Date.now() - startTime) / 1000));
 }
 
 // ========== Logger ==========
@@ -275,13 +272,6 @@ export class LoggerStore implements ILogger {
    */
   toDisplayLines(): string[] {
     return this.entries.value.map((e) => `[${e.elapsed}] ${e.message}`);
-  }
-
-  /**
-   * Get entries as simple string array (backward compatible)
-   */
-  getStatusLines(): string[] {
-    return this.toDisplayLines();
   }
 }
 
