@@ -269,7 +269,6 @@ export function parseMP3Duration(
   let totalDurationMs = 0;
   let frameCount = 0;
   let totalBytesAnalyzed = 0;
-  let _lastValidFrameSize = 0;
 
   while (offset < buffer.length && frameCount < maxFramesToSample) {
     const header = parseFrameHeader(buffer, offset);
@@ -283,7 +282,6 @@ export function parseMP3Duration(
 
     totalDurationMs += header.frameDurationMs;
     totalBytesAnalyzed += header.frameSize;
-    _lastValidFrameSize = header.frameSize;
     frameCount++;
     offset += header.frameSize;
   }
