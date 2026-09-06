@@ -127,7 +127,7 @@ export class AudioMerger {
    * Reads file sizes from disk to estimate durations
    */
   async calculateMergeGroups(
-    audioMap: Map<number, string>,
+    audioMap: Set<number>,
     totalSentences: number,
     fileNames: Array<[string, number]>,
   ): Promise<MergeGroup[]> {
@@ -164,9 +164,8 @@ export class AudioMerger {
       const isLastItem = i === totalSentences - 1;
 
       // Get actual duration from MP3 headers (with fallback to byte heuristic)
-      const chunkFilename = audioMap.get(i);
       let chunkDurationMs = 0;
-      if (chunkFilename) {
+      if (audioMap.has(i)) {
         chunkDurationMs = await this.getDurationMs(i);
       }
 
@@ -216,7 +215,7 @@ export class AudioMerger {
    */
   private async mergeAudioGroupAsync(
     ffmpegService: FFmpegService,
-    audioMap: Map<number, string>,
+    audioMap: Set<number>,
     group: MergeGroup,
     totalGroups: number,
     onProgress?: (message: string) => void,
@@ -230,8 +229,7 @@ export class AudioMerger {
 
     // Read chunks one by one from disk, null for missing
     for (let i = group.fromIndex; i <= group.toIndex; i++) {
-      const chunkFilename = audioMap.get(i);
-      if (chunkFilename) {
+      if (audioMap.has(i)) {
         try {
           const audio = await this.chunkStore.readChunk(i);
           chunks.push(audio);
@@ -270,7 +268,7 @@ export class AudioMerger {
       onProgress,
     );
 
-    const filename = this.generateFilename(group, totalGroups, 'opus');
+    const filename = this.generateGroupFilename(group, totalGroups, this.config.outputFormat);
 
     // Create a new Uint8Array to ensure it's a standard ArrayBuffer (not SharedArrayBuffer)
     const outputArray = new Uint8Array(processedAudio);
@@ -281,18 +279,6 @@ export class AudioMerger {
       fromIndex: group.fromIndex,
       toIndex: group.toIndex,
     };
-  }
-
-  private generateFilename(group: MergeGroup, totalGroups: number, extension: string): string {
-    const _durationMin = Math.round(group.durationMs / 60000);
-    const sanitizedName = sanitizeFilename(group.filename);
-
-    if (totalGroups === 1) {
-      return `${sanitizedName}.${extension}`;
-    } else {
-      const paddedNum = String(group.mergeNumber).padStart(4, '0');
-      return `${sanitizedName} ${paddedNum}.${extension}`;
-    }
   }
 
   /**
@@ -316,16 +302,15 @@ export class AudioMerger {
   /**
    * Generate the expected filename for a merge group
    */
-  private generateGroupFilename(group: MergeGroup, totalGroups: number): string {
+  private generateGroupFilename(group: MergeGroup, totalGroups: number, extension: string): string {
     const sanitizedName = sanitizeFilename(group.filename);
-    const extension = this.config.outputFormat;
 
     if (totalGroups === 1) {
       return `${sanitizedName}.${extension}`;
-    } else {
-      const paddedNum = String(group.mergeNumber).padStart(4, '0');
-      return `${sanitizedName} ${paddedNum}.${extension}`;
     }
+
+    const paddedNum = String(group.mergeNumber).padStart(4, '0');
+    return `${sanitizedName} ${paddedNum}.${extension}`;
   }
 
   /**
@@ -341,7 +326,7 @@ export class AudioMerger {
    * Returns the number of files saved
    */
   async mergeAndSave(
-    audioMap: Map<number, string>,
+    audioMap: Set<number>,
     totalSentences: number,
     fileNames: Array<[string, number]>,
     saveDirectoryHandle: FileSystemDirectoryHandle,
@@ -367,7 +352,11 @@ export class AudioMerger {
     let skippedCount = 0;
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
-      const expectedFilename = this.generateGroupFilename(group, groups.length);
+      const expectedFilename = this.generateGroupFilename(
+        group,
+        groups.length,
+        this.config.outputFormat,
+      );
       const folderName = this.getFolderName(group);
       const fileExists = await this.fileExistsWithContent(
         saveDirectoryHandle,

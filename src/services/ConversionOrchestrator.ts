@@ -867,13 +867,13 @@ async function runTTSStage(
     volume: '+0%',
   };
 
-  const audioMap = new Map<number, string>();
+  const audioMap = new Set<number>();
   const failedTasks = new Set<number>();
 
   // Pre-scan for cached chunks using ChunkStore
   const existingIndices = chunkStore.getExistingIndices();
   for (const index of existingIndices) {
-    audioMap.set(index, `chunk_${String(index).padStart(6, '0')}.bin`);
+    audioMap.add(index);
   }
 
   if (audioMap.size > 0) {
@@ -896,7 +896,7 @@ async function runTTSStage(
     let skippedCount = 0;
     for (const idx of failedIndices) {
       if (!audioMap.has(idx)) {
-        audioMap.set(idx, '');
+        audioMap.add(idx);
         skippedCount++;
       }
     }
@@ -933,7 +933,7 @@ async function runTTSStage(
           }
         },
         onTaskComplete: (partIndex) => {
-          audioMap.set(partIndex, `chunk_${String(partIndex).padStart(6, '0')}.bin`);
+          audioMap.add(partIndex);
           const completed = audioMap.size;
           const percentageInterval = Math.max(1, Math.floor(chunks.length * 0.01));
           const minInterval = 50;

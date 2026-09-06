@@ -122,11 +122,7 @@ describe('AudioMerger - parallel merge pool', () => {
     // indices 1..2. Both filenames share start index 1, so the first
     // boundary flips index 1 onward to 'book2' (index 0 stays 'book1').
     // Result: group [0,0]='book1', group [1,2]='book2' => 2 groups.
-    const audioMap = new Map<number, string>([
-      [0, 'chunk_0.mp3'],
-      [1, 'chunk_1.mp3'],
-      [2, 'chunk_2.mp3'],
-    ]);
+    const audioMap = new Set<number>([0, 1, 2]);
     const totalSentences = 3;
     const fileNames: Array<[string, number]> = [
       ['book1', 1],
@@ -193,11 +189,7 @@ describe('AudioMerger - parallel merge pool', () => {
     };
 
     const merger = new AudioMerger(primaryMock as unknown as FFmpegService, config);
-    const audioMap = new Map<number, string>([
-      [0, 'chunk_0.mp3'],
-      [1, 'chunk_1.mp3'],
-      [2, 'chunk_2.mp3'],
-    ]);
+    const audioMap = new Set<number>([0, 1, 2]);
     const totalSentences = 3;
     const fileNames: Array<[string, number]> = [
       ['book1', 1],
