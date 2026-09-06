@@ -8,11 +8,8 @@ import {
   complete,
   confirmResume,
   conversion,
-  elapsedTime,
   estimatedTimeRemaining,
-  incrementProgress,
   isProcessing,
-  progressPercent,
   resetConversionStore,
   setConcurrencyStats,
   setError,
@@ -54,29 +51,6 @@ describe('ConversionStore', () => {
       updateProgress(5, 10, 2);
       expect(conversion.value.progress).toEqual({ current: 5, total: 10, failed: 2 });
     });
-
-    it('increments progress', () => {
-      updateProgress(5, 10);
-      incrementProgress();
-      expect(conversion.value.progress).toEqual({ current: 6, total: 10, failed: 0 });
-    });
-
-    it('increments progress preserving failed count', () => {
-      updateProgress(5, 10, 2);
-      incrementProgress();
-      expect(conversion.value.progress).toEqual({ current: 6, total: 10, failed: 2 });
-    });
-
-    describe('progressPercent computed', () => {
-      it.each([
-        [25, 100, 25],
-        [0, 0, 0],
-        [1, 3, 33],
-      ])('calculates %d%% for current=%d, total=%d', (current, total, expected) => {
-        updateProgress(current, total);
-        expect(progressPercent.value).toBe(expected);
-      });
-    });
   });
 
   describe('error handling', () => {
@@ -113,26 +87,6 @@ describe('ConversionStore', () => {
       setStatus('converting');
       cancel();
       expect(conversion.value.status).toBe('cancelled');
-    });
-  });
-
-  describe('elapsed time formatting', () => {
-    it('returns 00:00:00 when not started', () => {
-      expect(elapsedTime.value).toBe('00:00:00');
-    });
-
-    it('formats elapsed time correctly', () => {
-      // Mock Date.now to control time
-      const startTime = 1000000;
-      vi.spyOn(Date, 'now').mockReturnValue(startTime);
-      startConversion();
-
-      // Advance time by 1 hour, 23 minutes, 45 seconds
-      vi.spyOn(Date, 'now').mockReturnValue(startTime + (1 * 3600 + 23 * 60 + 45) * 1000);
-
-      expect(elapsedTime.value).toBe('01:23:45');
-
-      vi.restoreAllMocks();
     });
   });
 

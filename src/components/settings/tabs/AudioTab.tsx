@@ -2,12 +2,11 @@ import { Text } from 'preact-i18n';
 import { Button, Toggle } from '@/components/common';
 import { useAudioProcessingPreview } from '@/hooks/useAudioProcessingPreview';
 import { AUDIO_PRESETS } from '@/state/types';
-import { useConversion, useSettings } from '@/stores';
+import { useSettings } from '@/stores';
 
 export function AudioTab() {
   const settings = useSettings();
   const audioPreview = useAudioProcessingPreview();
-  const conversion = useConversion();
 
   return (
     <div className="space-y-6">
@@ -318,13 +317,6 @@ export function AudioTab() {
           )}
         </div>
       </div>
-
-      {/* FFmpeg Warning */}
-      {conversion.ffmpegError.value && (
-        <div className="p-3 rounded-lg bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-          ⚠️ {conversion.ffmpegError.value}
-        </div>
-      )}
 
       {/* FFmpeg Status */}
       <div className="p-4 bg-primary rounded-lg border border-border">

@@ -41,9 +41,6 @@ interface ConversionState {
   phaseStartTime: number | null;
   phaseStartProgress: number;
   error: ConversionError | null;
-  ffmpegLoaded: boolean;
-  ffmpegLoading: boolean;
-  ffmpegError: string | null;
   resumeInfo: ResumeInfo | null;
   tabBlocked: boolean;
   activeLlmWorkers: number;
@@ -61,9 +58,6 @@ const defaultState: ConversionState = {
   phaseStartTime: null,
   phaseStartProgress: 0,
   error: null,
-  ffmpegLoaded: false,
-  ffmpegLoading: false,
-  ffmpegError: null,
   resumeInfo: null,
   tabBlocked: false,
   activeLlmWorkers: 0,
@@ -91,20 +85,10 @@ export const progress = computed(() => conversion.value.progress);
 
 // Export computed for nested state access
 export const status = computed(() => conversion.value.status);
-export const startTime = computed(() => conversion.value.startTime);
 export const error = computed(() => conversion.value.error);
 export const resumeInfo = computed(() => conversion.value.resumeInfo);
-export const ffmpegLoaded = computed(() => conversion.value.ffmpegLoaded);
-export const ffmpegLoading = computed(() => conversion.value.ffmpegLoading);
-export const ffmpegError = computed(() => conversion.value.ffmpegError);
 export const activeLlmWorkers = computed(() => conversion.value.activeLlmWorkers);
 export const activeTtsWorkers = computed(() => conversion.value.activeTtsWorkers);
-
-export const progressPercent = computed(() => {
-  const { current, total } = conversion.value.progress;
-  if (total === 0) return 0;
-  return Math.round((current / total) * 100);
-});
 
 const formatDuration = (ms: number): string => {
   const totalSeconds = Math.floor(ms / 1000);
@@ -113,12 +97,6 @@ const formatDuration = (ms: number): string => {
   const seconds = totalSeconds % 60;
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
-
-export const elapsedTime = computed(() => {
-  const start = conversion.value.startTime;
-  if (!start) return '00:00:00';
-  return formatDuration(Date.now() - start);
-});
 
 export const estimatedTimeRemaining = computed(() => {
   const { current, total } = conversion.value.progress;
@@ -182,7 +160,6 @@ export function patchState(partial: Partial<ConversionState>): void {
 export function startConversion(): void {
   conversion.value = {
     ...defaultState,
-    startTime: Date.now(),
     status: 'idle',
   };
 }
@@ -209,16 +186,6 @@ export function updateProgress(current: number, total: number, failed: number = 
   patchState({ progress: { current, total, failed } });
 }
 
-export function incrementProgress(): void {
-  const { current, total, failed } = conversion.value.progress;
-  patchState({ progress: { current: current + 1, total, failed } });
-}
-
-export function setTotal(total: number): void {
-  const { current, failed } = conversion.value.progress;
-  patchState({ progress: { current, total, failed } });
-}
-
 export function setError(message: string, code?: string): void {
   patchState({
     status: 'error',
@@ -236,30 +203,6 @@ export function cancel(): void {
 
 export function resetConversionStore(): void {
   conversion.value = { ...defaultState };
-}
-
-export function reset(): void {
-  resetConversionStore();
-}
-
-// ============================================================================
-// Public API - FFmpeg State
-// ============================================================================
-
-export function setFFmpegLoaded(loaded: boolean): void {
-  if (loaded) {
-    patchState({ ffmpegLoaded: true, ffmpegLoading: false, ffmpegError: null });
-  } else {
-    patchState({ ffmpegLoaded: loaded });
-  }
-}
-
-export function setFFmpegLoading(loading: boolean): void {
-  patchState({ ffmpegLoading: loading });
-}
-
-export function setFFmpegError(error: string | null): void {
-  patchState({ ffmpegError: error, ffmpegLoading: false });
 }
 
 // ============================================================================

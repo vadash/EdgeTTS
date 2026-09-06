@@ -14,16 +14,11 @@ export {
   // Resume functions
   confirmResume,
   conversion,
-  elapsedTime,
   error as conversionError,
   estimatedTimeRemaining,
-  ffmpegError,
-  ffmpegLoaded,
-  ffmpegLoading,
   isProcessing,
   // Computed values
   progress,
-  progressPercent,
   clearTabBlocked,
   resetConversionStore,
   resumeInfo,
@@ -31,7 +26,6 @@ export {
   setPhaseBaseline,
   setStatus,
   startConversion,
-  startTime,
   status,
   updateProgress,
 } from './ConversionStore';
