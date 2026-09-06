@@ -285,11 +285,6 @@ export function AudioTab() {
           </div>
         </div>
       </div>
-
-      {/* Save */}
-      <Button variant="primary" onClick={() => settings.save()} className="w-full">
-        💾 <Text id="settings.save">Save Settings</Text>
-      </Button>
     </div>
   );
 }

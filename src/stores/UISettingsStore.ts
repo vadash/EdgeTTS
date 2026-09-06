@@ -4,6 +4,7 @@
 
 import { computed, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
+import { saveJSON } from './persistence';
 
 // ============================================================================
 // Types
@@ -57,10 +58,6 @@ export function loadFromStorage(): UISettings {
   return { ...defaultState };
 }
 
-function saveSettings(settings: UISettings): void {
-  localStorage.setItem(StorageKeys.uiSettings, JSON.stringify(settings));
-}
-
 // ============================================================================
 // Store Definition
 // ============================================================================
@@ -82,7 +79,7 @@ export function dismissNotification(key: keyof DismissedNotifications): void {
       [key]: true,
     },
   };
-  saveSettings(uiSettings.value);
+  saveJSON(StorageKeys.uiSettings, uiSettings.value);
 }
 
 export function resetUISettings(): void {

@@ -5,6 +5,7 @@ import { computed, effect, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
 import type { AppSettings, AudioPreset } from '@/state/types';
 import { AUDIO_PRESETS } from '@/state/types';
+import { loadJSON, saveJSON } from './persistence';
 
 /** Default enabled voices curated list */
 const DEFAULT_ENABLED_VOICES = [
@@ -77,20 +78,12 @@ const defaultSettings: AppSettings = {
 };
 
 function loadFromStorage(): AppSettings {
-  try {
-    const saved = localStorage.getItem(StorageKeys.settings);
-    if (saved) {
-      const parsed: Partial<AppSettings> = JSON.parse(saved);
-      // Migration: [] used to mean "default enabled" -- convert to explicit list
-      if (parsed.enabledVoices && parsed.enabledVoices.length === 0) {
-        parsed.enabledVoices = [...DEFAULT_ENABLED_VOICES];
-      }
-      return { ...defaultSettings, ...parsed };
-    }
-  } catch {
-    // Fall through to defaults
+  const parsed = loadJSON(StorageKeys.settings, defaultSettings);
+  // Migration: [] used to mean "default enabled" -- convert to explicit list
+  if (parsed.enabledVoices && parsed.enabledVoices.length === 0) {
+    parsed.enabledVoices = [...DEFAULT_ENABLED_VOICES];
   }
-  return { ...defaultSettings };
+  return parsed;
 }
 
 // ============================================================================
@@ -135,7 +128,7 @@ export const mergeConcurrency = computed(() => settings.value.mergeConcurrency);
 // ============================================================================
 
 effect(() => {
-  localStorage.setItem(StorageKeys.settings, JSON.stringify(settings.value));
+  saveJSON(StorageKeys.settings, settings.value);
 });
 
 // ============================================================================

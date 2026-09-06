@@ -5,6 +5,7 @@ import { computed, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
 import type { LoggerStore } from '@/services/Logger';
 import { decryptValue, encryptValue } from '@/services/SecureStorage';
+import { saveJSON } from './persistence';
 import type {
   LLMCharacter,
   ReasoningLevel,
@@ -175,7 +176,7 @@ async function saveSettings(): Promise<void> {
       assign: { ...llm.value.assign, apiKey: assignKey },
       backup: { ...llm.value.backup, apiKey: backupKey },
     };
-    localStorage.setItem(StorageKeys.llmSettings, JSON.stringify(settings));
+    saveJSON(StorageKeys.llmSettings, settings);
   } finally {
     _savePending = false;
   }

@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import { Button, TabPanel, Tabs, Toggle } from '@/components/common';
+import { TabPanel, Tabs, Toggle } from '@/components/common';
 import { getLogger } from '@/services';
 import { LLMVoiceService } from '@/services/llm';
 import { useLLM } from '@/stores';
@@ -105,11 +105,6 @@ export function LLMTab() {
       ...prev,
       [stage]: { ...prev[stage], testing: false, result },
     }));
-
-    // Auto-save on success
-    if (result.success) {
-      await llm.saveSettings();
-    }
   };
 
   const handleStageFieldChange = <K extends keyof StageConfig>(
@@ -217,11 +212,6 @@ export function LLMTab() {
           </>
         )}
       </Tabs>
-
-      {/* Save Button */}
-      <Button variant="primary" onClick={() => llm.saveSettings()} className="w-full">
-        💾 <Text id="settings.save">Save Settings</Text>
-      </Button>
     </div>
   );
 }

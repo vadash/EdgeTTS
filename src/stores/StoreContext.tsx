@@ -13,7 +13,7 @@ import { conversion as conversionSignal } from './ConversionStore';
 import { createDataStore, type DataStore } from './DataStore';
 import { createLanguageStore, type LanguageStore } from './LanguageStore';
 import * as LLMStore from './LLMStore';
-import { loadSettings as llmLoadSettings, llm as llmSignal } from './LLMStore';
+import { llm as llmSignal } from './LLMStore';
 // Import signal-based stores
 import * as SettingsStore from './SettingsStore';
 import * as UISettingsStore from './UISettingsStore';
@@ -28,7 +28,6 @@ import { resetUISettings, uiSettings as uiSettingsSignal } from './UISettingsSto
 // Re-export the store modules as types for convenient access
 export type SettingsStoreType = typeof SettingsStore & {
   value: typeof settingsSignal;
-  save: () => void;
   toObject: () => AppSettings;
   reset: () => void;
 };
@@ -39,7 +38,6 @@ export type ConversionStoreType = typeof ConversionStore & {
 
 export type LLMStoreType = typeof LLMStore & {
   value: typeof llmSignal;
-  saveSettings: () => Promise<void>;
 };
 
 export type UISettingsStoreType = typeof UISettingsStore & {
@@ -108,9 +106,6 @@ export function useSettings(): SettingsStoreType {
   return {
     ...stores.settings,
     value: settingsSignal,
-    save: () => {
-      /* Persistence is handled by effect */
-    },
     toObject: () => ({ ...settingsSignal.value }),
     reset: () => {
       resetSettingsStore();
@@ -139,7 +134,6 @@ export function useLLM(): LLMStoreType {
   return {
     ...stores.llm,
     value: llmSignal,
-    saveSettings: () => llmLoadSettings(stores.logs),
   } as LLMStoreType;
 }
 

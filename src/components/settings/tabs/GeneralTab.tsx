@@ -1,5 +1,5 @@
 import { Text } from 'preact-i18n';
-import { Button, Slider } from '@/components/common';
+import { Slider } from '@/components/common';
 import { useLanguage, useSettings } from '@/stores';
 
 export function GeneralTab() {
@@ -58,11 +58,6 @@ export function GeneralTab() {
         max={20}
         onChange={(v) => settings.setLlmThreads(v)}
       />
-
-      {/* Save */}
-      <Button variant="primary" onClick={() => settings.save()} className="w-full">
-        💾 <Text id="settings.save">Save Settings</Text>
-      </Button>
     </div>
   );
 }
