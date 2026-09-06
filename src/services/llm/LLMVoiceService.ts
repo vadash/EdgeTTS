@@ -507,6 +507,25 @@ export class LLMVoiceService {
   }
 
   /**
+   * Parse a sparse assignments object ({"0": "A", "5": "B"}) into a
+   * relativeIndex → code map, dropping codes that don't resolve through
+   * codeToName so a hallucinated code degrades to narrator downstream.
+   */
+  private parseAssignments(
+    assignments: Record<string, string>,
+    codeToName: Map<string, string>,
+  ): Map<number, string> {
+    const map = new Map<number, string>();
+    for (const [key, code] of Object.entries(assignments)) {
+      const index = parseInt(key, 10);
+      if (codeToName.has(code)) {
+        map.set(index, code);
+      }
+    }
+    return map;
+  }
+
+  /**
    * Process a single block for Assign using structured outputs
    * New format: sparse JSON object {"0": "A", "5": "B"}
    * When useVoting is enabled: runs Assign -> QA sequential flow
@@ -566,14 +585,7 @@ export class LLMVoiceService {
         () => this.assignBackupSplit(context, overlapSentences, this.abortController?.signal),
       );
 
-      // Convert draft response to Map
-      const draftMap = new Map<number, string>();
-      for (const [key, code] of Object.entries(draftResponse.assignments)) {
-        const index = parseInt(key, 10);
-        if (context.codeToName.has(code)) {
-          draftMap.set(index, code);
-        }
-      }
+      const draftMap = this.parseAssignments(draftResponse.assignments, context.codeToName);
 
       // Save first assign phase log (draft)
       if (isFirstBlock) {
@@ -617,14 +629,7 @@ export class LLMVoiceService {
             },
           );
 
-          // Convert QA response to Map
-          relativeMap = new Map<number, string>();
-          for (const [key, code] of Object.entries(qaResponse.assignments)) {
-            const index = parseInt(key, 10);
-            if (context.codeToName.has(code)) {
-              relativeMap.set(index, code);
-            }
-          }
+          relativeMap = this.parseAssignments(qaResponse.assignments, context.codeToName);
 
           // Save QA phase log
           if (isFirstBlock) {
