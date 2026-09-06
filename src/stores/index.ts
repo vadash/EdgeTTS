@@ -1,135 +1,31 @@
 // Stores Module
-// Export all stores and related functionality
+// Re-exports the store surface consumed by components and hooks
 
-// Store classes (for LogStore, DataStore, LanguageStore which are still class-based)
-export type { LoggerStore } from '@/services/Logger';
-export { createLoggerStore } from '@/services/Logger';
-// Store types
-export type { ConversionError, ConversionStatus, Progress, ResumeInfo } from './ConversionStore';
-export * as ConversionStoreModule from './ConversionStore';
+// Conversion store
 export {
-  cancel,
   cancelResume,
-  complete,
-  // Resume functions
+  clearTabBlocked,
   confirmResume,
   conversion,
-  error as conversionError,
-  estimatedTimeRemaining,
-  isProcessing,
-  // Computed values
-  progress,
-  clearTabBlocked,
-  resetConversionStore,
   resumeInfo,
-  setError,
-  setPhaseBaseline,
-  setStatus,
-  startConversion,
-  status,
-  updateProgress,
 } from './ConversionStore';
-export { createDataStore, DataStore } from './DataStore';
-export type { SupportedLocale } from './LanguageStore';
-export { createLanguageStore, LanguageStore } from './LanguageStore';
-export type { LLMProcessingStatus } from './LLMStore';
-export * as LLMStoreModule from './LLMStore';
+// LLM store
 export {
-  assign,
-  backup,
-  awaitReview,
   cancelReview,
-  // Computed values
-  characterVoiceMap,
   confirmReview,
-  detectedCharacters,
-  error as llmError,
-  extract,
   isConfigured,
-  isProcessing as llmIsProcessing,
-  llm,
-  loadedProfile,
-  merge,
   pendingReview,
-  processingStatus,
-  removeCharacter,
-  removeVoiceMapping,
-  resetProcessingState,
-  setCharacters,
-  setLoadedProfile,
-  setPendingReview,
-  setProcessingStatus,
-  setSpeakerAssignments,
-  setStageConfig,
-  setStageField,
-  // Other functions
-  setUseVoting,
-  setVoiceMap,
-  speakerAssignments,
-  updateCharacter,
-  updateVoiceMapping,
-  useVoting,
 } from './LLMStore';
-// Signal-based stores - export entire modules
-export * as SettingsStoreModule from './SettingsStore';
-export * as UISettingsStoreModule from './UISettingsStore';
-// Re-export commonly used items from signal stores for convenience
+// Settings store
 export {
-  applyOpusPreset,
-  compressorEnabled,
-  deEssEnabled,
-  enabledVoices,
-  eqEnabled,
-  fadeInEnabled,
-  lexxRegister,
-  llmThreads,
-  narratorVoice,
-  normalizationEnabled,
-  opusCompressionLevel,
-  mergeConcurrency,
-  opusMaxBitrate,
-  opusMinBitrate,
-  opusPreset,
-  outputFormat,
   patchSettings,
-  pitch,
-  pitchDisplay,
-  rate,
-  rateDisplay,
-  resetSettings,
-  resetSettingsStore,
-  setCompressorEnabled,
-  setDeEssEnabled,
-  setEnabledVoices,
-  setEqEnabled,
-  setFadeInEnabled,
-  setLexxRegister,
-  setLlmThreads,
-  setMergeConcurrency,
-  setNarratorVoice,
-  setNormalizationEnabled,
-  setOpusCompressionLevel,
-  setOpusMaxBitrate,
-  setOpusMinBitrate,
-  setOutputFormat,
-  setPitch,
-  setRate,
-  setSilenceGapMs,
-  setSilenceRemovalEnabled,
-  setTtsThreads,
   settings,
-  silenceGapMs,
-  silenceRemovalEnabled,
-  ttsThreads,
+  setNarratorVoice,
 } from './SettingsStore';
+// UI settings store
 export {
-  defaultState as defaultUISettings,
   dismissNotification,
   dismissedNotifications,
-  isEdgeBrowser,
-  loadFromStorage as loadUISettings,
-  resetUISettings,
-  uiSettings,
 } from './UISettingsStore';
 // Context and hooks
 export {
@@ -144,5 +40,4 @@ export {
   useLogs,
   useSettings,
   useStores,
-  useUISettings,
 } from './StoreContext';

@@ -19,30 +19,24 @@ import * as SettingsStore from './SettingsStore';
 import * as UISettingsStore from './UISettingsStore';
 // Import individual exports for typed hook return values
 import { resetSettingsStore, settings as settingsSignal } from './SettingsStore';
-import { resetUISettings, uiSettings as uiSettingsSignal } from './UISettingsStore';
 
 // ============================================================================
 // Store Types
 // ============================================================================
 
-// Re-export the store modules as types for convenient access
-export type SettingsStoreType = typeof SettingsStore & {
+// Store module types used as hook return values
+type SettingsStoreType = typeof SettingsStore & {
   value: typeof settingsSignal;
   toObject: () => AppSettings;
   reset: () => void;
 };
 
-export type ConversionStoreType = typeof ConversionStore & {
+type ConversionStoreType = typeof ConversionStore & {
   value: typeof conversionSignal;
 };
 
-export type LLMStoreType = typeof LLMStore & {
+type LLMStoreType = typeof LLMStore & {
   value: typeof llmSignal;
-};
-
-export type UISettingsStoreType = typeof UISettingsStore & {
-  value: typeof uiSettingsSignal;
-  reset: () => void;
 };
 
 /**
@@ -159,21 +153,6 @@ export function useData(): DataStore {
 export function useLanguage(): LanguageStore {
   const stores = useStores();
   return stores.language;
-}
-
-/**
- * Hook to get UI settings store (signal-based)
- * Returns a typed object with all UI settings signals and actions
- */
-export function useUISettings(): UISettingsStoreType {
-  const stores = useStores();
-  return {
-    ...stores.uiSettings,
-    value: uiSettingsSignal,
-    reset: () => {
-      resetUISettings();
-    },
-  } as UISettingsStoreType;
 }
 
 // ============================================================================
