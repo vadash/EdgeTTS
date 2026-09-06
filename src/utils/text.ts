@@ -358,6 +358,39 @@ function applyFlattenedAssignmentsRecovery<T>(parsed: unknown, schema: z.ZodType
 }
 
 /**
+ * Shape a parsed value: apply recovery heuristics for common LLM malformations,
+ * then validate against the schema (or cast when absent).
+ */
+function shapeResult<T>(parsed: unknown, schema: z.ZodType<T> | undefined): T {
+  if (!schema) {
+    return parsed as T;
+  }
+  let recovered = applyArrayAtRootRecovery(parsed, schema);
+  recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
+  return schema.parse(recovered) as T;
+}
+
+/**
+ * Core tier pipeline: repair a candidate string via jsonrepair, parse it,
+ * apply recovery heuristics, and validate against the schema. Throws on any
+ * failure so the caller advances to the next tier.
+ */
+function parseRepaired<T>(candidate: string, schema: z.ZodType<T> | undefined): T {
+  return shapeResult(JSON.parse(jsonrepair(candidate)), schema);
+}
+
+/**
+ * Select the last block of at least minimumBlockSize characters, falling back
+ * to the last block of any size.
+ */
+function selectBlockText(blocks: Array<{ text: string }>, minimumBlockSize: number): string {
+  const substantial = blocks.filter((b) => b.text.length >= minimumBlockSize);
+  const selected =
+    substantial.length > 0 ? substantial[substantial.length - 1] : blocks[blocks.length - 1];
+  return selected.text;
+}
+
+/**
  * Safely parse JSON with progressive fallback waterfall.
  * Returns Zod-style result object for maximum reusability.
  *
@@ -434,14 +467,7 @@ export function safeParseJSON<T>(
   }
   // === Tier 1: Native Parse ===
   try {
-    const parsed = JSON.parse(text);
-    if (schema) {
-      let recovered = applyArrayAtRootRecovery(parsed, schema);
-      recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
-      const data = schema.parse(recovered) as T;
-      return { success: true, data };
-    }
-    return { success: true, data: parsed as T };
+    return { success: true, data: shapeResult(JSON.parse(text), schema) };
   } catch {
     // Continue to Tier 2
   }
@@ -449,93 +475,34 @@ export function safeParseJSON<T>(
   // === Tier 2: Extract + JsonRepair ===
   try {
     const blocks = extractJsonBlocks(text);
-
-    if (blocks.length > 0) {
-      // Select last substantial block
-      const substantialBlocks = blocks.filter((b) => b.text.length >= minimumBlockSize);
-      const selectedBlock =
-        substantialBlocks.length > 0
-          ? substantialBlocks[substantialBlocks.length - 1]
-          : blocks[blocks.length - 1];
-
-      const repaired = jsonrepair(selectedBlock.text);
-      const parsed = JSON.parse(repaired);
-      if (schema) {
-        let recovered = applyArrayAtRootRecovery(parsed, schema);
-        recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
-        const data = schema.parse(recovered) as T;
-        return { success: true, data };
-      }
-      return { success: true, data: parsed as T };
-    }
-
-    // No blocks found - apply jsonrepair to whole text
-    const repaired = jsonrepair(text);
-    const parsed = JSON.parse(repaired);
-    if (schema) {
-      let recovered = applyArrayAtRootRecovery(parsed, schema);
-      recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
-      const data = schema.parse(recovered) as T;
-      return { success: true, data };
-    }
-    return { success: true, data: parsed as T };
+    const candidate = blocks.length > 0 ? selectBlockText(blocks, minimumBlockSize) : text;
+    return { success: true, data: parseRepaired(candidate, schema) };
   } catch {
     // Continue to Tier 3
   }
 
   // === Tier 3: Normalize + Extract ===
   try {
-    const normalized = normalizeText(text);
-    const blocks = extractJsonBlocks(normalized);
-
+    const blocks = extractJsonBlocks(normalizeText(text));
     if (blocks.length === 0) {
       throw new Error('No JSON blocks found');
     }
-
-    const substantialBlocks = blocks.filter((b) => b.text.length >= minimumBlockSize);
-    const selectedBlock =
-      substantialBlocks.length > 0
-        ? substantialBlocks[substantialBlocks.length - 1]
-        : blocks[blocks.length - 1];
-
-    const repaired = jsonrepair(selectedBlock.text);
-    const parsed = JSON.parse(repaired);
-    if (schema) {
-      let recovered = applyArrayAtRootRecovery(parsed, schema);
-      recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
-      const data = schema.parse(recovered) as T;
-      return { success: true, data };
-    }
-    return { success: true, data: parsed as T };
+    return {
+      success: true,
+      data: parseRepaired(selectBlockText(blocks, minimumBlockSize), schema),
+    };
   } catch {
     // Continue to Tier 4
   }
 
   // === Tier 4: Aggressive Scrub ===
   try {
-    const normalized = normalizeText(text);
-    const blocks = extractJsonBlocks(normalized);
-
+    const blocks = extractJsonBlocks(normalizeText(text));
     if (blocks.length === 0) {
       throw new Error('No JSON blocks found');
     }
-
-    const substantialBlocks = blocks.filter((b) => b.text.length >= minimumBlockSize);
-    const selectedBlock =
-      substantialBlocks.length > 0
-        ? substantialBlocks[substantialBlocks.length - 1]
-        : blocks[blocks.length - 1];
-
-    const scrubbed = scrubConcatenation(selectedBlock.text);
-    const repaired = jsonrepair(scrubbed);
-    const parsed = JSON.parse(repaired);
-    if (schema) {
-      let recovered = applyArrayAtRootRecovery(parsed, schema);
-      recovered = applyFlattenedAssignmentsRecovery(recovered, schema);
-      const data = schema.parse(recovered) as T;
-      return { success: true, data };
-    }
-    return { success: true, data: parsed as T };
+    const scrubbed = scrubConcatenation(selectBlockText(blocks, minimumBlockSize));
+    return { success: true, data: parseRepaired(scrubbed, schema) };
   } catch (e) {
     // === Tier 5: Fatal Failure ===
     const error = new Error(`JSON parse failed at all tiers: ${(e as Error).message}`);
