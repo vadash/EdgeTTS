@@ -406,4 +406,9 @@ export const voices: VoiceOption[] = [
   v('zu-ZA, ThembaNeural', 'male'),
 ];
 
+/** Unique language prefixes ('en' from 'en-US') across the catalog, sorted. */
+export const availableLocales: readonly string[] = [
+  ...new Set(voices.map((voice) => voice.locale.split('-')[0])),
+].sort();
+
 export default voices;

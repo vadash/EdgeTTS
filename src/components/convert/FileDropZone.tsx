@@ -2,86 +2,7 @@ import { useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { convertFileToTxt } from '@/services/FileConverter';
 import { useData, useLogs, settings, setNarratorVoice } from '@/stores';
-import voices from '@/components/VoiceSelector/voices';
-
-// Extract unique 2-letter language codes from supported voices
-const AVAILABLE_LOCALES = [
-  'af',
-  'am',
-  'ar',
-  'az',
-  'bg',
-  'bn',
-  'bs',
-  'ca',
-  'cs',
-  'cy',
-  'da',
-  'de',
-  'el',
-  'en',
-  'es',
-  'et',
-  'fa',
-  'fi',
-  'fil',
-  'fr',
-  'ga',
-  'gl',
-  'gu',
-  'he',
-  'hi',
-  'hr',
-  'hu',
-  'id',
-  'is',
-  'it',
-  'iu',
-  'ja',
-  'jv',
-  'ka',
-  'kk',
-  'km',
-  'kn',
-  'ko',
-  'lo',
-  'lt',
-  'lv',
-  'mk',
-  'ml',
-  'mn',
-  'mr',
-  'ms',
-  'mt',
-  'my',
-  'nb',
-  'ne',
-  'nl',
-  'pl',
-  'ps',
-  'pt',
-  'ro',
-  'ru',
-  'si',
-  'sk',
-  'sl',
-  'so',
-  'sq',
-  'sr',
-  'su',
-  'sv',
-  'sw',
-  'ta',
-  'te',
-  'th',
-  'tr',
-  'uk',
-  'ur',
-  'uz',
-  'vi',
-  'zh',
-  'zu',
-];
+import voices, { availableLocales } from '@/components/VoiceSelector/voices';
 
 /**
  * Swap the narrator voice to a native voice for the detected book language.
@@ -117,7 +38,7 @@ function LanguageBadge() {
         onClick={(e) => e.stopPropagation()}
         className="bg-primary border border-border rounded px-2 py-0.5 text-xs text-accent font-mono cursor-pointer"
       >
-        {AVAILABLE_LOCALES.map((code) => (
+        {availableLocales.map((code) => (
           <option key={code} value={code}>
             {code.toUpperCase()}
           </option>
@@ -134,18 +55,14 @@ export function FileDropZone() {
   const logs = useLogs();
   const [isDragging, setIsDragging] = useState(false);
 
-  const handleFileChange = async (e: Event) => {
-    const input = e.target as HTMLInputElement;
-    const files = input.files;
-    if (!files || files.length === 0) return;
-
+  const loadFiles = async (files: File[]) => {
     try {
       // Clear previous language detection
       dataStore.clearDetectedLanguage();
 
       const allConverted: Array<{ filename: string; content: string }> = [];
 
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         const converted = await convertFileToTxt(file);
         allConverted.push(...converted);
 
@@ -174,11 +91,7 @@ export function FileDropZone() {
       // Create a book with the original filenames
       const fullText = dataStore.textContent.value;
       const allSentences = fullText.split(/[.!?]+/).filter((s) => s.trim().length > 0);
-      dataStore.setBook({
-        fileNames,
-        allSentences,
-        fullText,
-      });
+      dataStore.setBook({ fileNames, allSentences, fullText });
 
       // Detect language from loaded content
       const result = dataStore.detectLanguageFromContent();
@@ -186,9 +99,7 @@ export function FileDropZone() {
 
       // Store the display filename
       const displayName =
-        files.length === 1
-          ? (files[0] as File).name
-          : `${(files[0] as File).name} (+${files.length - 1})`;
+        files.length === 1 ? files[0].name : `${files[0].name} (+${files.length - 1})`;
       dataStore.setLoadedFileName(displayName);
 
       // Log if detection was uncertain
@@ -200,7 +111,14 @@ export function FileDropZone() {
     } catch (err) {
       logs.error(`Error loading file: ${(err as Error).message}`);
     }
+  };
 
+  const handleFileChange = async (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const files = input.files;
+    if (!files || files.length === 0) return;
+
+    await loadFiles(Array.from(files));
     input.value = '';
   };
 
@@ -237,61 +155,7 @@ export function FileDropZone() {
     const files = e.dataTransfer?.files;
     if (!files || files.length === 0) return;
 
-    try {
-      // Clear previous language detection
-      dataStore.clearDetectedLanguage();
-
-      const allConverted: Array<{ filename: string; content: string }> = [];
-
-      for (const file of Array.from(files)) {
-        const converted = await convertFileToTxt(file);
-        allConverted.push(...converted);
-
-        for (const { content } of converted) {
-          const currentText = dataStore.textContent.value;
-          dataStore.setTextContent(currentText + (currentText ? '\n\n' : '') + content);
-        }
-
-        logs.info(`Loaded: ${file.name}`);
-      }
-
-      // Build fileNames array with sentence boundaries
-      const fileNames: Array<[string, number]> = [];
-      let sentenceIndex = 0;
-      for (const { filename, content } of allConverted) {
-        fileNames.push([filename, sentenceIndex]);
-        // Estimate sentence count by splitting on sentence-ending punctuation
-        const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
-        sentenceIndex += sentences.length;
-      }
-
-      // Create a book with the original filenames
-      const fullText = dataStore.textContent.value;
-      const allSentences = fullText.split(/[.!?]+/).filter((s) => s.trim().length > 0);
-      dataStore.setBook({
-        fileNames,
-        allSentences,
-        fullText,
-      });
-
-      // Detect language from loaded content
-      const result = dataStore.detectLanguageFromContent();
-      if (result.confidence !== 'low') syncNarratorVoiceWithLanguage(result.language);
-
-      // Store the display filename
-      const displayName =
-        files.length === 1 ? files[0].name : `${files[0].name} (+${files.length - 1})`;
-      dataStore.setLoadedFileName(displayName);
-
-      // Log if detection was uncertain
-      if (result.confidence === 'low') {
-        logs.warn(`Could not reliably detect book language, falling back to EN`);
-      } else {
-        logs.info(`Detected book language: ${result.language.toUpperCase()}`);
-      }
-    } catch (err) {
-      logs.error(`Error loading file: ${(err as Error).message}`);
-    }
+    await loadFiles(Array.from(files));
   };
 
   const dictRulesCount = dataStore.dictionaryRaw.value.length;
