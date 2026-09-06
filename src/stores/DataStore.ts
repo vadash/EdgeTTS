@@ -1,8 +1,8 @@
 // Data Store
 // Manages application data (text content, book, dictionary, file handles)
 
-import { computed, signal } from '@preact/signals';
-import type { DictionaryRule, ProcessedBook } from '@/state/types';
+import { signal } from '@preact/signals';
+import type { ProcessedBook } from '@/state/types';
 import {
   type DetectedLanguage,
   type DetectionResult,
@@ -21,7 +21,6 @@ export class DataStore {
   readonly bookLoaded = signal<boolean>(false);
 
   // Dictionary
-  readonly dictionary = signal<DictionaryRule[]>([]);
   readonly dictionaryRaw = signal<string[]>([]); // Raw lines from .lexx files
 
   // File system
@@ -32,37 +31,6 @@ export class DataStore {
 
   // File naming state
   readonly loadedFileName = signal<string>('');
-
-  // ========== Computed Properties ==========
-
-  /**
-   * Check if there's content to convert
-   */
-  readonly hasContent = computed(
-    () => this.textContent.value.length > 0 || this.book.value !== null,
-  );
-
-  /**
-   * Get total sentence count
-   */
-  readonly sentenceCount = computed(() => this.book.value?.allSentences.length ?? 0);
-
-  /**
-   * Get file names from book
-   */
-  readonly fileNames = computed(() => this.book.value?.fileNames ?? []);
-
-  /**
-   * Check if dictionary has rules
-   */
-  readonly hasDictionary = computed(
-    () => this.dictionary.value.length > 0 || this.dictionaryRaw.value.length > 0,
-  );
-
-  /**
-   * Check if directory handle is available
-   */
-  readonly hasDirectoryHandle = computed(() => this.directoryHandle.value !== null);
 
   // ========== Language Detection ==========
 
@@ -116,16 +84,11 @@ export class DataStore {
 
   // ========== Dictionary Actions ==========
 
-  setDictionary(rules: DictionaryRule[]): void {
-    this.dictionary.value = rules;
-  }
-
   setDictionaryRaw(lines: string[]): void {
     this.dictionaryRaw.value = lines;
   }
 
   clearDictionary(): void {
-    this.dictionary.value = [];
     this.dictionaryRaw.value = [];
   }
 
@@ -148,17 +111,9 @@ export class DataStore {
     this.textContent.value = '';
     this.book.value = null;
     this.bookLoaded.value = false;
-    this.dictionary.value = [];
     this.dictionaryRaw.value = [];
     this.directoryHandle.value = null;
     this.loadedFileName.value = '';
-  }
-
-  /**
-   * Reset for new conversion (keep directory handle)
-   */
-  resetForConversion(): void {
-    // Currently a no-op but kept for future conversion-specific resets
   }
 }
 
