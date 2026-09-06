@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import { Button, TabPanel, Tabs } from '@/components/common';
+import { Button, TabPanel, Tabs, Toggle } from '@/components/common';
 import { getLogger } from '@/services';
 import { LLMVoiceService } from '@/services/llm';
 import { useLLM } from '@/stores';
@@ -8,11 +8,47 @@ import type { LLMStage, StageConfig } from '@/stores/LLMStore';
 import { LLMHelp } from './LLMHelp';
 import { StageConfigForm, type TestResult } from './StageConfigForm';
 
-const stageTabs = [
-  { id: 'extract', label: 'Extract', icon: '1️⃣' },
-  { id: 'merge', label: 'Merge', icon: '2️⃣' },
-  { id: 'assign', label: 'Assign', icon: '3️⃣' },
-  { id: 'backup', label: 'Backup', icon: '4️⃣' },
+interface StageInfo {
+  id: LLMStage;
+  label: string;
+  icon: string;
+  descId: string;
+  desc: string;
+  repeatPrompt?: boolean;
+}
+
+const stages: StageInfo[] = [
+  {
+    id: 'extract',
+    label: 'Extract',
+    icon: '1️⃣',
+    descId: 'llm.extractDesc',
+    desc: 'Detects characters from text',
+    repeatPrompt: true,
+  },
+  {
+    id: 'merge',
+    label: 'Merge',
+    icon: '2️⃣',
+    descId: 'llm.mergeDesc',
+    desc: 'Deduplicates detected characters',
+    repeatPrompt: true,
+  },
+  {
+    id: 'assign',
+    label: 'Assign',
+    icon: '3️⃣',
+    descId: 'llm.assignDesc',
+    desc: 'Assigns speakers to sentences',
+    repeatPrompt: true,
+  },
+  {
+    id: 'backup',
+    label: 'Backup',
+    icon: '4️⃣',
+    descId: 'llm.backupDesc',
+    desc: 'Used when any stage model exhausts its max retries',
+  },
 ];
 
 type TestState = Record<
@@ -40,7 +76,10 @@ export function LLMTab() {
     if (!config.apiKey) {
       setTestState((prev) => ({
         ...prev,
-        [stage]: { ...prev[stage], result: { success: false, error: 'API key is required' } },
+        [stage]: {
+          ...prev[stage],
+          result: { success: false, error: 'API key is required' },
+        },
       }));
       return;
     }
@@ -82,9 +121,7 @@ export function LLMTab() {
 
   const handleCopySettings = (sourceStage: LLMStage) => {
     const sourceConfig = llm[sourceStage].value;
-    const targetStages = ['extract', 'merge', 'assign', 'backup'].filter<LLMStage>(
-      (s): s is LLMStage => s !== sourceStage,
-    );
+    const targetStages = stages.map((s) => s.id).filter((s) => s !== sourceStage);
 
     for (const target of targetStages) {
       llm.setStageField(target, 'apiKey', sourceConfig.apiKey);
@@ -132,19 +169,11 @@ export function LLMTab() {
 
       {/* Stage description */}
       <div className="text-sm text-gray-400 space-y-1">
-        <p>
-          <strong>Extract:</strong> <Text id="llm.extractDesc">Detects characters from text</Text>
-        </p>
-        <p>
-          <strong>Merge:</strong> <Text id="llm.mergeDesc">Deduplicates detected characters</Text>
-        </p>
-        <p>
-          <strong>Assign:</strong> <Text id="llm.assignDesc">Assigns speakers to sentences</Text>
-        </p>
-        <p>
-          <strong>Backup:</strong>{' '}
-          <Text id="llm.backupDesc">Used when any stage model exhausts its max retries</Text>
-        </p>
+        {stages.map((s) => (
+          <p key={s.id}>
+            <strong>{s.label}:</strong> <Text id={s.descId}>{s.desc}</Text>
+          </p>
+        ))}
       </div>
 
       {/* Help section - Free API Options */}
@@ -166,79 +195,28 @@ export function LLMTab() {
 
         {/* Per-stage toggles */}
         <div className="grid grid-cols-3 gap-3">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={llm.extract.value.repeatPrompt}
-              onClick={() =>
-                handleStageFieldChange('extract', 'repeatPrompt', !llm.extract.value.repeatPrompt)
-              }
-              className={`toggle ${llm.extract.value.repeatPrompt ? 'toggle-checked' : ''}`}
-            >
-              <span
-                className={`toggle-thumb ${llm.extract.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`}
+          {stages
+            .filter((s) => s.repeatPrompt)
+            .map((s) => (
+              <Toggle
+                key={s.id}
+                checked={llm[s.id].value.repeatPrompt}
+                onChange={(v) => handleStageFieldChange(s.id, 'repeatPrompt', v)}
+                label={s.label}
               />
-            </button>
-            <span className="text-sm text-gray-300">
-              <Text id="llm.extract">Extract</Text>
-            </span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={llm.merge.value.repeatPrompt}
-              onClick={() =>
-                handleStageFieldChange('merge', 'repeatPrompt', !llm.merge.value.repeatPrompt)
-              }
-              className={`toggle ${llm.merge.value.repeatPrompt ? 'toggle-checked' : ''}`}
-            >
-              <span
-                className={`toggle-thumb ${llm.merge.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`}
-              />
-            </button>
-            <span className="text-sm text-gray-300">
-              <Text id="llm.merge">Merge</Text>
-            </span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={llm.assign.value.repeatPrompt}
-              onClick={() =>
-                handleStageFieldChange('assign', 'repeatPrompt', !llm.assign.value.repeatPrompt)
-              }
-              className={`toggle ${llm.assign.value.repeatPrompt ? 'toggle-checked' : ''}`}
-            >
-              <span
-                className={`toggle-thumb ${llm.assign.value.repeatPrompt ? 'toggle-thumb-checked' : 'toggle-thumb-unchecked'}`}
-              />
-            </button>
-            <span className="text-sm text-gray-300">
-              <Text id="llm.assign">Assign</Text>
-            </span>
-          </label>
+            ))}
         </div>
       </div>
 
       {/* Stage Tabs */}
-      <Tabs tabs={stageTabs} defaultTab="extract">
+      <Tabs tabs={stages} defaultTab="extract">
         {(activeTab) => (
           <>
-            <TabPanel id="extract" activeTab={activeTab}>
-              {renderStageForm('extract')}
-            </TabPanel>
-            <TabPanel id="merge" activeTab={activeTab}>
-              {renderStageForm('merge')}
-            </TabPanel>
-            <TabPanel id="assign" activeTab={activeTab}>
-              {renderStageForm('assign')}
-            </TabPanel>
-            <TabPanel id="backup" activeTab={activeTab}>
-              {renderStageForm('backup')}
-            </TabPanel>
+            {stages.map((s) => (
+              <TabPanel key={s.id} id={s.id} activeTab={activeTab}>
+                {renderStageForm(s.id)}
+              </TabPanel>
+            ))}
           </>
         )}
       </Tabs>
