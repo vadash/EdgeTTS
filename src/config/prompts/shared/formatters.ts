@@ -97,7 +97,6 @@ export function assembleUserConstraints(rules: string, schemaText: string): stri
  *
  * @param systemBody - Task-specific system prompt (role + examples)
  * @param userBody - The actual content (text/characters/paragraphs) + constraints
- * @param detectedLanguage - Detected language code ('zh' for Chinese, others use EN)
  * @param prefill - Which prefill preset to use (default: auto, which resolves based on language)
  * @param preamble - System preamble (default: CN)
  * @param repeatPrompt - Duplicate user message for improved accuracy (default: false)
@@ -105,7 +104,6 @@ export function assembleUserConstraints(rules: string, schemaText: string): stri
 export function buildMessages(
   systemBody: string,
   userBody: string,
-  _detectedLanguage: string = 'en',
   prefill: PrefillPreset = DEFAULT_PREFILL,
   preamble: string = SYSTEM_PREAMBLE_CN,
   repeatPrompt: boolean = false,

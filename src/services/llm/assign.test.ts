@@ -230,10 +230,10 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
     expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2);
 
     // First call (block 0) — no overlap
-    expect(spy.mock.calls[0][4]).toBeUndefined();
+    expect(spy.mock.calls[0][3]).toBeUndefined();
 
     // Second call (block 1) — overlap from block 0's last 5 sentences (block 0 only has 2)
-    expect(spy.mock.calls[1][4]).toEqual(['"Hello," said Alice.', '"Hi," replied Bob.']);
+    expect(spy.mock.calls[1][3]).toEqual(['"Hello," said Alice.', '"Hi," replied Bob.']);
 
     spy.mockRestore();
   });

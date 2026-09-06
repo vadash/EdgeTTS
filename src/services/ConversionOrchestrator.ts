@@ -486,7 +486,6 @@ export async function runConversion(
         onConcurrencyChange: setLlmConcurrency,
         directoryHandle: input.directoryHandle,
         logger,
-        detectedLanguage: input.detectedLanguage,
         mergeConfig: {
           apiKey: input.mergeConfig.apiKey,
           apiUrl: input.mergeConfig.apiUrl,
@@ -574,7 +573,6 @@ export async function runConversion(
         onConcurrencyChange: setLlmConcurrency,
         directoryHandle: input.directoryHandle,
         logger,
-        detectedLanguage: input.detectedLanguage,
         backupConfig: {
           apiKey: input.backupConfig.apiKey,
           apiUrl: input.backupConfig.apiUrl,

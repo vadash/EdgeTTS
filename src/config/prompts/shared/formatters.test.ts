@@ -95,7 +95,7 @@ describe('assembleUserConstraints', () => {
 
 describe('buildMessages', () => {
   it('resolves auto to no prefill since compliance presets removed', () => {
-    const result = buildMessages('system body', 'user body', 'zh', 'auto');
+    const result = buildMessages('system body', 'user body', 'auto');
     // auto resolves to cn_compliance which no longer exists, so no assistant message
     expect(result).toHaveLength(2);
   });
@@ -107,13 +107,13 @@ describe('buildMessages', () => {
   });
 
   it('does not duplicate user message when repeatPrompt is false', () => {
-    const result = buildMessages('sys', 'user body', 'en', 'none', undefined, false);
+    const result = buildMessages('sys', 'user body', 'none', undefined, false);
     const userMessages = result.filter((m) => m.role === 'user');
     expect(userMessages).toHaveLength(1);
   });
 
   it('duplicates user message when repeatPrompt is true', () => {
-    const result = buildMessages('sys', 'user body', 'en', 'none', undefined, true);
+    const result = buildMessages('sys', 'user body', 'none', undefined, true);
     const userMessages = result.filter((m) => m.role === 'user');
     expect(userMessages).toHaveLength(2);
     expect(userMessages[0].content).toBe(userMessages[1].content);
@@ -122,7 +122,7 @@ describe('buildMessages', () => {
   it('places duplicated user message before assistant prefill', () => {
     // Use a prefill that actually produces a message — 'none' doesn't,
     // so just verify ordering: system, user, user
-    const result = buildMessages('sys', 'user body', 'en', 'none', undefined, true);
+    const result = buildMessages('sys', 'user body', 'none', undefined, true);
     expect(result[0].role).toBe('system');
     expect(result[1].role).toBe('user');
     expect(result[2].role).toBe('user');

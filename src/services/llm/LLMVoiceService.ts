@@ -32,57 +32,6 @@ import { collectVotes, spreadTemps } from './collectVotes';
 import { runWithConcurrency } from './runWithConcurrency';
 
 /**
- * Unambiguous speech/dialogue symbols (no contraction risk):
- * " - Double quote
- * << >> - Guillemets (U+00AB, U+00BB)
- * < > - Single guillemets (U+2039, U+203A)
- * -- - Em dash (U+2014)
- * " " - Curly double quotes (U+201C, U+201D)
- * „ - Low double quote (U+201E)
- * ' - Left single quote (U+2018) - opening quote, not used in contractions
- */
-const UNAMBIGUOUS_SPEECH_REGEX = /["\u00AB\u00BB\u2014\u201C\u201D\u201E\u2039\u203A\u2018]/;
-
-/**
- * Apostrophe-like characters that could be contractions:
- * ' (U+0027) - straight apostrophe/quote
- * ' (U+2019) - right single quote (smart quote, also used as apostrophe)
- * ` (U+0060) - backtick/grave accent
- * ʼ (U+02BC) - modifier letter apostrophe
- * ' (U+2032) - prime
- * ＇ (U+FF07) - fullwidth apostrophe
- */
-const APOSTROPHE_LIKE_REGEX = /['\u2019`\u02BC\u2032\uFF07]/g;
-
-/**
- * Check if character at index is part of a contraction (letter on both sides)
- */
-const isContraction = (text: string, index: number): boolean => {
-  const prev = text[index - 1] || '';
-  const next = text[index + 1] || '';
-  // Letter before AND after = contraction (e.g., don't, it's, won't)
-  return /[\p{L}]/u.test(prev) && /[\p{L}]/u.test(next);
-};
-
-/**
- * Check if text contains speech/dialogue symbols.
- * Handles apostrophe-like characters by excluding contractions.
- */
-export const hasSpeechSymbols = (text: string): boolean => {
-  // Fast path: unambiguous speech markers
-  if (UNAMBIGUOUS_SPEECH_REGEX.test(text)) return true;
-
-  // Check apostrophe-like chars - only count if NOT a contraction
-  // Reset regex lastIndex for global regex
-  APOSTROPHE_LIKE_REGEX.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = APOSTROPHE_LIKE_REGEX.exec(text)) !== null) {
-    if (!isContraction(text, match.index)) return true;
-  }
-  return false;
-};
-
-/**
  * Number of sentences from the previous block to pass as overlap context
  */
 const OVERLAP_SIZE = 10;
@@ -111,7 +60,6 @@ export interface LLMVoiceServiceOptions {
   onConcurrencyChange?: (effective: number) => void;
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
-  detectedLanguage?: string; // NEW - for auto prefill selection
   // Optional separate config for merge stage
   mergeConfig?: {
     apiKey: string;
@@ -150,7 +98,6 @@ export class LLMVoiceService {
   public backupApiClient: LLMApiClient | null;
   private abortController: AbortController | null = null;
   private logger: ILogger;
-  private detectedLanguage!: string; // Store for prompt building
 
   constructor(options: LLMVoiceServiceOptions) {
     if (!options.logger) {
@@ -294,11 +241,7 @@ export class LLMVoiceService {
     const halves = [lines.slice(0, mid), lines.slice(mid)].filter((h) => h.length > 0);
 
     const callHalf = (text: string) => {
-      const messages = buildExtractPrompt(
-        text,
-        this.detectedLanguage,
-        this.options.repeatPrompt ?? false,
-      );
+      const messages = buildExtractPrompt(text, this.options.repeatPrompt ?? false);
       return withRetry(
         () =>
           this.backupApiClient!.callStructured({
@@ -350,7 +293,6 @@ export class LLMVoiceService {
         context.characters,
         context.nameToCode,
         numberedParagraphs,
-        this.detectedLanguage,
         overlapSentences,
         this.options.repeatPrompt ?? false,
       );
@@ -467,11 +409,7 @@ export class LLMVoiceService {
   ): Promise<{ characters: LLMCharacter[]; debugLog?: { messages: object; response: object } }> {
     const blockText = block.sentences.join('\n');
 
-    const extractMessages = buildExtractPrompt(
-      blockText,
-      this.detectedLanguage,
-      this.options.repeatPrompt ?? false,
-    );
+    const extractMessages = buildExtractPrompt(blockText, this.options.repeatPrompt ?? false);
     try {
       const response = await this.callWithStageBackup(
         'extract',
@@ -602,7 +540,6 @@ export class LLMVoiceService {
       context.characters,
       context.nameToCode,
       context.numberedParagraphs,
-      this.detectedLanguage,
       overlapSentences,
       this.options.repeatPrompt ?? false,
     );
@@ -654,7 +591,6 @@ export class LLMVoiceService {
           context.nameToCode,
           context.numberedParagraphs,
           draftResponse.assignments,
-          this.detectedLanguage,
           overlapSentences,
           this.options.repeatPrompt ?? false,
         );
@@ -840,7 +776,6 @@ export class LLMVoiceService {
 
     const mergeMessages = buildMergePrompt(
       characters,
-      this.detectedLanguage,
       this.options.mergeConfig?.repeatPrompt ?? false,
     );
 

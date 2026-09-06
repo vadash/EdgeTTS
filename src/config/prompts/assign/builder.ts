@@ -18,7 +18,6 @@ export function buildAssignPrompt(
   characters: LLMCharacter[],
   nameToCode: Map<string, string>,
   numberedParagraphs: string,
-  detectedLanguage: string = 'en',
   overlapSentences?: string[],
   repeatPrompt: boolean = false,
 ) {
@@ -69,12 +68,5 @@ ${numberedParagraphs}
 5. Only assign speaker codes to paragraphs [0] and above.
 Output the raw JSON now.`;
 
-  return buildMessages(
-    sys,
-    `${user}\n\n${constraints}`,
-    detectedLanguage,
-    undefined,
-    undefined,
-    repeatPrompt,
-  );
+  return buildMessages(sys, `${user}\n\n${constraints}`, undefined, undefined, repeatPrompt);
 }
