@@ -11,6 +11,33 @@ const reasoningOptions = [
   { value: 'high', label: 'High' },
 ];
 
+const textFieldSpecs = [
+  {
+    id: 'api-key-input',
+    field: 'apiKey',
+    labelId: 'llm.apiKey',
+    label: 'API Key',
+    type: 'password',
+    placeholder: 'sk-... (encrypted in browser storage)',
+  },
+  {
+    id: 'api-url-input',
+    field: 'apiUrl',
+    labelId: 'llm.apiUrl',
+    label: 'API URL',
+    type: 'text',
+    placeholder: 'https://api.openai.com/v1',
+  },
+  {
+    id: 'model-input',
+    field: 'model',
+    labelId: 'llm.model',
+    label: 'Model',
+    type: 'text',
+    placeholder: 'gpt-4o-mini',
+  },
+] as const;
+
 export interface TestResult {
   success: boolean;
   error?: string;
@@ -78,50 +105,22 @@ export function StageConfigForm({
         </Button>
       )}
 
-      {/* API Key */}
-      <div className="space-y-1">
-        <label className="input-label" htmlFor="api-key-input">
-          <Text id="llm.apiKey">API Key</Text>
-        </label>
-        <input
-          id="api-key-input"
-          type="password"
-          className="input-field"
-          value={config.apiKey}
-          onInput={(e) => onChange('apiKey', (e.target as HTMLInputElement).value)}
-          placeholder="sk-... (encrypted in browser storage)"
-        />
-      </div>
-
-      {/* API URL */}
-      <div className="space-y-1">
-        <label className="input-label" htmlFor="api-url-input">
-          <Text id="llm.apiUrl">API URL</Text>
-        </label>
-        <input
-          id="api-url-input"
-          type="text"
-          className="input-field"
-          value={config.apiUrl}
-          onInput={(e) => onChange('apiUrl', (e.target as HTMLInputElement).value)}
-          placeholder="https://api.openai.com/v1"
-        />
-      </div>
-
-      {/* Model */}
-      <div className="space-y-1">
-        <label className="input-label" htmlFor="model-input">
-          <Text id="llm.model">Model</Text>
-        </label>
-        <input
-          id="model-input"
-          type="text"
-          className="input-field"
-          value={config.model}
-          onInput={(e) => onChange('model', (e.target as HTMLInputElement).value)}
-          placeholder="gpt-4o-mini"
-        />
-      </div>
+      {/* Connection fields: API Key / URL / Model */}
+      {textFieldSpecs.map((f) => (
+        <div className="space-y-1" key={f.id}>
+          <label className="input-label" htmlFor={f.id}>
+            <Text id={f.labelId}>{f.label}</Text>
+          </label>
+          <input
+            id={f.id}
+            type={f.type}
+            className="input-field"
+            value={config[f.field]}
+            onInput={(e) => onChange(f.field, (e.target as HTMLInputElement).value)}
+            placeholder={f.placeholder}
+          />
+        </div>
+      ))}
 
       {/* Advanced Settings */}
       <div className="space-y-4 pt-2 border-t border-gray-700">
@@ -287,9 +286,55 @@ export function StageConfigForm({
   );
 }
 
+/**
+ * Shared local-cors-proxy setup steps. Plain variant renders inside the collapsible
+ * help panel; `inline` renders the tightened list inside the CORS error box.
+ */
+function CORSSetupSteps({ apiUrl, inline }: { apiUrl?: string; inline?: boolean }) {
+  const proxyUrl = apiUrl?.trim() || 'https://your-api.com';
+  const codeCls = `block bg-primary/50 px-1 py-0.5 rounded text-accent ${inline ? 'mt-0.5' : 'mt-1'}`;
+
+  return (
+    <>
+      <div>
+        <p className={inline ? undefined : 'text-gray-300 font-medium'}>
+          {inline ? '1.' : 'Step 1 -'} Install Node.js (skip if installed):
+        </p>
+        <code className={codeCls}>winget install OpenJS.NodeJS.LTS</code>
+        {!inline && <p className="mt-1">Then restart PowerShell.</p>}
+      </div>
+      <div>
+        <p className={inline ? undefined : 'text-gray-300 font-medium'}>
+          {inline ? '2.' : 'Step 2 -'} Run proxy:
+        </p>
+        <code className={`${codeCls} break-all`}>
+          npx local-cors-proxy --proxyUrl {proxyUrl} --port 8010
+        </code>
+      </div>
+      <p>
+        {inline ? '3. Set' : 'Then set'} CORS Proxy to:{' '}
+        <code className="bg-primary/50 px-1 rounded text-accent">http://localhost:8010/proxy</code>
+      </p>
+      <details className={inline ? undefined : 'mt-2'}>
+        <summary className="cursor-pointer text-gray-400 hover:text-gray-300 select-none">
+          Show diagram
+        </summary>
+        <img
+          src="./cors-diagram.png"
+          alt="CORS proxy flow"
+          className={
+            inline
+              ? 'mt-1 rounded border border-red-500/20 max-w-full'
+              : 'mt-2 rounded border border-gray-700 max-w-full'
+          }
+        />
+      </details>
+    </>
+  );
+}
+
 function CORSProxyHelp({ apiUrl }: { apiUrl?: string } = {}) {
   const [expanded, setExpanded] = useState(false);
-  const proxyUrl = apiUrl?.trim() || 'https://your-api.com';
 
   return (
     <div className="mt-1">
@@ -303,37 +348,7 @@ function CORSProxyHelp({ apiUrl }: { apiUrl?: string } = {}) {
       {expanded && (
         <div className="mt-2 p-2 bg-primary/20 rounded text-xs text-gray-400 space-y-2">
           <p>Some API providers block browser requests (no CORS headers). Use a local proxy:</p>
-          <div>
-            <p className="text-gray-300 font-medium">
-              Step 1 - Install Node.js (skip if installed):
-            </p>
-            <code className="block bg-primary/50 px-1 py-0.5 rounded text-accent mt-1">
-              winget install OpenJS.NodeJS.LTS
-            </code>
-            <p className="mt-1">Then restart PowerShell.</p>
-          </div>
-          <div>
-            <p className="text-gray-300 font-medium">Step 2 - Run proxy:</p>
-            <code className="block bg-primary/50 px-1 py-0.5 rounded text-accent mt-1 break-all">
-              npx local-cors-proxy --proxyUrl {proxyUrl} --port 8010
-            </code>
-          </div>
-          <p>
-            Then set CORS Proxy to:{' '}
-            <code className="bg-primary/50 px-1 rounded text-accent">
-              http://localhost:8010/proxy
-            </code>
-          </p>
-          <details className="mt-2">
-            <summary className="cursor-pointer text-gray-400 hover:text-gray-300 select-none">
-              Show diagram
-            </summary>
-            <img
-              src="./cors-diagram.png"
-              alt="CORS proxy flow"
-              className="mt-2 rounded border border-gray-700 max-w-full"
-            />
-          </details>
+          <CORSSetupSteps apiUrl={apiUrl} />
         </div>
       )}
     </div>
@@ -341,37 +356,10 @@ function CORSProxyHelp({ apiUrl }: { apiUrl?: string } = {}) {
 }
 
 function CORSInlineHelp({ apiUrl }: { apiUrl: string }) {
-  const proxyUrl = apiUrl?.trim() || 'https://your-api.com';
-
   return (
     <div className="mt-2 p-2 bg-red-500/10 rounded text-xs text-gray-300 space-y-1 border border-red-500/20">
       <p className="font-medium text-red-300">How to fix:</p>
-      <div>
-        <p>1. Install Node.js (skip if installed):</p>
-        <code className="block bg-primary/50 px-1 py-0.5 rounded text-accent mt-0.5">
-          winget install OpenJS.NodeJS.LTS
-        </code>
-      </div>
-      <div>
-        <p>2. Run proxy:</p>
-        <code className="block bg-primary/50 px-1 py-0.5 rounded text-accent mt-0.5 break-all">
-          npx local-cors-proxy --proxyUrl {proxyUrl} --port 8010
-        </code>
-      </div>
-      <p>
-        3. Set CORS Proxy to:{' '}
-        <code className="bg-primary/50 px-1 rounded text-accent">http://localhost:8010/proxy</code>
-      </p>
-      <details>
-        <summary className="cursor-pointer text-gray-400 hover:text-gray-300 select-none">
-          Show diagram
-        </summary>
-        <img
-          src="./cors-diagram.png"
-          alt="CORS proxy flow"
-          className="mt-1 rounded border border-red-500/20 max-w-full"
-        />
-      </details>
+      <CORSSetupSteps apiUrl={apiUrl} inline />
     </div>
   );
 }
