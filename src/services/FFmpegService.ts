@@ -4,6 +4,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { defaultConfig } from '@/config';
 import { IndexedDBNames } from '@/config/storage';
+import { getErrorMessage } from '@/errors';
 import { openIDB, requestToPromise, withTransaction } from '@/utils/idb';
 import { buildFilterChain } from './audio/buildFilterChain';
 import type { ILogger } from './Logger';
@@ -185,7 +186,7 @@ export class FFmpegService {
         return true;
       } catch (err) {
         this.logger?.warn('FFmpeg reload from cached blob URLs failed, trying IndexedDB', {
-          error: err instanceof Error ? err.message : String(err),
+          error: getErrorMessage(err),
         });
         sharedCachedCoreURL = null;
         sharedCachedWasmURL = null;
@@ -208,7 +209,7 @@ export class FFmpegService {
       }
     } catch (err) {
       this.logger?.warn('FFmpeg reload from IndexedDB cache failed', {
-        error: err instanceof Error ? err.message : String(err),
+        error: getErrorMessage(err),
       });
     }
 
@@ -241,7 +242,7 @@ export class FFmpegService {
       if (onProgress) onProgress('FFmpeg loaded successfully from local bundle');
       return true;
     } catch (err) {
-      this.loadError = `Failed to load local FFmpeg: ${err instanceof Error ? err.message : String(err)}`;
+      this.loadError = `Failed to load local FFmpeg: ${getErrorMessage(err)}`;
       this.logger?.error(this.loadError);
       if (onProgress) onProgress(this.loadError);
       return false;
@@ -405,7 +406,7 @@ export class FFmpegService {
       // This forces isAvailable() to return false, ensuring clean fallback to MP3
       this.terminate();
 
-      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorMessage = getErrorMessage(err);
       throw new Error(`FFmpeg processing failed: ${errorMessage}`);
     }
   }

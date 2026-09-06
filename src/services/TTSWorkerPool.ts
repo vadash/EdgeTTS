@@ -3,6 +3,7 @@
 
 import { createPool, type Pool } from 'generic-pool';
 import PQueue from 'p-queue';
+import { getErrorMessage } from '@/errors';
 import type { StatusUpdate, TTSConfig as VoiceConfig } from '../state/types';
 import type { ChunkStore } from './ChunkStore';
 import { LadderController } from './LadderController';
@@ -453,8 +454,7 @@ export class TTSWorkerPool {
       const fileHandle = await logsDir.getFileHandle(fileName, { create: true });
       const writable = await fileHandle.createWritable();
 
-      // Extract error message from Error or string
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = getErrorMessage(error);
 
       // Write the log entry as JSON
       const logEntry = {
@@ -470,7 +470,7 @@ export class TTSWorkerPool {
     } catch (err) {
       // Non-fatal: log the error but don't throw
       this.logger?.warn('Failed to write TTS failure log', {
-        error: err instanceof Error ? err.message : String(err),
+        error: getErrorMessage(err),
       });
     }
   }

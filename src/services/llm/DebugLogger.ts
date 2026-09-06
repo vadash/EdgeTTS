@@ -1,3 +1,4 @@
+import { getErrorMessage } from '@/errors';
 import type { ILogger } from '../Logger';
 
 /**
@@ -24,7 +25,7 @@ export class DebugLogger {
       await writable.close();
     } catch (e) {
       this.logger?.warn('Failed to save log', {
-        error: e instanceof Error ? e.message : String(e),
+        error: getErrorMessage(e),
       });
     }
   }

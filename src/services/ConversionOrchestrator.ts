@@ -346,7 +346,7 @@ async function saveVoiceProfile(
     logger.info(`Saved voice mapping: ${bookName}/${fileName}`);
   } catch (err) {
     logger.warn('Could not save voice mapping', {
-      error: err instanceof Error ? err.message : String(err),
+      error: getErrorMessage(err),
     });
   }
 }
