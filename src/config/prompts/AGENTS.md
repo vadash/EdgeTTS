@@ -6,6 +6,7 @@ Chain-of-Draft prompts, tuned for mid-tier instruct models.
 
 - Stage order: extract, merge, assign, QA.
 - Each stage holds a role, rules, a schema, a builder, and examples.
+- Assign and QA builders share the speaker-code roster, overlap context, and body skeleton in `shared/`.
 
 ## Message topology
 
