@@ -4,7 +4,7 @@
 import { signal } from '@preact/signals';
 import { useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
-import { Button } from '@/components/common';
+import { Button, Modal } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
 import { importProfile } from '@/services/llm/VoiceProfile';
@@ -183,167 +183,152 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-surface border border-border rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="text-lg font-semibold">
-            <Text id="voiceReview.title">Voice Review</Text>
-          </h2>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="text-gray-400 hover:text-white p-1"
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Sample text input */}
-        <div className="px-4 py-3 border-b border-border">
-          <label className="input-label text-sm" htmlFor="sample-text-input">
-            <Text id="voiceReview.sampleText">Sample text</Text>:
-          </label>
-          <input
-            id="sample-text-input"
-            type="text"
-            className="input-field w-full mt-1"
-            value={sampleText.value}
-            onInput={(e) => (sampleText.value = (e.target as HTMLInputElement).value)}
-            placeholder="Enter sample text to preview voices..."
-          />
-        </div>
-
-        {/* Character list */}
-        <div className="flex-1 overflow-auto px-4 py-3">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-surface">
-              <tr className="text-left text-gray-400 border-b border-border">
-                <th className="pb-2 font-medium">
-                  <Text id="voiceReview.character">Character</Text>
-                </th>
-                <th className="pb-2 font-medium">
-                  <Text id="voiceReview.voice">Voice</Text>
-                </th>
-                <th className="pb-2 w-12"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedCharacters.map((char, index) => {
-                const currentVoice = voiceMap.get(char.canonicalName) ?? '';
-
-                // Build used-above map: voices assigned to rows 0..index-1
-                const usedAbove = new Map<string, string>();
-                for (let i = 0; i < index; i++) {
-                  const v = voiceMap.get(sortedCharacters[i].canonicalName);
-                  if (v) usedAbove.set(v, sortedCharacters[i].canonicalName);
-                }
-
-                return (
-                  <tr key={char.canonicalName} className="border-b border-border/50">
-                    {/* Character column: name/gender/count on line 1, merge select on line 2 */}
-                    <td className="py-2 pr-2 align-bottom">
-                      <div className="flex items-baseline gap-1.5 mb-1">
-                        <span className="font-medium">{char.canonicalName}</span>
-                        <span className="text-gray-500 text-xs">{genderSymbol(char.gender)}</span>
-                        <span className="text-xs text-gray-400 bg-surface-alt px-1.5 py-0.5 rounded">
-                          {lineCounts.get(char.canonicalName) ?? 0}
-                        </span>
-                      </div>
-                      <select
-                        className="select-field text-xs w-full"
-                        value={mergeTarget[char.canonicalName] ?? ''}
-                        onChange={(e) => {
-                          const target = (e.target as HTMLSelectElement).value;
-                          if (target) handleMerge(target, char.canonicalName);
-                        }}
-                        title="Merge this character into another"
-                        aria-label={`Merge ${char.canonicalName} into...`}
-                      >
-                        <option value="">Merge into…</option>
-                        {sortedCharacters
-                          .filter((c) => c.canonicalName !== char.canonicalName)
-                          .map((c) => (
-                            <option key={c.canonicalName} value={c.canonicalName}>
-                              {c.canonicalName}
-                            </option>
-                          ))}
-                      </select>
-                    </td>
-                    {/* Voice column: VoicePicker aligned to merge-select baseline */}
-                    <td className="py-2 pr-2 align-bottom">
-                      <VoicePicker
-                        value={currentVoice}
-                        maleVoices={maleVoices}
-                        femaleVoices={femaleVoices}
-                        usedAbove={usedAbove}
-                        onChange={(v) => handleVoiceChange(char.canonicalName, v)}
-                      />
-                    </td>
-                    {/* Play + Dice buttons, aligned to bottom */}
-                    <td className="py-2 align-bottom">
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          className="btn btn-sm px-2"
-                          onClick={() => handlePlayPreview(currentVoice)}
-                          disabled={preview.isPlaying && preview.currentVoiceId === currentVoice}
-                          aria-label={`Preview voice for ${char.canonicalName}`}
-                        >
-                          {preview.isPlaying && preview.currentVoiceId === currentVoice
-                            ? '...'
-                            : '▶'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-sm px-2"
-                          onClick={() => handleRandomizeBelow(index)}
-                          title="Randomize voices below"
-                        >
-                          🎲↓
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {characters.length === 0 && (
-            <p className="text-gray-500 text-center py-8">
-              <Text id="voiceReview.noCharacters">No characters detected</Text>
-            </p>
-          )}
-        </div>
-
-        {/* Import button */}
-        <div className="px-4 py-3 border-t border-border">
-          <Button onClick={handleImportClick} className="w-full">
-            <Text id="voiceReview.import">Import JSON</Text>
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImportFile}
-            className="hidden"
-          />
-          {importError && <p className="text-red-400 text-sm mt-2">{importError}</p>}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
-          <Button onClick={onCancel}>
-            <Text id="common.cancel">Cancel</Text>
-          </Button>
-          <Button variant="primary" onClick={onConfirm}>
-            <Text id="voiceReview.continue">Continue</Text>
-            {' ->'}
-          </Button>
-        </div>
+    <Modal
+      title={<Text id="voiceReview.title">Voice Review</Text>}
+      onClose={onCancel}
+      className="max-w-5xl w-full max-h-[90vh] flex flex-col"
+    >
+      {/* Sample text input */}
+      <div className="px-4 py-3 border-b border-border">
+        <label className="input-label text-sm" htmlFor="sample-text-input">
+          <Text id="voiceReview.sampleText">Sample text</Text>:
+        </label>
+        <input
+          id="sample-text-input"
+          type="text"
+          className="input-field w-full mt-1"
+          value={sampleText.value}
+          onInput={(e) => (sampleText.value = (e.target as HTMLInputElement).value)}
+          placeholder="Enter sample text to preview voices..."
+        />
       </div>
-    </div>
+
+      {/* Character list */}
+      <div className="flex-1 overflow-auto px-4 py-3">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-surface">
+            <tr className="text-left text-gray-400 border-b border-border">
+              <th className="pb-2 font-medium">
+                <Text id="voiceReview.character">Character</Text>
+              </th>
+              <th className="pb-2 font-medium">
+                <Text id="voiceReview.voice">Voice</Text>
+              </th>
+              <th className="pb-2 w-12"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedCharacters.map((char, index) => {
+              const currentVoice = voiceMap.get(char.canonicalName) ?? '';
+
+              // Build used-above map: voices assigned to rows 0..index-1
+              const usedAbove = new Map<string, string>();
+              for (let i = 0; i < index; i++) {
+                const v = voiceMap.get(sortedCharacters[i].canonicalName);
+                if (v) usedAbove.set(v, sortedCharacters[i].canonicalName);
+              }
+
+              return (
+                <tr key={char.canonicalName} className="border-b border-border/50">
+                  {/* Character column: name/gender/count on line 1, merge select on line 2 */}
+                  <td className="py-2 pr-2 align-bottom">
+                    <div className="flex items-baseline gap-1.5 mb-1">
+                      <span className="font-medium">{char.canonicalName}</span>
+                      <span className="text-gray-500 text-xs">{genderSymbol(char.gender)}</span>
+                      <span className="text-xs text-gray-400 bg-surface-alt px-1.5 py-0.5 rounded">
+                        {lineCounts.get(char.canonicalName) ?? 0}
+                      </span>
+                    </div>
+                    <select
+                      className="select-field text-xs w-full"
+                      value={mergeTarget[char.canonicalName] ?? ''}
+                      onChange={(e) => {
+                        const target = (e.target as HTMLSelectElement).value;
+                        if (target) handleMerge(target, char.canonicalName);
+                      }}
+                      title="Merge this character into another"
+                      aria-label={`Merge ${char.canonicalName} into...`}
+                    >
+                      <option value="">Merge into…</option>
+                      {sortedCharacters
+                        .filter((c) => c.canonicalName !== char.canonicalName)
+                        .map((c) => (
+                          <option key={c.canonicalName} value={c.canonicalName}>
+                            {c.canonicalName}
+                          </option>
+                        ))}
+                    </select>
+                  </td>
+                  {/* Voice column: VoicePicker aligned to merge-select baseline */}
+                  <td className="py-2 pr-2 align-bottom">
+                    <VoicePicker
+                      value={currentVoice}
+                      maleVoices={maleVoices}
+                      femaleVoices={femaleVoices}
+                      usedAbove={usedAbove}
+                      onChange={(v) => handleVoiceChange(char.canonicalName, v)}
+                    />
+                  </td>
+                  {/* Play + Dice buttons, aligned to bottom */}
+                  <td className="py-2 align-bottom">
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        className="btn btn-sm px-2"
+                        onClick={() => handlePlayPreview(currentVoice)}
+                        disabled={preview.isPlaying && preview.currentVoiceId === currentVoice}
+                        aria-label={`Preview voice for ${char.canonicalName}`}
+                      >
+                        {preview.isPlaying && preview.currentVoiceId === currentVoice ? '...' : '▶'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm px-2"
+                        onClick={() => handleRandomizeBelow(index)}
+                        title="Randomize voices below"
+                      >
+                        🎲↓
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {characters.length === 0 && (
+          <p className="text-gray-500 text-center py-8">
+            <Text id="voiceReview.noCharacters">No characters detected</Text>
+          </p>
+        )}
+      </div>
+
+      {/* Import button */}
+      <div className="px-4 py-3 border-t border-border">
+        <Button onClick={handleImportClick} className="w-full">
+          <Text id="voiceReview.import">Import JSON</Text>
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleImportFile}
+          className="hidden"
+        />
+        {importError && <p className="text-red-400 text-sm mt-2">{importError}</p>}
+      </div>
+
+      {/* Footer */}
+      <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
+        <Button onClick={onCancel}>
+          <Text id="common.cancel">Cancel</Text>
+        </Button>
+        <Button variant="primary" onClick={onConfirm}>
+          <Text id="voiceReview.continue">Continue</Text>
+          {' ->'}
+        </Button>
+      </div>
+    </Modal>
   );
 }

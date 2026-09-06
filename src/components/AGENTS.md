@@ -14,4 +14,5 @@ Preact functional components with Tailwind styling.
 - Keep render work light. Move derived values into computed signals.
 - Use local component state for transient UI, such as an open dropdown.
 - Use global stores for state that persists or is shared.
+- Modal dialogs render through the shared modal component.
 - Dismissible notices use the shared banner, keyed by a stored dismissal flag.
