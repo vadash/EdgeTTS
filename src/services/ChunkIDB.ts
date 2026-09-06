@@ -1,6 +1,8 @@
 // ChunkIDB.ts - IndexedDB access layer for hybrid chunk storage
 // Provides low-level operations for the edgetts_hybrid_chunks database
 
+import { openIDB, requestToPromise, withTransaction } from '@/utils/idb';
+
 const DB_NAME = 'edgetts_hybrid_chunks';
 const STORE_NAME = 'chunks';
 const DB_VERSION = 1;
@@ -13,18 +15,10 @@ const DB_VERSION = 1;
  * @throws Error if database open fails
  */
 export async function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      // Create object store without keyPath (out-of-line keys)
-      // Keys are passed as the second argument to put()
-      db.createObjectStore(STORE_NAME);
-    };
+  return openIDB(DB_NAME, DB_VERSION, (db) => {
+    // Create object store without keyPath (out-of-line keys)
+    // Keys are passed as the second argument to put()
+    db.createObjectStore(STORE_NAME);
   });
 }
 
@@ -37,14 +31,8 @@ export async function openDatabase(): Promise<IDBDatabase> {
  * @throws Error if the put operation fails
  */
 export async function putChunk(db: IDBDatabase, index: number, data: Uint8Array): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-
-    store.put(data, index);
-
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+  await withTransaction(db, STORE_NAME, 'readwrite', (tx) => {
+    tx.objectStore(STORE_NAME).put(data, index);
   });
 }
 
@@ -62,19 +50,10 @@ export async function getAllChunks(
   const tx = db.transaction(STORE_NAME, 'readonly');
   const store = tx.objectStore(STORE_NAME);
 
-  const keysPromise = new Promise<number[]>((resolve, reject) => {
-    const request = store.getAllKeys();
-    request.onsuccess = () => resolve(request.result as number[]);
-    request.onerror = () => reject(request.error);
-  });
-
-  const dataPromise = new Promise<Uint8Array[]>((resolve, reject) => {
-    const request = store.getAll();
-    request.onsuccess = () => resolve(request.result as Uint8Array[]);
-    request.onerror = () => reject(request.error);
-  });
-
-  const [keys, data] = await Promise.all([keysPromise, dataPromise]);
+  const [keys, data] = await Promise.all([
+    requestToPromise<number[]>(store.getAllKeys()),
+    requestToPromise<Uint8Array[]>(store.getAll()),
+  ]);
 
   return keys.map((key, i) => ({ key, data: data[i] }));
 }
@@ -88,14 +67,10 @@ export async function getAllChunks(
  * @throws Error if the retrieval fails
  */
 export async function getAllKeys(db: IDBDatabase): Promise<number[]> {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
+  const tx = db.transaction(STORE_NAME, 'readonly');
+  const store = tx.objectStore(STORE_NAME);
 
-    const request = store.getAllKeys();
-    request.onsuccess = () => resolve(request.result as number[]);
-    request.onerror = () => reject(request.error);
-  });
+  return requestToPromise<number[]>(store.getAllKeys());
 }
 
 /**
@@ -112,22 +87,14 @@ export async function getChunksByKeys(
 ): Promise<Array<{ key: number; data: Uint8Array | undefined }>> {
   if (keys.length === 0) return [];
 
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
+  return withTransaction(db, STORE_NAME, 'readonly', async (tx) => {
     const store = tx.objectStore(STORE_NAME);
-
-    const results: Array<{ key: number; data: Uint8Array | undefined }> = [];
-
-    for (const key of keys) {
-      const request = store.get(key);
-      request.onsuccess = () => {
-        results.push({ key, data: request.result as Uint8Array | undefined });
-      };
-      request.onerror = () => reject(request.error);
-    }
-
-    tx.oncomplete = () => resolve(results);
-    tx.onerror = () => reject(tx.error);
+    return Promise.all(
+      keys.map(async (key) => ({
+        key,
+        data: await requestToPromise<Uint8Array | undefined>(store.get(key)),
+      })),
+    );
   });
 }
 
@@ -141,14 +108,10 @@ export async function getChunksByKeys(
  * @throws Error if the retrieval fails
  */
 export async function getChunk(db: IDBDatabase, key: number): Promise<Uint8Array | undefined> {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
+  const tx = db.transaction(STORE_NAME, 'readonly');
+  const store = tx.objectStore(STORE_NAME);
 
-    const request = store.get(key);
-    request.onsuccess = () => resolve(request.result as Uint8Array | undefined);
-    request.onerror = () => reject(request.error);
-  });
+  return requestToPromise<Uint8Array | undefined>(store.get(key));
 }
 
 /**
@@ -163,16 +126,11 @@ export async function deleteKeys(db: IDBDatabase, keys: number[]): Promise<void>
     return;
   }
 
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+  await withTransaction(db, STORE_NAME, 'readwrite', (tx) => {
     const store = tx.objectStore(STORE_NAME);
-
     for (const key of keys) {
       store.delete(key);
     }
-
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
   });
 }
 
@@ -183,14 +141,8 @@ export async function deleteKeys(db: IDBDatabase, keys: number[]): Promise<void>
  * @throws Error if the clear operation fails
  */
 export async function clearDatabase(db: IDBDatabase): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-
-    store.clear();
-
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+  await withTransaction(db, STORE_NAME, 'readwrite', (tx) => {
+    tx.objectStore(STORE_NAME).clear();
   });
 }
 

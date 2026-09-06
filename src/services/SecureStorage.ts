@@ -7,6 +7,7 @@
  */
 
 import { IndexedDBNames } from '@/config/storage';
+import { openIDB, requestToPromise } from '@/utils/idb';
 import type { ILogger } from './Logger';
 
 const KEY_ID = 'master';
@@ -14,13 +15,8 @@ const KEY_ID = 'master';
 let cachedKey: CryptoKey | null = null;
 
 function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(IndexedDBNames.secureDb, 1);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore(IndexedDBNames.keysStore);
-    };
+  return openIDB(IndexedDBNames.secureDb, 1, (db) => {
+    db.createObjectStore(IndexedDBNames.keysStore);
   });
 }
 
@@ -30,12 +26,10 @@ async function getOrCreateKey(): Promise<CryptoKey> {
   const db = await openDB();
 
   // Try to get existing key
-  const existing = await new Promise<CryptoKey | undefined>((resolve, reject) => {
-    const tx = db.transaction(IndexedDBNames.keysStore, 'readonly');
-    const request = tx.objectStore(IndexedDBNames.keysStore).get(KEY_ID);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-  });
+  const tx = db.transaction(IndexedDBNames.keysStore, 'readonly');
+  const existing = await requestToPromise<CryptoKey | undefined>(
+    tx.objectStore(IndexedDBNames.keysStore).get(KEY_ID),
+  );
 
   if (existing) {
     cachedKey = existing;
@@ -51,12 +45,8 @@ async function getOrCreateKey(): Promise<CryptoKey> {
   );
 
   // Store in IndexedDB
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(IndexedDBNames.keysStore, 'readwrite');
-    const request = tx.objectStore(IndexedDBNames.keysStore).put(key, KEY_ID);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve();
-  });
+  const putTx = db.transaction(IndexedDBNames.keysStore, 'readwrite');
+  await requestToPromise(putTx.objectStore(IndexedDBNames.keysStore).put(key, KEY_ID));
 
   cachedKey = key;
   db.close();

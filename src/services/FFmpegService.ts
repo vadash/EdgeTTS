@@ -4,6 +4,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { defaultConfig } from '@/config';
 import { IndexedDBNames } from '@/config/storage';
+import { openIDB, requestToPromise, withTransaction } from '@/utils/idb';
 import { buildFilterChain } from './audio/buildFilterChain';
 import type { ILogger } from './Logger';
 
@@ -28,26 +29,18 @@ let sharedCachedWasmURL: string | null = null;
  */
 export namespace FFmpegBlobCache {
   function openDB(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(IndexedDBNames.ffmpegCacheDb, 1);
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-      request.onupgradeneeded = () => {
-        request.result.createObjectStore(IndexedDBNames.ffmpegCacheStore);
-      };
+    return openIDB(IndexedDBNames.ffmpegCacheDb, 1, (db) => {
+      db.createObjectStore(IndexedDBNames.ffmpegCacheStore);
     });
   }
 
   export async function store(coreBlob: Blob, wasmBlob: Blob): Promise<void> {
     try {
       const db = await openDB();
-      const tx = db.transaction(IndexedDBNames.ffmpegCacheStore, 'readwrite');
-      const store = tx.objectStore(IndexedDBNames.ffmpegCacheStore);
-      store.put(coreBlob, CORE_KEY);
-      store.put(wasmBlob, WASM_KEY);
-      await new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+      await withTransaction(db, IndexedDBNames.ffmpegCacheStore, 'readwrite', (tx) => {
+        const store = tx.objectStore(IndexedDBNames.ffmpegCacheStore);
+        store.put(coreBlob, CORE_KEY);
+        store.put(wasmBlob, WASM_KEY);
       });
       db.close();
     } catch {
@@ -60,16 +53,8 @@ export namespace FFmpegBlobCache {
       const db = await openDB();
       const tx = db.transaction(IndexedDBNames.ffmpegCacheStore, 'readonly');
       const store = tx.objectStore(IndexedDBNames.ffmpegCacheStore);
-      const coreBlob: Blob | undefined = await new Promise((resolve, reject) => {
-        const r = store.get(CORE_KEY);
-        r.onerror = () => reject(r.error);
-        r.onsuccess = () => resolve(r.result);
-      });
-      const wasmBlob: Blob | undefined = await new Promise((resolve, reject) => {
-        const r = store.get(WASM_KEY);
-        r.onerror = () => reject(r.error);
-        r.onsuccess = () => resolve(r.result);
-      });
+      const coreBlob = await requestToPromise<Blob | undefined>(store.get(CORE_KEY));
+      const wasmBlob = await requestToPromise<Blob | undefined>(store.get(WASM_KEY));
       db.close();
       if (coreBlob && wasmBlob) {
         return {
@@ -86,12 +71,10 @@ export namespace FFmpegBlobCache {
   export async function clear(): Promise<void> {
     try {
       const db = await openDB();
-      const tx = db.transaction(IndexedDBNames.ffmpegCacheStore, 'readwrite');
-      tx.objectStore(IndexedDBNames.ffmpegCacheStore).delete(CORE_KEY);
-      tx.objectStore(IndexedDBNames.ffmpegCacheStore).delete(WASM_KEY);
-      await new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+      await withTransaction(db, IndexedDBNames.ffmpegCacheStore, 'readwrite', (tx) => {
+        const store = tx.objectStore(IndexedDBNames.ffmpegCacheStore);
+        store.delete(CORE_KEY);
+        store.delete(WASM_KEY);
       });
       db.close();
     } catch {
