@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
 import { LLMApiClient } from './LLMApiClient';
@@ -32,7 +32,6 @@ function loadUserContent(file: string): string {
 
 const PRIMARY_REJECT = new Error('primary failed');
 const BACKUP_REJECT = new Error('backup failed');
-const MERGE_REJECT = new Error('merge failed');
 
 vi.mock('openai', () => ({
   default: vi.fn().mockImplementation(function () {
@@ -94,19 +93,8 @@ function mockBackup(service: LLMVoiceService, result: 'reject' | object): void {
   else fn.mockResolvedValue(result as never);
 }
 
-function mockMerge(service: LLMVoiceService, result: 'reject' | object): void {
-  const fn = vi.spyOn(service.mergeApiClient, 'callStructured');
-  if (result === 'reject') fn.mockRejectedValue(MERGE_REJECT);
-  else fn.mockResolvedValue(result as never);
-}
-
 function primaryCalls(service: LLMVoiceService): CallArg[] {
   const fn = vi.mocked(service.apiClient.callStructured);
-  return fn.mock.calls.map((c) => c[0] as unknown as CallArg);
-}
-
-function mergeCalls(service: LLMVoiceService): CallArg[] {
-  const fn = vi.mocked(service.mergeApiClient.callStructured);
   return fn.mock.calls.map((c) => c[0] as unknown as CallArg);
 }
 
@@ -253,7 +241,6 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
       },
       backupConfig: { ...backupOpts },
     });
-    mockMerge(service, 'reject');
     vi.spyOn(service.backupApiClient!, 'callStructured');
 
     const chars: LLMCharacter[] = [
@@ -283,8 +270,15 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
       },
       backupConfig: { ...backupOpts },
     });
-    mockMerge(service, MERGE_OK);
-    vi.spyOn(service.backupApiClient!, 'callStructured');
+    // singleMerge builds a fresh client per vote, so patch the prototype to
+    // resolve every vote from one place and capture the wire calls. The
+    // backup spy must be installed FIRST: spying an inherited method while
+    // the prototype is already mocked returns the shared prototype mock
+    // instead of an instance-local one, which would count the vote calls.
+    const backupSpy = vi.spyOn(service.backupApiClient!, 'callStructured');
+    const protoSpy = vi
+      .spyOn(LLMApiClient.prototype, 'callStructured')
+      .mockResolvedValue(MERGE_OK as never);
 
     const chars: LLMCharacter[] = [
       { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
@@ -294,16 +288,20 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
     const typed = service as unknown as {
       mergeCharactersWithLLM: (c: LLMCharacter[]) => Promise<LLMCharacter[]>;
     };
-    await typed.mergeCharactersWithLLM(chars);
+    const result = await typed.mergeCharactersWithLLM(chars);
 
-    const calls = mergeCalls(service);
+    const calls = protoSpy.mock.calls.map((c) => c[0] as unknown as CallArg);
+    expect(calls.length).toBeGreaterThan(0);
     for (const c of calls) {
       expect(c.schema).toBe(MergeSchema);
       expect(c.schemaName).toBe('MergeSchema');
     }
-    expect(service.backupApiClient!.callStructured).not.toHaveBeenCalled();
+    // Every vote agrees on merging Alice+Alicia; the union filter runs after
+    // the gather, leaving the merged character plus Bob.
+    expect(result).toHaveLength(2);
+    expect(backupSpy).not.toHaveBeenCalled();
+    protoSpy.mockRestore();
   });
-
   it('merge: maxRetries=0 means no replacement budget — exactly 5 vote attempts', async () => {
     service = new LLMVoiceService({
       ...baseOpts,

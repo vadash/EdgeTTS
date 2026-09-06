@@ -11,25 +11,25 @@ import { buildQAPrompt } from '@/config/prompts/qa/builder';
 import { getErrorMessage } from '@/errors';
 import { withRetry } from '@/utils/retry';
 import {
-  applyMergeGroups,
   type AssignContext,
+  applyMergeGroups,
   buildCodeMapping,
   cullByFrequency,
   mergeCharacters,
 } from './CharacterUtils';
+import { collectVotes, spreadTemps } from './collectVotes';
 import { DebugLogger } from './DebugLogger';
 import { LLMApiClient } from './LLMApiClient';
+import { runWithConcurrency } from './runWithConcurrency';
 import {
+  type AssignResponse,
   AssignSchema,
+  type ExtractResponse,
   ExtractSchema,
   MergeSchema,
-  type AssignResponse,
-  type ExtractResponse,
 } from './schemas';
 import type { StructuredCallOptions } from './schemaUtils';
 import { buildMergeConsensus } from './votingConsensus';
-import { collectVotes, spreadTemps } from './collectVotes';
-import { runWithConcurrency } from './runWithConcurrency';
 
 /**
  * Number of sentences from the previous block to pass as overlap context
@@ -94,7 +94,6 @@ export interface LLMVoiceServiceOptions {
 export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
   public apiClient: LLMApiClient;
-  public mergeApiClient: LLMApiClient;
   public backupApiClient: LLMApiClient | null;
   private abortController: AbortController | null = null;
   private logger: ILogger;
@@ -107,51 +106,45 @@ export class LLMVoiceService {
     this.logger = options.logger;
     const debugLogger = new DebugLogger(options.directoryHandle, options.logger);
     this.backupApiClient = options.backupConfig
-      ? new LLMApiClient({
-          apiKey: options.backupConfig.apiKey,
-          apiUrl: options.backupConfig.apiUrl,
-          model: options.backupConfig.model,
-          streaming: options.backupConfig.streaming ?? options.streaming,
-          reasoning: options.backupConfig.reasoning ?? options.reasoning,
-          temperature: options.backupConfig.temperature ?? options.temperature,
-          topP: options.backupConfig.topP ?? options.topP,
-          maxTokens: defaultConfig.llm.maxTokens,
-          corsMiddleware: options.backupConfig.corsMiddleware ?? options.corsMiddleware,
-          debugLogger,
-          logger: options.logger,
-        })
+      ? this.makeClient(options.backupConfig, debugLogger)
       : null;
-    this.apiClient = new LLMApiClient({
-      apiKey: options.apiKey,
-      apiUrl: options.apiUrl,
-      model: options.model,
-      streaming: options.streaming,
-      reasoning: options.reasoning,
-      temperature: options.temperature,
-      topP: options.topP,
-      maxTokens: defaultConfig.llm.maxTokens,
-      corsMiddleware: options.corsMiddleware,
-      debugLogger,
-      logger: options.logger,
-    });
+    this.apiClient = this.makeClient(options, debugLogger);
+  }
 
-    // Use separate merge config if provided, otherwise use main config
-    const mergeConfig = options.mergeConfig;
-    this.mergeApiClient = mergeConfig
-      ? new LLMApiClient({
-          apiKey: mergeConfig.apiKey,
-          apiUrl: mergeConfig.apiUrl,
-          model: mergeConfig.model,
-          streaming: mergeConfig.streaming ?? options.streaming,
-          reasoning: mergeConfig.reasoning ?? options.reasoning,
-          temperature: mergeConfig.temperature ?? options.temperature,
-          topP: mergeConfig.topP ?? options.topP,
-          maxTokens: defaultConfig.llm.maxTokens,
-          corsMiddleware: mergeConfig.corsMiddleware ?? options.corsMiddleware,
-          debugLogger,
-          logger: options.logger,
-        })
-      : this.apiClient;
+  /**
+   * Single construction path for this service's LLM clients: a stage config
+   * (backup/merge) falls back to the main options field-by-field, and shared
+   * maxTokens/debugLogger/logger are applied uniformly. Callers pin
+   * per-request values by composing them into `config` after their spread —
+   * merge votes force non-streaming and carry the vote's own temperature.
+   */
+  private makeClient(
+    config: Pick<
+      LLMVoiceServiceOptions,
+      | 'apiKey'
+      | 'apiUrl'
+      | 'model'
+      | 'streaming'
+      | 'reasoning'
+      | 'temperature'
+      | 'topP'
+      | 'corsMiddleware'
+    >,
+    debugLogger: DebugLogger | undefined,
+  ): LLMApiClient {
+    return new LLMApiClient({
+      apiKey: config.apiKey,
+      apiUrl: config.apiUrl,
+      model: config.model,
+      streaming: config.streaming ?? this.options.streaming,
+      reasoning: config.reasoning ?? this.options.reasoning,
+      temperature: config.temperature ?? this.options.temperature,
+      topP: config.topP ?? this.options.topP,
+      maxTokens: defaultConfig.llm.maxTokens,
+      corsMiddleware: config.corsMiddleware ?? this.options.corsMiddleware,
+      debugLogger,
+      logger: this.options.logger,
+    });
   }
 
   /**
@@ -784,20 +777,15 @@ export class LLMVoiceService {
       this.options.mergeConfig?.repeatPrompt ?? false,
     );
 
-    // Create a client with the specified temperature
-    const client = new LLMApiClient({
-      apiKey: this.options.mergeConfig?.apiKey ?? this.options.apiKey,
-      apiUrl: this.options.mergeConfig?.apiUrl ?? this.options.apiUrl,
-      model: this.options.mergeConfig?.model ?? this.options.model,
-      streaming: false, // Always non-streaming for structured outputs
-      reasoning: this.options.mergeConfig?.reasoning ?? this.options.reasoning,
-      temperature: temperature,
-      topP: this.options.mergeConfig?.topP ?? this.options.topP,
-      maxTokens: defaultConfig.llm.maxTokens,
-      corsMiddleware: this.options.mergeConfig?.corsMiddleware ?? this.options.corsMiddleware,
-      debugLogger: this.apiClient.debugLogger, // share debugLogger
-      logger: this.logger,
-    });
+    // One client per vote: the vote temperature is client-level config
+    // (baked into every request), so votes cannot share one instance —
+    // spreadTemps' distinct temps are the voting design. Votes never
+    // stream: structured outputs.
+    const stage = this.options.mergeConfig ?? this.options;
+    const client = this.makeClient(
+      { ...stage, streaming: false, temperature },
+      this.apiClient.debugLogger, // share debugLogger
+    );
     try {
       const response = await client.callStructured({
         messages: mergeMessages,
