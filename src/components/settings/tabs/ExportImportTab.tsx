@@ -1,20 +1,12 @@
 import { useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { Button } from '@/components/common';
-import type { AppSettings } from '@/state/types';
+import { STAGE_EXPORT_FIELDS, type AppSettings, type StageConfig } from '@/state/types';
 import { useData, useLLM, useLogs, useSettings } from '@/stores';
 import { downloadFile } from '@/utils/file';
 import type { LLMStage } from '@/stores/LLMStore';
 
-interface StageExportConfig {
-  apiUrl: string;
-  model: string;
-  streaming: boolean;
-  reasoning: string | null;
-  temperature: number;
-  maxRetries: number;
-  topP: number;
-}
+type StageExportConfig = Pick<StageConfig, (typeof STAGE_EXPORT_FIELDS)[number]>;
 
 interface ExportData {
   version: number;
@@ -79,19 +71,10 @@ export function ExportImportTab() {
 
   const importStageConfig = (stage: LLMStage, config: StageExportConfig | undefined) => {
     if (!config) return;
-    if (config.apiUrl) llm.setStageField(stage, 'apiUrl', config.apiUrl);
-    if (config.model) llm.setStageField(stage, 'model', config.model);
-    if (config.streaming !== undefined) llm.setStageField(stage, 'streaming', config.streaming);
-    if (config.reasoning !== undefined)
-      llm.setStageField(
-        stage,
-        'reasoning',
-        config.reasoning as 'auto' | 'high' | 'medium' | 'low' | null,
-      );
-    if (config.temperature !== undefined)
-      llm.setStageField(stage, 'temperature', config.temperature);
-    if (config.maxRetries !== undefined) llm.setStageField(stage, 'maxRetries', config.maxRetries);
-    if (config.topP !== undefined) llm.setStageField(stage, 'topP', config.topP);
+    for (const field of STAGE_EXPORT_FIELDS) {
+      const value = config[field];
+      if (value !== undefined) llm.setStageField(stage, field, value);
+    }
   };
 
   const handleImport = async (e: Event) => {

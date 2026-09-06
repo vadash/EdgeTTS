@@ -4,7 +4,7 @@ import { Button, TabPanel, Tabs, Toggle } from '@/components/common';
 import { getLogger } from '@/services';
 import { LLMVoiceService } from '@/services/llm';
 import { useLLM } from '@/stores';
-import type { StageConfig } from '@/state/types';
+import { STAGE_COPY_FIELDS, type StageConfig } from '@/state/types';
 import type { LLMStage } from '@/stores/LLMStore';
 import { LLMHelp } from './LLMHelp';
 import { StageConfigForm, type TestResult } from './StageConfigForm';
@@ -125,13 +125,9 @@ export function LLMTab() {
     const targetStages = stages.map((s) => s.id).filter((s) => s !== sourceStage);
 
     for (const target of targetStages) {
-      llm.setStageField(target, 'apiKey', sourceConfig.apiKey);
-      llm.setStageField(target, 'apiUrl', sourceConfig.apiUrl);
-      llm.setStageField(target, 'model', sourceConfig.model);
-      llm.setStageField(target, 'temperature', sourceConfig.temperature);
-      llm.setStageField(target, 'topP', sourceConfig.topP);
-      llm.setStageField(target, 'repeatPrompt', sourceConfig.repeatPrompt);
-      llm.setStageField(target, 'maxRetries', sourceConfig.maxRetries);
+      for (const field of STAGE_COPY_FIELDS) {
+        llm.setStageField(target, field, sourceConfig[field]);
+      }
     }
   };
 

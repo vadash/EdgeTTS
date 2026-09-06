@@ -137,6 +137,28 @@ export interface StageConfig {
   maxRetries: number;
 }
 
+// Deliberate StageConfig subsets: exports never include apiKey (keys stay on
+// the device); copying leaves streaming/reasoning/corsMiddleware tuned per stage.
+export const STAGE_EXPORT_FIELDS = [
+  'apiUrl',
+  'model',
+  'streaming',
+  'reasoning',
+  'temperature',
+  'maxRetries',
+  'topP',
+] as const satisfies readonly (keyof StageConfig)[];
+
+export const STAGE_COPY_FIELDS = [
+  'apiKey',
+  'apiUrl',
+  'model',
+  'temperature',
+  'topP',
+  'repeatPrompt',
+  'maxRetries',
+] as const satisfies readonly (keyof StageConfig)[];
+
 // LLM Voice Assignment Types
 export interface LLMCharacter {
   canonicalName: string;
