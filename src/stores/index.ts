@@ -35,7 +35,6 @@ export { createLanguageStore, LanguageStore } from './LanguageStore';
 export type { LLMProcessingStatus } from './LLMStore';
 export * as LLMStoreModule from './LLMStore';
 export {
-  addCharacter,
   assign,
   backup,
   awaitReview,
@@ -46,7 +45,6 @@ export {
   detectedCharacters,
   error as llmError,
   extract,
-  getStageConfig,
   isConfigured,
   isProcessing as llmIsProcessing,
   llm,

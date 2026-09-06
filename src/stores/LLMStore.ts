@@ -143,15 +143,6 @@ export const isProcessing = computed(() => {
   return status === 'extracting' || status === 'assigning';
 });
 
-export const blockProgress = computed(() => ({
-  current: llm.value.currentBlock,
-  total: llm.value.totalBlocks,
-}));
-
-export const characterNames = computed(() =>
-  llm.value.detectedCharacters.map((c) => c.canonicalName),
-);
-
 export const characterLineCounts = computed(() => {
   const assignments = llm.value.speakerAssignments;
   const counts = new Map<string, number>();
@@ -281,10 +272,6 @@ export function setStageConfig(stage: LLMStage, config: StageConfig): void {
   scheduleSave();
 }
 
-export function getStageConfig(stage: LLMStage): StageConfig {
-  return llm.value[stage];
-}
-
 // ============================================================================
 // Public API - Processing State Actions
 // ============================================================================
@@ -307,10 +294,6 @@ export function setError(error: string | null): void {
 
 export function setCharacters(characters: LLMCharacter[]): void {
   patchState({ detectedCharacters: characters });
-}
-
-export function addCharacter(character: LLMCharacter): void {
-  patchState({ detectedCharacters: [...llm.value.detectedCharacters, character] });
 }
 
 export function updateCharacter(index: number, updates: Partial<LLMCharacter>): void {
@@ -402,8 +385,4 @@ export function resetLLMStore(): void {
     ...defaultPersistedState,
     ...defaultTransientState,
   };
-}
-
-export function reset(): void {
-  resetLLMStore();
 }

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LLMCharacter } from '@/state/types';
 import {
-  addCharacter,
   awaitReview,
   cancelReview,
   characterLineCounts,
@@ -118,11 +117,6 @@ describe('LLMStore', () => {
       gender: 'female',
       variations: ['Алиса'],
     };
-
-    it('adds character', () => {
-      addCharacter(mockCharacter);
-      expect(llm.value.detectedCharacters).toContainEqual(mockCharacter);
-    });
 
     it('updates character', () => {
       setCharacters([mockCharacter]);
