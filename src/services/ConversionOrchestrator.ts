@@ -312,7 +312,6 @@ async function saveVoiceProfile(
     const fileName = `${bookName}.json`;
 
     await withPermissionRetry(directoryHandle, async () => {
-      const bookFolder = await directoryHandle.getDirectoryHandle(bookName, { create: true });
       const json = exportToProfile(
         existingProfile ?? null,
         characters,
@@ -322,10 +321,18 @@ async function saveVoiceProfile(
         bookName,
       );
 
-      const fileHandle = await bookFolder.getFileHandle(fileName, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(json);
-      await writable.close();
+      const writeJson = async (dir: FileSystemDirectoryHandle, name: string) => {
+        const fileHandle = await dir.getFileHandle(name, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(json);
+        await writable.close();
+      };
+
+      const bookFolder = await directoryHandle.getDirectoryHandle(bookName, { create: true });
+      // Copy in the book folder and next to it, so the profile survives
+      // if the user deletes the folder after listening.
+      await writeJson(bookFolder, fileName);
+      await writeJson(directoryHandle, fileName);
     });
 
     logger.info(`Saved voice mapping: ${bookName}/${fileName}`);
