@@ -1,16 +1,9 @@
 import { computed, signal } from '@preact/signals';
 import { Text } from 'preact-i18n';
 import voices from '@/components/VoiceSelector/voices';
+import { SAMPLE_PHRASES } from '@/hooks/useAudioPreview';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
 import { patchSettings, settings, useData } from '@/stores';
-
-const SAMPLE_PHRASES = [
-  'The quick brown fox jumps over the lazy dog',
-  'Every moment is a fresh beginning',
-  'Fortune favors the bold',
-  'The stars shine bright tonight',
-  'Welcome to the world of voices',
-];
 
 const samplePhrase = signal<string>(
   SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)],
