@@ -1,5 +1,5 @@
 import { Text } from 'preact-i18n';
-import { Button, Toggle } from '@/components/common';
+import { Button, Slider, Toggle } from '@/components/common';
 import { useAudioProcessingPreview } from '@/hooks/useAudioProcessingPreview';
 import { AUDIO_PRESETS } from '@/state/types';
 import { useSettings } from '@/stores';
@@ -7,6 +7,88 @@ import { useSettings } from '@/stores';
 export function AudioTab() {
   const settings = useSettings();
   const audioPreview = useAudioProcessingPreview();
+
+  // Audio processing toggles: identical rows, differing only by signal and copy.
+  const toggles = [
+    {
+      labelId: 'settings.eq',
+      label: 'EQ (Broadcast Voice)',
+      hintId: 'settings.eqHint',
+      hint: 'Add warmth and reduce digital harshness',
+      enabled: settings.eqEnabled,
+      set: settings.setEqEnabled,
+    },
+    {
+      labelId: 'settings.deEss',
+      label: 'De-Ess',
+      hintId: 'settings.deEssHint',
+      hint: 'Reduce harsh sibilant sounds',
+      enabled: settings.deEssEnabled,
+      set: settings.setDeEssEnabled,
+    },
+    {
+      labelId: 'settings.silenceRemoval',
+      label: 'Remove Silence',
+      hintId: 'settings.silenceRemovalHint',
+      hint: 'Remove long pauses from audio',
+      enabled: settings.silenceRemovalEnabled,
+      set: settings.setSilenceRemovalEnabled,
+    },
+    {
+      labelId: 'settings.compressor',
+      label: 'Compressor',
+      hintId: 'settings.compressorHint',
+      hint: 'Smooth out volume differences for consistent listening',
+      enabled: settings.compressorEnabled,
+      set: settings.setCompressorEnabled,
+    },
+    {
+      labelId: 'settings.normalization',
+      label: 'Normalize Audio',
+      hintId: 'settings.normalizationHint',
+      hint: 'Balance audio levels (includes limiter)',
+      enabled: settings.normalizationEnabled,
+      set: settings.setNormalizationEnabled,
+    },
+    {
+      labelId: 'settings.fadeIn',
+      label: 'Fade-In',
+      hintId: 'settings.fadeInHint',
+      hint: 'Smooth 100ms fade-in to prevent clicks',
+      enabled: settings.fadeInEnabled,
+      set: settings.setFadeInEnabled,
+    },
+  ];
+
+  // Filter chain chips: identical spans, differing only by signal, color, and label.
+  const chips = [
+    { enabled: settings.eqEnabled.value, className: 'bg-blue-500/20 text-blue-400', label: 'EQ' },
+    {
+      enabled: settings.deEssEnabled.value,
+      className: 'bg-purple-500/20 text-purple-400',
+      label: 'De-Ess',
+    },
+    {
+      enabled: settings.compressorEnabled.value,
+      className: 'bg-yellow-500/20 text-yellow-400',
+      label: 'Compress',
+    },
+    {
+      enabled: settings.silenceRemovalEnabled.value,
+      className: 'bg-green-500/20 text-green-400',
+      label: 'Silence',
+    },
+    {
+      enabled: settings.normalizationEnabled.value,
+      className: 'bg-orange-500/20 text-orange-400',
+      label: 'Normalize',
+    },
+    {
+      enabled: settings.fadeInEnabled.value,
+      className: 'bg-cyan-500/20 text-cyan-400',
+      label: 'Fade-In',
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -45,16 +127,11 @@ export function AudioTab() {
               {settings.opusMinBitrate.value} <Text id="settings.kbps">kbps</Text>
             </span>
           </div>
-          <input
-            type="range"
-            min="16"
-            max="96"
-            step="1"
+          <Slider
             value={settings.opusMinBitrate.value}
-            onChange={(e) =>
-              settings.setOpusMinBitrate(Number((e.target as HTMLInputElement).value))
-            }
-            className="w-full"
+            min={16}
+            max={96}
+            onChange={(v) => settings.setOpusMinBitrate(v)}
           />
         </div>
 
@@ -66,35 +143,22 @@ export function AudioTab() {
               {settings.opusMaxBitrate.value} <Text id="settings.kbps">kbps</Text>
             </span>
           </div>
-          <input
-            type="range"
-            min="24"
-            max="96"
-            step="1"
+          <Slider
             value={settings.opusMaxBitrate.value}
-            onChange={(e) =>
-              settings.setOpusMaxBitrate(Number((e.target as HTMLInputElement).value))
-            }
-            className="w-full"
+            min={24}
+            max={96}
+            onChange={(v) => settings.setOpusMaxBitrate(v)}
           />
         </div>
 
         {/* Compression Level Slider */}
         <div>
-          <div className="flex justify-between text-sm">
-            <Text id="settings.compressionLevel">Compression Level</Text>
-            <span className="font-mono">{settings.opusCompressionLevel.value}</span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="10"
-            step="1"
+          <Slider
+            label="settings.compressionLevel"
             value={settings.opusCompressionLevel.value}
-            onChange={(e) =>
-              settings.setOpusCompressionLevel(Number((e.target as HTMLInputElement).value))
-            }
-            className="w-full"
+            min={0}
+            max={10}
+            onChange={(v) => settings.setOpusCompressionLevel(v)}
           />
           <p className="text-xs text-gray-500 mt-1">
             <Text id="settings.compressionLevelHint" />
@@ -103,20 +167,12 @@ export function AudioTab() {
 
         {/* Parallel Encoding Slider */}
         <div>
-          <div className="flex justify-between text-sm">
-            <Text id="settings.mergeConcurrency">Parallel Encoding</Text>
-            <span className="font-mono">{settings.mergeConcurrency.value}</span>
-          </div>
-          <input
-            type="range"
-            min="1"
-            max="4"
-            step="1"
+          <Slider
+            label="settings.mergeConcurrency"
             value={settings.mergeConcurrency.value}
-            onChange={(e) =>
-              settings.setMergeConcurrency(Number((e.target as HTMLInputElement).value))
-            }
-            className="w-full"
+            min={1}
+            max={4}
+            onChange={(v) => settings.setMergeConcurrency(v)}
           />
           <p className="text-xs text-gray-500 mt-1">
             <Text id="settings.mergeConcurrencyHint" />
@@ -125,100 +181,22 @@ export function AudioTab() {
       </div>
 
       {/* Audio processing settings */}
-      {/* 1. EQ (Broadcast Voice) */}
-      <div className="flex items-center justify-between p-4 bg-primary rounded-lg border border-border">
-        <div>
-          <div className="font-medium">
-            <Text id="settings.eq">EQ (Broadcast Voice)</Text>
+      {toggles.map((t) => (
+        <div
+          key={t.labelId}
+          className="flex items-center justify-between p-4 bg-primary rounded-lg border border-border"
+        >
+          <div>
+            <div className="font-medium">
+              <Text id={t.labelId}>{t.label}</Text>
+            </div>
+            <div className="text-sm text-gray-400">
+              <Text id={t.hintId}>{t.hint}</Text>
+            </div>
           </div>
-          <div className="text-sm text-gray-400">
-            <Text id="settings.eqHint">Add warmth and reduce digital harshness</Text>
-          </div>
+          <Toggle checked={t.enabled.value} onChange={t.set} />
         </div>
-        <Toggle checked={settings.eqEnabled.value} onChange={(v) => settings.setEqEnabled(v)} />
-      </div>
-
-      {/* 2. De-Ess */}
-      <div className="flex items-center justify-between p-4 bg-primary rounded-lg border border-border">
-        <div>
-          <div className="font-medium">
-            <Text id="settings.deEss">De-Ess</Text>
-          </div>
-          <div className="text-sm text-gray-400">
-            <Text id="settings.deEssHint">Reduce harsh sibilant sounds</Text>
-          </div>
-        </div>
-        <Toggle
-          checked={settings.deEssEnabled.value}
-          onChange={(v) => settings.setDeEssEnabled(v)}
-        />
-      </div>
-
-      {/* 3. Silence Removal */}
-      <div className="flex items-center justify-between p-4 bg-primary rounded-lg border border-border">
-        <div>
-          <div className="font-medium">
-            <Text id="settings.silenceRemoval">Remove Silence</Text>
-          </div>
-          <div className="text-sm text-gray-400">
-            <Text id="settings.silenceRemovalHint">Remove long pauses from audio</Text>
-          </div>
-        </div>
-        <Toggle
-          checked={settings.silenceRemovalEnabled.value}
-          onChange={(v) => settings.setSilenceRemovalEnabled(v)}
-        />
-      </div>
-
-      {/* 4. Compressor */}
-      <div className="flex items-center justify-between p-4 bg-primary rounded-lg border border-border">
-        <div>
-          <div className="font-medium">
-            <Text id="settings.compressor">Compressor</Text>
-          </div>
-          <div className="text-sm text-gray-400">
-            <Text id="settings.compressorHint">
-              Smooth out volume differences for consistent listening
-            </Text>
-          </div>
-        </div>
-        <Toggle
-          checked={settings.compressorEnabled.value}
-          onChange={(v) => settings.setCompressorEnabled(v)}
-        />
-      </div>
-
-      {/* 5. Normalization (includes Limiter) */}
-      <div className="flex items-center justify-between p-4 bg-primary rounded-lg border border-border">
-        <div>
-          <div className="font-medium">
-            <Text id="settings.normalization">Normalize Audio</Text>
-          </div>
-          <div className="text-sm text-gray-400">
-            <Text id="settings.normalizationHint">Balance audio levels (includes limiter)</Text>
-          </div>
-        </div>
-        <Toggle
-          checked={settings.normalizationEnabled.value}
-          onChange={(v) => settings.setNormalizationEnabled(v)}
-        />
-      </div>
-
-      {/* 6. Fade-In */}
-      <div className="flex items-center justify-between p-4 bg-primary rounded-lg border border-border">
-        <div>
-          <div className="font-medium">
-            <Text id="settings.fadeIn">Fade-In</Text>
-          </div>
-          <div className="text-sm text-gray-400">
-            <Text id="settings.fadeInHint">Smooth 100ms fade-in to prevent clicks</Text>
-          </div>
-        </div>
-        <Toggle
-          checked={settings.fadeInEnabled.value}
-          onChange={(v) => settings.setFadeInEnabled(v)}
-        />
-      </div>
+      ))}
 
       {/* Silence Gap */}
       <div className="p-4 bg-primary rounded-lg border border-border">
@@ -233,14 +211,12 @@ export function AudioTab() {
           </div>
           <span className="text-sm font-mono">{settings.silenceGapMs.value}ms</span>
         </div>
-        <input
-          type="range"
-          min="0"
-          max="500"
-          step="10"
+        <Slider
           value={settings.silenceGapMs.value}
-          onChange={(e) => settings.setSilenceGapMs(Number((e.target as HTMLInputElement).value))}
-          className="w-full"
+          min={0}
+          max={500}
+          step={10}
+          onChange={(v) => settings.setSilenceGapMs(v)}
         />
       </div>
 
@@ -250,34 +226,13 @@ export function AudioTab() {
           <Text id="settings.filterChain">Processing Chain</Text>
         </div>
         <div className="flex flex-wrap gap-1">
-          {settings.eqEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-blue-500/20 text-blue-400">EQ</span>
-          )}
-          {settings.deEssEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-purple-500/20 text-purple-400">
-              De-Ess
-            </span>
-          )}
-          {settings.compressorEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-yellow-500/20 text-yellow-400">
-              Compress
-            </span>
-          )}
-          {settings.silenceRemovalEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-green-500/20 text-green-400">
-              Silence
-            </span>
-          )}
-          {settings.normalizationEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-orange-500/20 text-orange-400">
-              Normalize
-            </span>
-          )}
-          {settings.fadeInEnabled.value && (
-            <span className="px-2 py-0.5 text-xs rounded bg-cyan-500/20 text-cyan-400">
-              Fade-In
-            </span>
-          )}
+          {chips
+            .filter((c) => c.enabled)
+            .map((c) => (
+              <span key={c.label} className={`px-2 py-0.5 text-xs rounded ${c.className}`}>
+                {c.label}
+              </span>
+            ))}
         </div>
         <div className="mt-3 space-y-2">
           <Button
