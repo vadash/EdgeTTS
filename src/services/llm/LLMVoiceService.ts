@@ -39,6 +39,17 @@ const OVERLAP_SIZE = 10;
 const DEFAULT_MAX_RETRIES = 3;
 
 /**
+ * Split text into two halves at the balanced line boundary (first half takes
+ * the extra line). A single-line block yields an empty second half, which
+ * callers treat as "replay the whole block".
+ */
+function splitHalves(text: string): [string[], string[]] {
+  const lines = text.split('\n');
+  const mid = Math.ceil(lines.length / 2);
+  return [lines.slice(0, mid), lines.slice(mid)];
+}
+
+/**
  * Options for creating LLM service instances
  * Aliased as LLMServiceFactoryOptions for DI compatibility
  */
@@ -158,6 +169,45 @@ export class LLMVoiceService {
   }
 
   /**
+   * withRetry with the primary model's retry budget; the caller shapes the
+   * per-attempt log (block indices differ per call site).
+   */
+  private retryPrimary<T>(
+    fn: () => Promise<T>,
+    signal: AbortSignal | undefined,
+    onRetry: (attempt: number, error: unknown) => void,
+  ): Promise<T> {
+    return withRetry(fn, {
+      maxRetries: this.options.maxRetries ?? DEFAULT_MAX_RETRIES,
+      signal,
+      onRetry,
+    });
+  }
+
+  /**
+   * withRetry against the backup client: backup retry budget plus the standard
+   * per-attempt warning. `kind` distinguishes whole-block replays from 2-way
+   * backup splits in the log.
+   */
+  private retryBackup<T>(
+    stage: string,
+    kind: 'retry' | 'split retry',
+    fn: () => Promise<T>,
+    signal: AbortSignal | undefined,
+  ): Promise<T> {
+    const backupRetries = this.options.backupConfig?.maxRetries ?? DEFAULT_MAX_RETRIES;
+    return withRetry(fn, {
+      maxRetries: backupRetries,
+      signal,
+      onRetry: (attempt, err) => {
+        this.logger?.warn(
+          `[${stage}] Backup ${kind} ${attempt}/${backupRetries}: ${getErrorMessage(err)}`,
+        );
+      },
+    });
+  }
+
+  /**
    * Call structured endpoint for a splittable stage (extract/assign): retry main
    * up to the user-set maxRetries, then fall back to the backup model with its own
    * maxRetries. If main + backup both exhaust, throw so the per-block handler can
@@ -183,11 +233,7 @@ export class LLMVoiceService {
     const maxRetries = this.options.maxRetries ?? DEFAULT_MAX_RETRIES;
 
     try {
-      return await withRetry(() => primaryClient.callStructured(callArgs), {
-        maxRetries,
-        signal,
-        onRetry,
-      });
+      return await this.retryPrimary(() => primaryClient.callStructured(callArgs), signal, onRetry);
     } catch (error) {
       // Don't fall back if aborted, or no backup configured
       if (signal?.aborted || !this.backupApiClient) throw error;
@@ -200,16 +246,12 @@ export class LLMVoiceService {
       // identical callArgs against the backup client.
       if (backup) return backup();
 
-      const backupRetries = this.options.backupConfig?.maxRetries ?? DEFAULT_MAX_RETRIES;
-      return withRetry(() => this.backupApiClient!.callStructured(callArgs), {
-        maxRetries: backupRetries,
+      return this.retryBackup(
+        stage,
+        'retry',
+        () => this.backupApiClient!.callStructured(callArgs),
         signal,
-        onRetry: (attempt, err) => {
-          this.logger?.warn(
-            `[${stage}] Backup retry ${attempt}/${backupRetries}: ${getErrorMessage(err)}`,
-          );
-        },
-      });
+      );
     }
   }
 
@@ -227,15 +269,14 @@ export class LLMVoiceService {
     blockText: string,
     signal: AbortSignal | undefined,
   ): Promise<ExtractResponse> {
-    const backupRetries = this.options.backupConfig?.maxRetries ?? DEFAULT_MAX_RETRIES;
-    const lines = blockText.split('\n');
-    const mid = Math.ceil(lines.length / 2);
     // Drop empty halves so a 1-line block just replays the whole block.
-    const halves = [lines.slice(0, mid), lines.slice(mid)].filter((h) => h.length > 0);
+    const halves = splitHalves(blockText).filter((h) => h.length > 0);
 
     const callHalf = (text: string) => {
       const messages = buildExtractPrompt(text, this.options.repeatPrompt ?? false);
-      return withRetry(
+      return this.retryBackup(
+        'extract',
+        'split retry',
         () =>
           this.backupApiClient!.callStructured({
             messages,
@@ -243,15 +284,7 @@ export class LLMVoiceService {
             schemaName: 'ExtractSchema',
             signal,
           }),
-        {
-          maxRetries: backupRetries,
-          signal,
-          onRetry: (attempt, err) => {
-            this.logger?.warn(
-              `[extract] Backup split retry ${attempt}/${backupRetries}: ${getErrorMessage(err)}`,
-            );
-          },
-        },
+        signal,
       );
     };
 
@@ -274,11 +307,8 @@ export class LLMVoiceService {
     overlapSentences: string[] | undefined,
     signal: AbortSignal | undefined,
   ): Promise<AssignResponse> {
-    const backupRetries = this.options.backupConfig?.maxRetries ?? DEFAULT_MAX_RETRIES;
-    const lines = context.numberedParagraphs.split('\n');
-    const mid = Math.ceil(lines.length / 2);
-    const firstLines = lines.slice(0, mid);
-    const secondLines = lines.slice(mid).filter((l) => l.length > 0);
+    const [firstLines, secondHalf] = splitHalves(context.numberedParagraphs);
+    const secondLines = secondHalf.filter((l) => l.length > 0);
     const offset = firstLines.length;
 
     const callHalf = (numberedParagraphs: string) => {
@@ -289,7 +319,9 @@ export class LLMVoiceService {
         overlapSentences,
         this.options.repeatPrompt ?? false,
       );
-      return withRetry(
+      return this.retryBackup(
+        'assign',
+        'split retry',
         () =>
           this.backupApiClient!.callStructured({
             messages,
@@ -297,15 +329,7 @@ export class LLMVoiceService {
             schemaName: 'AssignSchema',
             signal,
           }),
-        {
-          maxRetries: backupRetries,
-          signal,
-          onRetry: (attempt, err) => {
-            this.logger?.warn(
-              `[assign] Backup split retry ${attempt}/${backupRetries}: ${getErrorMessage(err)}`,
-            );
-          },
-        },
+        signal,
       );
     };
 
@@ -603,7 +627,7 @@ export class LLMVoiceService {
         try {
           // QA retries the PRIMARY only — backup split never activates here. On
           // exhaustion the catch below falls back to draft (DRY with voting-off).
-          const qaResponse = await withRetry(
+          const qaResponse = await this.retryPrimary(
             () =>
               this.apiClient.callStructured({
                 messages: qaMessages,
@@ -611,14 +635,11 @@ export class LLMVoiceService {
                 schemaName: 'AssignSchema',
                 signal: this.abortController?.signal,
               }),
-            {
-              maxRetries: this.options.maxRetries ?? DEFAULT_MAX_RETRIES,
-              signal: this.abortController?.signal,
-              onRetry: (attempt, error) => {
-                this.logger?.warn(
-                  `[assign] QA pass at ${block.sentenceStartIndex} retry ${attempt}: ${getErrorMessage(error)}`,
-                );
-              },
+            this.abortController?.signal,
+            (attempt, error) => {
+              this.logger?.warn(
+                `[assign] QA pass at ${block.sentenceStartIndex} retry ${attempt}: ${getErrorMessage(error)}`,
+              );
             },
           );
 
