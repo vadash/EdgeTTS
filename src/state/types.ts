@@ -119,6 +119,24 @@ export interface VoicePool {
   female: string[];
 }
 
+// LLM Stage Configuration
+
+export type ReasoningLevel = 'auto' | 'high' | 'medium' | 'low';
+
+export interface StageConfig {
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  streaming: boolean;
+  reasoning: ReasoningLevel | null;
+  temperature: number;
+  topP: number;
+  repeatPrompt: boolean;
+  corsMiddleware: string;
+  /** Retry attempts for this stage before giving up (backup model takes over) */
+  maxRetries: number;
+}
+
 // LLM Voice Assignment Types
 export interface LLMCharacter {
   canonicalName: string;

@@ -5,29 +5,20 @@ import { computed, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
 import type { LoggerStore } from '@/services/Logger';
 import { decryptValue, encryptValue } from '@/services/SecureStorage';
-import type { LLMCharacter, SpeakerAssignment, VoiceProfileFile } from '@/state/types';
+import type {
+  LLMCharacter,
+  ReasoningLevel,
+  SpeakerAssignment,
+  StageConfig,
+  VoiceProfileFile,
+} from '@/state/types';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export type LLMProcessingStatus = 'idle' | 'extracting' | 'review' | 'assigning' | 'error';
-export type ReasoningLevel = 'auto' | 'high' | 'medium' | 'low';
 export type LLMStage = 'extract' | 'merge' | 'assign' | 'backup';
-
-export interface StageConfig {
-  apiKey: string;
-  apiUrl: string;
-  model: string;
-  streaming: boolean;
-  reasoning: ReasoningLevel | null;
-  temperature: number;
-  topP: number;
-  repeatPrompt: boolean;
-  corsMiddleware: string;
-  /** Retry attempts for this stage before giving up (backup model takes over) */
-  maxRetries: number;
-}
 
 interface LLMSettings {
   useVoting: boolean;

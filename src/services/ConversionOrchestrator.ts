@@ -7,6 +7,7 @@ import type {
   LLMCharacter,
   ProcessedBook,
   SpeakerAssignment,
+  StageConfig,
   TTSConfig,
   VoicePool,
   VoiceProfileFile,
@@ -49,32 +50,16 @@ export interface WorkflowProgress {
 }
 
 /**
- * Per-stage LLM configuration
- */
-export interface StageLLMConfig {
-  apiKey: string;
-  apiUrl: string;
-  model: string;
-  streaming?: boolean;
-  reasoning?: 'auto' | 'high' | 'medium' | 'low' | null;
-  temperature?: number;
-  topP?: number;
-  repeatPrompt?: boolean;
-  corsMiddleware?: string;
-  maxRetries?: number;
-}
-
-/**
  * Input configuration snapshot -- read once at the start of run().
  * Replaces all signal .value reads.
  */
 export interface OrchestratorInput {
   // LLM config
   isLLMConfigured: boolean;
-  extractConfig: StageLLMConfig;
-  mergeConfig: StageLLMConfig;
-  assignConfig: StageLLMConfig;
-  backupConfig: StageLLMConfig;
+  extractConfig: StageConfig;
+  mergeConfig: StageConfig;
+  assignConfig: StageConfig;
+  backupConfig: StageConfig;
   useVoting: boolean;
 
   // Settings
@@ -470,46 +455,18 @@ export async function runConversion(
       conversion.setConcurrencyStats(input.llmThreads, 0);
       const setLlmConcurrency = (effective: number) => conversion.setConcurrencyStats(effective, 0);
 
+      // Backup stage options shared by both LLM passes below.
+      const backupStage = { ...input.backupConfig };
+
       const extractLLMOptions: LLMServiceFactoryOptions = {
-        apiKey: input.extractConfig.apiKey,
-        apiUrl: input.extractConfig.apiUrl,
-        model: input.extractConfig.model,
+        ...input.extractConfig,
         narratorVoice: input.narratorVoice,
-        streaming: input.extractConfig.streaming,
-        reasoning: input.extractConfig.reasoning,
-        temperature: input.extractConfig.temperature,
-        topP: input.extractConfig.topP,
-        repeatPrompt: input.extractConfig.repeatPrompt,
-        maxRetries: input.extractConfig.maxRetries,
-        corsMiddleware: input.extractConfig.corsMiddleware,
         maxConcurrentRequests: input.llmThreads,
         onConcurrencyChange: setLlmConcurrency,
         directoryHandle: input.directoryHandle,
         logger,
-        mergeConfig: {
-          apiKey: input.mergeConfig.apiKey,
-          apiUrl: input.mergeConfig.apiUrl,
-          model: input.mergeConfig.model,
-          streaming: input.mergeConfig.streaming,
-          reasoning: input.mergeConfig.reasoning,
-          temperature: input.mergeConfig.temperature,
-          topP: input.mergeConfig.topP,
-          repeatPrompt: input.mergeConfig.repeatPrompt,
-          maxRetries: input.mergeConfig.maxRetries,
-          corsMiddleware: input.mergeConfig.corsMiddleware,
-        },
-        backupConfig: {
-          apiKey: input.backupConfig.apiKey,
-          apiUrl: input.backupConfig.apiUrl,
-          model: input.backupConfig.model,
-          streaming: input.backupConfig.streaming,
-          reasoning: input.backupConfig.reasoning,
-          temperature: input.backupConfig.temperature,
-          topP: input.backupConfig.topP,
-          repeatPrompt: input.backupConfig.repeatPrompt,
-          corsMiddleware: input.backupConfig.corsMiddleware,
-          maxRetries: input.backupConfig.maxRetries,
-        },
+        mergeConfig: { ...input.mergeConfig },
+        backupConfig: backupStage,
       };
 
       const blocks = textBlockSplitter.createExtractBlocks(text, input.detectedLanguage);
@@ -557,34 +514,14 @@ export async function runConversion(
       checkCancelled(signal);
 
       const assignLLMOptions: LLMServiceFactoryOptions = {
-        apiKey: input.assignConfig.apiKey,
-        apiUrl: input.assignConfig.apiUrl,
-        model: input.assignConfig.model,
+        ...input.assignConfig,
         narratorVoice: input.narratorVoice,
-        streaming: input.assignConfig.streaming,
-        reasoning: input.assignConfig.reasoning,
-        temperature: input.assignConfig.temperature,
-        topP: input.assignConfig.topP,
-        repeatPrompt: input.assignConfig.repeatPrompt,
-        maxRetries: input.assignConfig.maxRetries,
-        corsMiddleware: input.assignConfig.corsMiddleware,
         useVoting: input.useVoting,
         maxConcurrentRequests: input.llmThreads,
         onConcurrencyChange: setLlmConcurrency,
         directoryHandle: input.directoryHandle,
         logger,
-        backupConfig: {
-          apiKey: input.backupConfig.apiKey,
-          apiUrl: input.backupConfig.apiUrl,
-          model: input.backupConfig.model,
-          streaming: input.backupConfig.streaming,
-          reasoning: input.backupConfig.reasoning,
-          temperature: input.backupConfig.temperature,
-          topP: input.backupConfig.topP,
-          repeatPrompt: input.backupConfig.repeatPrompt,
-          corsMiddleware: input.backupConfig.corsMiddleware,
-          maxRetries: input.backupConfig.maxRetries,
-        },
+        backupConfig: backupStage,
       };
 
       const assignBlocks = textBlockSplitter.createAssignBlocks(text, input.detectedLanguage);

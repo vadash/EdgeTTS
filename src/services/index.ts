@@ -146,7 +146,6 @@ export function getOrchestratorServices(): ConversionOrchestratorServices {
 export type {
   ConversionOrchestratorServices,
   OrchestratorInput,
-  StageLLMConfig,
   WorkflowProgress,
 } from './ConversionOrchestrator';
 export { runConversion } from './ConversionOrchestrator';

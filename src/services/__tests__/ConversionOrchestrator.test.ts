@@ -43,6 +43,10 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
       streaming: false,
       temperature: 0,
       topP: 1,
+      reasoning: null,
+      repeatPrompt: false,
+      corsMiddleware: '',
+      maxRetries: 3,
     },
     mergeConfig: {
       apiKey: 'k',
@@ -51,6 +55,10 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
       streaming: false,
       temperature: 0,
       topP: 1,
+      reasoning: null,
+      repeatPrompt: false,
+      corsMiddleware: '',
+      maxRetries: 3,
     },
     assignConfig: {
       apiKey: 'k',
@@ -59,6 +67,10 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
       streaming: false,
       temperature: 0,
       topP: 1,
+      reasoning: null,
+      repeatPrompt: false,
+      corsMiddleware: '',
+      maxRetries: 3,
     },
     backupConfig: {
       apiKey: 'k',
@@ -67,6 +79,10 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
       streaming: false,
       temperature: 0,
       topP: 1,
+      reasoning: null,
+      repeatPrompt: false,
+      corsMiddleware: '',
+      maxRetries: 3,
     },
     ...overrides,
   };

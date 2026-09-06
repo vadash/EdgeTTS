@@ -4,7 +4,8 @@ import { Button, TabPanel, Tabs, Toggle } from '@/components/common';
 import { getLogger } from '@/services';
 import { LLMVoiceService } from '@/services/llm';
 import { useLLM } from '@/stores';
-import type { LLMStage, StageConfig } from '@/stores/LLMStore';
+import type { StageConfig } from '@/state/types';
+import type { LLMStage } from '@/stores/LLMStore';
 import { LLMHelp } from './LLMHelp';
 import { StageConfigForm, type TestResult } from './StageConfigForm';
 

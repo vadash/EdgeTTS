@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { Button, Select, Slider, Toggle } from '@/components/common';
-import type { ReasoningLevel, StageConfig } from '@/stores/LLMStore';
+import type { ReasoningLevel, StageConfig } from '@/state/types';
 
 const reasoningOptions = [
   { value: 'off', label: 'Off' },

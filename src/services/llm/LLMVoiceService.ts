@@ -1,4 +1,10 @@
-import type { LLMCharacter, SpeakerAssignment, TextBlock } from '@/state/types';
+import type {
+  LLMCharacter,
+  ReasoningLevel,
+  SpeakerAssignment,
+  StageConfig,
+  TextBlock,
+} from '@/state/types';
 import type { ILogger } from '../Logger';
 
 export type ProgressCallback = (current: number, total: number, message?: string) => void;
@@ -50,6 +56,12 @@ function splitHalves(text: string): [string[], string[]] {
 }
 
 /**
+ * Nested merge/backup stage config: connection triple required, tuning optional.
+ */
+type NestedStageConfig = Pick<StageConfig, 'apiKey' | 'apiUrl' | 'model'> &
+  Partial<Omit<StageConfig, 'apiKey' | 'apiUrl' | 'model'>>;
+
+/**
  * Options for creating LLM service instances
  * Aliased as LLMServiceFactoryOptions for DI compatibility
  */
@@ -59,7 +71,7 @@ export interface LLMVoiceServiceOptions {
   model: string;
   narratorVoice: string;
   streaming?: boolean;
-  reasoning?: 'auto' | 'high' | 'medium' | 'low' | null;
+  reasoning?: ReasoningLevel | null;
   temperature?: number;
   topP?: number;
   useVoting?: boolean;
@@ -72,31 +84,9 @@ export interface LLMVoiceServiceOptions {
   directoryHandle?: FileSystemDirectoryHandle | null;
   logger: ILogger; // Required - prevents silent failures
   // Optional separate config for merge stage
-  mergeConfig?: {
-    apiKey: string;
-    apiUrl: string;
-    model: string;
-    streaming?: boolean;
-    reasoning?: 'auto' | 'high' | 'medium' | 'low' | null;
-    temperature?: number;
-    topP?: number;
-    repeatPrompt?: boolean;
-    maxRetries?: number;
-    corsMiddleware?: string;
-  };
+  mergeConfig?: NestedStageConfig;
   /** Optional backup model — used when this stage exhausts maxRetries */
-  backupConfig?: {
-    apiKey: string;
-    apiUrl: string;
-    model: string;
-    streaming?: boolean;
-    reasoning?: 'auto' | 'high' | 'medium' | 'low' | null;
-    temperature?: number;
-    topP?: number;
-    repeatPrompt?: boolean;
-    corsMiddleware?: string;
-    maxRetries?: number;
-  };
+  backupConfig?: NestedStageConfig;
 }
 
 /**
