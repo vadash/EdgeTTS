@@ -2,6 +2,7 @@ import { useRef } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { Button, Toggle } from '@/components/common';
 import { useData, useLogs, useSettings } from '@/stores';
+import { downloadFile, parseDictionary } from '@/utils/file';
 
 export function DictionaryTab() {
   const dataStore = useData();
@@ -17,8 +18,7 @@ export function DictionaryTab() {
     if (!file) return;
 
     try {
-      const text = await file.text();
-      const newRules = text.split('\n').filter((line) => line.trim() && !line.startsWith('#'));
+      const newRules = parseDictionary(await file.text());
       dataStore.setDictionaryRaw(newRules);
       logs.info(`Loaded dictionary: ${file.name} (${newRules.length} rules)`);
     } catch (err) {
@@ -36,14 +36,7 @@ export function DictionaryTab() {
   const handleExport = () => {
     if (rules.length === 0) return;
 
-    const text = rules.join('\n');
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'dictionary.lexx';
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(rules.join('\n'), 'dictionary.lexx', 'text/plain');
   };
 
   return (

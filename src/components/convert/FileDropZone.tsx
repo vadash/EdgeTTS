@@ -2,6 +2,7 @@ import { useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { convertFileToTxt } from '@/services/FileConverter';
 import { useData, useLogs, settings, setNarratorVoice } from '@/stores';
+import { parseDictionary } from '@/utils/file';
 import voices, { availableLocales } from '@/components/VoiceSelector/voices';
 
 /**
@@ -128,8 +129,7 @@ export function FileDropZone() {
     if (!file) return;
 
     try {
-      const text = await file.text();
-      const rules = text.split('\n').filter((line) => line.trim() && !line.startsWith('#'));
+      const rules = parseDictionary(await file.text());
       dataStore.setDictionaryRaw(rules);
       logs.info(`Loaded dictionary: ${file.name} (${rules.length} rules)`);
     } catch (err) {

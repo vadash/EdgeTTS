@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { sanitizeFilename } from './file';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { downloadFile, parseDictionary, sanitizeFilename } from './file';
 
 describe('sanitizeFilename', () => {
   it('should replace invalid characters with underscores', () => {
@@ -45,5 +45,55 @@ describe('sanitizeFilename', () => {
     expect(sanitizeFilename('My Book - Chapter 1')).toBe('My Book - Chapter 1');
     expect(sanitizeFilename('file_name.txt')).toBe('file_name.txt');
     expect(sanitizeFilename('日本語ファイル')).toBe('日本語ファイル');
+  });
+});
+
+describe('parseDictionary', () => {
+  it('should split rules per line, skipping blank lines and # comments', () => {
+    expect(parseDictionary('hello->hi\n\n# comment\nworld->earth\n')).toEqual([
+      'hello->hi',
+      'world->earth',
+    ]);
+  });
+
+  it('should drop whitespace-only lines', () => {
+    expect(parseDictionary('a\n   \nb')).toEqual(['a', 'b']);
+  });
+
+  it('should keep indented comment lines as rules', () => {
+    expect(parseDictionary('  # kept')).toEqual(['  # kept']);
+  });
+
+  it('should return empty for blank or comment-only input', () => {
+    expect(parseDictionary('\n\n# only\n   \n')).toEqual([]);
+  });
+});
+
+describe('downloadFile', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should download a string with the given mime and revoke the object URL', () => {
+    downloadFile('content', 'out.txt', 'text/plain');
+
+    const blob = vi.mocked(URL.createObjectURL).mock.calls[0]?.[0] as Blob;
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe('text/plain');
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+  });
+
+  it('should default string mime to text/plain', () => {
+    downloadFile('content', 'out.txt');
+
+    const blob = vi.mocked(URL.createObjectURL).mock.calls[0]?.[0] as Blob;
+    expect(blob.type).toBe('text/plain');
+  });
+
+  it('should pass a Blob through with its own type', () => {
+    const blob = new Blob(['x'], { type: 'application/json' });
+    downloadFile(blob, 'data.json');
+
+    expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
   });
 });

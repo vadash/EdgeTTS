@@ -35,3 +35,24 @@ export function sanitizeFilename(filename: string): string {
 export function readJSONFile(file: File): Promise<string> {
   return file.text();
 }
+
+/**
+ * Trigger a browser download of a Blob or raw string
+ * Creates an object URL, clicks a temporary anchor, and revokes the URL
+ */
+export function downloadFile(data: Blob | string, filename: string, mime?: string): void {
+  const blob = data instanceof Blob ? data : new Blob([data], { type: mime ?? 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Parse dictionary text: one rule per line, skipping blank lines and # comments
+ */
+export function parseDictionary(text: string): string[] {
+  return text.split('\n').filter((line) => line.trim() && !line.startsWith('#'));
+}

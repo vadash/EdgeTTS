@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'preact/hooks';
 import { getLogger } from '@/services';
 import type { LogLevel } from '@/services/Logger';
 import { useConversion, useLogs } from '@/stores';
+import { downloadFile } from '@/utils/file';
 import { activeLlmWorkers, activeTtsWorkers } from '@/stores/ConversionStore';
 import { ProgressBar } from './ProgressBar';
 
@@ -49,14 +50,11 @@ export function StatusPanel() {
   }, [logs, logger]);
 
   const handleExport = useCallback(() => {
-    const text = logs.toText();
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `edgetts-logs-${new Date().toISOString().slice(0, 10)}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(
+      logs.toText(),
+      `edgetts-logs-${new Date().toISOString().slice(0, 10)}.txt`,
+      'text/plain',
+    );
   }, [logs]);
 
   const eta = conversion.estimatedTimeRemaining.value || '';

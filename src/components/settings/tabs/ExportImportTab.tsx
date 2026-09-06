@@ -3,6 +3,7 @@ import { Text } from 'preact-i18n';
 import { Button } from '@/components/common';
 import type { AppSettings } from '@/state/types';
 import { useData, useLLM, useLogs, useSettings } from '@/stores';
+import { downloadFile } from '@/utils/file';
 import type { LLMStage } from '@/stores/LLMStore';
 
 interface StageExportConfig {
@@ -66,14 +67,11 @@ export function ExportImportTab() {
       dictionary: data.dictionaryRaw.value,
     };
 
-    const json = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `edgetts-settings-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(
+      JSON.stringify(exportData, null, 2),
+      `edgetts-settings-${new Date().toISOString().slice(0, 10)}.json`,
+      'application/json',
+    );
 
     setLastAction({ type: 'success', message: 'Settings exported successfully' });
     logs.info('Settings exported');
