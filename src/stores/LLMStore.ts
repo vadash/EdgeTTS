@@ -204,24 +204,23 @@ export async function loadSettings(logStore: LoggerStore): Promise<void> {
     };
 
     for (const stage of ['extract', 'merge', 'assign', 'backup'] as const) {
-      if (settings[stage]) {
-        const decryptedKey = await decryptValue(settings[stage].apiKey ?? '', logStore);
-        llm.value = {
-          ...llm.value,
-          [stage]: {
-            apiKey: decryptedKey,
-            apiUrl: settings[stage].apiUrl ?? defaultStageConfig.apiUrl,
-            model: settings[stage].model ?? defaultStageConfig.model,
-            streaming: settings[stage].streaming ?? defaultStageConfig.streaming,
-            reasoning: settings[stage].reasoning ?? defaultStageConfig.reasoning,
-            temperature: settings[stage].temperature ?? defaultStageConfig.temperature,
-            topP: settings[stage].topP ?? defaultStageConfig.topP,
-            repeatPrompt: settings[stage].repeatPrompt ?? defaultStageConfig.repeatPrompt,
-            corsMiddleware: settings[stage].corsMiddleware ?? defaultStageConfig.corsMiddleware,
-            maxRetries: settings[stage].maxRetries ?? defaultStageConfig.maxRetries,
-          },
-        };
-      }
+      const persisted = settings[stage];
+      if (!persisted) continue;
+
+      // Same semantics as a per-field `persisted[key] ?? default` merge: JSON null
+      // resets a field to its default, unknown keys are dropped, and apiKey is
+      // decrypted separately instead of merged.
+      const config: StageConfig = {
+        ...defaultStageConfig,
+        ...Object.fromEntries(
+          (Object.keys(defaultStageConfig) as (keyof StageConfig)[])
+            .map((key) => [key, persisted[key]] as const)
+            .filter(([, value]) => value != null),
+        ),
+      };
+      config.apiKey = await decryptValue(persisted.apiKey ?? '', logStore);
+
+      llm.value = { ...llm.value, [stage]: config };
     }
   } catch (e) {
     logStore.error(
