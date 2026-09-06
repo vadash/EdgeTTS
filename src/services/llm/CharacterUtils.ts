@@ -5,6 +5,14 @@ export interface CodeMapping {
   codeToName: Map<string, string>;
 }
 
+export interface AssignContext {
+  characters: LLMCharacter[];
+  nameToCode: Map<string, string>;
+  codeToName: Map<string, string>;
+  numberedParagraphs: string;
+  sentenceCount: number;
+}
+
 /**
  * Length of each speaker code in hex characters (e.g. "A3F1" = 4 chars).
  * Mirrors oh-my-pi's hashline snapshot tag format for compact, opaque tokens.

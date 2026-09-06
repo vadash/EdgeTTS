@@ -4,23 +4,21 @@ import type { ILogger } from '../Logger';
 export type ProgressCallback = (current: number, total: number, message?: string) => void;
 
 import { defaultConfig } from '@/config';
+import { buildAssignPrompt } from '@/config/prompts/assign/builder';
+import { buildExtractPrompt } from '@/config/prompts/extract/builder';
+import { buildMergePrompt } from '@/config/prompts/merge/builder';
 import { buildQAPrompt } from '@/config/prompts/qa/builder';
 import { getErrorMessage } from '@/errors';
 import { withRetry } from '@/utils/retry';
 import {
   applyMergeGroups,
+  type AssignContext,
   buildCodeMapping,
   cullByFrequency,
   mergeCharacters,
 } from './CharacterUtils';
 import { DebugLogger } from './DebugLogger';
 import { LLMApiClient } from './LLMApiClient';
-import {
-  type AssignContext,
-  buildAssignPrompt,
-  buildExtractPrompt,
-  buildMergePrompt,
-} from './PromptStrategy';
 import {
   AssignSchema,
   ExtractSchema,

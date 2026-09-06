@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as assignBuilder from '@/config/prompts/assign/builder';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
 import { LLMVoiceService } from './LLMVoiceService';
@@ -195,8 +196,7 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
     });
 
     // Spy on buildAssignPrompt to capture the overlapSentences argument
-    const PromptStrategy = await import('./PromptStrategy');
-    const spy = vi.spyOn(PromptStrategy, 'buildAssignPrompt');
+    const spy = vi.spyOn(assignBuilder, 'buildAssignPrompt');
 
     service = new LLMVoiceService({
       apiKey: 'test-key',

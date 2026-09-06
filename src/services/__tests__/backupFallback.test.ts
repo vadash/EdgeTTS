@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import { LLMVoiceService } from '../llm/LLMVoiceService';
-import type { AssignContext } from '../llm/PromptStrategy';
+import type { AssignContext } from '../llm/CharacterUtils';
 import type { LLMCharacter, TextBlock } from '@/state/types';
 import type { StructuredCallOptions } from '../llm/schemaUtils';
 import extractFixture from '../../test/fixtures/llm-real-data/extract_request.json';
