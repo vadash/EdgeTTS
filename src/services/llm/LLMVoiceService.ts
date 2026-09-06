@@ -819,17 +819,12 @@ export class LLMVoiceService {
   }
 
   /**
-   * Test API connection (non-streaming)
+   * Test API connection (streaming/SSE endpoint when requested)
    */
-  async testConnection(): Promise<{ success: boolean; error?: string; model?: string }> {
-    return this.apiClient.testConnection();
-  }
-
-  /**
-   * Test API connection (streaming/SSE)
-   */
-  async testConnectionStreaming(): Promise<{ success: boolean; error?: string; model?: string }> {
-    return this.apiClient.testConnectionStreaming();
+  async testConnection(
+    streaming = false,
+  ): Promise<{ success: boolean; error?: string; model?: string }> {
+    return this.apiClient.testConnection(streaming);
   }
 }
 

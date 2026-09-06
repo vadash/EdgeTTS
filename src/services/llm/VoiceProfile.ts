@@ -2,12 +2,9 @@ import type {
   CharacterEntry,
   LLMCharacter,
   SpeakerAssignment,
-  VoiceOption,
   VoiceProfileFile,
 } from '@/state/types';
 import { IMPORTANCE_THRESHOLD } from '@/state/types';
-import type { DetectedLanguage } from '@/utils/languageDetection';
-import { allocateTiered, randomizeBelow } from '../VoiceAllocator';
 import { countSpeakingFrequency } from './CharacterUtils';
 import { matchCharacter } from './NameMatcher';
 
@@ -144,87 +141,4 @@ export function importProfile(
  */
 export function isCharacterVisible(entry: CharacterEntry): boolean {
   return entry.percentage >= IMPORTANCE_THRESHOLD;
-}
-
-/**
- * Tiered voice assignment
- * Top N characters get unique voices, remaining characters share voices
- * @param characters Character entries sorted by importance (will be re-sorted)
- * @param availableVoices Available voice options
- * @param narratorVoice Narrator voice to exclude from assignment
- * @returns Map of character name to voice ID
- */
-export function assignVoicesTiered(
-  characters: CharacterEntry[],
-  availableVoices: VoiceOption[],
-  narratorVoice: string,
-): Map<string, string> {
-  return allocateTiered(
-    characters.map((c) => ({
-      canonicalName: c.canonicalName,
-      voice: c.voice,
-      lines: c.lines,
-    })),
-    availableVoices,
-    narratorVoice,
-  );
-}
-
-/**
- * Parameters for randomizeBelowVoices function
- */
-export interface RandomizeBelowParams {
-  /** Characters sorted by line count (descending) */
-  sortedCharacters: LLMCharacter[];
-  /** Current voice assignments */
-  currentVoiceMap: Map<string, string>;
-  /** Index of row where button clicked (randomize BELOW this) */
-  clickedIndex: number;
-  /** All enabled voices */
-  enabledVoices: VoiceOption[];
-  /** Narrator voice to reserve */
-  narratorVoice: string;
-  /** Detected book language */
-  bookLanguage: DetectedLanguage;
-  /** Optional speaking frequency per character (name -> line count) */
-  frequency?: Map<string, number>;
-  /** Randomize pool order within priority tiers (UI reroll); default deterministic */
-  shuffle?: boolean;
-}
-
-/**
- * Randomizes voice assignments for characters below a given index
- * Re-exports from VoiceAllocator for backward compatibility
- */
-export function randomizeBelowVoices(params: RandomizeBelowParams): Map<string, string> {
-  return randomizeBelow(
-    params.sortedCharacters,
-    params.currentVoiceMap,
-    params.clickedIndex,
-    params.enabledVoices,
-    params.narratorVoice,
-    params.bookLanguage,
-    params.frequency,
-    params.shuffle,
-  );
-}
-
-/**
- * Download JSON as a file
- */
-export function downloadJSON(json: string, filename: string): void {
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/**
- * Read JSON file from user input
- */
-export async function readJSONFile(file: File): Promise<string> {
-  return file.text();
 }

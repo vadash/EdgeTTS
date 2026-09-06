@@ -49,8 +49,6 @@ export interface LLMApiClientOptions {
   logger?: ILogger;
 }
 
-export type PassType = 'extract' | 'merge' | 'assign' | 'structured';
-
 /**
  * Detect provider from API URL or model name
  */
@@ -202,34 +200,31 @@ export class LLMApiClient {
   }
 
   /**
-   * Test API connection with a real completion request (non-streaming)
+   * Test API connection with a real completion request (streaming endpoint when requested)
    */
-  async testConnection(): Promise<{ success: boolean; error?: string; model?: string }> {
+  async testConnection(
+    streaming = false,
+  ): Promise<{ success: boolean; error?: string; model?: string }> {
     try {
-      const response = await this.client.chat.completions.create({
-        model: this.options.model,
-        messages: [{ role: 'user', content: 'Reply with: ok' }],
-        max_tokens: 10,
-        stream: false,
-      });
+      if (!streaming) {
+        const response = await this.client.chat.completions.create({
+          model: this.options.model,
+          messages: [{ role: 'user', content: 'Reply with: ok' }],
+          max_tokens: 10,
+          stream: false,
+        });
 
-      const message = response.choices[0]?.message;
-      const content = message?.content || (message as unknown as { reasoning?: string })?.reasoning;
-      if (!content) {
-        return { success: false, error: 'Empty response from model' };
+        const message = response.choices[0]?.message;
+        // Reasoning-first models expose text on a sibling field the SDK types don't declare
+        const ext = message as unknown as { reasoning?: string };
+        const content = message?.content || ext?.reasoning;
+        if (!content) {
+          return { success: false, error: 'Empty response from model' };
+        }
+
+        return { success: true, model: response.model };
       }
 
-      return { success: true, model: response.model };
-    } catch (e) {
-      return { success: false, error: this.formatApiError(e) };
-    }
-  }
-
-  /**
-   * Test API connection with streaming (SSE) endpoint
-   */
-  async testConnectionStreaming(): Promise<{ success: boolean; error?: string; model?: string }> {
-    try {
       const stream = await this.client.chat.completions.create({
         model: this.options.model,
         messages: [{ role: 'user', content: 'Reply with: ok' }],
@@ -243,7 +238,9 @@ export class LLMApiClient {
       for await (const chunk of stream) {
         model = chunk.model || model;
         const delta = chunk.choices[0]?.delta;
-        content += delta?.content || (delta as unknown as { reasoning?: string })?.reasoning || '';
+        // Streaming variant of the same vendor reasoning extension
+        const deltaExt = delta as unknown as { reasoning?: string };
+        content += delta?.content || deltaExt?.reasoning || '';
       }
 
       if (!content) {

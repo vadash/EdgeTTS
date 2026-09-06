@@ -59,9 +59,7 @@ export function LLMTab() {
       logger,
     });
 
-    const result = useStreaming
-      ? await service.testConnectionStreaming()
-      : await service.testConnection();
+    const result = await service.testConnection(useStreaming);
 
     setTestState((prev) => ({
       ...prev,

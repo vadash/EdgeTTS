@@ -1,5 +1,5 @@
 /**
- * File utilities for sanitizing filenames and folder names
+ * File utilities: filename sanitizing and browser file helpers
  */
 
 /**
@@ -27,4 +27,11 @@ export function sanitizeFilename(filename: string): string {
 
   // Ensure not empty
   return sanitized || 'untitled';
+}
+
+/**
+ * Read a browser File's contents as text
+ */
+export function readJSONFile(file: File): Promise<string> {
+  return file.text();
 }

@@ -7,10 +7,11 @@ import { Text } from 'preact-i18n';
 import { Button } from '@/components/common';
 import voices from '@/components/VoiceSelector/voices';
 import { useVoicePreview } from '@/hooks/useVoicePreview';
-import { importProfile, randomizeBelowVoices, readJSONFile } from '@/services/llm/VoiceProfile';
-import { assignUnmatchedFromPool } from '@/services/VoiceAllocator';
+import { importProfile } from '@/services/llm/VoiceProfile';
+import { assignUnmatchedFromPool, randomizeBelow } from '@/services/VoiceAllocator';
 import type { VoiceProfileFile } from '@/state/types';
 import { useData, useLLM, useLogs, useSettings } from '@/stores';
+import { readJSONFile } from '@/utils/file';
 import { VoicePicker } from './VoicePicker';
 
 interface VoiceReviewModalProps {
@@ -87,16 +88,16 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
 
   const handleRandomizeBelow = (clickedIndex: number) => {
     const enabledVoiceOptions = voices.filter((v) => enabledVoices.includes(v.fullValue));
-    const newMap = randomizeBelowVoices({
+    const newMap = randomizeBelow(
       sortedCharacters,
-      currentVoiceMap: voiceMap,
-      clickedIndex: clickedIndex - 1,
-      enabledVoices: enabledVoiceOptions,
-      narratorVoice: settings.narratorVoice.value,
-      bookLanguage: data.detectedLanguage.value,
-      frequency: lineCounts,
-      shuffle: true,
-    });
+      voiceMap,
+      clickedIndex - 1,
+      enabledVoiceOptions,
+      settings.narratorVoice.value,
+      data.detectedLanguage.value,
+      lineCounts,
+      true,
+    );
     llm.setVoiceMap(newMap);
   };
 

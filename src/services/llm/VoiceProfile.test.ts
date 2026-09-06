@@ -6,14 +6,8 @@ import type {
   VoiceOption,
   VoiceProfileFile,
 } from '@/state/types';
-import {
-  assignVoicesTiered,
-  exportToProfile,
-  importProfile,
-  isCharacterVisible,
-  type RandomizeBelowParams,
-  randomizeBelowVoices,
-} from './VoiceProfile';
+import { allocateTiered, randomizeBelow } from '../VoiceAllocator';
+import { exportToProfile, importProfile, isCharacterVisible } from './VoiceProfile';
 
 describe('exportToProfile', () => {
   it('creates new profile when existingProfile is null', () => {
@@ -387,7 +381,7 @@ describe('isCharacterVisible', () => {
   });
 });
 
-describe('assignVoicesTiered', () => {
+describe('allocateTiered', () => {
   const createVoiceOptions = (): VoiceOption[] => [
     { locale: 'en-US', name: 'Voice1', fullValue: 'voice-1', gender: 'male' },
     { locale: 'en-US', name: 'Voice2', fullValue: 'voice-2', gender: 'male' },
@@ -452,7 +446,7 @@ describe('assignVoicesTiered', () => {
     const characters = createCharacterEntries();
     const narratorVoice = 'narrator-voice';
 
-    const result = assignVoicesTiered(characters, voices, narratorVoice);
+    const result = allocateTiered(characters, voices, narratorVoice);
 
     // Top 3 get unique voices (function returns Map<string, string>)
     expect(result.get('Main1')).toBeDefined();
@@ -471,7 +465,7 @@ describe('assignVoicesTiered', () => {
     const characters = createCharacterEntries();
     const narratorVoice = 'narrator-voice';
 
-    const result = assignVoicesTiered(characters, voices, narratorVoice);
+    const result = allocateTiered(characters, voices, narratorVoice);
 
     // Minor characters should get voices (they cycle through the pool)
     expect(result.get('Minor1')).toBeDefined();
@@ -525,7 +519,7 @@ describe('assignVoicesTiered', () => {
     ];
     const narratorVoice = 'narrator-voice';
 
-    const result = assignVoicesTiered(characters, voices, narratorVoice);
+    const result = allocateTiered(characters, voices, narratorVoice);
 
     // Minor 1-4 should cycle through voices 1-3
     const minorVoices = ['Minor1', 'Minor2', 'Minor3', 'Minor4'].map((name) => result.get(name));
@@ -571,7 +565,7 @@ describe('assignVoicesTiered', () => {
     ];
     const narratorVoice = 'narrator-voice';
 
-    const result = assignVoicesTiered(characters, voices, narratorVoice);
+    const result = allocateTiered(characters, voices, narratorVoice);
 
     // All 3 characters get unique voices (3 voices, 3 characters)
     expect(result.get('HighLines')).toBeDefined();
@@ -611,7 +605,7 @@ describe('assignVoicesTiered', () => {
     ];
     const narratorVoice = 'narrator-voice';
 
-    const result = assignVoicesTiered(characters, voices, narratorVoice);
+    const result = allocateTiered(characters, voices, narratorVoice);
 
     // Narrator should not be in result
     expect(result.has('Narrator')).toBe(false);
@@ -621,7 +615,7 @@ describe('assignVoicesTiered', () => {
   });
 });
 
-describe('randomizeBelowVoices', () => {
+describe('randomizeBelow', () => {
   const maleVoices: VoiceOption[] = [
     { locale: 'en-US', name: 'GuyNeural', fullValue: 'en-US, GuyNeural', gender: 'male' },
     { locale: 'en-US', name: 'DavisNeural', fullValue: 'en-US, DavisNeural', gender: 'male' },
@@ -648,16 +642,14 @@ describe('randomizeBelowVoices', () => {
       ['Carol', 'en-US, GuyNeural'], // duplicate - will be randomized
     ]);
 
-    const params: RandomizeBelowParams = {
-      sortedCharacters: characters,
-      currentVoiceMap: currentMap,
-      clickedIndex: 1, // Click on Alice, randomize Bob and Carol
-      enabledVoices: allVoices,
-      narratorVoice: 'en-US, GuyNeural',
-      bookLanguage: 'en',
-    };
-
-    const result = randomizeBelowVoices(params);
+    const result = randomizeBelow(
+      characters,
+      currentMap,
+      1, // Click on Alice, randomize Bob and Carol
+      allVoices,
+      'en-US, GuyNeural',
+      'en',
+    );
 
     // Narrator and Alice should be unchanged
     expect(result.get('Narrator')).toBe('en-US, GuyNeural');
@@ -681,16 +673,14 @@ describe('randomizeBelowVoices', () => {
       ['Carol', 'en-US, AriaNeural'],
     ]);
 
-    const params: RandomizeBelowParams = {
-      sortedCharacters: characters,
-      currentVoiceMap: currentMap,
-      clickedIndex: 2, // Click on Bob, only Carol randomized
-      enabledVoices: allVoices,
-      narratorVoice: 'en-US, TonyNeural',
-      bookLanguage: 'en',
-    };
-
-    const result = randomizeBelowVoices(params);
+    const result = randomizeBelow(
+      characters,
+      currentMap,
+      2, // Click on Bob, only Carol randomized
+      allVoices,
+      'en-US, TonyNeural',
+      'en',
+    );
 
     expect(result.get('Narrator')).toBe('en-US, GuyNeural');
     expect(result.get('Alice')).toBe('en-US, JennyNeural');
@@ -713,16 +703,7 @@ describe('randomizeBelowVoices', () => {
 
     const currentMap = new Map([['Alice', 'en-US, JennyNeural']]);
 
-    const params: RandomizeBelowParams = {
-      sortedCharacters: manyMaleChars,
-      currentVoiceMap: currentMap,
-      clickedIndex: 0,
-      enabledVoices: limitedVoices,
-      narratorVoice: 'other-voice',
-      bookLanguage: 'en',
-    };
-
-    const result = randomizeBelowVoices(params);
+    const result = randomizeBelow(manyMaleChars, currentMap, 0, limitedVoices, 'other-voice', 'en');
 
     // 2-voice pool: 80% cut rounds up to 2, split forces unique=[Guy], shared=[Davis].
     expect(result.get('Bob')).toBe('en-US, GuyNeural'); // unique slot
@@ -749,14 +730,7 @@ describe('randomizeBelowVoices', () => {
     ];
     const currentMap = new Map([['Narrator', 'en-US, NarratorNeural']]);
 
-    const result = randomizeBelowVoices({
-      sortedCharacters: chars,
-      currentVoiceMap: currentMap,
-      clickedIndex: -1,
-      enabledVoices: voices,
-      narratorVoice: 'en-US, NarratorNeural',
-      bookLanguage: 'en',
-    });
+    const result = randomizeBelow(chars, currentMap, -1, voices, 'en-US, NarratorNeural', 'en');
 
     const assigned = chars.slice(1).map((c) => result.get(c.canonicalName)!);
     expect(new Set(assigned).size).toBe(9); // 9 unique + 1-voice shared tail
@@ -781,14 +755,7 @@ describe('randomizeBelowVoices', () => {
     ];
     const currentMap = new Map([['Narrator', 'en-US, NarratorNeural']]);
 
-    const result = randomizeBelowVoices({
-      sortedCharacters: chars,
-      currentVoiceMap: currentMap,
-      clickedIndex: -1,
-      enabledVoices: voices,
-      narratorVoice: 'en-US, NarratorNeural',
-      bookLanguage: 'en',
-    });
+    const result = randomizeBelow(chars, currentMap, -1, voices, 'en-US, NarratorNeural', 'en');
 
     const top = chars.slice(1, 9).map((c) => result.get(c.canonicalName)!); // 8 unique slots
     const tail = chars.slice(9).map((c) => result.get(c.canonicalName)!); // 5 overflow
@@ -809,16 +776,7 @@ describe('randomizeBelowVoices', () => {
 
     const currentMap = new Map([['Narrator', 'other-voice']]);
 
-    const params: RandomizeBelowParams = {
-      sortedCharacters: femaleChar,
-      currentVoiceMap: currentMap,
-      clickedIndex: 0,
-      enabledVoices: onlyMaleVoices,
-      narratorVoice: 'other-voice',
-      bookLanguage: 'en',
-    };
-
-    const result = randomizeBelowVoices(params);
+    const result = randomizeBelow(femaleChar, currentMap, 0, onlyMaleVoices, 'other-voice', 'en');
 
     // Female Alice gets male voice since no female voices available
     expect(result.get('Alice')).toBe('en-US, GuyNeural');
@@ -849,14 +807,7 @@ describe('randomizeBelowVoices', () => {
     ];
     const currentMap = new Map([['Narrator', 'OTHER']]);
 
-    const result = randomizeBelowVoices({
-      sortedCharacters: chars,
-      currentVoiceMap: currentMap,
-      clickedIndex: -1,
-      enabledVoices: genderedVoices,
-      narratorVoice: 'OTHER',
-      bookLanguage: 'en',
-    });
+    const result = randomizeBelow(chars, currentMap, -1, genderedVoices, 'OTHER', 'en');
 
     expect(result.get('Alice')).toContain('F');
     expect(result.get('Carol')).toContain('F');
@@ -873,16 +824,14 @@ describe('randomizeBelowVoices', () => {
       ['Alice', 'en-US, JennyNeural'],
     ]);
 
-    const params: RandomizeBelowParams = {
-      sortedCharacters: characters.slice(0, 2),
-      currentVoiceMap: currentMap,
-      clickedIndex: 1, // Last index
-      enabledVoices: allVoices,
-      narratorVoice: 'other-voice',
-      bookLanguage: 'en',
-    };
-
-    const result = randomizeBelowVoices(params);
+    const result = randomizeBelow(
+      characters.slice(0, 2),
+      currentMap,
+      1, // Last index
+      allVoices,
+      'other-voice',
+      'en',
+    );
 
     expect(result.get('Narrator')).toBe('en-US, GuyNeural');
     expect(result.get('Alice')).toBe('en-US, JennyNeural');
