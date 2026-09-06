@@ -86,12 +86,6 @@ export interface ConvertedFile {
   content: string;
 }
 
-export interface DictionaryRule {
-  type: 'regex' | 'exact' | 'word';
-  pattern: string;
-  replacement: string;
-}
-
 export interface StatusUpdate {
   partIndex: number;
   message: string;
@@ -120,14 +114,6 @@ declare global {
   }
 }
 
-// Character Info (for non-LLM voice assignment - still used by VoiceAssigner)
-export interface CharacterInfo {
-  name: string;
-  gender: 'male' | 'female' | 'unknown';
-  occurrences: number;
-  assignedVoice?: string;
-}
-
 export interface VoicePool {
   male: string[];
   female: string[];
@@ -147,37 +133,11 @@ export interface TextBlock {
   sentenceStartIndex: number;
 }
 
-export interface ExtractResponse {
-  characters: LLMCharacter[];
-}
-
-export interface AssignResponse {
-  sentences: Array<{ index: number; speaker: string }>;
-}
-
-export interface CharacterMergeEntry {
-  keep: string;
-  absorb: string[];
-  variations: string[];
-  gender: 'male' | 'female' | 'unknown';
-}
-
-export interface MergeResponse {
-  merges: CharacterMergeEntry[];
-  unchanged: string[];
-}
-
 export interface SpeakerAssignment {
   sentenceIndex: number;
   text: string;
   speaker: string;
   voiceId: string;
-}
-
-export interface LLMValidationResult {
-  valid: boolean;
-  errors: string[];
-  repairedResponse?: string;
 }
 
 // Voice Profile Types (v2)
@@ -197,12 +157,6 @@ export interface CharacterEntry {
   percentage: number;
   lastSeenIn: string;
   bookAppearances: number;
-}
-
-export interface VoiceAssignment {
-  character: string;
-  voice: string;
-  shared: boolean;
 }
 
 // Voice Profile Constants
