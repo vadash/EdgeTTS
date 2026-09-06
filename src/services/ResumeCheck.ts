@@ -3,6 +3,8 @@
 
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 
+import { ChunkStore } from './ChunkStore';
+
 export interface ResumeInfo {
   cachedChunks: number;
   hasLLMState: boolean;
@@ -38,12 +40,10 @@ async function tryReadJSON<T>(dir: FileSystemDirectoryHandle, filename: string):
   }
 }
 
-const NUMBERED_INDEX_RE = /^chunks_index_\d+\.jsonl$/;
-
 async function countNewFormatChunks(dir: FileSystemDirectoryHandle): Promise<number> {
   let total = 0;
   for await (const entry of dir.values()) {
-    if (entry.kind === 'file' && NUMBERED_INDEX_RE.test(entry.name)) {
+    if (entry.kind === 'file' && ChunkStore.INDEX_FILE_RE.test(entry.name)) {
       const handle = await dir.getFileHandle(entry.name);
       const file = await handle.getFile();
       const text = await file.text();
@@ -55,7 +55,7 @@ async function countNewFormatChunks(dir: FileSystemDirectoryHandle): Promise<num
 
 async function hasNewFormat(dir: FileSystemDirectoryHandle): Promise<boolean> {
   for await (const entry of dir.values()) {
-    if (entry.kind === 'file' && NUMBERED_INDEX_RE.test(entry.name)) {
+    if (entry.kind === 'file' && ChunkStore.INDEX_FILE_RE.test(entry.name)) {
       return true;
     }
   }

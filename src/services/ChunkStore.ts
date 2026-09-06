@@ -13,6 +13,19 @@ import {
 const FLUSH_THRESHOLD = 2000;
 
 export class ChunkStore {
+  /** Numbered index file names: chunks_index_N.jsonl (capture = file index). */
+  static readonly INDEX_FILE_RE = /^chunks_index_(\d+)\.jsonl$/;
+  /** Numbered data file names: chunks_data_N.bin. */
+  static readonly DATA_FILE_RE = /^chunks_data_\d+\.bin$/;
+
+  static indexFileName(fileIndex: number): string {
+    return `chunks_index_${fileIndex}.jsonl`;
+  }
+
+  static dataFileName(fileIndex: number): string {
+    return `chunks_data_${fileIndex}.bin`;
+  }
+
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private ramIndex = new Map<number, { file: string; offset: number; length: number }>();
   private fileCache = new Map<string, File>();
@@ -50,8 +63,8 @@ export class ChunkStore {
         name === 'chunks_index.jsonl' ||
         (name.startsWith('chunks_data.bin') && name.endsWith('.crswap')) ||
         (name.startsWith('chunks_index.jsonl') && name.endsWith('.crswap')) ||
-        /^chunks_data_\d+\.bin$/.test(name) ||
-        /^chunks_index_\d+\.jsonl$/.test(name)
+        ChunkStore.DATA_FILE_RE.test(name) ||
+        ChunkStore.INDEX_FILE_RE.test(name)
       ) {
         toDelete.push(name);
       }
@@ -79,7 +92,7 @@ export class ChunkStore {
 
     for await (const entry of this.directoryHandle!.values()) {
       if (entry.kind !== 'file') continue;
-      const match = entry.name.match(/^chunks_index_(\d+)\.jsonl$/);
+      const match = entry.name.match(ChunkStore.INDEX_FILE_RE);
       if (match) {
         const fileIndex = parseInt(match[1], 10);
         if (fileIndex > maxFileIndex) {
@@ -102,7 +115,7 @@ export class ChunkStore {
               typeof parsed.l === 'number'
             ) {
               this.ramIndex.set(parsed.i, {
-                file: `chunks_data_${fileIndex}.bin`,
+                file: ChunkStore.dataFileName(fileIndex),
                 offset: parsed.o,
                 length: parsed.l,
               });
@@ -152,8 +165,8 @@ export class ChunkStore {
         return;
       }
 
-      const dataFileName = `chunks_data_${this.fileCounter}.bin`;
-      const indexFileName = `chunks_index_${this.fileCounter}.jsonl`;
+      const dataFileName = ChunkStore.dataFileName(this.fileCounter);
+      const indexFileName = ChunkStore.indexFileName(this.fileCounter);
 
       const dataHandle = await this.directoryHandle!.getFileHandle(dataFileName, { create: true });
       const indexHandle = await this.directoryHandle!.getFileHandle(indexFileName, {
