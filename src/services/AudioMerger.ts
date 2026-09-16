@@ -5,6 +5,7 @@
 import { defaultConfig } from '@/config';
 import { sanitizeFilename } from '@/utils/file';
 import { withPermissionRetry } from '@/utils/retry';
+import type { AudioSettings } from '@/state/types';
 import type { FFmpegService } from './FFmpegService';
 import { parseMP3Duration } from './MP3Parser';
 import type { ChunkStore } from './ChunkStore';
@@ -28,21 +29,11 @@ export interface MergeGroup {
 
 export interface MergerConfig {
   outputFormat: 'opus';
-  silenceRemoval: boolean;
-  normalization: boolean;
-  deEss: boolean;
-  silenceGapMs: number;
-  eq: boolean;
-  compressor: boolean;
-  fadeIn: boolean;
-  // Opus encoding settings
-  opusMinBitrate?: number;
-  opusMaxBitrate?: number;
-  opusCompressionLevel?: number;
-  // Parallel encoding pool: optional FFmpegService factory (DI) and worker count.
-  // Absent/legacy config => sequential behavior (existing tests unaffected).
+  // Audio processing and encoding settings, carried as one object.
+  audio: AudioSettings;
+  // Parallel encoding pool: optional FFmpegService factory (DI). Absent
+  // factory => sequential behavior (pool is just the injected singleton).
   ffmpegFactory?: () => FFmpegService;
-  mergeConcurrency?: number;
   chunkStore?: ChunkStore | null;
 }
 
@@ -251,22 +242,7 @@ export class AudioMerger {
     // Check if ALL chunks are missing
     if (chunks.every((c) => c === null)) return null;
 
-    const processedAudio = await ffmpegService.processAudio(
-      chunks,
-      {
-        silenceRemoval: this.config.silenceRemoval,
-        normalization: this.config.normalization,
-        deEss: this.config.deEss,
-        silenceGapMs: this.config.silenceGapMs,
-        eq: this.config.eq,
-        compressor: this.config.compressor,
-        fadeIn: this.config.fadeIn,
-        opusMinBitrate: this.config.opusMinBitrate,
-        opusMaxBitrate: this.config.opusMaxBitrate,
-        opusCompressionLevel: this.config.opusCompressionLevel,
-      },
-      onProgress,
-    );
+    const processedAudio = await ffmpegService.processAudio(chunks, this.config.audio, onProgress);
 
     const filename = this.generateGroupFilename(group, totalGroups, this.config.outputFormat);
 
@@ -377,7 +353,7 @@ export class AudioMerger {
     // singleton => concurrency 1 (existing tests unaffected).
     const workerCount = Math.max(
       1,
-      Math.min(this.config.mergeConcurrency ?? 1, MAX_MERGE_CONCURRENCY),
+      Math.min(this.config.audio.mergeConcurrency, MAX_MERGE_CONCURRENCY),
     );
     const workers: FFmpegService[] = [this.ffmpegService];
     if (this.config.ffmpegFactory) {

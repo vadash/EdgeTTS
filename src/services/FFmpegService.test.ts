@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LoggerStore } from '@/services/Logger';
-import { FFmpegBlobCache, FFmpegService, type AudioProcessingConfig } from './FFmpegService';
+import type { AudioSettings } from '@/state/types';
+import { FFmpegBlobCache, FFmpegService } from './FFmpegService';
 
 describe('FFmpegService Opus integration', () => {
   it('should use custom Opus settings when provided', async () => {
@@ -20,7 +21,7 @@ describe('FFmpegService Opus integration', () => {
     };
     (service as any).loaded = true;
 
-    const config: AudioProcessingConfig = {
+    const config: AudioSettings = {
       silenceRemoval: false,
       normalization: false,
       deEss: false,
@@ -31,6 +32,7 @@ describe('FFmpegService Opus integration', () => {
       opusMinBitrate: 48,
       opusMaxBitrate: 64,
       opusCompressionLevel: 5,
+      mergeConcurrency: 2,
     };
 
     await service.processAudio([new Uint8Array()], config);

@@ -4,6 +4,7 @@
 import { defaultConfig } from '@/config';
 import { AppError, getErrorMessage, insufficientVoicesError, noContentError } from '@/errors';
 import type {
+  AudioSettings,
   LLMCharacter,
   ProcessedBook,
   SpeakerAssignment,
@@ -76,17 +77,7 @@ export interface OrchestratorInput {
   enabledVoices: string[];
   lexxRegister: boolean;
   outputFormat: 'opus';
-  silenceRemoval: boolean;
-  normalization: boolean;
-  deEss: boolean;
-  silenceGapMs: number;
-  eq: boolean;
-  compressor: boolean;
-  fadeIn: boolean;
-  opusMinBitrate: number;
-  opusMaxBitrate: number;
-  opusCompressionLevel: number;
-  mergeConcurrency: number;
+  audio: AudioSettings;
 
   // Data
   directoryHandle: FileSystemDirectoryHandle | null;
@@ -985,17 +976,8 @@ async function runTTSStage(
   await chunkStore.prepareForRead();
 
   const merger = audioMergerFactory.create({
+    audio: input.audio,
     outputFormat: 'opus',
-    silenceRemoval: input.silenceRemoval,
-    normalization: input.normalization,
-    deEss: input.deEss,
-    silenceGapMs: input.silenceGapMs,
-    eq: input.eq,
-    compressor: input.compressor,
-    fadeIn: input.fadeIn,
-    opusMinBitrate: input.opusMinBitrate,
-    opusCompressionLevel: input.opusCompressionLevel,
-    mergeConcurrency: input.mergeConcurrency,
     chunkStore: chunkStore,
   });
 

@@ -25,6 +25,10 @@ _Avoid_: block, segment
 **Gap**:
 Deliberate silence inserted between chunks before the filter chain runs.
 
+**Audio settings**:
+The processing and encoding flags configured on the Audio tab, carried as one object from Conversion input into the audio merge.
+_Avoid_: audio config, filter chain config
+
 **Failure log**:
 The file where permanently failed chunks are recorded.
 

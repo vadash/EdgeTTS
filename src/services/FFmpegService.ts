@@ -4,6 +4,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { defaultConfig } from '@/config';
 import { IndexedDBNames } from '@/config/storage';
+import type { AudioSettings } from '@/state/types';
 import { getErrorMessage } from '@/errors';
 import { openIDB, requestToPromise, withTransaction } from '@/utils/idb';
 import { buildFilterChain } from './audio/buildFilterChain';
@@ -107,33 +108,6 @@ async function safeToBlobURL(
 }
 
 export type FFmpegProgressCallback = (message: string) => void;
-
-export interface AudioProcessingOptions {
-  silenceRemoval: boolean;
-  normalization: boolean;
-  deEss: boolean;
-  silenceGapMs: number;
-  eq: boolean;
-  compressor: boolean;
-  fadeIn: boolean;
-  opusMinBitrate?: number;
-  opusMaxBitrate?: number;
-  opusCompressionLevel?: number;
-}
-
-export interface AudioProcessingConfig {
-  silenceRemoval: boolean;
-  normalization: boolean;
-  deEss: boolean;
-  silenceGapMs: number;
-  eq: boolean;
-  compressor: boolean;
-  fadeIn: boolean;
-  // Opus encoding settings (optional, uses defaults if not provided)
-  opusMinBitrate?: number;
-  opusMaxBitrate?: number;
-  opusCompressionLevel?: number;
-}
 
 /**
  * FFmpegService
@@ -263,7 +237,7 @@ export class FFmpegService {
    */
   async processAudio(
     chunks: (Uint8Array | null)[],
-    config: AudioProcessingConfig,
+    audio: AudioSettings,
     onProgress?: (message: string) => void,
   ): Promise<Uint8Array> {
     // Proactively refresh FFmpeg to prevent WASM memory exhaustion after many operations
@@ -289,7 +263,7 @@ export class FFmpegService {
 
     try {
       // Generate silence file upfront (for gaps and missing chunk placeholders)
-      const silenceGapMs = config.silenceGapMs ?? 200; // Default 200ms for missing chunks
+      const silenceGapMs = audio.silenceGapMs;
       const hasMissingChunks = chunks.some((c) => c === null);
       const needsGaps = silenceGapMs > 0 && chunks.filter((c) => c !== null).length > 1;
 
@@ -348,7 +322,7 @@ export class FFmpegService {
       await ffmpeg.writeFile('concat.txt', concatLines.join('\n'));
 
       // Build filter chain
-      const filters = buildFilterChain(config);
+      const filters = buildFilterChain(audio);
 
       // Build FFmpeg arguments
       const args = ['-f', 'concat', '-safe', '0', '-i', 'concat.txt'];
@@ -357,21 +331,18 @@ export class FFmpegService {
         args.push('-af', filters);
       }
 
-      // Determine Opus encoding settings
-      const minBitrate = config.opusMinBitrate ?? defaultConfig.audio.opusBitrate;
-      const maxBitrate = config.opusMaxBitrate ?? minBitrate;
-      const compression = config.opusCompressionLevel ?? defaultConfig.audio.opusCompression;
-
       args.push(
         '-c:a',
         'libopus',
         '-b:a',
-        `${minBitrate}k`,
+        `${audio.opusMinBitrate}k`,
         '-compression_level',
-        String(compression),
+        String(audio.opusCompressionLevel),
         '-vbr',
         'on',
-        ...(maxBitrate > minBitrate ? ['-maxrate', `${maxBitrate}k`] : []),
+        ...(audio.opusMaxBitrate > audio.opusMinBitrate
+          ? ['-maxrate', `${audio.opusMaxBitrate}k`]
+          : []),
         '-ar',
         String(defaultConfig.audio.sampleRate),
         '-ac',

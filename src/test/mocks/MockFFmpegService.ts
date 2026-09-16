@@ -2,7 +2,8 @@
 // Used for testing components that depend on FFmpeg functionality
 
 import { vi } from 'vitest';
-import type { AudioProcessingOptions, FFmpegProgressCallback } from '@/services/FFmpegService';
+import type { FFmpegProgressCallback } from '@/services/FFmpegService';
+import type { AudioSettings } from '@/state/types';
 
 export class MockFFmpegService {
   private loaded = false;
@@ -31,7 +32,7 @@ export class MockFFmpegService {
   processAudio = vi.fn(
     async (
       chunks: Uint8Array[],
-      _config: AudioProcessingOptions,
+      _config: AudioSettings,
       onProgress?: FFmpegProgressCallback,
     ): Promise<Uint8Array> => {
       if (!this.loaded) {

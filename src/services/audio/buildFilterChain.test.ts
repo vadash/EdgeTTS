@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import type { AudioSettings } from '@/state/types';
 import { buildFilterChain } from './buildFilterChain';
 
 describe('buildFilterChain', () => {
-  const allOff = {
+  const allOff: AudioSettings = {
     silenceRemoval: false,
     normalization: false,
     deEss: false,
@@ -10,6 +11,10 @@ describe('buildFilterChain', () => {
     eq: false,
     compressor: false,
     fadeIn: false,
+    opusMinBitrate: 24,
+    opusMaxBitrate: 64,
+    opusCompressionLevel: 10,
+    mergeConcurrency: 2,
   };
 
   it('returns empty string when all filters disabled', () => {
@@ -80,6 +85,10 @@ describe('buildFilterChain', () => {
       compressor: false,
       fadeIn: true,
       silenceGapMs: 100,
+      opusMinBitrate: 24,
+      opusMaxBitrate: 64,
+      opusCompressionLevel: 10,
+      mergeConcurrency: 2,
     });
     expect(chain).toMatch(/^deesser=.*silenceremove=.*loudnorm=.*afade=t=in:ss=0:d=0\.1$/);
   });

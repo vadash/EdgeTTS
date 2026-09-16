@@ -15,10 +15,6 @@ export interface AudioConfig {
   tolerancePercent: number;
   /** Edge TTS output: 96kbps = 12 bytes/ms */
   bytesPerMs: number;
-  /** Opus encoding bitrate (kbps) */
-  opusBitrate: number;
-  /** Opus compression level (1-10) */
-  opusCompression: number;
   /** Sample rate (Hz) */
   sampleRate: number;
   /** Normalization LUFS target */
@@ -95,8 +91,6 @@ export const defaultConfig: AppConfig = {
     targetDurationMinutes: 15,
     tolerancePercent: 10,
     bytesPerMs: 12, // 96kbps = 12 bytes/ms
-    opusBitrate: 32,
-    opusCompression: 10,
     sampleRate: 24000,
     normLufs: -20,
     normLra: 7,

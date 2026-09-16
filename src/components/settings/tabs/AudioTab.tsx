@@ -251,6 +251,10 @@ export function AudioTab() {
                   normalization: settings.normalizationEnabled.value,
                   fadeIn: settings.fadeInEnabled.value,
                   silenceGapMs: 0,
+                  opusMinBitrate: settings.opusMinBitrate.value,
+                  opusMaxBitrate: settings.opusMaxBitrate.value,
+                  opusCompressionLevel: settings.opusCompressionLevel.value,
+                  mergeConcurrency: settings.mergeConcurrency.value,
                 },
               })
             }

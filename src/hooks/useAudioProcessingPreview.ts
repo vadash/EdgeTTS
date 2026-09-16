@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'preact/hooks';
 import { getFFmpeg } from '@/services';
-import type { AudioProcessingConfig } from '@/services/FFmpegService';
+import type { AudioSettings } from '@/state/types';
 import { withRetry } from '@/utils/retry/network';
 import { SAMPLE_PHRASES, synthesizeSample, useAudioPreview } from './useAudioPreview';
 
@@ -14,7 +14,7 @@ export interface AudioProcessingPreviewInput {
   /** Pitch in Hz points, e.g. 0 -> "+0Hz" */
   pitch?: number;
   /** Filter chain config; silenceGapMs is always forced to 0 (single chunk) */
-  config: AudioProcessingConfig;
+  config: AudioSettings;
 }
 
 /**
@@ -49,7 +49,7 @@ export function useAudioProcessingPreview() {
           setStage('ffmpeg');
 
           // silenceGapMs is meaningless for a single chunk — always force 0
-          const processConfig: AudioProcessingConfig = { ...input.config, silenceGapMs: 0 };
+          const processConfig: AudioSettings = { ...input.config, silenceGapMs: 0 };
 
           const ffmpeg = getFFmpeg();
           const processed = await withRetry(

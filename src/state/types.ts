@@ -71,6 +71,24 @@ export interface AppSettings {
   mergeConcurrency: number;
 }
 
+/**
+ * Audio processing and encoding flags configured on the Audio tab, carried
+ * as one object from Conversion input into the audio merge.
+ */
+export interface AudioSettings {
+  silenceRemoval: boolean;
+  normalization: boolean;
+  deEss: boolean;
+  silenceGapMs: number;
+  eq: boolean;
+  compressor: boolean;
+  fadeIn: boolean;
+  opusMinBitrate: number;
+  opusMaxBitrate: number;
+  opusCompressionLevel: number;
+  mergeConcurrency: number;
+}
+
 export interface ProcessedBook {
   fileNames: Array<[string, number]>;
   allSentences: string[];

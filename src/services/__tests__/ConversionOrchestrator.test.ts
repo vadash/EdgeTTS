@@ -3,7 +3,7 @@ import { AppError } from '@/errors';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, StageConfig, StageId } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
-import type { AudioMerger } from '../AudioMerger';
+import type { AudioMerger, MergerConfig } from '../AudioMerger';
 import type { ChunkStore } from '../ChunkStore';
 import {
   type ConversionOrchestratorServices,
@@ -48,17 +48,19 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
     useVoting: false,
     lexxRegister: false,
     outputFormat: 'opus' as const,
-    silenceRemoval: false,
-    normalization: false,
-    deEss: false,
-    silenceGapMs: 0,
-    eq: false,
-    compressor: false,
-    fadeIn: false,
-    opusMinBitrate: 24,
-    opusMaxBitrate: 64,
-    opusCompressionLevel: 10,
-    mergeConcurrency: 2,
+    audio: {
+      silenceRemoval: false,
+      normalization: false,
+      deEss: false,
+      silenceGapMs: 0,
+      eq: false,
+      compressor: false,
+      fadeIn: false,
+      opusMinBitrate: 24,
+      opusMaxBitrate: 64,
+      opusCompressionLevel: 10,
+      mergeConcurrency: 2,
+    },
     extractConfig: mockStageConfig(),
     mergeConfig: mockStageConfig(),
     assignConfig: mockStageConfig(),
@@ -130,6 +132,9 @@ function createMockServices(failPart?: number) {
   };
   const workerPool = { addTasks: vi.fn(), clear: vi.fn() };
   const merger = { mergeAndSave: vi.fn(() => Promise.resolve(1)) };
+  const mergerCreate = vi.fn(
+    (_config: MergerConfig & { chunkStore: ChunkStore }) => merger as unknown as AudioMerger,
+  );
   const llmStages = {
     extract: vi.fn(() => Promise.resolve(TEST_CHARACTERS)),
     assign: vi.fn(() => Promise.resolve(TEST_ASSIGNMENTS)),
@@ -160,16 +165,14 @@ function createMockServices(failPart?: number) {
         return workerPool as unknown as TTSWorkerPool;
       }),
     },
-    audioMergerFactory: {
-      create: vi.fn(() => merger as unknown as AudioMerger),
-    },
+    audioMergerFactory: { create: mergerCreate },
     voicePoolBuilder: {
       buildPool: vi.fn(() => ({ male: ['m1', 'm2'], female: ['f1', 'f2', 'f3'] })),
     },
     ffmpegService: { load: vi.fn(() => Promise.resolve(true)) } as unknown as FFmpegService,
     chunkStoreFactory: { create: () => chunkStore as unknown as ChunkStore },
   };
-  return { services, chunkStore, workerPool, merger };
+  return { services, chunkStore, workerPool, merger, mergerCreate };
 }
 
 async function writeResumeState(
@@ -382,5 +385,41 @@ describe('runConversion', () => {
       'Persisted 1 total failed chunk(s) to failed_chunks.json',
     );
     expect(ports.run.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards the complete audio settings to the audio merger', async () => {
+    const { services, mergerCreate } = createMockServices();
+    const ports = createMockPorts();
+    // Resume with one cached/failed chunk: the only path where the mock
+    // pipeline has audio to merge, so audioMergerFactory.create runs.
+    ports.resume.confirm = vi.fn(() => Promise.resolve(true));
+    const dirHandle = createMockDirectoryHandle() as unknown as FileSystemDirectoryHandle;
+    await writeResumeState(dirHandle, { 'failed_chunks.json': '[0]' });
+
+    await runConversion(
+      services,
+      ports,
+      new AbortController().signal,
+      createMockInput({ directoryHandle: dirHandle }),
+    );
+
+    expect(reportMessages(ports)).toContain('Saved 1 file(s)');
+    expect(mergerCreate).toHaveBeenCalledTimes(1);
+    // Regression: the merger config was hand-copied field by field and
+    // dropped opusMaxBitrate, so the merge silently fell back to the min
+    // bitrate. The settings must travel as one object, untouched.
+    expect(mergerCreate.mock.calls[0][0].audio).toEqual({
+      silenceRemoval: false,
+      normalization: false,
+      deEss: false,
+      silenceGapMs: 0,
+      eq: false,
+      compressor: false,
+      fadeIn: false,
+      opusMinBitrate: 24,
+      opusMaxBitrate: 64,
+      opusCompressionLevel: 10,
+      mergeConcurrency: 2,
+    });
   });
 });

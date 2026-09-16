@@ -104,14 +104,19 @@ describe('AudioMerger - parallel merge pool', () => {
 
     const config: MergerConfig = {
       outputFormat: 'opus',
-      silenceRemoval: false,
-      normalization: false,
-      deEss: false,
-      silenceGapMs: 0,
-      eq: false,
-      compressor: false,
-      fadeIn: false,
-      mergeConcurrency: 2,
+      audio: {
+        silenceRemoval: false,
+        normalization: false,
+        deEss: false,
+        silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        opusMinBitrate: 24,
+        opusMaxBitrate: 64,
+        opusCompressionLevel: 10,
+        mergeConcurrency: 2,
+      },
       ffmpegFactory: () => workerMock as unknown as FFmpegService,
       chunkStore,
     };
@@ -177,14 +182,19 @@ describe('AudioMerger - parallel merge pool', () => {
 
     const config: MergerConfig = {
       outputFormat: 'opus',
-      silenceRemoval: false,
-      normalization: false,
-      deEss: false,
-      silenceGapMs: 0,
-      eq: false,
-      compressor: false,
-      fadeIn: false,
-      mergeConcurrency: 2,
+      audio: {
+        silenceRemoval: false,
+        normalization: false,
+        deEss: false,
+        silenceGapMs: 0,
+        eq: false,
+        compressor: false,
+        fadeIn: false,
+        opusMinBitrate: 24,
+        opusMaxBitrate: 64,
+        opusCompressionLevel: 10,
+        mergeConcurrency: 2,
+      },
       chunkStore,
     };
 
