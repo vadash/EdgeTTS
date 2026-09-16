@@ -21,11 +21,11 @@ import {
   applyMergeGroups,
   buildCodeMapping,
   cullByFrequency,
-  mergeCharacters,
+  mergeCharacters as dedupeCharacters,
 } from './CharacterUtils';
 import { collectVotes, spreadTemps } from './collectVotes';
 import { DebugLogger } from './DebugLogger';
-import { LLMApiClient } from './LLMApiClient';
+import { LLMApiClient, type LLMApiClientOptions } from './LLMApiClient';
 import { runWithConcurrency } from './runWithConcurrency';
 import {
   type AssignResponse,
@@ -62,6 +62,14 @@ type NestedStageConfig = Pick<StageConfig, 'apiKey' | 'apiUrl' | 'model'> &
   Partial<Omit<StageConfig, 'apiKey' | 'apiUrl' | 'model'>>;
 
 /**
+ * Resolved client config for one structured-call adapter: exactly the fields
+ * an LLMApiClient consumes once stage-config fallbacks have been applied.
+ * Exported so an injected transport can switch on the same fields the prod
+ * adapter sees (model distinguishes primary/backup/merge stages).
+ */
+export type LLMClientConfig = LLMApiClientOptions;
+
+/**
  * Options for creating LLM service instances
  * Aliased as LLMServiceFactoryOptions for DI compatibility
  */
@@ -87,6 +95,14 @@ export interface LLMVoiceServiceOptions {
   mergeConfig?: NestedStageConfig;
   /** Optional backup model — used when this stage exhausts maxRetries */
   backupConfig?: NestedStageConfig;
+  /**
+   * Transport seam: routes one structured call through an arbitrary adapter.
+   * When present, no LLMApiClient (OpenAI SDK) is constructed — stage tests
+   * stub this with canned parsed responses instead of mocking the SDK.
+   */
+  transport?: <T>(config: LLMClientConfig, opts: StructuredCallOptions<T>) => Promise<T>;
+  /** Deterministic speaker-code source for tests; defaults to random hex codes. */
+  speakerCodeFactory?: () => string;
 }
 
 /**
@@ -94,10 +110,18 @@ export interface LLMVoiceServiceOptions {
  */
 export class LLMVoiceService {
   private options: LLMVoiceServiceOptions;
-  public apiClient: LLMApiClient;
-  public backupApiClient: LLMApiClient | null;
-  private abortController: AbortController | null = null;
   private logger: ILogger;
+  private debugLogger: DebugLogger;
+  /** Resolved per-stage adapter configs; `call` routes these. */
+  private primaryConfig: LLMClientConfig;
+  private backupConfig: NestedStageConfig | null;
+  private backupClientConfig: LLMClientConfig | null;
+  /** Prod OpenAI-SDK adapters — built only when no transport is injected. */
+  private apiClient: LLMApiClient | undefined;
+  private backupApiClient: LLMApiClient | null = null;
+  /** Identical resolved configs share one client (safe: the rate-limit gate is process-global). */
+  private clientCache = new Map<string, LLMApiClient>();
+  private abortController: AbortController | null = null;
 
   constructor(options: LLMVoiceServiceOptions) {
     if (!options.logger) {
@@ -105,21 +129,33 @@ export class LLMVoiceService {
     }
     this.options = options;
     this.logger = options.logger;
-    const debugLogger = new DebugLogger(options.directoryHandle, options.logger);
-    this.backupApiClient = options.backupConfig
-      ? this.makeClient(options.backupConfig, debugLogger)
+    this.debugLogger = new DebugLogger(options.directoryHandle, options.logger);
+    this.backupConfig = options.backupConfig ?? null;
+    this.backupClientConfig = options.backupConfig
+      ? this.resolveClientConfig(options.backupConfig)
       : null;
-    this.apiClient = this.makeClient(options, debugLogger);
+    this.primaryConfig = this.resolveClientConfig(options);
+    if (!options.transport) {
+      // Prod adapter: one primary + one backup client, as before the seam.
+      this.backupApiClient = this.backupClientConfig
+        ? new LLMApiClient(this.backupClientConfig)
+        : null;
+      this.apiClient = new LLMApiClient(this.primaryConfig);
+      this.clientCache.set(JSON.stringify(this.primaryConfig), this.apiClient);
+      if (this.backupApiClient) {
+        this.clientCache.set(JSON.stringify(this.backupClientConfig!), this.backupApiClient);
+      }
+    }
   }
 
   /**
-   * Single construction path for this service's LLM clients: a stage config
+   * Single resolution path for this service's adapter configs: a stage config
    * (backup/merge) falls back to the main options field-by-field, and shared
    * maxTokens/debugLogger/logger are applied uniformly. Callers pin
    * per-request values by composing them into `config` after their spread —
    * merge votes force non-streaming and carry the vote's own temperature.
    */
-  private makeClient(
+  private resolveClientConfig(
     config: Pick<
       LLMVoiceServiceOptions,
       | 'apiKey'
@@ -131,9 +167,8 @@ export class LLMVoiceService {
       | 'topP'
       | 'corsMiddleware'
     >,
-    debugLogger: DebugLogger | undefined,
-  ): LLMApiClient {
-    return new LLMApiClient({
+  ): LLMClientConfig {
+    return {
       apiKey: config.apiKey,
       apiUrl: config.apiUrl,
       model: config.model,
@@ -143,9 +178,28 @@ export class LLMVoiceService {
       topP: config.topP ?? this.options.topP,
       maxTokens: defaultConfig.llm.maxTokens,
       corsMiddleware: config.corsMiddleware ?? this.options.corsMiddleware,
-      debugLogger,
+      debugLogger: this.debugLogger,
       logger: this.options.logger,
-    });
+    };
+  }
+
+  /**
+   * Route one structured call: the injected transport when present, otherwise
+   * the LLMApiClient adapter for `config`. Clients are cached by resolved
+   * config, so repeated identical configs (e.g. merge votes at the same
+   * temperature) share one instance — safe because the rate-limit gate is
+   * process-global, not per client (ADR 0012).
+   */
+  private call<T>(config: LLMClientConfig, opts: StructuredCallOptions<T>): Promise<T> {
+    const transport = this.options.transport;
+    if (transport) return transport(config, opts);
+    const key = JSON.stringify(config);
+    let client = this.clientCache.get(key);
+    if (!client) {
+      client = new LLMApiClient(config);
+      this.clientCache.set(key, client);
+    }
+    return client.callStructured(opts);
   }
 
   /**
@@ -210,11 +264,11 @@ export class LLMVoiceService {
    * ponytail: merge deliberately does NOT use this path — it never falls back to
    * the backup model. The vote pool (`collectVotes`) replaces a failed attempt
    * with a fresh temperature; `mergeConfig.maxRetries` sizes that replacement
-   * budget, not retries of the same call (see `mergeCharactersWithLLM`).
+   * budget, not retries of the same call (see `mergeCharacters`).
    */
   private async callWithStageBackup<T>(
     stage: 'extract' | 'assign',
-    primaryClient: LLMApiClient,
+    primaryConfig: LLMClientConfig,
     callArgs: StructuredCallOptions<T>,
     signal: AbortSignal | undefined,
     onRetry: (attempt: number, error: unknown) => void,
@@ -223,13 +277,13 @@ export class LLMVoiceService {
     const maxRetries = this.options.maxRetries ?? DEFAULT_MAX_RETRIES;
 
     try {
-      return await this.retryPrimary(() => primaryClient.callStructured(callArgs), signal, onRetry);
+      return await this.retryPrimary(() => this.call(primaryConfig, callArgs), signal, onRetry);
     } catch (error) {
       // Don't fall back if aborted, or no backup configured
-      if (signal?.aborted || !this.backupApiClient) throw error;
+      if (signal?.aborted || !this.backupConfig) throw error;
 
       this.logger?.warn(
-        `[${stage}] Primary model exhausted ${maxRetries} retries, falling back to backup model (${this.options.backupConfig?.model})`,
+        `[${stage}] Primary model exhausted ${maxRetries} retries, falling back to backup model (${this.backupConfig.model})`,
       );
 
       // Custom backup path (2-way split) when provided; otherwise replay the
@@ -239,7 +293,7 @@ export class LLMVoiceService {
       return this.retryBackup(
         stage,
         'retry',
-        () => this.backupApiClient!.callStructured(callArgs),
+        () => this.call(this.backupClientConfig!, callArgs),
         signal,
       );
     }
@@ -268,7 +322,7 @@ export class LLMVoiceService {
         'extract',
         'split retry',
         () =>
-          this.backupApiClient!.callStructured({
+          this.call(this.backupClientConfig!, {
             messages,
             schema: ExtractSchema,
             schemaName: 'ExtractSchema',
@@ -313,7 +367,7 @@ export class LLMVoiceService {
         'assign',
         'split retry',
         () =>
-          this.backupApiClient!.callStructured({
+          this.call(this.backupClientConfig!, {
             messages,
             schema: AssignSchema,
             schemaName: 'AssignSchema',
@@ -353,7 +407,7 @@ export class LLMVoiceService {
     this.logger?.info(`[Extract] Starting (${blocks.length} blocks)`);
     const controller = new AbortController();
     this.abortController = controller;
-    this.apiClient.resetLogging();
+    this.apiClient?.resetLogging();
 
     // Map blocks to task thunks for parallel execution
     const tasks = blocks.map(
@@ -374,7 +428,7 @@ export class LLMVoiceService {
 
     // Save first extract phase log
     if (responses[0]?.debugLog) {
-      await this.apiClient.debugLogger?.savePhaseLog(
+      await this.debugLogger?.savePhaseLog(
         'extract',
         { messages: responses[0].debugLog.messages },
         responses[0].debugLog.response,
@@ -382,7 +436,7 @@ export class LLMVoiceService {
     }
 
     // Simple merge by canonicalName
-    let merged = mergeCharacters(allCharacters);
+    let merged = dedupeCharacters(allCharacters);
 
     // Pre-merge frequency culling (remove hallucinated/noise characters)
     const fullText = blocks
@@ -398,7 +452,7 @@ export class LLMVoiceService {
     // LLM merge if multiple blocks and characters
     if (blocks.length > 1 && merged.length > 1) {
       onProgress?.(blocks.length, blocks.length, `Merging ${merged.length} characters...`);
-      merged = await this.mergeCharactersWithLLM(merged, onProgress);
+      merged = await this.mergeCharacters(merged, onProgress);
       onProgress?.(blocks.length, blocks.length, `Merged to ${merged.length} characters`);
     }
 
@@ -420,7 +474,7 @@ export class LLMVoiceService {
     try {
       const response = await this.callWithStageBackup(
         'extract',
-        this.apiClient,
+        this.primaryConfig,
         {
           messages: extractMessages,
           schema: ExtractSchema,
@@ -467,7 +521,10 @@ export class LLMVoiceService {
     this.abortController = new AbortController();
 
     // Build code mapping from characters (including variations)
-    const { nameToCode, codeToName } = buildCodeMapping(characters);
+    const { nameToCode, codeToName } = buildCodeMapping(
+      characters,
+      this.options.speakerCodeFactory,
+    );
 
     // Build task array for parallel processing
     const tasks = blocks.map((block, globalIndex) => {
@@ -576,7 +633,7 @@ export class LLMVoiceService {
       // Step 1: Always run the initial Assign call
       const draftResponse = await this.callWithStageBackup(
         'assign',
-        this.apiClient,
+        this.primaryConfig,
         {
           messages: assignMessages,
           schema: AssignSchema,
@@ -596,7 +653,7 @@ export class LLMVoiceService {
 
       // Save first assign phase log (draft)
       if (isFirstBlock) {
-        await this.apiClient.debugLogger?.savePhaseLog(
+        await this.debugLogger?.savePhaseLog(
           'assign_draft',
           { messages: assignMessages },
           draftResponse,
@@ -619,7 +676,7 @@ export class LLMVoiceService {
           // exhaustion the catch below falls back to draft (DRY with voting-off).
           const qaResponse = await this.retryPrimary(
             () =>
-              this.apiClient.callStructured({
+              this.call(this.primaryConfig, {
                 messages: qaMessages,
                 schema: AssignSchema,
                 schemaName: 'AssignSchema',
@@ -637,11 +694,7 @@ export class LLMVoiceService {
 
           // Save QA phase log
           if (isFirstBlock) {
-            await this.apiClient.debugLogger?.savePhaseLog(
-              'assign_qa',
-              { messages: qaMessages },
-              qaResponse,
-            );
+            await this.debugLogger?.savePhaseLog('assign_qa', { messages: qaMessages }, qaResponse);
           }
 
           this.logger?.info(
@@ -695,7 +748,7 @@ export class LLMVoiceService {
    * a fresh temperature instead of retried at the same value. Consensus merges
    * pairs that survive >=2 of the gathered votes.
    */
-  private async mergeCharactersWithLLM(
+  async mergeCharacters(
     characters: LLMCharacter[],
     onProgress?: ProgressCallback,
   ): Promise<LLMCharacter[]> {
@@ -788,31 +841,26 @@ export class LLMVoiceService {
       this.options.mergeConfig?.repeatPrompt ?? false,
     );
 
-    // One client per vote: the vote temperature is client-level config
-    // (baked into every request), so votes cannot share one instance —
-    // spreadTemps' distinct temps are the voting design. Votes never
-    // stream: structured outputs.
+    // Votes never stream, and each carries its own temperature as client-level
+    // config — spreadTemps' distinct temps are the voting design (ADR 0008),
+    // so each vote temperature resolves its own adapter config; `call`'s
+    // per-config cache gives identical configs one shared client instance.
     const stage = this.options.mergeConfig ?? this.options;
-    const client = this.makeClient(
-      { ...stage, streaming: false, temperature },
-      this.apiClient.debugLogger, // share debugLogger
-    );
     try {
-      const response = await client.callStructured({
-        messages: mergeMessages,
-        schema: MergeSchema,
-        schemaName: 'MergeSchema',
-        signal,
-      });
+      const response = await this.call(
+        this.resolveClientConfig({ ...stage, streaming: false, temperature }),
+        {
+          messages: mergeMessages,
+          schema: MergeSchema,
+          schemaName: 'MergeSchema',
+          signal,
+        },
+      );
 
       // Save first merge phase log
       // savePhaseLog self-dedups to the first call per phase (DebugLogger),
       // so a safe always-call here captures the first successful merge vote.
-      await this.apiClient.debugLogger?.savePhaseLog(
-        'merge',
-        { messages: mergeMessages },
-        response,
-      );
+      await this.debugLogger?.savePhaseLog('merge', { messages: mergeMessages }, response);
       return response.merges;
     } catch (error) {
       this.logger?.warn(
@@ -828,6 +876,8 @@ export class LLMVoiceService {
   async testConnection(
     streaming = false,
   ): Promise<{ success: boolean; error?: string; model?: string }> {
+    // The transport seam has no SDK client to probe.
+    if (!this.apiClient) return { success: false, error: 'no client' };
     return this.apiClient.testConnection(streaming);
   }
 }

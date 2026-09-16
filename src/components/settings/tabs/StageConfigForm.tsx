@@ -168,7 +168,7 @@ export function StageConfigForm({
         />
         {/* Max Retries — p-retry semantics: attempts AFTER the first, so 0 = one call.
             Merge doesn't retry at all; there the value sizes the replacement-temperature
-            budget for the vote pool (see LLMVoiceService.mergeCharactersWithLLM). */}
+            budget for the vote pool (see LLMVoiceService.mergeCharacters). */}
         <div className="space-y-1">
           <label className="input-label" htmlFor="max-retries-input">
             {isMerge ? (

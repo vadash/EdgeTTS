@@ -2,44 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as assignBuilder from '@/config/prompts/assign/builder';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
+import type { LLMVoiceServiceOptions } from './LLMVoiceService';
 import { LLMVoiceService } from './LLMVoiceService';
-
-// Mock buildCodeMapping to return deterministic codes matching mock LLM responses
-vi.mock('./CharacterUtils', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./CharacterUtils')>();
-  return {
-    ...actual,
-    buildCodeMapping: (characters: LLMCharacter[]) => {
-      const nameToCode = new Map<string, string>();
-      const codeToName = new Map<string, string>();
-      const allNames = [
-        ...characters.map((c) => c.canonicalName),
-        'MALE_UNNAMED',
-        'FEMALE_UNNAMED',
-        'UNKNOWN_UNNAMED',
-      ];
-      const codes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
-      allNames.forEach((name, i) => {
-        nameToCode.set(name, codes[i] ?? `X${i}`);
-        codeToName.set(codes[i] ?? `X${i}`, name);
-      });
-      return { nameToCode, codeToName };
-    },
-  };
-});
-
-// Mock OpenAI client
-vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(function () {
-    return {
-      chat: {
-        completions: {
-          create: vi.fn(),
-        },
-      },
-    };
-  }),
-}));
 
 describe('LLMVoiceService - Assign with Structured Outputs', () => {
   let service: LLMVoiceService;
@@ -55,49 +19,37 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
     { canonicalName: 'Bob', variations: ['Bob'], gender: 'male' },
   ];
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  // Sequential codes matching the canned LLM responses: canonicalNames first,
+  // then MALE_UNNAMED / FEMALE_UNNAMED / UNKNOWN_UNNAMED.
+  const CODES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
 
-  it('assigns speakers using structured output (sparse format)', async () => {
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              reasoning: 'Assigning speakers to dialogue',
-              assignments: {
-                '0': 'A', // Code for Alice
-                '1': 'B', // Code for Bob
-              },
-            }),
-            refusal: null,
-          },
-        },
-      ],
-      model: 'gpt-4o-mini',
-    };
-
-    // Setup mock before creating service
-    const openai = await import('openai');
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(function () {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate,
-          },
-        },
-      } as any;
-    });
-
-    service = new LLMVoiceService({
+  function makeService(options: Partial<LLMVoiceServiceOptions> = {}) {
+    let next = 0;
+    return new LLMVoiceService({
       apiKey: 'test-key',
       apiUrl: 'https://api.openai.com/v1',
       model: 'gpt-4o-mini',
       narratorVoice: 'narrator-voice',
       logger: mockLogger,
+      speakerCodeFactory: () => CODES[next++] ?? `X${next}`,
+      ...options,
     });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('assigns speakers using structured output (sparse format)', async () => {
+    const assignResponse = {
+      reasoning: 'Assigning speakers to dialogue',
+      assignments: {
+        '0': 'A', // Code for Alice
+        '1': 'B', // Code for Bob
+      },
+    };
+
+    service = makeService({ transport: async () => assignResponse as never });
 
     const blocks: TextBlock[] = [
       {
@@ -115,42 +67,14 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
   });
 
   it('handles sparse assignments (missing indices get narrator)', async () => {
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              reasoning: null,
-              assignments: {
-                '0': 'A', // Only sentence 0 assigned (A = Alice)
-              },
-            }),
-            refusal: null,
-          },
-        },
-      ],
-      model: 'gpt-4o-mini',
+    const assignResponse = {
+      reasoning: null,
+      assignments: {
+        '0': 'A', // Only sentence 0 assigned (A = Alice)
+      },
     };
 
-    const openai = await import('openai');
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(function () {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate,
-          },
-        },
-      } as any;
-    });
-
-    service = new LLMVoiceService({
-      apiKey: 'test-key',
-      apiUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
-      narratorVoice: 'narrator-voice',
-      logger: mockLogger,
-    });
+    service = makeService({ transport: async () => assignResponse as never });
 
     const blocks: TextBlock[] = [
       {
@@ -168,43 +92,15 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
   });
 
   it('passes overlap sentences from previous block to processAssignBlock', async () => {
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              reasoning: null,
-              assignments: { '0': 'A' },
-            }),
-            refusal: null,
-          },
-        },
-      ],
-      model: 'gpt-4o-mini',
+    const assignResponse = {
+      reasoning: null,
+      assignments: { '0': 'A' },
     };
-
-    const openai = await import('openai');
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(function () {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate,
-          },
-        },
-      } as any;
-    });
 
     // Spy on buildAssignPrompt to capture the overlapSentences argument
     const spy = vi.spyOn(assignBuilder, 'buildAssignPrompt');
 
-    service = new LLMVoiceService({
-      apiKey: 'test-key',
-      apiUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
-      narratorVoice: 'narrator-voice',
-      logger: mockLogger,
-    });
+    service = makeService({ transport: async () => assignResponse as never });
 
     const blocks: TextBlock[] = [
       {

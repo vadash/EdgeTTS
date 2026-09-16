@@ -3,15 +3,15 @@ import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
-import { LLMApiClient } from './LLMApiClient';
 import { LLMVoiceService } from './LLMVoiceService';
+import type { LLMClientConfig, LLMVoiceServiceOptions } from './LLMVoiceService';
 import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
 import type { StructuredCallOptions } from './schemaUtils';
 
 // Real LLM request capture from an actual Infinite Regressor conversion. The
 // `messages` block is exactly what the pipeline built on the wire; we replay it
-// against a mocked api client to exercise the stage fallback behaviour without
-// network. Files are git-added under src/test/fixtures/llm-real-data/.
+// against the injected transport to exercise the stage fallback behaviour
+// without network. Files are git-added under src/test/fixtures/llm-real-data/.
 const FIXTURES = path.resolve(
   __dirname,
   '..',
@@ -32,12 +32,6 @@ function loadUserContent(file: string): string {
 
 const PRIMARY_REJECT = new Error('primary failed');
 const BACKUP_REJECT = new Error('backup failed');
-
-vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(function () {
-    return { chat: { completions: { create: vi.fn() } } };
-  }),
-}));
 
 const mockLogger: ILogger = {
   info: vi.fn(),
@@ -79,23 +73,29 @@ const characters: LLMCharacter[] = [
 ];
 
 type CallArg = StructuredCallOptions<unknown>;
+type TransportCall = { config: LLMClientConfig; opts: CallArg };
+type Transport = NonNullable<LLMVoiceServiceOptions['transport']>;
+type TransportBehavior = 'reject' | object;
 
-function mockPrimary(service: LLMVoiceService, result: 'reject' | object): void {
-  const fn = vi.spyOn(service.apiClient, 'callStructured');
-  if (result === 'reject') fn.mockRejectedValue(PRIMARY_REJECT);
-  else fn.mockResolvedValue(result as never);
+// Injected transport stub: primary/merge vs backup behaviour is routed by
+// config.model (the resolved stage config the service hands to the seam),
+// and every call is captured for wire-shape and routing assertions.
+function makeTransport(primary: TransportBehavior, backup: TransportBehavior = 'reject') {
+  const calls: TransportCall[] = [];
+  const transport: Transport = async (config, opts) => {
+    calls.push({ config, opts });
+    if (config.model === backupOpts.model) {
+      if (backup === 'reject') throw BACKUP_REJECT;
+      return backup as never;
+    }
+    if (primary === 'reject') throw PRIMARY_REJECT;
+    return primary as never;
+  };
+  return { transport, calls };
 }
 
-function mockBackup(service: LLMVoiceService, result: 'reject' | object): void {
-  if (!service.backupApiClient) return;
-  const fn = vi.spyOn(service.backupApiClient, 'callStructured');
-  if (result === 'reject') fn.mockRejectedValue(BACKUP_REJECT);
-  else fn.mockResolvedValue(result as never);
-}
-
-function primaryCalls(service: LLMVoiceService): CallArg[] {
-  const fn = vi.mocked(service.apiClient.callStructured);
-  return fn.mock.calls.map((c) => c[0] as unknown as CallArg);
+function modelCalls(calls: TransportCall[], model: string): CallArg[] {
+  return calls.filter((c) => c.config.model === model).map((c) => c.opts);
 }
 
 describe('LLMVoiceService - per-stage fallback (real request data)', () => {
@@ -108,38 +108,35 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
   // --------------------------------------------------------------------- extract
 
   it('extract: primary succeeds -> returns characters from that block, no backup call', async () => {
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts } });
-    mockPrimary(service, EXTRACT_OK);
-    vi.spyOn(service.backupApiClient!, 'callStructured');
+    const { transport, calls } = makeTransport(EXTRACT_OK);
+    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
     const blocks: TextBlock[] = [
       { blockIndex: 0, sentenceStartIndex: 0, sentences: ['Line one.', 'Line two.'] },
     ];
     const result = await service.extractCharacters(blocks);
 
-    expect(service.backupApiClient!.callStructured).not.toHaveBeenCalled();
+    expect(calls.some((c) => c.config.model === backupOpts.model)).toBe(false);
     expect(Array.isArray(result)).toBe(true);
   });
 
   it('extract: primary exhausted -> falls back to backup (backup succeeds)', async () => {
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts } });
-    mockPrimary(service, 'reject');
-    mockBackup(service, EXTRACT_OK);
+    const { transport, calls } = makeTransport('reject', EXTRACT_OK);
+    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
 
     const blocks: TextBlock[] = [
       { blockIndex: 0, sentenceStartIndex: 0, sentences: ['Line one.'] },
     ];
     await service.extractCharacters(blocks);
 
-    expect(service.backupApiClient!.callStructured).toHaveBeenCalled();
+    expect(calls.some((c) => c.config.model === backupOpts.model)).toBe(true);
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('falling back to backup model (backup-model)'),
     );
   });
 
   it('extract: main + backup both fail -> block skipped (empty characters), no throw', async () => {
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts } });
-    mockPrimary(service, 'reject');
-    mockBackup(service, 'reject');
+    const { transport } = makeTransport('reject', 'reject');
+    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
 
     const blocks: TextBlock[] = [
       { blockIndex: 0, sentenceStartIndex: 0, sentences: ['Line one.', 'Line two.'] },
@@ -153,8 +150,8 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
   });
 
   it('extract: real Infinite Regressor request uses ExtractSchema wire shape', async () => {
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts } });
-    mockPrimary(service, EXTRACT_OK);
+    const { transport, calls } = makeTransport(EXTRACT_OK);
+    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
 
     const blocks: TextBlock[] = [
       {
@@ -164,20 +161,19 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
       },
     ];
     await service.extractCharacters(blocks).catch(() => {});
-    const calls = primaryCalls(service);
-    expect(calls[0].schema).toBe(ExtractSchema);
-    expect(calls[0].schemaName).toBe('ExtractSchema');
-    expect(calls[0].messages[0].role).toBe('system');
-    expect(calls[0].messages[1].role).toBe('user');
+    const wire = modelCalls(calls, baseOpts.model);
+    expect(wire[0].schema).toBe(ExtractSchema);
+    expect(wire[0].schemaName).toBe('ExtractSchema');
+    expect(wire[0].messages[0].role).toBe('system');
+    expect(wire[0].messages[1].role).toBe('user');
   });
 
   // --------------------------------------------------------------------- assign
 
   it('assign: primary succeeds -> speakers assigned, no backup call', async () => {
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts } });
-    mockPrimary(service, ASSIGN_OK);
+    const { transport, calls } = makeTransport(ASSIGN_OK);
+    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
 
-    vi.spyOn(service.backupApiClient!, 'callStructured');
     const blocks: TextBlock[] = [
       {
         blockIndex: 0,
@@ -187,13 +183,12 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
     ];
     const result = await service.assignSpeakers(blocks, new Map(), characters);
     expect(result).toHaveLength(2);
-    expect(service.backupApiClient!.callStructured).not.toHaveBeenCalled();
+    expect(calls.some((c) => c.config.model === backupOpts.model)).toBe(false);
   });
 
   it('assign: main + backup both fail -> all sentences fall back to narrator', async () => {
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts } });
-    mockPrimary(service, 'reject');
-    mockBackup(service, 'reject');
+    const { transport } = makeTransport('reject', 'reject');
+    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
 
     const blocks: TextBlock[] = [
       {
@@ -212,8 +207,8 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
   });
 
   it('assign: real Infinite Regressor request uses AssignSchema wire shape', async () => {
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts } });
-    mockPrimary(service, ASSIGN_OK);
+    const { transport, calls } = makeTransport(ASSIGN_OK);
+    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
 
     const blocks: TextBlock[] = [
       {
@@ -223,14 +218,15 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
       },
     ];
     await service.assignSpeakers(blocks, new Map(), characters).catch(() => {});
-    const calls = primaryCalls(service);
-    expect(calls[0].schema).toBe(AssignSchema);
-    expect(calls[0].schemaName).toBe('AssignSchema');
+    const wire = modelCalls(calls, baseOpts.model);
+    expect(wire[0].schema).toBe(AssignSchema);
+    expect(wire[0].schemaName).toBe('AssignSchema');
   });
 
   // ----------------------------------------------------------------------- merge
 
   it('merge: never falls back to backup — failed votes are skipped (no backup call)', async () => {
+    const { transport, calls } = makeTransport('reject');
     service = new LLMVoiceService({
       ...baseOpts,
       mergeConfig: {
@@ -240,26 +236,24 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
         maxRetries: 5,
       },
       backupConfig: { ...backupOpts },
+      transport,
     });
-    vi.spyOn(service.backupApiClient!, 'callStructured');
 
     const chars: LLMCharacter[] = [
       { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
       { canonicalName: 'Alicia', variations: ['Alicia'], gender: 'female' },
     ];
-    const typed = service as unknown as {
-      mergeCharactersWithLLM: (c: LLMCharacter[]) => Promise<LLMCharacter[]>;
-    };
-    const result = await typed.mergeCharactersWithLLM(chars);
+    const result = await service.mergeCharacters(chars);
 
     expect(result).toEqual(chars); // consensus with no votes returns the input
-    expect(service.backupApiClient!.callStructured).not.toHaveBeenCalled();
+    expect(calls.some((c) => c.config.model === backupOpts.model)).toBe(false);
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.stringContaining('Only 0/5 votes survived'),
     );
   });
 
   it('merge: every successful vote uses MergeSchema; union filter runs after gather', async () => {
+    const { transport, calls } = makeTransport(MERGE_OK);
     service = new LLMVoiceService({
       ...baseOpts,
       mergeConfig: {
@@ -269,40 +263,29 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
         maxRetries: 5,
       },
       backupConfig: { ...backupOpts },
+      transport,
     });
-    // singleMerge builds a fresh client per vote, so patch the prototype to
-    // resolve every vote from one place and capture the wire calls. The
-    // backup spy must be installed FIRST: spying an inherited method while
-    // the prototype is already mocked returns the shared prototype mock
-    // instead of an instance-local one, which would count the vote calls.
-    const backupSpy = vi.spyOn(service.backupApiClient!, 'callStructured');
-    const protoSpy = vi
-      .spyOn(LLMApiClient.prototype, 'callStructured')
-      .mockResolvedValue(MERGE_OK as never);
 
     const chars: LLMCharacter[] = [
       { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
       { canonicalName: 'Alicia', variations: ['Alicia'], gender: 'female' },
       { canonicalName: 'Bob', variations: ['Bob'], gender: 'male' },
     ];
-    const typed = service as unknown as {
-      mergeCharactersWithLLM: (c: LLMCharacter[]) => Promise<LLMCharacter[]>;
-    };
-    const result = await typed.mergeCharactersWithLLM(chars);
+    const result = await service.mergeCharacters(chars);
 
-    const calls = protoSpy.mock.calls.map((c) => c[0] as unknown as CallArg);
     expect(calls.length).toBeGreaterThan(0);
     for (const c of calls) {
-      expect(c.schema).toBe(MergeSchema);
-      expect(c.schemaName).toBe('MergeSchema');
+      expect(c.opts.schema).toBe(MergeSchema);
+      expect(c.opts.schemaName).toBe('MergeSchema');
     }
     // Every vote agrees on merging Alice+Alicia; the union filter runs after
     // the gather, leaving the merged character plus Bob.
     expect(result).toHaveLength(2);
-    expect(backupSpy).not.toHaveBeenCalled();
-    protoSpy.mockRestore();
+    expect(calls.some((c) => c.config.model === backupOpts.model)).toBe(false);
   });
+
   it('merge: maxRetries=0 means no replacement budget — exactly 5 vote attempts', async () => {
+    const { transport, calls } = makeTransport(MERGE_OK);
     service = new LLMVoiceService({
       ...baseOpts,
       mergeConfig: {
@@ -312,26 +295,59 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
         maxRetries: 0,
       },
       backupConfig: { ...backupOpts },
+      transport,
     });
-    // singleMerge builds a fresh LLMApiClient per vote, so the instance spy
-    // (mockMerge on service.mergeApiClient) does not intercept it. Patch the
-    // prototype so every vote is counted and resolved from one place.
-    const protoSpy = vi
-      .spyOn(LLMApiClient.prototype, 'callStructured')
-      .mockResolvedValue(MERGE_OK as never);
 
     const chars: LLMCharacter[] = [
       { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
       { canonicalName: 'Alicia', variations: ['Alicia'], gender: 'female' },
     ];
-    const typed = service as unknown as {
-      mergeCharactersWithLLM: (c: LLMCharacter[]) => Promise<LLMCharacter[]>;
-    };
-    await typed.mergeCharactersWithLLM(chars);
+    await service.mergeCharacters(chars);
 
     // budget = 5 × (1 + 0) = 5 temps; every vote succeeds, so exactly 5 calls
     // — no replacement budget, no retries.
-    expect(protoSpy).toHaveBeenCalledTimes(5);
-    protoSpy.mockRestore();
+    expect(calls.length).toBe(5);
+  });
+});
+
+// ----------------------------------------------------------------- transport seam
+
+describe('LLMVoiceService - public mergeCharacters via injected transport', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('merge: public mergeCharacters merges Alice+Alicia via MergeSchema votes, no backup calls', async () => {
+    const calls: TransportCall[] = [];
+    const transport: Transport = async (config, opts) => {
+      calls.push({ config, opts });
+      return MERGE_OK as never;
+    };
+    const service = new LLMVoiceService({
+      ...baseOpts,
+      mergeConfig: {
+        apiKey: 'merge-key',
+        apiUrl: 'https://merge.api.com/v1',
+        model: 'merge-model',
+        maxRetries: 5,
+      },
+      backupConfig: { ...backupOpts },
+      transport,
+    });
+
+    const chars: LLMCharacter[] = [
+      { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
+      { canonicalName: 'Alicia', variations: ['Alicia'], gender: 'female' },
+      { canonicalName: 'Bob', variations: ['Bob'], gender: 'male' },
+    ];
+    const result = await service.mergeCharacters(chars);
+
+    // Every vote agrees on merging Alice+Alicia; Bob stays separate.
+    expect(result).toHaveLength(2);
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) {
+      expect(c.opts.schemaName).toBe('MergeSchema');
+      // Votes carry the merge stage's config, never the backup model's.
+      expect(c.config.model).toBe('merge-model');
+    }
+    expect(calls.some((c) => c.config.model === backupOpts.model)).toBe(false);
   });
 });

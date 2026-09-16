@@ -35,13 +35,14 @@ function randomHexCode(): string {
 /**
  * Draw `count` mutually-unique random hex codes, rejecting collisions.
  * With 65 536 possible values and typical book character counts (<30), redraws
- * are rare and the loop terminates quickly.
+ * are rare and the loop terminates quickly. `randomCode` is injectable so
+ * tests can pin deterministic codes.
  */
-function generateUniqueHexCodes(count: number): string[] {
+function generateUniqueHexCodes(count: number, randomCode: () => string = randomHexCode): string[] {
   const codes: string[] = [];
   const used = new Set<string>();
   while (codes.length < count) {
-    const code = randomHexCode();
+    const code = randomCode();
     if (!used.has(code)) {
       used.add(code);
       codes.push(code);
@@ -54,20 +55,31 @@ function generateUniqueHexCodes(count: number): string[] {
  * Build code mapping for characters using random 4-hex codes (e.g. "A3F1").
  * Random codes prevent LLMs from falling into positional routines where the
  * same character always receives the same code across different books.
+ * `randomCode` is injectable so tests can pin deterministic codes.
  */
-export function buildCodeMapping(characters: LLMCharacter[]): CodeMapping {
-  return buildCodeMappingFromNames(characters.map((c) => c.canonicalName));
+export function buildCodeMapping(
+  characters: LLMCharacter[],
+  randomCode: () => string = randomHexCode,
+): CodeMapping {
+  return buildCodeMappingFromNames(
+    characters.map((c) => c.canonicalName),
+    randomCode,
+  );
 }
 
 /**
  * Build code mapping from character names using random 4-hex codes.
  * Also adds MALE_UNNAMED, FEMALE_UNNAMED, and UNKNOWN_UNNAMED codes.
  * Each call produces a fresh random mapping — the same character list
- * yields different codes across invocations.
+ * yields different codes across invocations. `randomCode` is injectable
+ * so tests can pin deterministic codes.
  */
-export function buildCodeMappingFromNames(names: string[]): CodeMapping {
+export function buildCodeMappingFromNames(
+  names: string[],
+  randomCode: () => string = randomHexCode,
+): CodeMapping {
   const allNames = [...names, ...UNNAMED_SPEAKERS];
-  const codes = generateUniqueHexCodes(allNames.length);
+  const codes = generateUniqueHexCodes(allNames.length, randomCode);
 
   const nameToCode = new Map<string, string>();
   const codeToName = new Map<string, string>();

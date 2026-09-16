@@ -3,19 +3,6 @@ import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter } from '@/state/types';
 import { LLMVoiceService } from './LLMVoiceService';
 
-// Mock OpenAI client
-vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(function () {
-    return {
-      chat: {
-        completions: {
-          create: vi.fn(),
-        },
-      },
-    };
-  }),
-}));
-
 describe('LLMVoiceService - Merge with Structured Outputs', () => {
   let service: LLMVoiceService;
   const mockLogger: ILogger = {
@@ -36,32 +23,10 @@ describe('LLMVoiceService - Merge with Structured Outputs', () => {
   });
 
   it('merges characters using structured output', async () => {
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              reasoning: 'Alice and Alicia are the same person',
-              merges: [[0, 1]], // Merge Alice (0) and Alicia (1)
-            }),
-            refusal: null,
-          },
-        },
-      ],
+    const mergeResponse = {
+      reasoning: 'Alice and Alicia are the same person',
+      merges: [[0, 1]], // Merge Alice (0) and Alicia (1)
     };
-
-    // Setup mock before creating service
-    const openai = await import('openai');
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(function () {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate,
-          },
-        },
-      } as any;
-    });
 
     service = new LLMVoiceService({
       apiKey: 'test-key',
@@ -69,42 +34,20 @@ describe('LLMVoiceService - Merge with Structured Outputs', () => {
       model: 'gpt-4o-mini',
       narratorVoice: 'narrator',
       logger: mockLogger,
+      transport: async () => mergeResponse as never,
     });
 
-    // Access internal merge method via the public method
-    const result = await (service as any).mergeCharactersWithLLM(testCharacters);
+    const result = await service.mergeCharacters(testCharacters);
 
     // After merging 0 and 1, we should have 2 characters (Alice/Alicia merged, Bob separate)
     expect(result.length).toBeLessThanOrEqual(2);
   });
 
   it('handles empty merges (no duplicates)', async () => {
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              reasoning: null,
-              merges: [], // No merges needed
-            }),
-            refusal: null,
-          },
-        },
-      ],
+    const mergeResponse = {
+      reasoning: null,
+      merges: [], // No merges needed
     };
-
-    // Setup mock before creating service
-    const openai = await import('openai');
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(function () {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate,
-          },
-        },
-      } as any;
-    });
 
     service = new LLMVoiceService({
       apiKey: 'test-key',
@@ -112,9 +55,10 @@ describe('LLMVoiceService - Merge with Structured Outputs', () => {
       model: 'gpt-4o-mini',
       narratorVoice: 'narrator',
       logger: mockLogger,
+      transport: async () => mergeResponse as never,
     });
 
-    const result = await (service as any).mergeCharactersWithLLM(testCharacters);
+    const result = await service.mergeCharacters(testCharacters);
 
     // No merges means all characters remain
     expect(result).toHaveLength(testCharacters.length);

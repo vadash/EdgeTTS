@@ -1,20 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import type { TextBlock } from '@/state/types';
+import { RetriableError } from '@/errors';
 import { LLMVoiceService } from './LLMVoiceService';
-
-// Mock OpenAI client
-vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(function () {
-    return {
-      chat: {
-        completions: {
-          create: vi.fn(),
-        },
-      },
-    };
-  }),
-}));
 
 describe('LLMVoiceService - Extract with Structured Outputs', () => {
   let service: LLMVoiceService;
@@ -30,36 +18,13 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
   });
 
   it('extracts characters using structured output', async () => {
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              reasoning: 'Found two speakers',
-              characters: [
-                { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
-                { canonicalName: 'Bob', variations: ['Bob', 'Bobby'], gender: 'male' },
-              ],
-            }),
-            refusal: null,
-          },
-        },
+    const extractResponse = {
+      reasoning: 'Found two speakers',
+      characters: [
+        { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' as const },
+        { canonicalName: 'Bob', variations: ['Bob', 'Bobby'], gender: 'male' as const },
       ],
-      model: 'gpt-4o-mini',
     };
-
-    // Setup mock before creating service
-    const openai = await import('openai');
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(function () {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate,
-          },
-        },
-      } as any;
-    });
 
     service = new LLMVoiceService({
       apiKey: 'test-key',
@@ -67,6 +32,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
       model: 'gpt-4o-mini',
       narratorVoice: 'narrator',
       logger: mockLogger,
+      transport: async () => extractResponse as never,
     });
 
     const blocks: TextBlock[] = [
@@ -92,34 +58,12 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
   });
 
   it('handles null reasoning (transformed to undefined)', async () => {
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              reasoning: null,
-              characters: [
-                { canonicalName: 'Narrator', variations: ['Narrator'], gender: 'unknown' },
-              ],
-            }),
-            refusal: null,
-          },
-        },
+    const extractResponse = {
+      reasoning: null,
+      characters: [
+        { canonicalName: 'Narrator', variations: ['Narrator'], gender: 'unknown' as const },
       ],
-      model: 'gpt-4o-mini',
     };
-
-    const openai = await import('openai');
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(function () {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate,
-          },
-        },
-      } as any;
-    });
 
     service = new LLMVoiceService({
       apiKey: 'test-key',
@@ -127,6 +71,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
       model: 'gpt-4o-mini',
       narratorVoice: 'narrator',
       logger: mockLogger,
+      transport: async () => extractResponse as never,
     });
 
     const blocks: TextBlock[] = [
@@ -149,35 +94,17 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
   });
 
   it('skips block on refusal during extract (no backup)', async () => {
-    const mockResponse = {
-      choices: [
-        {
-          message: {
-            content: null,
-            refusal: 'Content policy violation',
-          },
-        },
-      ],
-    };
-
-    const openai = await import('openai');
-    const mockCreate = vi.fn().mockResolvedValue(mockResponse as any);
-    vi.mocked(openai.default).mockImplementation(function () {
-      return {
-        chat: {
-          completions: {
-            create: mockCreate,
-          },
-        },
-      } as any;
-    });
-
+    // The adapter throws the retriable refusal error on the wire; the service
+    // exhausts retries and the per-block handler skips the block.
     service = new LLMVoiceService({
       apiKey: 'test-key',
       apiUrl: 'https://api.openai.com/v1',
       model: 'gpt-4o-mini',
       narratorVoice: 'narrator',
       logger: mockLogger,
+      transport: async () => {
+        throw new RetriableError('LLM refused: Content policy violation');
+      },
     });
 
     const blocks: TextBlock[] = [
