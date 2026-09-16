@@ -38,3 +38,17 @@ Read the router for a directory before you edit inside it.
 - `src/test/AGENTS.md` — Mocks and test runners.
 
 Deep knowledge lives in `agent_docs/`, indexed in `agent_docs/agent_docs.md`. Routers link to the matching leaf.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `vadash/edgetts`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role triage vocabulary; label strings equal the role names. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
