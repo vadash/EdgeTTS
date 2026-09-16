@@ -2,6 +2,7 @@
 // Checks for cached work to resume after interruption
 
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
+import { withPermissionRetry } from '@/utils/retry/filesystem';
 
 import { ChunkStore } from './ChunkStore';
 
@@ -138,4 +139,30 @@ export async function loadPipelineState(
   const tempDir = await tryGetDirectory(dirHandle, '_temp_work');
   if (!tempDir) return null;
   return tryReadJSON<PipelineState>(tempDir, 'pipeline_state.json');
+}
+
+/**
+ * Persist pipeline state for resume. Writes the same pipeline_state.json
+ * that loadPipelineState reads, creating _temp_work when needed.
+ * Non-fatal: errors are swallowed so saving never breaks the pipeline.
+ */
+export async function savePipelineState(
+  directoryHandle: FileSystemDirectoryHandle,
+  state: PipelineState,
+): Promise<void> {
+  try {
+    await withPermissionRetry(directoryHandle, async () => {
+      const tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work', {
+        create: true,
+      });
+      const stateFile = await tempDirHandle.getFileHandle('pipeline_state.json', {
+        create: true,
+      });
+      const writable = await stateFile.createWritable();
+      await writable.write(JSON.stringify(state));
+      await writable.close();
+    });
+  } catch {
+    // Non-fatal
+  }
 }

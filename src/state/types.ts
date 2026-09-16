@@ -1,5 +1,8 @@
 // TypeScript interfaces for EdgeTTS application
 
+import type { ConversionStatus } from '@/stores/ConversionStore';
+import type { LLMProcessingStatus } from '@/stores/LLMStore';
+
 // Audio Presets for Opus encoding
 export enum AudioPreset {
   PC = 'pc',
@@ -203,3 +206,27 @@ export interface CharacterEntry {
 export const IMPORTANCE_THRESHOLD = 0.005; // 0.5%
 export const MAX_NAME_EDITS = 2;
 export const MIN_NAME_PAIRINGS = 2;
+
+// Pipeline stage identifiers and their conversion/LLM status projection.
+// Both stores import this module for types only — no runtime cycle.
+export type StageId =
+  | 'character-extraction'
+  | 'voice-assignment'
+  | 'speaker-assignment'
+  | 'text-sanitization'
+  | 'dictionary-processing'
+  | 'tts-conversion'
+  | 'audio-merge';
+
+export const STAGE_STATUS: Record<
+  StageId,
+  { conversion: ConversionStatus | null; llm: LLMProcessingStatus | null }
+> = {
+  'character-extraction': { conversion: 'llm-extract', llm: 'extracting' },
+  'voice-assignment': { conversion: null, llm: null },
+  'speaker-assignment': { conversion: 'llm-assign', llm: 'assigning' },
+  'text-sanitization': { conversion: null, llm: null },
+  'dictionary-processing': { conversion: null, llm: null },
+  'tts-conversion': { conversion: 'converting', llm: 'idle' },
+  'audio-merge': { conversion: 'merging', llm: null },
+};
