@@ -2,10 +2,8 @@ import { getCooldownRemainingMs } from '@/services/llm/rateLimitGate';
 
 // Network retry utilities with exponential backoff
 
-import pRetry, { AbortError } from 'p-retry';
-import { isRetriableError } from '@/errors';
-
-export { AbortError };
+import pRetry from 'p-retry';
+import { CancellationError, isRetriableError, throwIfAborted } from '@/errors';
 
 export interface RetryOptions {
   maxRetries?: number;
@@ -37,42 +35,53 @@ export async function withRetry<T>(
   // p-retry doesn't support Infinity, use MAX_SAFE_INTEGER instead
   const retries = maxRetries === Infinity ? Number.MAX_SAFE_INTEGER : maxRetries;
 
-  return pRetry(
-    async (_attemptNumber) => {
-      // Check for cancellation before each attempt
-      if (signal?.aborted) {
-        throw new AbortError('Operation cancelled');
-      }
-      return operation();
-    },
-    {
-      retries,
-      // When a 429 cooldown is in flight, the rate-limit gate inside the
-      // operation already waited the provider's full deadline; p-retry must
-      // not stack its own backoff on top — its timers are capped at maxDelay
-      // (60s) and would only delay the next attempt pointlessly. Zero the
-      // timers so the gate owns the wait and the retry resumes the instant
-      // the cooldown releases.
-      minTimeout: getCooldownRemainingMs() > 0 ? 0 : baseDelay,
-      maxTimeout: getCooldownRemainingMs() > 0 ? 0 : maxDelay,
-      factor: 2, // Exponential backoff factor
-      randomize: true, // Adds jitter to prevent thundering herd
-      signal,
-      onFailedAttempt: (context) => {
-        // p-retry 7.x passes a context object {error, attemptNumber, retriesLeft, ...}
-        const actualError = context.error;
-
-        // Check if error should be retried
-        if (shouldRetry && !shouldRetry(actualError)) {
-          throw actualError; // Don't retry - rethrow to stop
-        }
-
-        // Calculate delay for callback (p-retry handles actual delay)
-        const jitter = Math.random() * 1000;
-        const nextDelay = Math.min(baseDelay * 2 ** (context.attemptNumber - 1) + jitter, maxDelay);
-
-        onRetry?.(context.attemptNumber, actualError, nextDelay);
+  try {
+    return await pRetry(
+      async () => {
+        // Check for cancellation before each attempt
+        throwIfAborted(signal);
+        return operation();
       },
-    },
-  );
+      {
+        retries,
+        // When a 429 cooldown is in flight, the rate-limit gate inside the
+        // operation already waited the provider's full deadline; p-retry must
+        // not stack its own backoff on top — its timers are capped at maxDelay
+        // (60s) and would only delay the next attempt pointlessly. Zero the
+        // timers so the gate owns the wait and the retry resumes the instant
+        // the cooldown releases.
+        minTimeout: getCooldownRemainingMs() > 0 ? 0 : baseDelay,
+        maxTimeout: getCooldownRemainingMs() > 0 ? 0 : maxDelay,
+        factor: 2, // Exponential backoff factor
+        randomize: true, // Adds jitter to prevent thundering herd
+        signal,
+        onFailedAttempt: (context) => {
+          // p-retry 7.x passes a context object {error, attemptNumber, retriesLeft, ...}
+          const actualError = context.error;
+
+          // Check if error should be retried
+          if (shouldRetry && !shouldRetry(actualError)) {
+            throw actualError; // Don't retry - rethrow to stop
+          }
+
+          // Calculate delay for callback (p-retry handles actual delay)
+          const jitter = Math.random() * 1000;
+          const nextDelay = Math.min(
+            baseDelay * 2 ** (context.attemptNumber - 1) + jitter,
+            maxDelay,
+          );
+
+          onRetry?.(context.attemptNumber, actualError, nextDelay);
+        },
+      },
+    );
+  } catch (error) {
+    // When the signal fires mid-flight (e.g. during backoff), p-retry rejects
+    // with the signal's own abort reason instead of our error. Translate that
+    // window once here so cancellation has a single encoding (ADR 0017).
+    if (signal?.aborted && !(error instanceof CancellationError)) {
+      throw new CancellationError();
+    }
+    throw error;
+  }
 }

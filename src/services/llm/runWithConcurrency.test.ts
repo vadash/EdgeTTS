@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.unmock('p-queue');
 
 import { runWithConcurrency } from './runWithConcurrency';
+import { CancellationError } from '@/errors';
 
 describe('runWithConcurrency', () => {
   beforeEach(() => {
@@ -26,7 +27,7 @@ describe('runWithConcurrency', () => {
     expect(task3).toHaveBeenCalledTimes(1);
   });
 
-  it('throws Operation cancelled when signal is already aborted', async () => {
+  it('rejects with CancellationError when signal is already aborted', async () => {
     const controller = new AbortController();
     controller.abort();
 
@@ -37,7 +38,7 @@ describe('runWithConcurrency', () => {
         concurrency: 2,
         signal: controller.signal,
       }),
-    ).rejects.toThrow('Operation cancelled');
+    ).rejects.toBeInstanceOf(CancellationError);
 
     expect(task1).not.toHaveBeenCalled();
   });

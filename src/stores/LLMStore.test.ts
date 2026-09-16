@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CancellationError } from '@/errors';
 import type { LLMCharacter } from '@/state/types';
 import {
   awaitReview,
@@ -203,11 +204,11 @@ describe('LLMStore', () => {
       await expect(promise).resolves.toBeUndefined();
     });
 
-    it('rejects awaitReview when cancelled', async () => {
+    it('rejects awaitReview with CancellationError when cancelled', async () => {
       setPendingReview(true);
       const promise = awaitReview();
       cancelReview();
-      await expect(promise).rejects.toThrow('Voice review cancelled');
+      await expect(promise).rejects.toBeInstanceOf(CancellationError);
     });
   });
 

@@ -6,12 +6,6 @@ import { afterEach, vi } from 'vitest';
 // Mock p-retry - executes immediately without retry
 vi.mock('p-retry', () => ({
   default: vi.fn(async (fn: (attemptNumber: number) => Promise<unknown>) => fn(1)),
-  AbortError: class AbortError extends Error {
-    constructor(message?: string) {
-      super(message);
-      this.name = 'AbortError';
-    }
-  },
 }));
 
 // Mock p-queue - executes tasks immediately

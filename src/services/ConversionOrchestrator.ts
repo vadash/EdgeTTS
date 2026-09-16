@@ -2,7 +2,14 @@
 // Runs the TTS conversion workflow as a single async function
 
 import { defaultConfig } from '@/config';
-import { AppError, getErrorMessage, insufficientVoicesError, noContentError } from '@/errors';
+import {
+  AppError,
+  CancellationError,
+  getErrorMessage,
+  insufficientVoicesError,
+  noContentError,
+  throwIfAborted,
+} from '@/errors';
 import type {
   AudioSettings,
   LLMCharacter,
@@ -267,9 +274,7 @@ function extractBookName(fileNames?: Array<[string, number]>): string {
 }
 
 function checkCancelled(signal: AbortSignal): void {
-  if (signal.aborted) {
-    throw new Error('Pipeline cancelled');
-  }
+  throwIfAborted(signal);
 }
 
 function logVoiceSummary(
@@ -728,12 +733,6 @@ export async function runConversion(
     if (error instanceof AppError && error.isCancellation()) {
       ports.run.cancel();
       logger.info('Conversion cancelled');
-    } else if (
-      (error as Error).message === 'Pipeline cancelled' ||
-      (error as Error).message === 'Voice review cancelled'
-    ) {
-      ports.run.cancel();
-      logger.info('Conversion cancelled');
     } else {
       const appError = AppError.fromUnknown(error);
       ports.run.fail(appError.message, appError.code);
@@ -838,7 +837,7 @@ async function runTTSStage(
   if (remainingChunks.length > 0) {
     await new Promise<void>((resolve, reject) => {
       if (signal.aborted) {
-        reject(new Error('Pipeline cancelled'));
+        reject(new CancellationError());
         return;
       }
 

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, vi } from 'vitest';
 
+import { CancellationError } from '@/errors';
+
 import {
   getCooldownRemainingMs,
   getLimit,
@@ -166,11 +168,11 @@ describe('rateLimitGate', (t) => {
     expect(rejected).toBe(true);
   });
 
-  t('waitTurn rejects immediately if signal already aborted', async () => {
+  t('waitTurn rejects with CancellationError if signal already aborted', async () => {
     noteRateLimit(120_000);
     const controller = new AbortController();
     controller.abort();
-    await expect(waitTurn(controller.signal)).rejects.toThrow('Operation cancelled');
+    await expect(waitTurn(controller.signal)).rejects.toBeInstanceOf(CancellationError);
   });
 
   // parseRetryAfterMs ----------------------------------------------------

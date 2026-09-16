@@ -1,4 +1,5 @@
 import type { ILogger } from '../Logger';
+import { CancellationError, throwIfAborted } from '@/errors';
 
 /**
  * Global adaptive rate-limit governor for LLM calls (AIMD).
@@ -219,7 +220,7 @@ function sleep(ms: number, signal?: AbortSignal | null): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const onAbort = () => {
       clearTimeout(timer);
-      reject(new Error('Operation cancelled'));
+      reject(new CancellationError());
     };
     const timer = setTimeout(() => {
       signal?.removeEventListener('abort', onAbort);
@@ -233,7 +234,7 @@ function sleep(ms: number, signal?: AbortSignal | null): Promise<void> {
  * may extend the deadline while we are already waiting.
  */
 export async function waitTurn(signal?: AbortSignal | null): Promise<void> {
-  if (signal?.aborted) throw new Error('Operation cancelled');
+  throwIfAborted(signal);
   while (true) {
     const remaining = cooldownUntil - Date.now();
     if (remaining <= 0) return;

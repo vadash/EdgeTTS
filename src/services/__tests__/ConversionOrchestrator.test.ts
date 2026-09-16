@@ -1,5 +1,5 @@
 import { describe, expect, it, type Mock, vi } from 'vitest';
-import { AppError } from '@/errors';
+import { AppError, CancellationError } from '@/errors';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, StageConfig, StageId } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
@@ -135,7 +135,9 @@ function createMockServices(failPart?: number) {
   const mergerCreate = vi.fn(
     (_config: MergerConfig & { chunkStore: ChunkStore }) => merger as unknown as AudioMerger,
   );
-  const llmStages = {
+  // Loose record type so individual tests can swap stage implementations
+  // (e.g. a hanging extract for the mid-flight abort regression).
+  const llmStages: Record<string, Mock> = {
     extract: vi.fn(() => Promise.resolve(TEST_CHARACTERS)),
     assign: vi.fn(() => Promise.resolve(TEST_ASSIGNMENTS)),
     merge: vi.fn(async (characters: LLMCharacter[]) => characters),
@@ -172,7 +174,7 @@ function createMockServices(failPart?: number) {
     ffmpegService: { load: vi.fn(() => Promise.resolve(true)) } as unknown as FFmpegService,
     chunkStoreFactory: { create: () => chunkStore },
   };
-  return { services, chunkStore, workerPool, merger, mergerCreate };
+  return { services, chunkStore, workerPool, merger, mergerCreate, llmStages };
 }
 
 async function writeResumeState(
@@ -308,6 +310,31 @@ describe('runConversion', () => {
     await runConversion(services, ports, controller.signal, createMockInput());
 
     expect(ports.run.cancel).toHaveBeenCalledTimes(1);
+    expect(ports.run.complete).not.toHaveBeenCalled();
+  });
+
+  it('mid-flight abort cancels the run and never records a failure', async () => {
+    const { services, llmStages } = createMockServices();
+    const ports = createMockPorts();
+    const controller = new AbortController();
+    // Extract hangs on the signal; aborting mid-run rejects with the one
+    // canonical cancellation encoding (ADR 0017).
+    llmStages.extract = vi.fn(
+      (_blocks: unknown[], call: { signal?: AbortSignal }) =>
+        new Promise<never>((_resolve, reject) => {
+          call.signal?.addEventListener('abort', () => reject(new CancellationError()), {
+            once: true,
+          });
+        }),
+    );
+
+    const pending = runConversion(services, ports, controller.signal, createMockInput());
+    await vi.waitFor(() => expect(llmStages.extract).toHaveBeenCalled());
+    controller.abort();
+
+    await expect(pending).resolves.toBeUndefined();
+    expect(ports.run.cancel).toHaveBeenCalledTimes(1);
+    expect(ports.run.fail).not.toHaveBeenCalled();
     expect(ports.run.complete).not.toHaveBeenCalled();
   });
 

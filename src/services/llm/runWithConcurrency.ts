@@ -1,5 +1,6 @@
 import PQueue from 'p-queue';
 
+import { throwIfAborted } from '@/errors';
 import { getLimit, onLimitChange, setCeiling } from './rateLimitGate';
 
 export interface ConcurrencyOptions {
@@ -40,9 +41,7 @@ export async function runWithConcurrency<T>(
   }
 
   // Check if already aborted
-  if (signal?.aborted) {
-    throw new Error('Operation cancelled');
-  }
+  throwIfAborted(signal);
 
   // ponytail: min over config and the global rate-limit gate. When a 429
   // collapses the gate to 1, the queue drains to a single in-flight call and
@@ -69,9 +68,7 @@ export async function runWithConcurrency<T>(
   const wrappedTasks = tasks.map((task) => {
     return queue.add(async () => {
       // Check abort before running the task
-      if (signal?.aborted) {
-        throw new Error('Operation cancelled');
-      }
+      throwIfAborted(signal);
 
       const result = await task();
 

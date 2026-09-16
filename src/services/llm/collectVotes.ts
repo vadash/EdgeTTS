@@ -17,6 +17,8 @@
  * attempt for the provider's cooldown.
  */
 
+import { throwIfAborted } from '@/errors';
+
 export interface CollectVotesOptions<T> {
   /** Successful votes required. */
   need: number;
@@ -42,9 +44,7 @@ export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<
   if (need <= 0 || temps.length === 0) {
     return [];
   }
-  if (signal?.aborted) {
-    throw new Error('Operation cancelled');
-  }
+  throwIfAborted(signal);
 
   const queue = [...temps];
   const results: T[] = [];
@@ -57,9 +57,7 @@ export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<
 
   const worker = async (): Promise<void> => {
     while (results.length < need) {
-      if (signal?.aborted) {
-        throw new Error('Operation cancelled');
-      }
+      throwIfAborted(signal);
       const temp = queue.shift();
       if (temp === undefined) {
         return; // budget exhausted

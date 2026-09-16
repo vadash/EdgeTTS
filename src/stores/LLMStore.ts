@@ -3,6 +3,7 @@
 
 import { computed, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
+import { CancellationError } from '@/errors';
 import type { LoggerStore } from '@/services/Logger';
 import { decryptValue, encryptValue } from '@/services/SecureStorage';
 import { saveJSON } from './persistence';
@@ -352,7 +353,7 @@ export function confirmReview(): void {
 
 export function cancelReview(): void {
   patchState({ pendingReview: false });
-  reviewRejecter?.(new Error('Voice review cancelled'));
+  reviewRejecter?.(new CancellationError());
   reviewResolver = null;
   reviewRejecter = null;
 }

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CancellationError } from '@/errors';
 import type { ILogger } from '@/services/Logger';
 import { createLlmStages } from '../llm/stages';
 import type { LLMClientConfig, LlmStageDeps } from '../llm/stages';
@@ -183,7 +184,7 @@ describe('LlmStages - Backup fallback', () => {
         [{ blockIndex: 0, sentenceStartIndex: 0, sentences: ['"Hi," said Alice.'] }],
         { signal: controller.signal },
       ),
-    ).rejects.toThrow('aborted');
+    ).rejects.toBeInstanceOf(CancellationError);
 
     // Backup should never be called because the signal was aborted
     expect(calls.some((c) => c.config.model === 'backup-model')).toBe(false);

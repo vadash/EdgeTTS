@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { CancellationError } from '@/errors';
+
 import { collectVotes, spreadTemps } from './collectVotes';
 
 describe('collectVotes', () => {
@@ -73,13 +75,13 @@ describe('collectVotes', () => {
     expect(run).toHaveBeenCalledTimes(4); // every temp tried exactly once
   });
 
-  it('rejects on already-aborted signal', async () => {
+  it('rejects with CancellationError on already-aborted signal', async () => {
     const ac = new AbortController();
     ac.abort();
     const run = vi.fn(async () => [0]);
     await expect(
       collectVotes({ need: 1, parallel: 1, temps: [0], run, signal: ac.signal }),
-    ).rejects.toThrow('Operation cancelled');
+    ).rejects.toBeInstanceOf(CancellationError);
     expect(run).not.toHaveBeenCalled();
   });
 

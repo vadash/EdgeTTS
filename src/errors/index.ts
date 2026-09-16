@@ -152,6 +152,29 @@ export class AppError extends Error {
   }
 }
 
+/**
+ * The one canonical cancellation encoding (ADR 0017): every producer that
+ * unwinds a run because the user cancelled throws this, and the orchestrator
+ * catch branch matches on the type via `AppError.isCancellation` — never on
+ * message strings.
+ */
+export class CancellationError extends AppError {
+  constructor(message?: string) {
+    super('CONVERSION_CANCELLED', message ?? errorMessages['CONVERSION_CANCELLED']);
+    this.name = 'CancellationError';
+  }
+}
+
+/**
+ * Throws a `CancellationError` when the signal has aborted; no-op otherwise.
+ * The standard pre-check before starting (or between steps of) cancellable work.
+ */
+export function throwIfAborted(signal?: AbortSignal | null): void {
+  if (signal?.aborted) {
+    throw new CancellationError();
+  }
+}
+
 // ============================================================================
 // Error Factory Functions
 // ============================================================================
