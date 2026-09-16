@@ -15,8 +15,11 @@ API orchestration and structured JSON parsing.
 - The request body has a dedicated type that includes vendor extensions. Cast only at the client call site.
 - Never use an untyped cast for the whole request. Add new vendor keys to the request type instead.
 
-## Detailed Gotchas
+## Decisions
 
-- Changing JSON parsing or repair → read `../../../agent_docs/llm/json-repair_gotchas.md`.
-- Changing voting, QA pass, culling, or model fallback → read `../../../agent_docs/llm/pipelines_gotchas.md`.
-- Changing rate-limit handling, concurrency, or backoff → read `../../../agent_docs/llm/rate-limit_gotchas.md`.
+Read the ADR before changing the governed area:
+
+- JSON parsing or repair → `../../../docs/adr/0007-tiered-json-parse-and-repair.md`
+- Voting, QA pass, culling → `../../../docs/adr/0008-character-merge-voting.md`, `../../../docs/adr/0009-assign-draft-and-qa-pass.md`
+- Model fallback and degradation → `../../../docs/adr/0010-primary-then-backup-fallback.md`, `../../../docs/adr/0011-degrade-on-exhaustion.md`
+- Rate-limit handling, concurrency, backoff → `../../../docs/adr/0012-process-global-rate-limit-gate.md`

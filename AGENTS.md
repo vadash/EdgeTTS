@@ -37,7 +37,7 @@ Read the router for a directory before you edit inside it.
 - `src/stores/AGENTS.md` — Global state.
 - `src/test/AGENTS.md` — Mocks and test runners.
 
-Deep knowledge lives in `agent_docs/`, indexed in `agent_docs/agent_docs.md`. Routers link to the matching leaf.
+Domain language lives in `CONTEXT.md`; decisions live in `docs/adr/`. Read the glossary and the ADRs for your area before changing governed behavior. See `docs/agents/domain.md`.
 
 ## Agent skills
 

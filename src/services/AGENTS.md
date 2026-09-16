@@ -18,9 +18,13 @@ The conversion pipeline, driven by a stateless orchestrator.
 - Rerolling a subset returns the same voices unless the pool order is shuffled explicitly.
 - A shuffle must stay inside its priority tier, so a native voice is never passed over for a multilingual one.
 
-## Detailed Gotchas
+## Decisions
 
-- Changing pool lifecycle, retries, or cancellation → read `../../agent_docs/services/tts-worker-pool_gotchas.md`.
-- Changing FFmpeg, chunk storage, or crash recovery → read `../../agent_docs/services/ffmpeg-and-storage_gotchas.md`.
-- Changing sentence splitting or block sizes → read `../../agent_docs/services/text-block-splitter_gotchas.md`.
-- Changing voice allocation, the 80/20 split, or reroll invariance → read `../../agent_docs/services/voice-allocation_gotchas.md`.
+Read the ADR before changing the governed area:
+
+- Pool lifecycle, retries, cancellation → `../../docs/adr/0013-bounded-retry-tts-socket-pool.md`
+- FFmpeg, chunk storage, crash recovery → `../../docs/adr/0002-stream-audio-chunks-to-disk.md`, `../../docs/adr/0003-ffmpeg-wasm-lifecycle.md`
+- Sentence splitting, block sizes → `../../docs/adr/0001-native-sentence-segmenter-for-split.md`
+- Voice allocation, the 80/20 split, reroll invariance → `../../docs/adr/0006-80-20-unique-shared-voice-allocation.md`
+- Filter chain, gap preservation → `../../docs/adr/0004-fixed-audio-filter-chain-order.md`
+- Settings persistence → `../../docs/adr/0005-settings-merge-without-migrations.md`
