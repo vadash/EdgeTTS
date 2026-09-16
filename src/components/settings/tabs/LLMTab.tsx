@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { TabPanel, Tabs, Toggle } from '@/components/common';
 import { getLogger } from '@/services';
-import { LLMVoiceService } from '@/services/llm';
+import { testLlmConnection } from '@/services/llm';
 import { useLLM } from '@/stores';
 import { STAGE_COPY_FIELDS, type StageConfig } from '@/state/types';
 import type { LLMStage } from '@/stores/LLMStore';
@@ -90,16 +90,7 @@ export function LLMTab() {
       [stage]: { ...prev[stage], testing: true, result: null },
     }));
 
-    const service = new LLMVoiceService({
-      apiKey: config.apiKey,
-      apiUrl: config.apiUrl,
-      model: config.model,
-      narratorVoice: '',
-      corsMiddleware: config.corsMiddleware,
-      logger,
-    });
-
-    const result = await service.testConnection(useStreaming);
+    const result = await testLlmConnection({ config, logger }, useStreaming);
 
     setTestState((prev) => ({
       ...prev,

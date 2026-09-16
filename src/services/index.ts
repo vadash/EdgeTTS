@@ -7,8 +7,7 @@ import { AudioMerger } from './AudioMerger';
 import { ChunkStore } from './ChunkStore';
 import { FFmpegService } from './FFmpegService';
 import { createLogger, type Logger } from './Logger';
-import type { LLMServiceFactoryOptions } from './llm/LLMVoiceService';
-import { LLMVoiceService } from './llm/LLMVoiceService';
+import { createLlmStages } from './llm/stages';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 import { TextBlockSplitter } from './TextBlockSplitter';
 import type { WorkerPoolOptions } from './TTSWorkerPool';
@@ -95,13 +94,6 @@ export function getTTSPreviewService(): ReusableEdgeTTSService {
 // ============================================================================
 
 /**
- * Create a new LLM service for a conversion
- */
-export function createLLMService(options: LLMServiceFactoryOptions): LLMVoiceService {
-  return new LLMVoiceService({ ...options, logger: getLogger() });
-}
-
-/**
  * Create a new TTS worker pool for a conversion
  */
 export function createWorkerPool(options: WorkerPoolOptions): TTSWorkerPool {
@@ -131,7 +123,7 @@ export function getOrchestratorServices(): ConversionOrchestratorServices {
   return {
     logger: getLogger(),
     textBlockSplitter: getTextBlockSplitter(),
-    llmServiceFactory: { create: createLLMService },
+    llmStagesFactory: { create: createLlmStages },
     workerPoolFactory: { create: createWorkerPool },
     audioMergerFactory: { create: createAudioMerger },
     voicePoolBuilder: getVoicePoolBuilder(),

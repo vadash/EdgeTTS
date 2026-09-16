@@ -3,8 +3,8 @@ import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
-import { LLMVoiceService } from './LLMVoiceService';
-import type { LLMClientConfig, LLMVoiceServiceOptions } from './LLMVoiceService';
+import { createLlmStages } from './stages';
+import type { LLMClientConfig, LlmStageDeps, LlmStages } from './stages';
 import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
 import type { StructuredCallOptions } from './schemaUtils';
 
@@ -40,12 +40,10 @@ const mockLogger: ILogger = {
   debug: vi.fn(),
 };
 
-const baseOpts = {
+const primaryConfig = {
   apiKey: 'primary-key',
   apiUrl: 'https://api.openai.com/v1',
   model: 'primary-model',
-  narratorVoice: 'narrator-voice',
-  logger: mockLogger,
   maxRetries: 3,
 };
 
@@ -55,6 +53,20 @@ const backupOpts = {
   model: 'backup-model',
   maxRetries: 2,
 };
+
+function baseDeps(overrides: Partial<LlmStageDeps> = {}): LlmStageDeps {
+  return {
+    extract: { ...primaryConfig },
+    assign: { ...primaryConfig },
+    merge: { ...primaryConfig },
+    narratorVoice: 'narrator-voice',
+    llmThreads: 2,
+    useVoting: false,
+    directoryHandle: null,
+    logger: mockLogger,
+    ...overrides,
+  };
+}
 
 // Canned successful responses shaped to satisfy the stage schemas.
 const EXTRACT_OK = {
@@ -74,7 +86,7 @@ const characters: LLMCharacter[] = [
 
 type CallArg = StructuredCallOptions<unknown>;
 type TransportCall = { config: LLMClientConfig; opts: CallArg };
-type Transport = NonNullable<LLMVoiceServiceOptions['transport']>;
+type Transport = NonNullable<LlmStageDeps['transport']>;
 type TransportBehavior = 'reject' | object;
 
 // Injected transport stub: primary/merge vs backup behaviour is routed by
@@ -98,8 +110,8 @@ function modelCalls(calls: TransportCall[], model: string): CallArg[] {
   return calls.filter((c) => c.config.model === model).map((c) => c.opts);
 }
 
-describe('LLMVoiceService - per-stage fallback (real request data)', () => {
-  let service: LLMVoiceService;
+describe('LlmStages - per-stage fallback (real request data)', () => {
+  let service: LlmStages;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -109,11 +121,11 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
 
   it('extract: primary succeeds -> returns characters from that block, no backup call', async () => {
     const { transport, calls } = makeTransport(EXTRACT_OK);
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
+    service = createLlmStages(baseDeps({ backup: { ...backupOpts }, transport }));
     const blocks: TextBlock[] = [
       { blockIndex: 0, sentenceStartIndex: 0, sentences: ['Line one.', 'Line two.'] },
     ];
-    const result = await service.extractCharacters(blocks);
+    const result = await service.extract(blocks);
 
     expect(calls.some((c) => c.config.model === backupOpts.model)).toBe(false);
     expect(Array.isArray(result)).toBe(true);
@@ -121,12 +133,12 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
 
   it('extract: primary exhausted -> falls back to backup (backup succeeds)', async () => {
     const { transport, calls } = makeTransport('reject', EXTRACT_OK);
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
+    service = createLlmStages(baseDeps({ backup: { ...backupOpts }, transport }));
 
     const blocks: TextBlock[] = [
       { blockIndex: 0, sentenceStartIndex: 0, sentences: ['Line one.'] },
     ];
-    await service.extractCharacters(blocks);
+    await service.extract(blocks);
 
     expect(calls.some((c) => c.config.model === backupOpts.model)).toBe(true);
     expect(mockLogger.warn).toHaveBeenCalledWith(
@@ -136,13 +148,13 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
 
   it('extract: main + backup both fail -> block skipped (empty characters), no throw', async () => {
     const { transport } = makeTransport('reject', 'reject');
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
+    service = createLlmStages(baseDeps({ backup: { ...backupOpts }, transport }));
 
     const blocks: TextBlock[] = [
       { blockIndex: 0, sentenceStartIndex: 0, sentences: ['Line one.', 'Line two.'] },
       { blockIndex: 1, sentenceStartIndex: 2, sentences: ['Line three.'] },
     ];
-    const result = await service.extractCharacters(blocks);
+    const result = await service.extract(blocks);
     expect(result).toEqual([]);
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('failed after all retries, skipping'),
@@ -151,7 +163,7 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
 
   it('extract: real Infinite Regressor request uses ExtractSchema wire shape', async () => {
     const { transport, calls } = makeTransport(EXTRACT_OK);
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
+    service = createLlmStages(baseDeps({ backup: { ...backupOpts }, transport }));
 
     const blocks: TextBlock[] = [
       {
@@ -160,8 +172,8 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
         sentences: loadUserContent('extract_request.json').split('\n'),
       },
     ];
-    await service.extractCharacters(blocks).catch(() => {});
-    const wire = modelCalls(calls, baseOpts.model);
+    await service.extract(blocks).catch(() => {});
+    const wire = modelCalls(calls, primaryConfig.model);
     expect(wire[0].schema).toBe(ExtractSchema);
     expect(wire[0].schemaName).toBe('ExtractSchema');
     expect(wire[0].messages[0].role).toBe('system');
@@ -172,7 +184,7 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
 
   it('assign: primary succeeds -> speakers assigned, no backup call', async () => {
     const { transport, calls } = makeTransport(ASSIGN_OK);
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
+    service = createLlmStages(baseDeps({ backup: { ...backupOpts }, transport }));
 
     const blocks: TextBlock[] = [
       {
@@ -181,14 +193,14 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
         sentences: ['"Hi," said Undertaker.', '"Hey," said Adele.'],
       },
     ];
-    const result = await service.assignSpeakers(blocks, new Map(), characters);
+    const result = await service.assign(blocks, new Map(), characters);
     expect(result).toHaveLength(2);
     expect(calls.some((c) => c.config.model === backupOpts.model)).toBe(false);
   });
 
   it('assign: main + backup both fail -> all sentences fall back to narrator', async () => {
     const { transport } = makeTransport('reject', 'reject');
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
+    service = createLlmStages(baseDeps({ backup: { ...backupOpts }, transport }));
 
     const blocks: TextBlock[] = [
       {
@@ -197,7 +209,7 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
         sentences: ['"Hi," said Undertaker.', '"Hey," said Adele.', 'Narration here.'],
       },
     ];
-    const result = await service.assignSpeakers(blocks, new Map(), characters);
+    const result = await service.assign(blocks, new Map(), characters);
     expect(result).toHaveLength(3);
     expect(result.every((a) => a.speaker === 'narrator')).toBe(true);
     expect(result.every((a) => a.voiceId === 'narrator-voice')).toBe(true);
@@ -208,7 +220,7 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
 
   it('assign: real Infinite Regressor request uses AssignSchema wire shape', async () => {
     const { transport, calls } = makeTransport(ASSIGN_OK);
-    service = new LLMVoiceService({ ...baseOpts, backupConfig: { ...backupOpts }, transport });
+    service = createLlmStages(baseDeps({ backup: { ...backupOpts }, transport }));
 
     const blocks: TextBlock[] = [
       {
@@ -217,8 +229,8 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
         sentences: loadUserContent('assign_request.json').split('\n'),
       },
     ];
-    await service.assignSpeakers(blocks, new Map(), characters).catch(() => {});
-    const wire = modelCalls(calls, baseOpts.model);
+    await service.assign(blocks, new Map(), characters).catch(() => {});
+    const wire = modelCalls(calls, primaryConfig.model);
     expect(wire[0].schema).toBe(AssignSchema);
     expect(wire[0].schemaName).toBe('AssignSchema');
   });
@@ -227,23 +239,24 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
 
   it('merge: never falls back to backup — failed votes are skipped (no backup call)', async () => {
     const { transport, calls } = makeTransport('reject');
-    service = new LLMVoiceService({
-      ...baseOpts,
-      mergeConfig: {
-        apiKey: 'merge-key',
-        apiUrl: 'https://merge.api.com/v1',
-        model: 'merge-model',
-        maxRetries: 5,
-      },
-      backupConfig: { ...backupOpts },
-      transport,
-    });
+    service = createLlmStages(
+      baseDeps({
+        merge: {
+          apiKey: 'merge-key',
+          apiUrl: 'https://merge.api.com/v1',
+          model: 'merge-model',
+          maxRetries: 5,
+        },
+        backup: { ...backupOpts },
+        transport,
+      }),
+    );
 
     const chars: LLMCharacter[] = [
       { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
       { canonicalName: 'Alicia', variations: ['Alicia'], gender: 'female' },
     ];
-    const result = await service.mergeCharacters(chars);
+    const result = await service.merge(chars);
 
     expect(result).toEqual(chars); // consensus with no votes returns the input
     expect(calls.some((c) => c.config.model === backupOpts.model)).toBe(false);
@@ -254,24 +267,25 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
 
   it('merge: every successful vote uses MergeSchema; union filter runs after gather', async () => {
     const { transport, calls } = makeTransport(MERGE_OK);
-    service = new LLMVoiceService({
-      ...baseOpts,
-      mergeConfig: {
-        apiKey: 'merge-key',
-        apiUrl: 'https://merge.api.com/v1',
-        model: 'merge-model',
-        maxRetries: 5,
-      },
-      backupConfig: { ...backupOpts },
-      transport,
-    });
+    service = createLlmStages(
+      baseDeps({
+        merge: {
+          apiKey: 'merge-key',
+          apiUrl: 'https://merge.api.com/v1',
+          model: 'merge-model',
+          maxRetries: 5,
+        },
+        backup: { ...backupOpts },
+        transport,
+      }),
+    );
 
     const chars: LLMCharacter[] = [
       { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
       { canonicalName: 'Alicia', variations: ['Alicia'], gender: 'female' },
       { canonicalName: 'Bob', variations: ['Bob'], gender: 'male' },
     ];
-    const result = await service.mergeCharacters(chars);
+    const result = await service.merge(chars);
 
     expect(calls.length).toBeGreaterThan(0);
     for (const c of calls) {
@@ -286,23 +300,24 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
 
   it('merge: maxRetries=0 means no replacement budget — exactly 5 vote attempts', async () => {
     const { transport, calls } = makeTransport(MERGE_OK);
-    service = new LLMVoiceService({
-      ...baseOpts,
-      mergeConfig: {
-        apiKey: 'merge-key',
-        apiUrl: 'https://merge.api.com/v1',
-        model: 'merge-model',
-        maxRetries: 0,
-      },
-      backupConfig: { ...backupOpts },
-      transport,
-    });
+    service = createLlmStages(
+      baseDeps({
+        merge: {
+          apiKey: 'merge-key',
+          apiUrl: 'https://merge.api.com/v1',
+          model: 'merge-model',
+          maxRetries: 0,
+        },
+        backup: { ...backupOpts },
+        transport,
+      }),
+    );
 
     const chars: LLMCharacter[] = [
       { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
       { canonicalName: 'Alicia', variations: ['Alicia'], gender: 'female' },
     ];
-    await service.mergeCharacters(chars);
+    await service.merge(chars);
 
     // budget = 5 × (1 + 0) = 5 temps; every vote succeeds, so exactly 5 calls
     // — no replacement budget, no retries.
@@ -310,35 +325,101 @@ describe('LLMVoiceService - per-stage fallback (real request data)', () => {
   });
 });
 
-// ----------------------------------------------------------------- transport seam
+// ----------------------------------------------------------------- stage tags
 
-describe('LLMVoiceService - public mergeCharacters via injected transport', () => {
+describe('LlmStages - stage tags on transport options', () => {
+  let service: LlmStages;
+
   beforeEach(() => vi.clearAllMocks());
 
-  it('merge: public mergeCharacters merges Alice+Alicia via MergeSchema votes, no backup calls', async () => {
+  it('tags every extract-pass call with stage "extract"', async () => {
+    const { transport, calls } = makeTransport(EXTRACT_OK);
+    service = createLlmStages(baseDeps({ backup: { ...backupOpts }, transport }));
+
+    const blocks: TextBlock[] = [
+      { blockIndex: 0, sentenceStartIndex: 0, sentences: ['Line one.', 'Line two.'] },
+    ];
+    await service.extract(blocks);
+
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) expect(c.opts.stage).toBe('extract');
+  });
+
+  it('tags the assign draft with "assign" and the QA pass with "qa"', async () => {
+    const { transport, calls } = makeTransport(ASSIGN_OK);
+    service = createLlmStages(baseDeps({ backup: { ...backupOpts }, useVoting: true, transport }));
+
+    const blocks: TextBlock[] = [
+      {
+        blockIndex: 0,
+        sentenceStartIndex: 0,
+        sentences: ['"Hi," said Undertaker.', '"Hey," said Adele.'],
+      },
+    ];
+    await service.assign(blocks, new Map(), characters);
+
+    const primary = modelCalls(calls, primaryConfig.model);
+    expect(primary).toHaveLength(2);
+    expect(primary[0].stage).toBe('assign');
+    expect(primary[1].stage).toBe('qa');
+  });
+
+  it('tags merge votes with stage "merge"', async () => {
+    const { transport, calls } = makeTransport(MERGE_OK);
+    service = createLlmStages(
+      baseDeps({
+        merge: {
+          apiKey: 'merge-key',
+          apiUrl: 'https://merge.api.com/v1',
+          model: 'merge-model',
+          maxRetries: 5,
+        },
+        backup: { ...backupOpts },
+        transport,
+      }),
+    );
+
+    const chars: LLMCharacter[] = [
+      { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
+      { canonicalName: 'Alicia', variations: ['Alicia'], gender: 'female' },
+    ];
+    await service.merge(chars);
+
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) expect(c.opts.stage).toBe('merge');
+  });
+});
+
+// ----------------------------------------------------------------- transport seam
+
+describe('LlmStages - public merge via injected transport', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('merge: public merge merges Alice+Alicia via MergeSchema votes, no backup calls', async () => {
     const calls: TransportCall[] = [];
     const transport: Transport = async (config, opts) => {
       calls.push({ config, opts });
       return MERGE_OK as never;
     };
-    const service = new LLMVoiceService({
-      ...baseOpts,
-      mergeConfig: {
-        apiKey: 'merge-key',
-        apiUrl: 'https://merge.api.com/v1',
-        model: 'merge-model',
-        maxRetries: 5,
-      },
-      backupConfig: { ...backupOpts },
-      transport,
-    });
+    const service = createLlmStages(
+      baseDeps({
+        merge: {
+          apiKey: 'merge-key',
+          apiUrl: 'https://merge.api.com/v1',
+          model: 'merge-model',
+          maxRetries: 5,
+        },
+        backup: { ...backupOpts },
+        transport,
+      }),
+    );
 
     const chars: LLMCharacter[] = [
       { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' },
       { canonicalName: 'Alicia', variations: ['Alicia'], gender: 'female' },
       { canonicalName: 'Bob', variations: ['Bob'], gender: 'male' },
     ];
-    const result = await service.mergeCharacters(chars);
+    const result = await service.merge(chars);
 
     // Every vote agrees on merging Alice+Alicia; Bob stays separate.
     expect(result).toHaveLength(2);

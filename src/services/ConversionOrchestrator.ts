@@ -22,7 +22,7 @@ import { FailureLog } from './FailureLog';
 import type { FFmpegService } from './FFmpegService';
 // Import concrete service classes
 import type { ILogger } from './Logger';
-import type { LLMServiceFactoryOptions, LLMVoiceService } from './llm/LLMVoiceService';
+import type { LlmStageDeps, LlmStages } from './llm/stages';
 import { exportToProfile } from './llm/VoiceProfile';
 import {
   checkResumeState,
@@ -102,8 +102,8 @@ export interface OrchestratorInput {
 export interface ConversionOrchestratorServices {
   logger: ILogger;
   textBlockSplitter: TextBlockSplitter;
-  llmServiceFactory: {
-    create(options: LLMServiceFactoryOptions): LLMVoiceService;
+  llmStagesFactory: {
+    create(deps: LlmStageDeps): LlmStages;
   };
   workerPoolFactory: {
     create(options: WorkerPoolOptions): TTSWorkerPool;
@@ -421,7 +421,7 @@ export async function runConversion(
   input: OrchestratorInput,
   existingBook?: ProcessedBook | null,
 ): Promise<void> {
-  const { logger, textBlockSplitter, llmServiceFactory, voicePoolBuilder } = services;
+  const { logger, textBlockSplitter, llmStagesFactory, voicePoolBuilder } = services;
 
   // ==================== INPUT VALIDATION ====================
   if (!input.textContent.trim()) {
@@ -502,8 +502,6 @@ export async function runConversion(
     ports.progress.report(stage, current, total, message, failed);
   };
 
-  let llmService: LLMVoiceService | null = null;
-
   try {
     // ==================== LLM STAGE 1: CHARACTER EXTRACTION ====================
     let characters: LLMCharacter[] | undefined;
@@ -516,46 +514,42 @@ export async function runConversion(
       ports.progress.setConcurrency(input.llmThreads, 0);
       const setLlmConcurrency = (effective: number) => ports.progress.setConcurrency(effective, 0);
 
-      // Backup stage options shared by both LLM passes below.
-      const backupStage = { ...input.backupConfig };
-
-      const extractLLMOptions: LLMServiceFactoryOptions = {
-        ...input.extractConfig,
+      // One stages record for the whole run (ADR 0015): per-stage configs in,
+      // per-call signals out — the caller's signal is the only cancellation
+      // channel, so there is no abort bridge here.
+      const stages = llmStagesFactory.create({
+        extract: input.extractConfig,
+        assign: input.assignConfig,
+        merge: input.mergeConfig,
+        backup: { ...input.backupConfig },
         narratorVoice: input.narratorVoice,
-        maxConcurrentRequests: input.llmThreads,
-        onConcurrencyChange: setLlmConcurrency,
+        llmThreads: input.llmThreads,
+        useVoting: input.useVoting,
         directoryHandle: input.directoryHandle,
+        onConcurrencyChange: setLlmConcurrency,
         logger,
-        mergeConfig: { ...input.mergeConfig },
-        backupConfig: backupStage,
-      };
+      });
 
       const blocks = textBlockSplitter.createExtractBlocks(text, input.detectedLanguage);
       report('character-extraction', 0, blocks.length, '=== LLM Pass 1: Character Extraction ===');
 
-      llmService = llmServiceFactory.create(extractLLMOptions);
-      const abortHandler = () => llmService?.cancel();
-      signal.addEventListener('abort', abortHandler);
-
-      try {
-        characters = await llmService.extractCharacters(blocks, (current, total, message) => {
+      characters = await stages.extract(blocks, {
+        signal,
+        onProgress: (current, total, message) => {
           report(
             'character-extraction',
             current,
             total,
             message ?? `Extract: Block ${current}/${total}`,
           );
-        });
-        report(
-          'character-extraction',
-          blocks.length,
-          blocks.length,
-          `Detected ${characters.length} character(s)`,
-        );
-      } finally {
-        signal.removeEventListener('abort', abortHandler);
-        llmService = null;
-      }
+        },
+      });
+      report(
+        'character-extraction',
+        blocks.length,
+        blocks.length,
+        `Detected ${characters.length} character(s)`,
+      );
 
       // ==================== VOICE ASSIGNMENT (initial) ====================
       checkCancelled(signal);
@@ -574,17 +568,6 @@ export async function runConversion(
       // ==================== LLM STAGE 2: SPEAKER ASSIGNMENT ====================
       checkCancelled(signal);
 
-      const assignLLMOptions: LLMServiceFactoryOptions = {
-        ...input.assignConfig,
-        narratorVoice: input.narratorVoice,
-        useVoting: input.useVoting,
-        maxConcurrentRequests: input.llmThreads,
-        onConcurrencyChange: setLlmConcurrency,
-        directoryHandle: input.directoryHandle,
-        logger,
-        backupConfig: backupStage,
-      };
-
       const assignBlocks = textBlockSplitter.createAssignBlocks(text, input.detectedLanguage);
       report(
         'speaker-assignment',
@@ -593,45 +576,39 @@ export async function runConversion(
         '=== LLM Pass 2: Speaker Assignment ===',
       );
 
-      llmService = llmServiceFactory.create(assignLLMOptions);
-      signal.addEventListener('abort', abortHandler);
-
-      let assignments: SpeakerAssignment[];
-
-      try {
-        assignments = await llmService.assignSpeakers(
-          assignBlocks,
-          voiceMap,
-          characters,
-          (current, total) => {
+      // Reassigned by the frequency remap below.
+      let assignments: SpeakerAssignment[] = await stages.assign(
+        assignBlocks,
+        voiceMap,
+        characters,
+        {
+          signal,
+          onProgress: (current, total) => {
             report('speaker-assignment', current, total, `Assign: Block ${current}/${total}`);
           },
-        );
+        },
+      );
+      report(
+        'speaker-assignment',
+        assignBlocks.length,
+        assignBlocks.length,
+        `Assigned speakers to ${assignments.length} sentence(s)`,
+      );
+
+      // Save pipeline state for resume
+      const stateSaved = await savePipelineState(directoryHandle, {
+        assignments,
+        characterVoiceMap: Object.fromEntries(voiceMap),
+        characters,
+        fileNames,
+      });
+      if (stateSaved) {
         report(
           'speaker-assignment',
           assignBlocks.length,
           assignBlocks.length,
-          `Assigned speakers to ${assignments.length} sentence(s)`,
+          'Saved pipeline state for resume',
         );
-
-        // Save pipeline state for resume
-        const stateSaved = await savePipelineState(directoryHandle, {
-          assignments,
-          characterVoiceMap: Object.fromEntries(voiceMap),
-          characters,
-          fileNames,
-        });
-        if (stateSaved) {
-          report(
-            'speaker-assignment',
-            assignBlocks.length,
-            assignBlocks.length,
-            'Saved pipeline state for resume',
-          );
-        }
-      } finally {
-        signal.removeEventListener('abort', abortHandler);
-        llmService = null;
       }
 
       // ==================== VOICE REMAPPING (by frequency) ====================

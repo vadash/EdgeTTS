@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ILogger } from '@/services/Logger';
-import { LLMVoiceService } from '@/services/llm';
+import { createLlmStages, type LlmStages } from '@/services/llm/stages';
 import { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 import { testConfig } from '../../test.config.local';
@@ -83,21 +83,28 @@ export function getUseQA(): boolean {
 }
 
 /**
- * Create LLMVoiceService instance
+ * Create LLM stages instance
  * @param repeatPrompt - Optional override for repeatPrompt (defaults to REPEAT_PROMPT env var)
  */
-export function createService(repeatPrompt?: boolean): LLMVoiceService {
+export function createService(repeatPrompt?: boolean): LlmStages {
   validateConfig();
-  return new LLMVoiceService({
+  const stageConfig = () => ({
     apiKey: testConfig.apiKey,
     apiUrl: testConfig.apiUrl,
     model: testConfig.model,
-    narratorVoice: 'en-US-AriaNeural',
-    reasoning: testConfig.reasoning ? 'auto' : null,
     streaming: testConfig.streaming ?? true,
+    reasoning: testConfig.reasoning ? ('auto' as const) : null,
     temperature: testConfig.temperature,
-    useVoting: getUseQA(),
     repeatPrompt: repeatPrompt ?? getRepeatPrompt(),
+  });
+  return createLlmStages({
+    extract: stageConfig(),
+    assign: stageConfig(),
+    merge: stageConfig(),
+    narratorVoice: 'en-US-AriaNeural',
+    llmThreads: 2,
+    useVoting: getUseQA(),
+    directoryHandle: null,
     logger: testLogger,
   });
 }
@@ -121,7 +128,7 @@ export function loadFixtureText(filename: string): string {
  * Run Extract (character extraction)
  */
 export async function runExtract(
-  service: LLMVoiceService,
+  service: LlmStages,
   splitter: TextBlockSplitter,
   text: string,
   verbose = true,
@@ -133,10 +140,12 @@ export async function runExtract(
   }
 
   const startTime = Date.now();
-  const characters = await service.extractCharacters(blocks, (current, total) => {
-    if (verbose) {
-      console.log(`    Block ${current}/${total}`);
-    }
+  const characters = await service.extract(blocks, {
+    onProgress: (current, total) => {
+      if (verbose) {
+        console.log(`    Block ${current}/${total}`);
+      }
+    },
   });
   const durationMs = Date.now() - startTime;
 
@@ -151,7 +160,7 @@ export async function runExtract(
  * Run Assign (speaker assignment)
  */
 export async function runAssign(
-  service: LLMVoiceService,
+  service: LlmStages,
   splitter: TextBlockSplitter,
   text: string,
   characters: LLMCharacter[],
@@ -170,16 +179,13 @@ export async function runAssign(
   }
 
   const startTime = Date.now();
-  const assignments = await service.assignSpeakers(
-    blocks,
-    characterVoiceMap,
-    characters,
-    (current, total) => {
+  const assignments = await service.assign(blocks, characterVoiceMap, characters, {
+    onProgress: (current, total) => {
       if (verbose) {
         console.log(`    Block ${current}/${total}`);
       }
     },
-  );
+  });
   const durationMs = Date.now() - startTime;
 
   const dialogueCount = assignments.filter((a) => a.speaker !== 'narrator').length;

@@ -1,10 +1,19 @@
 import { z } from 'zod';
 
+/**
+ * Pipeline pass id carried on every structured call so transport adapters and
+ * tests can route on the pass instead of sniffing config.model (ADR 0015).
+ * `test` is reserved for connection probes; `qa` is the Assign QA pass.
+ */
+export type LlmPassId = 'extract' | 'assign' | 'qa' | 'merge' | 'test';
+
 export interface StructuredCallOptions<T> {
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
   schema: z.ZodType<T>;
   schemaName: string;
   signal?: AbortSignal;
+  /** Which pipeline pass issued this call. Transport adapters ignore it. */
+  stage?: LlmPassId;
 }
 
 export type JSONSchemaFormat = {

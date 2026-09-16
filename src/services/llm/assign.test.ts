@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as assignBuilder from '@/config/prompts/assign/builder';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
-import type { LLMVoiceServiceOptions } from './LLMVoiceService';
-import { LLMVoiceService } from './LLMVoiceService';
+import { createLlmStages } from './stages';
+import type { LlmStageDeps, LlmStages } from './stages';
 
-describe('LLMVoiceService - Assign with Structured Outputs', () => {
-  let service: LLMVoiceService;
+describe('LlmStages - Assign with Structured Outputs', () => {
+  let service: LlmStages;
   const mockLogger: ILogger = {
     info: vi.fn(),
     warn: vi.fn(),
@@ -23,13 +23,16 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
   // then MALE_UNNAMED / FEMALE_UNNAMED / UNKNOWN_UNNAMED.
   const CODES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
 
-  function makeService(options: Partial<LLMVoiceServiceOptions> = {}) {
+  function makeService(options: Partial<LlmStageDeps> = {}): LlmStages {
     let next = 0;
-    return new LLMVoiceService({
-      apiKey: 'test-key',
-      apiUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
+    return createLlmStages({
+      extract: { apiKey: 'test-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+      assign: { apiKey: 'test-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+      merge: { apiKey: 'test-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
       narratorVoice: 'narrator-voice',
+      llmThreads: 2,
+      useVoting: false,
+      directoryHandle: null,
       logger: mockLogger,
       speakerCodeFactory: () => CODES[next++] ?? `X${next}`,
       ...options,
@@ -59,7 +62,7 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
       },
     ];
 
-    const result = await service.assignSpeakers(blocks, new Map(), characters);
+    const result = await service.assign(blocks, new Map(), characters);
 
     expect(result).toHaveLength(2);
     expect(result[0].speaker).toBe('Alice');
@@ -84,7 +87,7 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
       },
     ];
 
-    const result = await service.assignSpeakers(blocks, new Map(), characters);
+    const result = await service.assign(blocks, new Map(), characters);
 
     expect(result).toHaveLength(2);
     expect(result[0].speaker).toBe('Alice');
@@ -120,7 +123,7 @@ describe('LLMVoiceService - Assign with Structured Outputs', () => {
       ['Bob', 'voice-b'],
     ]);
 
-    await service.assignSpeakers(blocks, voiceMap, characters);
+    await service.assign(blocks, voiceMap, characters);
 
     // buildAssignPrompt should have been called twice
     expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2);

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { LLMVoiceService } from '@/services/llm';
+import type { LlmStages } from '@/services/llm';
 import type { TextBlockSplitter } from '@/services/TextBlockSplitter';
 import { findCharacter, fixtures, type TestFixture } from './fixtures';
 import {
@@ -31,7 +31,7 @@ import {
  */
 
 describe('LLM Real API Tests', () => {
-  let service: LLMVoiceService;
+  let service: LlmStages;
   let splitter: TextBlockSplitter;
 
   beforeAll(() => {

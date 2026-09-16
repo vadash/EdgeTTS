@@ -2,16 +2,31 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import type { TextBlock } from '@/state/types';
 import { RetriableError } from '@/errors';
-import { LLMVoiceService } from './LLMVoiceService';
+import { createLlmStages } from './stages';
+import type { LlmStageDeps, LlmStages } from './stages';
 
-describe('LLMVoiceService - Extract with Structured Outputs', () => {
-  let service: LLMVoiceService;
+describe('LlmStages - Extract with Structured Outputs', () => {
+  let service: LlmStages;
   const mockLogger: ILogger = {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
   };
+
+  function makeService(overrides: Partial<LlmStageDeps> = {}): LlmStages {
+    return createLlmStages({
+      extract: { apiKey: 'test-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+      assign: { apiKey: 'test-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+      merge: { apiKey: 'test-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+      narratorVoice: 'narrator',
+      llmThreads: 2,
+      useVoting: false,
+      directoryHandle: null,
+      logger: mockLogger,
+      ...overrides,
+    });
+  }
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -26,12 +41,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
       ],
     };
 
-    service = new LLMVoiceService({
-      apiKey: 'test-key',
-      apiUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
-      narratorVoice: 'narrator',
-      logger: mockLogger,
+    service = makeService({
       transport: async () => extractResponse as never,
     });
 
@@ -50,7 +60,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
       },
     ];
 
-    const result = await service.extractCharacters(blocks);
+    const result = await service.extract(blocks);
 
     expect(result).toHaveLength(2);
     expect(result[0].canonicalName).toBe('Alice');
@@ -65,12 +75,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
       ],
     };
 
-    service = new LLMVoiceService({
-      apiKey: 'test-key',
-      apiUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
-      narratorVoice: 'narrator',
-      logger: mockLogger,
+    service = makeService({
       transport: async () => extractResponse as never,
     });
 
@@ -87,7 +92,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
       },
     ];
 
-    const result = await service.extractCharacters(blocks);
+    const result = await service.extract(blocks);
 
     expect(result).toHaveLength(1);
     expect(result[0].canonicalName).toBe('Narrator');
@@ -96,12 +101,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
   it('skips block on refusal during extract (no backup)', async () => {
     // The adapter throws the retriable refusal error on the wire; the service
     // exhausts retries and the per-block handler skips the block.
-    service = new LLMVoiceService({
-      apiKey: 'test-key',
-      apiUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
-      narratorVoice: 'narrator',
-      logger: mockLogger,
+    service = makeService({
       transport: async () => {
         throw new RetriableError('LLM refused: Content policy violation');
       },
@@ -115,7 +115,7 @@ describe('LLMVoiceService - Extract with Structured Outputs', () => {
       },
     ];
 
-    const result = await service.extractCharacters(blocks);
+    const result = await service.extract(blocks);
     expect(result).toEqual([]); // refusal skips the block, no throw
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('failed after all retries, skipping'),

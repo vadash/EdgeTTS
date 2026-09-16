@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, TextBlock } from '@/state/types';
-import { LLMVoiceService } from './LLMVoiceService';
+import { createLlmStages } from './stages';
+import type { LlmStageDeps, LlmStages } from './stages';
 
-describe('LLMVoiceService - Assign with QA Pass', () => {
-  let service: LLMVoiceService;
+describe('LlmStages - Assign with QA Pass', () => {
+  let service: LlmStages;
   const mockLogger: ILogger = {
     info: vi.fn(),
     warn: vi.fn(),
@@ -23,7 +24,7 @@ describe('LLMVoiceService - Assign with QA Pass', () => {
 
   function makeService(
     run: (call: number) => Promise<unknown>,
-    options: Partial<ConstructorParameters<typeof LLMVoiceService>[0]> = {},
+    options: Partial<LlmStageDeps> = {},
   ) {
     let next = 0;
     let call = 0;
@@ -32,11 +33,14 @@ describe('LLMVoiceService - Assign with QA Pass', () => {
       const value = await run(call);
       return value as never;
     });
-    service = new LLMVoiceService({
-      apiKey: 'test-key',
-      apiUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
+    service = createLlmStages({
+      extract: { apiKey: 'test-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+      assign: { apiKey: 'test-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+      merge: { apiKey: 'test-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
       narratorVoice: 'narrator-voice',
+      llmThreads: 2,
+      useVoting: false,
+      directoryHandle: null,
       logger: mockLogger,
       speakerCodeFactory: () => CODES[next++] ?? `X${next}`,
       transport,
@@ -80,7 +84,7 @@ describe('LLMVoiceService - Assign with QA Pass', () => {
       },
     ];
 
-    const result = await service.assignSpeakers(blocks, new Map(), characters);
+    const result = await service.assign(blocks, new Map(), characters);
 
     // Should have made 2 API calls (draft + QA)
     expect(transport).toHaveBeenCalledTimes(2);
@@ -116,7 +120,7 @@ describe('LLMVoiceService - Assign with QA Pass', () => {
       },
     ];
 
-    const result = await service.assignSpeakers(blocks, new Map(), characters);
+    const result = await service.assign(blocks, new Map(), characters);
 
     // Should have tried 2 calls (draft succeeded, QA failed)
     expect(transport).toHaveBeenCalledTimes(2);
@@ -146,7 +150,7 @@ describe('LLMVoiceService - Assign with QA Pass', () => {
       },
     ];
 
-    const result = await service.assignSpeakers(blocks, new Map(), characters);
+    const result = await service.assign(blocks, new Map(), characters);
 
     // Should have made only 1 API call
     expect(transport).toHaveBeenCalledTimes(1);

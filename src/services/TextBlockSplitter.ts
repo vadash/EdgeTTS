@@ -201,7 +201,7 @@ export class TextBlockSplitter {
 
   /**
    * Check if sentence contains dialogue symbols (simplified check for narration detection).
-   * Avoids importing hasSpeechSymbols from LLMVoiceService (wrong dependency direction).
+   * Avoids importing hasSpeechSymbols from the LLM stages module (wrong dependency direction).
    */
   private hasDialogueSymbols(text: string): boolean {
     // Straight quotes, guillemets, curly quotes, em dash (Russian dialogue)

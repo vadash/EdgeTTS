@@ -1,7 +1,7 @@
 import { describe, expect, it, type Mock, vi } from 'vitest';
 import { AppError } from '@/errors';
 import type { ILogger } from '@/services/Logger';
-import type { StageConfig, StageId } from '@/state/types';
+import type { LLMCharacter, StageConfig, StageId } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 import type { AudioMerger } from '../AudioMerger';
 import type { ChunkStore } from '../ChunkStore';
@@ -12,7 +12,7 @@ import {
   runConversion,
 } from '../ConversionOrchestrator';
 import type { FFmpegService } from '../FFmpegService';
-import type { LLMVoiceService } from '../llm/LLMVoiceService';
+import type { LlmStages } from '../llm/stages';
 import type { TextBlockSplitter } from '../TextBlockSplitter';
 import type { TTSWorkerPool, WorkerPoolOptions } from '../TTSWorkerPool';
 
@@ -130,10 +130,11 @@ function createMockServices(failPart?: number) {
   };
   const workerPool = { addTasks: vi.fn(), clear: vi.fn() };
   const merger = { mergeAndSave: vi.fn(() => Promise.resolve(1)) };
-  const llmService = {
-    extractCharacters: vi.fn(() => Promise.resolve(TEST_CHARACTERS)),
-    assignSpeakers: vi.fn(() => Promise.resolve(TEST_ASSIGNMENTS)),
-    cancel: vi.fn(),
+  const llmStages = {
+    extract: vi.fn(() => Promise.resolve(TEST_CHARACTERS)),
+    assign: vi.fn(() => Promise.resolve(TEST_ASSIGNMENTS)),
+    merge: vi.fn(async (characters: LLMCharacter[]) => characters),
+    testConnection: vi.fn(async () => ({ success: true, model: 'mock-model' })),
   };
   const services: ConversionOrchestratorServices = {
     logger: {
@@ -146,8 +147,8 @@ function createMockServices(failPart?: number) {
       createExtractBlocks: vi.fn(() => ['block1']),
       createAssignBlocks: vi.fn(() => ['block1']),
     } as unknown as TextBlockSplitter,
-    llmServiceFactory: {
-      create: vi.fn(() => llmService as unknown as LLMVoiceService),
+    llmStagesFactory: {
+      create: vi.fn(() => llmStages as unknown as LlmStages),
     },
     workerPoolFactory: {
       create: vi.fn((opts: WorkerPoolOptions): TTSWorkerPool => {

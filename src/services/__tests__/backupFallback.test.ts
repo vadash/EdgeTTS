@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ILogger } from '@/services/Logger';
-import { LLMVoiceService } from '../llm/LLMVoiceService';
-import type { LLMClientConfig, LLMVoiceServiceOptions } from '../llm/LLMVoiceService';
+import { createLlmStages } from '../llm/stages';
+import type { LLMClientConfig, LlmStageDeps } from '../llm/stages';
 import type { StructuredCallOptions } from '../llm/schemaUtils';
 import type { LLMCharacter, TextBlock } from '@/state/types';
 import extractFixture from '../../test/fixtures/llm-real-data/extract_request.json';
@@ -22,11 +22,11 @@ type TransportCall = { config: LLMClientConfig; opts: StructuredCallOptions<unkn
 // Injected transport stub: routes by resolved stage config (model field),
 // capturing every call. Primary/backup behaviour is chosen per test.
 function captureTransport(route: (config: LLMClientConfig) => 'reject' | unknown): {
-  transport: NonNullable<LLMVoiceServiceOptions['transport']>;
+  transport: NonNullable<LlmStageDeps['transport']>;
   calls: TransportCall[];
 } {
   const calls: TransportCall[] = [];
-  const transport: NonNullable<LLMVoiceServiceOptions['transport']> = async (config, opts) => {
+  const transport: NonNullable<LlmStageDeps['transport']> = async (config, opts) => {
     calls.push({ config, opts });
     const result = route(config);
     if (result === 'reject') {
@@ -37,14 +37,17 @@ function captureTransport(route: (config: LLMClientConfig) => 'reject' | unknown
   return { transport, calls };
 }
 
-function makeService(withBackup: boolean, overrides: Partial<LLMVoiceServiceOptions> = {}) {
-  return new LLMVoiceService({
-    apiKey: 'primary-key',
-    apiUrl: 'https://api.openai.com/v1',
-    model: 'gpt-4o-mini',
+function makeService(withBackup: boolean, overrides: Partial<LlmStageDeps> = {}) {
+  return createLlmStages({
+    extract: { apiKey: 'primary-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    assign: { apiKey: 'primary-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    merge: { apiKey: 'primary-key', apiUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
     narratorVoice: 'narrator',
+    llmThreads: 2,
+    useVoting: false,
+    directoryHandle: null,
     logger: mockLogger,
-    backupConfig: withBackup
+    backup: withBackup
       ? {
           apiKey: 'backup-key',
           apiUrl: 'https://backup.api.com/v1',
@@ -56,7 +59,7 @@ function makeService(withBackup: boolean, overrides: Partial<LLMVoiceServiceOpti
   });
 }
 
-describe('LLMVoiceService - Backup fallback', () => {
+describe('LlmStages - Backup fallback', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('falls back to backup model when primary exhausts retries', async () => {
@@ -67,7 +70,7 @@ describe('LLMVoiceService - Backup fallback', () => {
     );
     const service = makeService(true, { transport });
 
-    const result = await service.extractCharacters([
+    const result = await service.extract([
       {
         blockIndex: 0,
         sentenceStartIndex: 0,
@@ -88,7 +91,7 @@ describe('LLMVoiceService - Backup fallback', () => {
     const { transport, calls } = captureTransport(() => 'reject');
     const service = makeService(false, { transport });
 
-    const result = await service.extractCharacters([
+    const result = await service.extract([
       { blockIndex: 0, sentenceStartIndex: 0, sentences: ['"Hi," said Alice.'] },
     ]);
 
@@ -110,14 +113,31 @@ describe('LLMVoiceService - Backup fallback', () => {
     const { transport, calls } = captureTransport((config) =>
       config.model === 'backup-model' ? { characters: [alice] } : 'reject',
     );
-    const service = new LLMVoiceService({
-      apiKey: 'primary-key',
-      apiUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
+    const service = createLlmStages({
+      extract: {
+        apiKey: 'primary-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        maxRetries: 0,
+      },
+      assign: {
+        apiKey: 'primary-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        maxRetries: 0,
+      },
+      merge: {
+        apiKey: 'primary-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        maxRetries: 0,
+      },
       narratorVoice: 'narrator',
+      llmThreads: 2,
+      useVoting: false,
+      directoryHandle: null,
       logger: mockLogger,
-      maxRetries: 0,
-      backupConfig: {
+      backup: {
         apiKey: 'backup-key',
         apiUrl: 'https://backup.api.com/v1',
         model: 'backup-model',
@@ -126,7 +146,7 @@ describe('LLMVoiceService - Backup fallback', () => {
       transport,
     });
 
-    const result = await service.extractCharacters([
+    const result = await service.extract([
       {
         blockIndex: 0,
         sentenceStartIndex: 0,
@@ -146,21 +166,23 @@ describe('LLMVoiceService - Backup fallback', () => {
 
   it('does not fall back to backup once the signal is aborted', async () => {
     const calls: TransportCall[] = [];
+    const controller = new AbortController();
     const service = makeService(true, {
       transport: async (config, opts) => {
         calls.push({ config, opts });
         if (config.model === 'backup-model') throw BACKUP_REJECT;
-        // Cancel mid-flight so the in-progress primary attempt sees an
+        // Abort mid-flight so the in-progress primary attempt sees an
         // aborted signal when it fails — an aborted request never backs up.
-        service.cancel();
+        controller.abort();
         throw Object.assign(new Error('aborted'), { name: 'AbortError' });
       },
     });
 
     await expect(
-      service.extractCharacters([
-        { blockIndex: 0, sentenceStartIndex: 0, sentences: ['"Hi," said Alice.'] },
-      ]),
+      service.extract(
+        [{ blockIndex: 0, sentenceStartIndex: 0, sentences: ['"Hi," said Alice.'] }],
+        { signal: controller.signal },
+      ),
     ).rejects.toThrow('aborted');
 
     // Backup should never be called because the signal was aborted
@@ -196,7 +218,7 @@ describe('LLMVoiceService - Backup fallback', () => {
         sentences: realText.split('\n'),
       },
     ];
-    const result = await service.extractCharacters(blocks);
+    const result = await service.extract(blocks);
 
     const backupCalls = calls.filter((c) => c.config.model === 'backup-model');
     expect(backupCalls).toHaveLength(2);
@@ -245,7 +267,7 @@ describe('LLMVoiceService - Backup fallback', () => {
         sentences: realParagraphs.split('\n'),
       },
     ];
-    const result = await service.assignSpeakers(blocks, new Map(), []);
+    const result = await service.assign(blocks, new Map(), []);
 
     const backupCalls = calls.filter((c) => c.config.model === 'backup-model');
     expect(backupCalls).toHaveLength(2);
@@ -283,7 +305,7 @@ describe('LLMVoiceService - Backup fallback', () => {
       { blockIndex: 0, sentenceStartIndex: 0, sentences: ['"Hi," said Alice.'] },
     ];
 
-    const result = await service.assignSpeakers(blocks, new Map(), characters);
+    const result = await service.assign(blocks, new Map(), characters);
 
     // QA must never touch the backup model — only the primary is retried.
     expect(calls.some((c) => c.config.model === 'backup-model')).toBe(false);
