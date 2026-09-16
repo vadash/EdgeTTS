@@ -1,49 +1,54 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+
+import { ChunkStore } from '@/services/ChunkStore';
 import { checkResumeState } from '@/services/ResumeCheck';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
+import { createMockChunkIdb } from '@/test/mocks/MockChunkIdb';
 
 describe('checkResumeState', () => {
+  let root: FileSystemDirectoryHandle;
+  let store: ChunkStore;
+
+  beforeEach(() => {
+    root = createMockDirectoryHandle();
+    store = new ChunkStore(createMockChunkIdb());
+  });
+
   it('returns null when _temp_work does not exist', async () => {
-    const dirHandle = createMockDirectoryHandle();
-    const result = await checkResumeState(dirHandle);
+    const result = await checkResumeState(store, root);
     expect(result).toBeNull();
   });
 
   it('returns null when _temp_work exists but no pipeline_state.json', async () => {
-    const dirHandle = createMockDirectoryHandle();
-    await dirHandle.getDirectoryHandle('_temp_work', { create: true });
+    await root.getDirectoryHandle('_temp_work', { create: true });
 
-    const result = await checkResumeState(dirHandle);
+    const result = await checkResumeState(store, root);
     expect(result).toBeNull();
   });
 
   it('returns ResumeInfo when pipeline_state.json exists', async () => {
-    const dirHandle = createMockDirectoryHandle();
-    const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
+    const tempDir = await root.getDirectoryHandle('_temp_work', { create: true });
 
     // Write pipeline state
     const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
     const stateWritable = await stateFile.createWritable();
     await stateWritable.write(
       JSON.stringify({
-        assignments: [
-          { text: 'Hi', sentenceIndex: 0, speaker: 'Narrator', voiceId: 'en-US-AriaNeural' },
-        ],
-        characterVoiceMap: { Narrator: 'en-US-AriaNeural' },
+        assignments: [],
+        characterVoiceMap: {},
         fileNames: [],
       }),
     );
     await stateWritable.close();
 
-    const result = await checkResumeState(dirHandle);
+    const result = await checkResumeState(store, root);
     expect(result).not.toBeNull();
     expect(result!.hasLLMState).toBe(true);
     expect(result!.cachedChunks).toBe(0);
   });
 
   it('counts cached chunk files using new format', async () => {
-    const dirHandle = createMockDirectoryHandle();
-    const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
+    const tempDir = await root.getDirectoryHandle('_temp_work', { create: true });
 
     // Write pipeline state
     const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
@@ -70,14 +75,13 @@ describe('checkResumeState', () => {
     await indexWritable.write('{"i":2,"o":6,"l":3}\n');
     await indexWritable.close();
 
-    const result = await checkResumeState(dirHandle);
+    const result = await checkResumeState(store, root);
     expect(result).not.toBeNull();
     expect(result!.cachedChunks).toBe(3);
   });
 
   it('wipes legacy format chunk files', async () => {
-    const dirHandle = createMockDirectoryHandle();
-    const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
+    const tempDir = await root.getDirectoryHandle('_temp_work', { create: true });
 
     // Write pipeline state
     const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
@@ -102,7 +106,7 @@ describe('checkResumeState', () => {
     const logs: string[] = [];
     const log = (msg: string) => logs.push(msg);
 
-    const result = await checkResumeState(dirHandle, log);
+    const result = await checkResumeState(store, root, log);
     // Should return null because legacy format is detected and wiped
     expect(result).toBeNull();
     expect(logs.some((msg) => msg.includes('legacy format detected'))).toBe(true);
@@ -110,7 +114,7 @@ describe('checkResumeState', () => {
     // Verify _temp_work was removed
     let tempWorkExists = false;
     try {
-      await dirHandle.getDirectoryHandle('_temp_work');
+      await root.getDirectoryHandle('_temp_work');
       tempWorkExists = true;
     } catch {
       tempWorkExists = false;

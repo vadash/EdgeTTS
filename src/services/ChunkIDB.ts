@@ -8,6 +8,26 @@ const STORE_NAME = 'chunks';
 const DB_VERSION = 1;
 
 /**
+ * The IDB operations ChunkStore depends on, as an injectable adapter.
+ * The module's own exports satisfy this interface; tests substitute a
+ * Map-backed fake (see src/test/mocks/MockChunkIdb.ts).
+ */
+export interface ChunkIdbAdapter {
+  openDatabase(): Promise<IDBDatabase>;
+  putChunk(db: IDBDatabase, index: number, data: Uint8Array): Promise<void>;
+  getAllChunks(db: IDBDatabase): Promise<Array<{ key: number; data: Uint8Array }>>;
+  getAllKeys(db: IDBDatabase): Promise<number[]>;
+  getChunksByKeys(
+    db: IDBDatabase,
+    keys: number[],
+  ): Promise<Array<{ key: number; data: Uint8Array | undefined }>>;
+  getChunk(db: IDBDatabase, key: number): Promise<Uint8Array | undefined>;
+  deleteKeys(db: IDBDatabase, keys: number[]): Promise<void>;
+  clearDatabase(db: IDBDatabase): Promise<void>;
+  closeDatabase(db: IDBDatabase): Promise<void>;
+}
+
+/**
  * Opens or creates the IndexedDB database for chunk storage.
  * Creates the 'chunks' object store on upgrade needed.
  *

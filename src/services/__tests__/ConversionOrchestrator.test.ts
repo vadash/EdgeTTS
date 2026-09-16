@@ -3,8 +3,9 @@ import { AppError } from '@/errors';
 import type { ILogger } from '@/services/Logger';
 import type { LLMCharacter, StageConfig, StageId } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
+import { createMockChunkIdb } from '@/test/mocks/MockChunkIdb';
 import type { AudioMerger, MergerConfig } from '../AudioMerger';
-import type { ChunkStore } from '../ChunkStore';
+import { ChunkStore } from '../ChunkStore';
 import {
   type ConversionOrchestratorServices,
   type ConversionPorts,
@@ -123,13 +124,12 @@ const TEST_ASSIGNMENTS = [
  * because their private state cannot be satisfied structurally.
  */
 function createMockServices(failPart?: number) {
-  const chunkStore = {
-    init: vi.fn(() => Promise.resolve()),
-    clearDatabase: vi.fn(() => Promise.resolve()),
-    close: vi.fn(() => Promise.resolve()),
-    getExistingIndices: vi.fn(() => new Set<number>()),
-    prepareForRead: vi.fn(() => Promise.resolve()),
-  };
+  // Real ChunkStore over the shared FS mock and an in-memory IDB adapter:
+  // the orchestrator now drives resume/load/save through the store itself.
+  const chunkStore = new ChunkStore(createMockChunkIdb());
+  vi.spyOn(chunkStore, 'init');
+  vi.spyOn(chunkStore, 'clearAll');
+  vi.spyOn(chunkStore, 'close');
   const workerPool = { addTasks: vi.fn(), clear: vi.fn() };
   const merger = { mergeAndSave: vi.fn(() => Promise.resolve(1)) };
   const mergerCreate = vi.fn(
@@ -170,7 +170,7 @@ function createMockServices(failPart?: number) {
       buildPool: vi.fn(() => ({ male: ['m1', 'm2'], female: ['f1', 'f2', 'f3'] })),
     },
     ffmpegService: { load: vi.fn(() => Promise.resolve(true)) } as unknown as FFmpegService,
-    chunkStoreFactory: { create: () => chunkStore as unknown as ChunkStore },
+    chunkStoreFactory: { create: () => chunkStore },
   };
   return { services, chunkStore, workerPool, merger, mergerCreate };
 }
@@ -242,7 +242,7 @@ describe('runConversion', () => {
     await runConversion(services, ports, new AbortController().signal, createMockInput());
 
     expect(ports.run.begin).toHaveBeenCalledTimes(1);
-    expect(chunkStore.clearDatabase).toHaveBeenCalledTimes(1);
+    expect(chunkStore.clearAll).toHaveBeenCalledTimes(1);
     expect(chunkStore.init).toHaveBeenCalledTimes(1);
     expect(chunkStore.close).toHaveBeenCalledTimes(1);
 

@@ -105,7 +105,8 @@ Concurrency growing one slot per clean call, up to the configured ceiling.
 ### Storage
 
 **Chunk store**:
-The temporary work folder where chunks stream to disk.
+The temporary work folder of a Conversion and everything in it. Chunks stream to disk there, and the Chunk store alone owns the folder's lifecycle; the Failure log and pipeline state are tenants inside it.
+_Avoid_: work folder, temp dir
 
 **Voice profile**:
 A best-effort JSON sidecar in the Book output folder recording the allocation.

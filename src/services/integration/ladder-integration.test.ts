@@ -30,7 +30,6 @@ describe('Ladder Integration - E2E', () => {
       prepareForRead: vi.fn().mockResolvedValue(undefined),
       readChunk: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
       getExistingIndices: vi.fn().mockReturnValue(new Set<number>()),
-      clearDatabase: vi.fn().mockResolvedValue(undefined),
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as ChunkStore;
 

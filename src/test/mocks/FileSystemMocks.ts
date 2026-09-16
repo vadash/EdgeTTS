@@ -6,28 +6,30 @@ interface SharedMockState {
   subdirs: Map<string, FileSystemDirectoryHandle>;
 }
 
+/** Blob-like view over bytes; slice() returns a narrowed view like a real Blob. */
+function mockBlob(name: string, data: Uint8Array): File {
+  return {
+    name,
+    type: 'application/octet-stream',
+    size: data.length,
+    lastModified: Date.now(),
+    webkitRelativePath: '',
+    bytes: async () => data,
+    arrayBuffer: async () =>
+      data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
+    text: async () => new TextDecoder().decode(data),
+    slice: (start?: number, end?: number) =>
+      mockBlob(name, data.slice(start ?? 0, end ?? data.length)) as unknown as File,
+    stream: () => new ReadableStream(),
+  } as unknown as File;
+}
+
 function createMockFile(name: string, files: Map<string, Uint8Array>): FileSystemFileHandle {
   return {
     kind: 'file',
     name,
     isSameEntry: async () => false,
-    getFile: async () => {
-      const data = files.get(name) ?? new Uint8Array([]);
-      const file = {
-        name,
-        type: 'application/octet-stream',
-        size: data.length,
-        lastModified: Date.now(),
-        webkitRelativePath: '',
-        bytes: async () => data,
-        arrayBuffer: async () =>
-          data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
-        text: async () => new TextDecoder().decode(data),
-        slice: () => file,
-        stream: () => new ReadableStream(),
-      } as unknown as File;
-      return file;
-    },
+    getFile: async () => mockBlob(name, files.get(name) ?? new Uint8Array([])),
     createWritable: async () => {
       const chunks: Uint8Array[] = [];
       return {
@@ -107,6 +109,9 @@ function createMockDirectoryHandleWithState(
       return createMockFile(fileName, files);
     },
     removeEntry: async (name: string, _options?: { recursive?: boolean }) => {
+      if (!files.has(name) && !subdirs.has(name)) {
+        throw new DOMException('Entry not found', 'NotFoundError');
+      }
       files.delete(name);
       subdirs.delete(name);
     },

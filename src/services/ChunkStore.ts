@@ -1,31 +1,25 @@
-import {
-  openDatabase,
-  putChunk,
-  getAllChunks,
-  getAllKeys,
-  getChunk,
-  getChunksByKeys,
-  deleteKeys,
-  clearDatabase,
-  closeDatabase,
-} from './ChunkIDB';
+import { withPermissionRetry } from '@/utils/retry/filesystem';
+
+import * as ChunkIDB from './ChunkIDB';
+import type { ChunkIdbAdapter } from './ChunkIDB';
 
 const FLUSH_THRESHOLD = 2000;
 
+/** Numbered index file names: chunks_index_N.jsonl (capture = file index). */
+const INDEX_FILE_RE = /^chunks_index_(\d+)\.jsonl$/;
+/** Numbered data file names: chunks_data_N.bin. */
+const DATA_FILE_RE = /^chunks_data_\d+\.bin$/;
+
+function indexFileName(fileIndex: number): string {
+  return `chunks_index_${fileIndex}.jsonl`;
+}
+
+function dataFileName(fileIndex: number): string {
+  return `chunks_data_${fileIndex}.bin`;
+}
+
 export class ChunkStore {
-  /** Numbered index file names: chunks_index_N.jsonl (capture = file index). */
-  static readonly INDEX_FILE_RE = /^chunks_index_(\d+)\.jsonl$/;
-  /** Numbered data file names: chunks_data_N.bin. */
-  static readonly DATA_FILE_RE = /^chunks_data_\d+\.bin$/;
-
-  static indexFileName(fileIndex: number): string {
-    return `chunks_index_${fileIndex}.jsonl`;
-  }
-
-  static dataFileName(fileIndex: number): string {
-    return `chunks_data_${fileIndex}.bin`;
-  }
-
+  private idb: ChunkIdbAdapter;
   private directoryHandle: FileSystemDirectoryHandle | null = null;
   private ramIndex = new Map<number, { file: string; offset: number; length: number }>();
   private fileCache = new Map<string, File>();
@@ -33,9 +27,99 @@ export class ChunkStore {
   private flushing = false;
   private db: IDBDatabase | null = null;
 
-  async init(directoryHandle: FileSystemDirectoryHandle): Promise<void> {
-    this.directoryHandle = directoryHandle;
-    this.db = await openDatabase();
+  constructor(idb: ChunkIdbAdapter = ChunkIDB) {
+    this.idb = idb;
+  }
+
+  /**
+   * Post-init accessor for the `_temp_work` handle (FailureLog etc.).
+   * Throws before init() and after close().
+   */
+  workFolder(): FileSystemDirectoryHandle {
+    if (!this.directoryHandle) throw new Error('ChunkStore not initialized');
+    return this.directoryHandle;
+  }
+
+  /**
+   * Returns the existing `_temp_work` handle under root, or null.
+   * Never creates the folder. Safe before init().
+   */
+  async peekWorkFolder(root: FileSystemDirectoryHandle): Promise<FileSystemDirectoryHandle | null> {
+    try {
+      return await root.getDirectoryHandle('_temp_work');
+    } catch {
+      return null;
+    }
+  }
+
+  /** Returns the `_temp_work` handle under root, creating the folder when missing. */
+  async ensureWorkFolder(root: FileSystemDirectoryHandle): Promise<FileSystemDirectoryHandle> {
+    return withPermissionRetry(root, () => root.getDirectoryHandle('_temp_work', { create: true }));
+  }
+
+  /**
+   * Folder scan only — never opens IDB. Safe before init().
+   * chunkCount: number of chunks recorded in current-format JSONL index files.
+   * legacyOnly: legacy chunk_*.bin files present AND no current-format index.
+   */
+  async snapshot(
+    root: FileSystemDirectoryHandle,
+  ): Promise<{ chunkCount: number; legacyOnly: boolean }> {
+    let chunkCount = 0;
+    let hasIndex = false;
+    let hasLegacy = false;
+
+    for await (const entry of root.values()) {
+      if (entry.kind !== 'file') continue;
+      if (INDEX_FILE_RE.test(entry.name)) {
+        hasIndex = true;
+        const handle = await root.getFileHandle(entry.name);
+        const file = await handle.getFile();
+        const text = await file.text();
+        chunkCount += text.split('\n').filter((line) => line.trim().length > 0).length;
+      } else if (entry.name.startsWith('chunk_') && entry.name.endsWith('.bin')) {
+        hasLegacy = true;
+      }
+    }
+
+    return { chunkCount, legacyOnly: hasLegacy && !hasIndex };
+  }
+
+  /**
+   * Best-effort recursive removal of `_temp_work`. A missing folder is not
+   * an error. Never touches IDB — that is clearAll().
+   * Returns true when removal succeeded, false when it was swallowed.
+   */
+  async wipe(root: FileSystemDirectoryHandle): Promise<boolean> {
+    try {
+      await root.removeEntry('_temp_work', { recursive: true });
+      return true;
+    } catch {
+      // Expected when _temp_work does not exist
+      return false;
+    }
+  }
+
+  /**
+   * Fresh start: wipe the work folder AND clear the IDB chunk store.
+   * The IDB clear runs even when the folder is already gone.
+   */
+  async clearAll(root: FileSystemDirectoryHandle): Promise<void> {
+    await this.wipe(root);
+    if (this.db) {
+      await this.idb.clearDatabase(this.db);
+    }
+    this.ramIndex.clear();
+  }
+
+  /**
+   * Creates `_temp_work` under root when missing, then opens IDB and
+   * ingests any existing state (migration + index parse). Safe to call
+   * again on an already-initialized store.
+   */
+  async init(root: FileSystemDirectoryHandle): Promise<void> {
+    this.directoryHandle = await this.ensureWorkFolder(root);
+    this.db = await this.idb.openDatabase();
     await this.migrateOldFormat();
     await this.parseExistingIndex();
   }
@@ -63,8 +147,8 @@ export class ChunkStore {
         name === 'chunks_index.jsonl' ||
         (name.startsWith('chunks_data.bin') && name.endsWith('.crswap')) ||
         (name.startsWith('chunks_index.jsonl') && name.endsWith('.crswap')) ||
-        ChunkStore.DATA_FILE_RE.test(name) ||
-        ChunkStore.INDEX_FILE_RE.test(name)
+        DATA_FILE_RE.test(name) ||
+        INDEX_FILE_RE.test(name)
       ) {
         toDelete.push(name);
       }
@@ -79,7 +163,7 @@ export class ChunkStore {
         }
       }
       if (this.db) {
-        await clearDatabase(this.db);
+        await this.idb.clearDatabase(this.db);
       }
     }
   }
@@ -92,7 +176,7 @@ export class ChunkStore {
 
     for await (const entry of this.directoryHandle!.values()) {
       if (entry.kind !== 'file') continue;
-      const match = entry.name.match(ChunkStore.INDEX_FILE_RE);
+      const match = entry.name.match(INDEX_FILE_RE);
       if (match) {
         const fileIndex = parseInt(match[1], 10);
         if (fileIndex > maxFileIndex) {
@@ -115,7 +199,7 @@ export class ChunkStore {
               typeof parsed.l === 'number'
             ) {
               this.ramIndex.set(parsed.i, {
-                file: ChunkStore.dataFileName(fileIndex),
+                file: dataFileName(fileIndex),
                 offset: parsed.o,
                 length: parsed.l,
               });
@@ -131,7 +215,7 @@ export class ChunkStore {
 
     // Also load IDB entries
     if (this.db) {
-      const idbChunks = await getAllChunks(this.db);
+      const idbChunks = await this.idb.getAllChunks(this.db);
       for (const { key, data } of idbChunks) {
         this.ramIndex.set(key, { file: 'idb', offset: 0, length: data.byteLength });
       }
@@ -141,11 +225,11 @@ export class ChunkStore {
   async writeChunk(index: number, data: Uint8Array): Promise<void> {
     if (!this.db) throw new Error('ChunkStore not initialized');
 
-    await putChunk(this.db, index, data);
+    await this.idb.putChunk(this.db, index, data);
     this.ramIndex.set(index, { file: 'idb', offset: 0, length: data.byteLength });
 
     // Check if we should auto-flush
-    const keys = await getAllKeys(this.db);
+    const keys = await this.idb.getAllKeys(this.db);
     if (keys.length >= FLUSH_THRESHOLD && !this.flushing) {
       await this.flushToDisk();
     }
@@ -159,17 +243,17 @@ export class ChunkStore {
     this.flushing = true;
 
     try {
-      const keys = await getAllKeys(this.db!);
+      const keys = await this.idb.getAllKeys(this.db!);
 
       if (keys.length === 0) {
         return;
       }
 
-      const dataFileName = ChunkStore.dataFileName(this.fileCounter);
-      const indexFileName = ChunkStore.indexFileName(this.fileCounter);
+      const dataName = dataFileName(this.fileCounter);
+      const indexName = indexFileName(this.fileCounter);
 
-      const dataHandle = await this.directoryHandle!.getFileHandle(dataFileName, { create: true });
-      const indexHandle = await this.directoryHandle!.getFileHandle(indexFileName, {
+      const dataHandle = await this.directoryHandle!.getFileHandle(dataName, { create: true });
+      const indexHandle = await this.directoryHandle!.getFileHandle(indexName, {
         create: true,
       });
 
@@ -180,7 +264,7 @@ export class ChunkStore {
       const flushedKeys: number[] = [];
 
       // Fetch all chunks in a single IDB transaction instead of one per key
-      const chunks = await getChunksByKeys(this.db!, keys);
+      const chunks = await this.idb.getChunksByKeys(this.db!, keys);
 
       for (const { key, data: chunkData } of chunks) {
         if (!chunkData) continue;
@@ -196,7 +280,7 @@ export class ChunkStore {
 
         // Update RAM index to point to disk file
         this.ramIndex.set(key, {
-          file: dataFileName,
+          file: dataName,
           offset: byteOffset,
           length: chunkData.byteLength,
         });
@@ -209,12 +293,12 @@ export class ChunkStore {
       await indexStream.close();
 
       // Delete flushed keys from IDB
-      await deleteKeys(this.db!, flushedKeys);
+      await this.idb.deleteKeys(this.db!, flushedKeys);
 
       this.fileCounter++;
 
       // Recurse if more chunks accumulated during flush
-      const remaining = await getAllKeys(this.db!);
+      const remaining = await this.idb.getAllKeys(this.db!);
       if (remaining.length >= FLUSH_THRESHOLD) {
         await this.flushToDisk();
       }
@@ -249,7 +333,7 @@ export class ChunkStore {
     }
 
     if (entry.file === 'idb') {
-      const data = await getChunk(this.db!, index);
+      const data = await this.idb.getChunk(this.db!, index);
       if (!data) throw new Error(`Chunk ${index} not found in IDB`);
       return data;
     }
@@ -268,16 +352,9 @@ export class ChunkStore {
     return new Set(this.ramIndex.keys());
   }
 
-  async clearDatabase(): Promise<void> {
-    if (this.db) {
-      await clearDatabase(this.db);
-    }
-    this.ramIndex.clear();
-  }
-
   async close(): Promise<void> {
     if (this.db) {
-      await closeDatabase(this.db);
+      await this.idb.closeDatabase(this.db);
       this.db = null;
     }
     this.fileCache.clear();

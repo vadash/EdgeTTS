@@ -92,7 +92,6 @@ describe('AudioMerger - parallel merge pool', () => {
       prepareForRead: vi.fn().mockResolvedValue(undefined),
       readChunk: vi.fn().mockResolvedValue(fakeChunk),
       getExistingIndices: vi.fn().mockReturnValue(new Set<number>()),
-      clearDatabase: vi.fn().mockResolvedValue(undefined),
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as ChunkStore;
   });

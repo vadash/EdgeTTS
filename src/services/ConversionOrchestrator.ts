@@ -272,18 +272,6 @@ function checkCancelled(signal: AbortSignal): void {
   }
 }
 
-async function cleanupTemp(
-  directoryHandle: FileSystemDirectoryHandle,
-  logger: ILogger,
-): Promise<void> {
-  try {
-    await directoryHandle.removeEntry('_temp_work', { recursive: true });
-    logger.debug?.('Cleaned up temp directory');
-  } catch (err) {
-    logger.debug?.(`Cleanup skipped: ${(err as Error).message}`);
-  }
-}
-
 function logVoiceSummary(
   characters: LLMCharacter[],
   assignments: SpeakerAssignment[],
@@ -429,29 +417,25 @@ export async function runConversion(
   }
 
   // ==================== RESUME CHECK ====================
-  const resumeInfo = await checkResumeState(directoryHandle, (msg) => logger.info(msg));
+  // ChunkStore comes first: the check inspects/wipes the work folder through it.
+  const chunkStore = services.chunkStoreFactory.create();
+  const resumeInfo = await checkResumeState(chunkStore, directoryHandle, (msg) => logger.info(msg));
 
   let skipLLMSteps = false;
   let resumedAssignments: SpeakerAssignment[] | undefined;
   let resumedVoiceMap: Map<string, string> | undefined;
   let resumedCharacters: LLMCharacter[] | undefined;
 
-  // Create ChunkStore early so it's available for clearDatabase on fresh start
-  const chunkStore = services.chunkStoreFactory.create();
-
   if (resumeInfo) {
     const confirmed = await ports.resume.confirm(resumeInfo);
     if (!confirmed) {
       ports.run.cancel();
       logger.info('User cancelled resume, starting fresh');
-      try {
-        await directoryHandle.removeEntry('_temp_work', { recursive: true });
-        logger.info('Cleaned up _temp_work directory');
-      } catch {
-        // Expected if no temp dir exists
-      }
+      if (await chunkStore.wipe(directoryHandle)) logger.info('Cleaned up _temp_work directory');
     } else if (resumeInfo.hasLLMState) {
-      const pipelineState = await loadPipelineState(directoryHandle);
+      const pipelineState = await loadPipelineState(
+        await chunkStore.peekWorkFolder(directoryHandle),
+      );
       if (pipelineState) {
         skipLLMSteps = true;
         resumedAssignments = pipelineState.assignments;
@@ -462,13 +446,8 @@ export async function runConversion(
     }
   } else {
     // Fresh start - clean any leftover _temp_work and IDB data
-    try {
-      await directoryHandle.removeEntry('_temp_work', { recursive: true });
-      logger.info('Cleaned up _temp_work directory');
-    } catch {
-      // Expected if no temp dir exists
-    }
-    await chunkStore.clearDatabase();
+    if (await chunkStore.wipe(directoryHandle)) logger.info('Cleaned up _temp_work directory');
+    await chunkStore.clearAll(directoryHandle);
   }
 
   // ==================== VOICE POOL VALIDATION ====================
@@ -587,12 +566,15 @@ export async function runConversion(
       );
 
       // Save pipeline state for resume
-      const stateSaved = await savePipelineState(directoryHandle, {
-        assignments,
-        characterVoiceMap: Object.fromEntries(voiceMap),
-        characters,
-        fileNames,
-      });
+      const stateSaved = await savePipelineState(
+        await chunkStore.ensureWorkFolder(directoryHandle).catch(() => null),
+        {
+          assignments,
+          characterVoiceMap: Object.fromEntries(voiceMap),
+          characters,
+          fileNames,
+        },
+      );
       if (stateSaved) {
         report(
           'speaker-assignment',
@@ -786,9 +768,8 @@ async function runTTSStage(
   const directoryHandle = input.directoryHandle!;
 
   // ==================== INIT CHUNKSTORE ====================
-  const tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work', { create: true });
-  await chunkStore.init(tempDirHandle);
-  const failureLog = new FailureLog(tempDirHandle, logger);
+  await chunkStore.init(directoryHandle);
+  const failureLog = new FailureLog(chunkStore.workFolder(), logger);
 
   // ==================== TTS CONVERSION ====================
   checkCancelled(signal);
@@ -956,7 +937,11 @@ async function runTTSStage(
   if (audioMap.size === 0) {
     report('audio-merge', 1, 1, 'No audio to merge');
     await chunkStore.close();
-    await cleanupTemp(directoryHandle, logger);
+    if (await chunkStore.wipe(directoryHandle)) {
+      logger.debug?.('Cleaned up temp directory');
+    } else {
+      logger.debug?.('Cleanup skipped: _temp_work removal failed');
+    }
     return;
   }
 
@@ -998,5 +983,9 @@ async function runTTSStage(
 
   // ==================== CLEANUP ====================
   await chunkStore.close();
-  await cleanupTemp(directoryHandle, logger);
+  if (await chunkStore.wipe(directoryHandle)) {
+    logger.debug?.('Cleaned up temp directory');
+  } else {
+    logger.debug?.('Cleanup skipped: _temp_work removal failed');
+  }
 }
