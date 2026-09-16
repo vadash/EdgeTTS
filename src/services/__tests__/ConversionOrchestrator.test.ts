@@ -1,18 +1,41 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
+import { AppError } from '@/errors';
 import type { ILogger } from '@/services/Logger';
-import type { Stores } from '@/stores';
-import { ChunkStore } from '@/services/ChunkStore';
+import type { StageConfig, StageId } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
+import type { AudioMerger } from '../AudioMerger';
+import type { ChunkStore } from '../ChunkStore';
 import {
   type ConversionOrchestratorServices,
+  type ConversionPorts,
   type OrchestratorInput,
   runConversion,
 } from '../ConversionOrchestrator';
+import type { FFmpegService } from '../FFmpegService';
+import type { LLMVoiceService } from '../llm/LLMVoiceService';
+import type { TextBlockSplitter } from '../TextBlockSplitter';
+import type { TTSWorkerPool, WorkerPoolOptions } from '../TTSWorkerPool';
+
+function mockStageConfig(overrides?: Partial<StageConfig>): StageConfig {
+  return {
+    apiKey: 'k',
+    apiUrl: 'u',
+    model: 'm',
+    streaming: false,
+    temperature: 0,
+    topP: 1,
+    reasoning: null,
+    repeatPrompt: false,
+    corsMiddleware: '',
+    maxRetries: 3,
+    ...overrides,
+  };
+}
 
 function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorInput {
   return {
     isLLMConfigured: true,
-    directoryHandle: {} as FileSystemDirectoryHandle,
+    directoryHandle: createMockDirectoryHandle() as unknown as FileSystemDirectoryHandle,
     detectedLanguage: 'en',
     enabledVoices: ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'],
     textContent: 'Hello world',
@@ -36,261 +59,327 @@ function createMockInput(overrides?: Partial<OrchestratorInput>): OrchestratorIn
     opusMaxBitrate: 64,
     opusCompressionLevel: 10,
     mergeConcurrency: 2,
-    extractConfig: {
-      apiKey: 'k',
-      apiUrl: 'u',
-      model: 'm',
-      streaming: false,
-      temperature: 0,
-      topP: 1,
-      reasoning: null,
-      repeatPrompt: false,
-      corsMiddleware: '',
-      maxRetries: 3,
-    },
-    mergeConfig: {
-      apiKey: 'k',
-      apiUrl: 'u',
-      model: 'm',
-      streaming: false,
-      temperature: 0,
-      topP: 1,
-      reasoning: null,
-      repeatPrompt: false,
-      corsMiddleware: '',
-      maxRetries: 3,
-    },
-    assignConfig: {
-      apiKey: 'k',
-      apiUrl: 'u',
-      model: 'm',
-      streaming: false,
-      temperature: 0,
-      topP: 1,
-      reasoning: null,
-      repeatPrompt: false,
-      corsMiddleware: '',
-      maxRetries: 3,
-    },
-    backupConfig: {
-      apiKey: 'k',
-      apiUrl: 'u',
-      model: 'm',
-      streaming: false,
-      temperature: 0,
-      topP: 1,
-      reasoning: null,
-      repeatPrompt: false,
-      corsMiddleware: '',
-      maxRetries: 3,
-    },
+    extractConfig: mockStageConfig(),
+    mergeConfig: mockStageConfig(),
+    assignConfig: mockStageConfig(),
+    backupConfig: mockStageConfig(),
     ...overrides,
   };
 }
 
-function createMockStores(): Stores {
+type ReportFn = Mock<
+  (stage: StageId, current: number, total: number, message: string, failed?: number) => void
+>;
+
+interface MockPorts extends ConversionPorts {
+  progress: {
+    report: ReportFn;
+    setConcurrency: Mock;
+    setPhaseBaseline: Mock;
+  };
+  review: { open: Mock };
+  resume: { confirm: Mock };
+  run: { begin: Mock; complete: Mock; cancel: Mock; fail: Mock };
+  characters: { push: Mock };
+}
+
+function createMockPorts(): MockPorts {
   return {
-    settings: {
-      narratorVoice: { value: 'narrator' },
-      voice: { value: 'default' },
-      pitch: { value: 0 },
-      rate: { value: 0 },
-      ttsThreads: { value: 2 },
-      llmThreads: { value: 1 },
-      enabledVoices: { value: ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'] },
-      lexxRegister: { value: false },
-      outputFormat: { value: 'opus' as const },
-      silenceRemovalEnabled: { value: false },
-      normalizationEnabled: { value: false },
-      deEssEnabled: { value: false },
-      silenceGapMs: { value: 0 },
-      eqEnabled: { value: false },
-      compressorEnabled: { value: false },
-      fadeInEnabled: { value: false },
-      opusMinBitrate: { value: 24 },
-      opusCompressionLevel: { value: 10 },
-      mergeConcurrency: { value: 2 },
-    } as any,
-    conversion: {
-      startConversion: vi.fn(),
+    progress: {
+      report: vi.fn(),
+      setConcurrency: vi.fn(),
+      setPhaseBaseline: vi.fn(),
+    },
+    review: {
+      open: vi.fn(() => Promise.resolve({ voiceMap: new Map(), profile: null })),
+    },
+    resume: {
+      confirm: vi.fn(() => Promise.resolve(true)),
+    },
+    run: {
+      begin: vi.fn(),
       complete: vi.fn(),
       cancel: vi.fn(),
-      setError: vi.fn(),
-      setStatus: vi.fn(),
-      updateProgress: vi.fn(),
-      setConcurrencyStats: vi.fn(),
-      isProcessing: { value: false },
-      progress: { value: { current: 0, total: 0 } },
-      awaitResumeConfirmation: vi.fn().mockResolvedValue(false),
-    } as any,
-    llm: {
-      setProcessingStatus: vi.fn(),
-      setBlockProgress: vi.fn(),
-      setCharacters: vi.fn(),
-      setVoiceMap: vi.fn(),
-      setSpeakerAssignments: vi.fn(),
-      setPendingReview: vi.fn(),
-      awaitReview: vi.fn().mockResolvedValue(undefined),
-      characterVoiceMap: { value: new Map() },
-      loadedProfile: { value: null },
-      resetProcessingState: vi.fn(),
-      setError: vi.fn(),
-      isConfigured: { value: true },
-      extract: {
-        value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 },
-      },
-      merge: {
-        value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 },
-      },
-      assign: {
-        value: { apiKey: 'k', apiUrl: 'u', model: 'm', streaming: false, temperature: 0, topP: 1 },
-      },
-      useVoting: { value: false },
-    } as any,
-    logs: {
-      info: vi.fn(),
-      error: vi.fn(),
-      startTimer: vi.fn(),
-    } as any,
-    data: {
-      directoryHandle: { value: {} as FileSystemDirectoryHandle },
-      detectLanguageFromContent: vi.fn().mockReturnValue('en'),
-      dictionaryRaw: { value: [] },
-      setTextContent: vi.fn(),
-      setBook: vi.fn(),
-    } as any,
-    language: {} as any,
-    uiSettings: {
-      uiSettings: {
-        value: { dismissedNotifications: { llmRequired: false, resumeFeatureTip: false } },
-      },
-      dismissedNotifications: { value: { llmRequired: false, resumeFeatureTip: false } },
-      dismissNotification: vi.fn(),
-      resetUISettings: vi.fn(),
-    } as any,
+      fail: vi.fn(),
+    },
+    characters: {
+      push: vi.fn(),
+    },
   };
 }
 
-function createMockServices(): ConversionOrchestratorServices {
-  return {
+const TEST_CHARACTERS = [
+  { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' as const },
+];
+const TEST_ASSIGNMENTS = [
+  { text: 'Hello', sentenceIndex: 0, speaker: 'Alice', voiceId: 'original' },
+];
+
+/**
+ * Full-pipeline service mocks. failPart makes the worker pool report that
+ * chunk as permanently failed. Class-typed members need unchecked casts
+ * because their private state cannot be satisfied structurally.
+ */
+function createMockServices(failPart?: number) {
+  const chunkStore = {
+    init: vi.fn(() => Promise.resolve()),
+    clearDatabase: vi.fn(() => Promise.resolve()),
+    close: vi.fn(() => Promise.resolve()),
+    getExistingIndices: vi.fn(() => new Set<number>()),
+    prepareForRead: vi.fn(() => Promise.resolve()),
+  };
+  const workerPool = { addTasks: vi.fn(), clear: vi.fn() };
+  const merger = { mergeAndSave: vi.fn(() => Promise.resolve(1)) };
+  const llmService = {
+    extractCharacters: vi.fn(() => Promise.resolve(TEST_CHARACTERS)),
+    assignSpeakers: vi.fn(() => Promise.resolve(TEST_ASSIGNMENTS)),
+    cancel: vi.fn(),
+  };
+  const services: ConversionOrchestratorServices = {
     logger: {
       info: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),
       debug: vi.fn(),
-    } as ILogger,
+    } satisfies ILogger,
     textBlockSplitter: {
-      createExtractBlocks: vi.fn(),
-      createAssignBlocks: vi.fn(),
-    } as any,
+      createExtractBlocks: vi.fn(() => ['block1']),
+      createAssignBlocks: vi.fn(() => ['block1']),
+    } as unknown as TextBlockSplitter,
     llmServiceFactory: {
-      create: vi.fn(),
-    } as any,
+      create: vi.fn(() => llmService as unknown as LLMVoiceService),
+    },
     workerPoolFactory: {
-      create: vi.fn(),
-    } as any,
+      create: vi.fn((opts: WorkerPoolOptions): TTSWorkerPool => {
+        if (failPart !== undefined) {
+          opts.onTaskError?.(failPart, new Error('tts boom'));
+        }
+        opts.onAllComplete?.();
+        // Pool stand-in: the orchestrator only drives the callback surface
+        return workerPool as unknown as TTSWorkerPool;
+      }),
+    },
     audioMergerFactory: {
-      create: vi.fn(),
-    } as any,
+      create: vi.fn(() => merger as unknown as AudioMerger),
+    },
     voicePoolBuilder: {
-      buildPool: vi.fn().mockReturnValue({ male: ['m1', 'm2'], female: ['f1', 'f2', 'f3'] }),
-    } as any,
-    ffmpegService: {
-      load: vi.fn().mockResolvedValue(true),
-    } as any,
+      buildPool: vi.fn(() => ({ male: ['m1', 'm2'], female: ['f1', 'f2', 'f3'] })),
+    },
+    ffmpegService: { load: vi.fn(() => Promise.resolve(true)) } as unknown as FFmpegService,
+    chunkStoreFactory: { create: () => chunkStore as unknown as ChunkStore },
   };
+  return { services, chunkStore, workerPool, merger };
+}
+
+async function writeResumeState(
+  dirHandle: FileSystemDirectoryHandle,
+  extraFiles: Record<string, string> = {},
+): Promise<void> {
+  const tempDir = await dirHandle.getDirectoryHandle('_temp_work', { create: true });
+  const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
+  const writable = await stateFile.createWritable();
+  await writable.write(
+    JSON.stringify({
+      assignments: TEST_ASSIGNMENTS,
+      characterVoiceMap: { Alice: 'cached-alice' },
+      characters: TEST_CHARACTERS,
+      fileNames: [],
+    }),
+  );
+  await writable.close();
+  for (const [name, content] of Object.entries(extraFiles)) {
+    const file = await tempDir.getFileHandle(name, { create: true });
+    const w = await file.createWritable();
+    await w.write(content);
+    await w.close();
+  }
+}
+
+/** Progress report mock calls carry the message at index 3. */
+function reportMessages(ports: MockPorts): string[] {
+  return ports.progress.report.mock.calls.map((call) => call[3]);
 }
 
 describe('runConversion', () => {
   it('throws when text is empty', async () => {
-    const stores = createMockStores();
-    const services = createMockServices();
-    const signal = new AbortController().signal;
+    const { services } = createMockServices();
+    const ports = createMockPorts();
     const input = createMockInput({ textContent: '' });
-    await expect(runConversion(services, stores, signal, input)).rejects.toThrow();
+    await expect(
+      runConversion(services, ports, new AbortController().signal, input),
+    ).rejects.toThrow();
   });
 
   it('throws when LLM not configured', async () => {
-    const stores = createMockStores();
-    const services = createMockServices();
-    const signal = new AbortController().signal;
+    const { services } = createMockServices();
+    const ports = createMockPorts();
     const input = createMockInput({ isLLMConfigured: false });
-    await expect(runConversion(services, stores, signal, input)).rejects.toThrow(
-      'LLM API key not configured',
-    );
+    await expect(
+      runConversion(services, ports, new AbortController().signal, input),
+    ).rejects.toThrow('LLM API key not configured');
   });
 
   it('throws when no directory handle', async () => {
-    const stores = createMockStores();
-    const services = createMockServices();
-    const signal = new AbortController().signal;
+    const { services } = createMockServices();
+    const ports = createMockPorts();
     const input = createMockInput({ directoryHandle: null });
-    await expect(runConversion(services, stores, signal, input)).rejects.toThrow(
-      'Please select an output directory',
-    );
+    await expect(
+      runConversion(services, ports, new AbortController().signal, input),
+    ).rejects.toThrow('Please select an output directory');
   });
 
-  it('calls chunkStore.clearDatabase() on fresh start (no resume state)', async () => {
-    const clearDatabaseSpy = vi.spyOn(ChunkStore.prototype, 'clearDatabase').mockResolvedValue();
-    const initSpy = vi.spyOn(ChunkStore.prototype, 'init').mockResolvedValue();
-    const closeSpy = vi.spyOn(ChunkStore.prototype, 'close').mockResolvedValue();
-    const getExistingSpy = vi
-      .spyOn(ChunkStore.prototype, 'getExistingIndices')
-      .mockReturnValue(new Set());
+  it('begins, clears the chunk DB, reviews, and completes a fresh conversion', async () => {
+    const { services, chunkStore, workerPool } = createMockServices();
+    const ports = createMockPorts();
+    ports.review.open = vi.fn(() =>
+      Promise.resolve({ voiceMap: new Map([['Alice', 'reviewed-alice']]), profile: null }),
+    );
 
-    const stores = createMockStores();
-    const services = createMockServices();
+    await runConversion(services, ports, new AbortController().signal, createMockInput());
 
-    // Mock LLM factory to return a service with all needed methods
-    const mockLLMService = {
-      extractCharacters: vi
-        .fn()
-        .mockResolvedValue([
-          { canonicalName: 'Narrator', variations: ['Narrator'], gender: 'unknown' },
-        ]),
-      assignSpeakers: vi
-        .fn()
-        .mockResolvedValue([
-          { text: 'Hello', sentenceIndex: 0, speaker: 'narrator', voiceId: 'narrator' },
-        ]),
-      cancel: vi.fn(),
-    };
-    services.llmServiceFactory.create = vi.fn().mockReturnValue(mockLLMService);
+    expect(ports.run.begin).toHaveBeenCalledTimes(1);
+    expect(chunkStore.clearDatabase).toHaveBeenCalledTimes(1);
+    expect(chunkStore.init).toHaveBeenCalledTimes(1);
+    expect(chunkStore.close).toHaveBeenCalledTimes(1);
 
-    // Mock text block splitter
-    services.textBlockSplitter.createExtractBlocks = vi.fn().mockReturnValue(['block1']);
-    services.textBlockSplitter.createAssignBlocks = vi.fn().mockReturnValue(['block1']);
+    // Review gate replaces the direct store pushes on the fresh path
+    expect(ports.review.open).toHaveBeenCalledTimes(1);
+    expect(ports.review.open).toHaveBeenCalledWith(TEST_CHARACTERS, expect.any(Map), [
+      {
+        text: 'Hello',
+        sentenceIndex: 0,
+        speaker: 'Alice',
+        voiceId: expect.any(String), // already remapped by tiered allocation
+      },
+    ]);
+    expect(ports.characters.push).not.toHaveBeenCalled();
 
-    // Mock worker pool
-    const mockWorkerPool = {
-      addTasks: vi.fn(),
-      clear: vi.fn(),
-    };
-    services.workerPoolFactory.create = vi.fn().mockImplementation((opts: any) => {
-      // Simulate immediate completion
-      setTimeout(() => opts.onAllComplete?.(), 0);
-      return mockWorkerPool;
+    // Reviewed voiceMap flows into the TTS chunk voices
+    const tasks = workerPool.addTasks.mock.calls[0][0];
+    expect(tasks[0].voice).toBe('reviewed-alice');
+
+    // LLM concurrency was announced before extraction
+    expect(ports.progress.setConcurrency).toHaveBeenCalledWith(1, 0);
+
+    // TTS progress is reported under the tts-conversion stage
+    const ttsReported = ports.progress.report.mock.calls.some(
+      (call) => call[0] === 'tts-conversion',
+    );
+    expect(ttsReported).toBe(true);
+
+    expect(ports.run.complete).toHaveBeenCalledTimes(1);
+    expect(ports.run.cancel).not.toHaveBeenCalled();
+    expect(ports.run.fail).not.toHaveBeenCalled();
+  });
+
+  it('declining resume cancels the run and continues fresh', async () => {
+    const { services } = createMockServices();
+    const ports = createMockPorts();
+    ports.resume.confirm = vi.fn(() => Promise.resolve(false));
+    const dirHandle = createMockDirectoryHandle() as unknown as FileSystemDirectoryHandle;
+    await writeResumeState(dirHandle);
+
+    await runConversion(
+      services,
+      ports,
+      new AbortController().signal,
+      createMockInput({ directoryHandle: dirHandle }),
+    );
+
+    expect(ports.resume.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ hasLLMState: true }),
+    );
+    expect(ports.run.cancel).toHaveBeenCalledTimes(1);
+    // Fresh continuation ran to completion afterwards
+    expect(ports.review.open).toHaveBeenCalledTimes(1);
+    expect(ports.run.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancellation routes to ports.run.cancel instead of completing', async () => {
+    const { services } = createMockServices();
+    const ports = createMockPorts();
+    const controller = new AbortController();
+    controller.abort();
+
+    await runConversion(services, ports, controller.signal, createMockInput());
+
+    expect(ports.run.cancel).toHaveBeenCalledTimes(1);
+    expect(ports.run.complete).not.toHaveBeenCalled();
+  });
+
+  it('failures route through ports.run.fail with the app error code', async () => {
+    const { services } = createMockServices();
+    const ports = createMockPorts();
+    services.textBlockSplitter.createExtractBlocks = vi.fn(() => {
+      throw new AppError('LLM_API_ERROR', 'LLM exploded');
     });
 
-    // Mock audio merger
-    const mockMerger = {
-      mergeAndSave: vi.fn().mockResolvedValue(1),
-    };
-    services.audioMergerFactory.create = vi.fn().mockReturnValue(mockMerger);
+    await expect(
+      runConversion(services, ports, new AbortController().signal, createMockInput()),
+    ).rejects.toThrow('LLM exploded');
 
-    const signal = new AbortController().signal;
-    const input = createMockInput({
-      directoryHandle: createMockDirectoryHandle() as unknown as FileSystemDirectoryHandle,
-    });
+    expect(ports.run.fail).toHaveBeenCalledWith('LLM exploded', 'LLM_API_ERROR');
+    expect(ports.run.complete).not.toHaveBeenCalled();
+  });
 
-    // The mock directoryHandle has no _temp_work, so checkResumeState returns null (fresh start)
-    await runConversion(services, stores, signal, input);
+  it('resume mode pushes cached state and skips the review gate', async () => {
+    const { services, workerPool } = createMockServices();
+    const ports = createMockPorts();
+    ports.resume.confirm = vi.fn(() => Promise.resolve(true));
+    const dirHandle = createMockDirectoryHandle() as unknown as FileSystemDirectoryHandle;
+    await writeResumeState(dirHandle);
 
-    expect(clearDatabaseSpy).toHaveBeenCalledTimes(1);
+    await runConversion(
+      services,
+      ports,
+      new AbortController().signal,
+      createMockInput({ directoryHandle: dirHandle }),
+    );
 
-    clearDatabaseSpy.mockRestore();
-    initSpy.mockRestore();
-    closeSpy.mockRestore();
-    getExistingSpy.mockRestore();
+    expect(ports.characters.push).toHaveBeenCalledTimes(1);
+    expect(ports.characters.push).toHaveBeenCalledWith(
+      TEST_CHARACTERS,
+      new Map([['Alice', 'cached-alice']]),
+      TEST_ASSIGNMENTS,
+    );
+    expect(ports.review.open).not.toHaveBeenCalled();
+
+    // Cached voiceMap flows into the TTS chunk voices
+    const tasks = workerPool.addTasks.mock.calls[0][0];
+    expect(tasks[0].voice).toBe('cached-alice');
+    expect(ports.run.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips previously failed chunks recorded in failed_chunks.json', async () => {
+    const { services, workerPool } = createMockServices();
+    const ports = createMockPorts();
+    ports.resume.confirm = vi.fn(() => Promise.resolve(true));
+    const dirHandle = createMockDirectoryHandle() as unknown as FileSystemDirectoryHandle;
+    await writeResumeState(dirHandle, { 'failed_chunks.json': '[0]' });
+
+    await runConversion(
+      services,
+      ports,
+      new AbortController().signal,
+      createMockInput({ directoryHandle: dirHandle }),
+    );
+
+    expect(reportMessages(ports)).toContain('Skipping 1 previously failed chunk(s)');
+    expect(workerPool.addTasks).not.toHaveBeenCalled();
+    // The only chunk was skipped, so the merge still runs over the cached audio
+    expect(reportMessages(ports)).toContain('Saved 1 file(s)');
+  });
+
+  it('persists failed chunks via FailureLog and reports the total', async () => {
+    const { services } = createMockServices(0);
+    const ports = createMockPorts();
+
+    await runConversion(services, ports, new AbortController().signal, createMockInput());
+
+    expect(reportMessages(ports)).toContain('Part 1 failed: tts boom');
+    expect(reportMessages(ports)).toContain(
+      'Persisted 1 total failed chunk(s) to failed_chunks.json',
+    );
+    expect(ports.run.complete).toHaveBeenCalledTimes(1);
   });
 });

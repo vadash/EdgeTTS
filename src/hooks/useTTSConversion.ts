@@ -3,12 +3,22 @@
 
 import { useCallback, useRef } from 'preact/hooks';
 import { getOrchestratorServices } from '@/services';
-import { type OrchestratorInput, runConversion } from '@/services/ConversionOrchestrator';
+import {
+  type ConversionPorts,
+  type OrchestratorInput,
+  runConversion,
+} from '@/services/ConversionOrchestrator';
 import { getKeepAwake, KeepAwake } from '@/services/KeepAwake';
-import type { ProcessedBook } from '@/state/types';
+import { type ProcessedBook, STAGE_STATUS } from '@/state/types';
 import type { Stores } from '@/stores';
 import { useStores } from '@/stores';
-import { isProcessing, progress, setError, patchState } from '@/stores/ConversionStore';
+import {
+  isProcessing,
+  patchState,
+  progress,
+  setError,
+  updateProgress,
+} from '@/stores/ConversionStore';
 import { isConfigured, llm } from '@/stores/LLMStore';
 // Import signal-based stores directly for snapshot access
 import { settings } from '@/stores/SettingsStore';
@@ -111,6 +121,60 @@ export function useTTSConversion(): UseTTSConversionResult {
       // Get orchestrator services bundle
       const orchestratorServices = getOrchestratorServices();
 
+      // Adapters bridging the orchestrator ports to the signal-based stores.
+      // STAGE_STATUS projects each stage id onto the conversion/LLM status
+      // stores; null entries mean "leave untouched".
+      const ports: ConversionPorts = {
+        progress: {
+          report: (stage, current, total, _message, failed = 0) => {
+            const status = STAGE_STATUS[stage];
+            if (status.conversion) stores.conversion.setStatus(status.conversion);
+            if (status.llm) stores.llm.setProcessingStatus(status.llm);
+            if (total > 0) updateProgress(current, total, failed);
+          },
+          setConcurrency: (llmCount, tts) => stores.conversion.setConcurrencyStats(llmCount, tts),
+          setPhaseBaseline: (count) => stores.conversion.setPhaseBaseline(count),
+        },
+        review: {
+          open: async (characters, voiceMap, assignments) => {
+            stores.llm.setCharacters(characters);
+            stores.llm.setVoiceMap(voiceMap);
+            stores.llm.setSpeakerAssignments(assignments);
+            stores.llm.setPendingReview(true);
+            await stores.llm.awaitReview();
+            return {
+              voiceMap: stores.llm.characterVoiceMap.value,
+              profile: stores.llm.loadedProfile.value,
+            };
+          },
+        },
+        resume: {
+          confirm: (info) => stores.conversion.awaitResumeConfirmation(info),
+        },
+        run: {
+          begin: () => {
+            stores.conversion.startConversion();
+            stores.logs.startTimer();
+            stores.llm.resetProcessingState();
+            stores.data.setTextContent('');
+            stores.data.setBook(null);
+          },
+          complete: () => stores.conversion.complete(),
+          cancel: () => stores.conversion.cancel(),
+          fail: (message, code) => {
+            stores.conversion.setError(message, code);
+            stores.llm.setError(message);
+          },
+        },
+        characters: {
+          push: (characters, voiceMap, assignments) => {
+            stores.llm.setCharacters(characters);
+            stores.llm.setVoiceMap(voiceMap);
+            stores.llm.setSpeakerAssignments(assignments);
+          },
+        },
+      };
+
       // Start keep-awake to prevent background throttling
       const keepAwake = getKeepAwake();
       await keepAwake.start();
@@ -118,7 +182,7 @@ export function useTTSConversion(): UseTTSConversionResult {
       try {
         await runConversion(
           orchestratorServices,
-          stores,
+          ports,
           abortControllerRef.current.signal,
           input,
           existingBook,

@@ -47,7 +47,7 @@ describe('FailureLog', () => {
     await expect(log.load()).resolves.toEqual(new Set([1, 2, 3]));
   });
 
-  it('record unions with existing entries and writes sorted ascending', async () => {
+  it('record unions with existing entries, writes sorted ascending, and resolves the total', async () => {
     const dir = createMockDirectoryHandle();
     const handle = await dir.getFileHandle('failed_chunks.json', { create: true });
     const writable = await handle.createWritable();
@@ -55,7 +55,7 @@ describe('FailureLog', () => {
     await writable.close();
 
     const log = new FailureLog(dir, logger);
-    await log.record([7, 2]);
+    await expect(log.record([7, 2])).resolves.toBe(4);
 
     const loaded = await log.load();
     expect([...loaded]).toEqual([1, 2, 4, 7]);
@@ -64,7 +64,7 @@ describe('FailureLog', () => {
   it('record with an empty array leaves the file untouched', async () => {
     const dir = createMockDirectoryHandle();
     const log = new FailureLog(dir, logger);
-    await log.record([]);
+    await expect(log.record([])).resolves.toBeNull();
 
     // File must not have been created
     await expect(dir.getFileHandle('failed_chunks.json')).rejects.toMatchObject({
@@ -73,12 +73,12 @@ describe('FailureLog', () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
-  it('record warns and does not throw when the write fails', async () => {
+  it('record resolves null and warns when the write fails', async () => {
     const dir = createMockDirectoryHandle();
     const log = new FailureLog(dir, logger);
     vi.spyOn(dir, 'getFileHandle').mockRejectedValue(new Error('disk on fire'));
 
-    await expect(log.record([5])).resolves.toBeUndefined();
+    await expect(log.record([5])).resolves.toBeNull();
     expect(logger.warn).toHaveBeenCalledTimes(1);
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('disk on fire'));
   });

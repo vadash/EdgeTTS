@@ -24,11 +24,11 @@ describe('savePipelineState', () => {
     await expect(loadPipelineState(dir)).resolves.toEqual(STATE);
   });
 
-  it('resolves without throwing when the write fails', async () => {
+  it('resolves false without throwing when the write fails', async () => {
     const failingDir = createMockDirectoryHandle();
     vi.spyOn(failingDir, 'getDirectoryHandle').mockRejectedValue(
       new DOMException('permission lost', 'NotAllowedError'),
     );
-    await expect(savePipelineState(failingDir, STATE)).resolves.toBeUndefined();
+    await expect(savePipelineState(failingDir, STATE)).resolves.toBe(false);
   });
 });

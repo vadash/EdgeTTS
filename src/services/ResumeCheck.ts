@@ -149,7 +149,7 @@ export async function loadPipelineState(
 export async function savePipelineState(
   directoryHandle: FileSystemDirectoryHandle,
   state: PipelineState,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await withPermissionRetry(directoryHandle, async () => {
       const tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work', {
@@ -162,7 +162,9 @@ export async function savePipelineState(
       await writable.write(JSON.stringify(state));
       await writable.close();
     });
+    return true;
   } catch {
     // Non-fatal
+    return false;
   }
 }

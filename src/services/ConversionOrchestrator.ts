@@ -8,25 +8,30 @@ import type {
   ProcessedBook,
   SpeakerAssignment,
   StageConfig,
+  StageId,
   TTSConfig,
   VoicePool,
   VoiceProfileFile,
 } from '@/state/types';
-import type { Stores } from '@/stores';
-import { updateProgress } from '@/stores/ConversionStore';
-import { withPermissionRetry } from '@/utils/retry';
 import { sanitizeFilename } from '@/utils/file';
+import { withPermissionRetry } from '@/utils/retry';
 import { sanitizeText } from '@/utils/text';
-import type { AudioMerger } from './AudioMerger';
+import type { AudioMerger, MergerConfig } from './AudioMerger';
+import type { ChunkStore } from './ChunkStore';
+import { FailureLog } from './FailureLog';
 import type { FFmpegService } from './FFmpegService';
 // Import concrete service classes
 import type { ILogger } from './Logger';
 import type { LLMServiceFactoryOptions, LLMVoiceService } from './llm/LLMVoiceService';
 import { exportToProfile } from './llm/VoiceProfile';
-import { checkResumeState, loadPipelineState } from './ResumeCheck';
+import {
+  checkResumeState,
+  loadPipelineState,
+  type ResumeInfo,
+  savePipelineState,
+} from './ResumeCheck';
 import type { TextBlockSplitter } from './TextBlockSplitter';
-import type { TTSWorkerPool } from './TTSWorkerPool';
-import { ChunkStore } from './ChunkStore';
+import type { TTSWorkerPool, WorkerPoolOptions } from './TTSWorkerPool';
 import {
   allocateByGender,
   allocateTieredVoices,
@@ -101,13 +106,70 @@ export interface ConversionOrchestratorServices {
     create(options: LLMServiceFactoryOptions): LLMVoiceService;
   };
   workerPoolFactory: {
-    create(options: import('./TTSWorkerPool').WorkerPoolOptions): TTSWorkerPool;
+    create(options: WorkerPoolOptions): TTSWorkerPool;
   };
   audioMergerFactory: {
-    create(config: import('./AudioMerger').MergerConfig & { chunkStore: ChunkStore }): AudioMerger;
+    create(config: MergerConfig & { chunkStore: ChunkStore }): AudioMerger;
   };
   voicePoolBuilder: VoicePoolBuilder;
   ffmpegService: FFmpegService;
+  chunkStoreFactory: {
+    create(): ChunkStore;
+  };
+}
+
+// ============================================================================
+// Orchestrator Ports
+// ============================================================================
+
+/**
+ * Progress reporting seam. The adapter projects StageId onto the
+ * conversion/LLM status stores via STAGE_STATUS and mirrors the numbers
+ * into ConversionStore progress state.
+ */
+export interface ProgressReporter {
+  report(stage: StageId, current: number, total: number, message: string, failed?: number): void;
+  setConcurrency(llm: number, tts: number): void;
+  setPhaseBaseline(count: number): void;
+}
+
+/** Voice review pause: pushes data, awaits user review, returns the result. */
+export interface ReviewGate {
+  open(
+    characters: LLMCharacter[],
+    voiceMap: Map<string, string>,
+    assignments: SpeakerAssignment[],
+  ): Promise<{ voiceMap: Map<string, string>; profile: VoiceProfileFile | null }>;
+}
+
+/** Resume confirmation prompt. */
+export interface ResumeGate {
+  confirm(info: ResumeInfo): Promise<boolean>;
+}
+
+/** Run lifecycle: begin/end bookkeeping, cancellation, and failure surface. */
+export interface RunControl {
+  begin(): void;
+  complete(): void;
+  cancel(): void;
+  fail(message: string, code?: string): void;
+}
+
+/** Pushes LLM results into the UI stores (resume path; review handles fresh). */
+export interface CharacterDataSink {
+  push(
+    characters: LLMCharacter[],
+    voiceMap: Map<string, string>,
+    assignments: SpeakerAssignment[],
+  ): void;
+}
+
+export interface ConversionPorts {
+  progress: ProgressReporter;
+  review: ReviewGate;
+  resume: ResumeGate;
+  run: RunControl;
+  characters: CharacterDataSink;
 }
 
 // ============================================================================
@@ -354,13 +416,12 @@ async function saveVoiceProfile(
  */
 export async function runConversion(
   services: ConversionOrchestratorServices,
-  stores: Stores,
+  ports: ConversionPorts,
   signal: AbortSignal,
   input: OrchestratorInput,
   existingBook?: ProcessedBook | null,
 ): Promise<void> {
   const { logger, textBlockSplitter, llmServiceFactory, voicePoolBuilder } = services;
-  const { conversion, llm, logs, data } = stores;
 
   // ==================== INPUT VALIDATION ====================
   if (!input.textContent.trim()) {
@@ -385,12 +446,12 @@ export async function runConversion(
   let resumedCharacters: LLMCharacter[] | undefined;
 
   // Create ChunkStore early so it's available for clearDatabase on fresh start
-  const chunkStore = new ChunkStore();
+  const chunkStore = services.chunkStoreFactory.create();
 
   if (resumeInfo) {
-    const confirmed = await conversion.awaitResumeConfirmation(resumeInfo);
+    const confirmed = await ports.resume.confirm(resumeInfo);
     if (!confirmed) {
-      conversion.cancel();
+      ports.run.cancel();
       logger.info('User cancelled resume, starting fresh');
       try {
         await directoryHandle.removeEntry('_temp_work', { recursive: true });
@@ -427,11 +488,7 @@ export async function runConversion(
   }
 
   // ==================== INITIALIZATION ====================
-  conversion.startConversion();
-  logs.startTimer();
-  llm.resetProcessingState();
-  data.setTextContent('');
-  data.setBook(null);
+  ports.run.begin();
 
   logger.info(`Detected language: ${input.detectedLanguage.toUpperCase()}`);
 
@@ -440,12 +497,9 @@ export async function runConversion(
     existingBook?.fileNames ?? ([[extractFilename(text), 0]] as Array<[string, number]>);
 
   // Progress reporter helper
-  const report = (stage: string, current: number, total: number, message: string, failed = 0) => {
+  const report = (stage: StageId, current: number, total: number, message: string, failed = 0) => {
     logger.info(message);
-    updateStatus(stage, stores);
-    if (total > 0) {
-      updateProgress(current, total, failed);
-    }
+    ports.progress.report(stage, current, total, message, failed);
   };
 
   let llmService: LLMVoiceService | null = null;
@@ -459,8 +513,8 @@ export async function runConversion(
       checkCancelled(signal);
 
       // Set initial LLM concurrency before starting LLM stage
-      conversion.setConcurrencyStats(input.llmThreads, 0);
-      const setLlmConcurrency = (effective: number) => conversion.setConcurrencyStats(effective, 0);
+      ports.progress.setConcurrency(input.llmThreads, 0);
+      const setLlmConcurrency = (effective: number) => ports.progress.setConcurrency(effective, 0);
 
       // Backup stage options shared by both LLM passes below.
       const backupStage = { ...input.backupConfig };
@@ -561,30 +615,19 @@ export async function runConversion(
         );
 
         // Save pipeline state for resume
-        let tempDirHandle: FileSystemDirectoryHandle | null = null;
-        try {
-          tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work', { create: true });
-          const stateFile = await tempDirHandle.getFileHandle('pipeline_state.json', {
-            create: true,
-          });
-          const writable = await stateFile.createWritable();
-          await writable.write(
-            JSON.stringify({
-              assignments,
-              characterVoiceMap: Object.fromEntries(voiceMap),
-              characters,
-              fileNames,
-            }),
-          );
-          await writable.close();
+        const stateSaved = await savePipelineState(directoryHandle, {
+          assignments,
+          characterVoiceMap: Object.fromEntries(voiceMap),
+          characters,
+          fileNames,
+        });
+        if (stateSaved) {
           report(
             'speaker-assignment',
             assignBlocks.length,
             assignBlocks.length,
             'Saved pipeline state for resume',
           );
-        } catch {
-          // Non-fatal
         }
       } finally {
         signal.removeEventListener('abort', abortHandler);
@@ -626,14 +669,11 @@ export async function runConversion(
       // ==================== VOICE REVIEW PAUSE ====================
       checkCancelled(signal);
 
-      llm.setCharacters(characters);
-      llm.setVoiceMap(voiceMap);
-      llm.setSpeakerAssignments(assignments);
-
-      llm.setPendingReview(true);
-      await llm.awaitReview();
-      const reviewedVoiceMap = llm.characterVoiceMap.value;
-      const existingProfile = llm.loadedProfile.value;
+      const { voiceMap: reviewedVoiceMap, profile: existingProfile } = await ports.review.open(
+        characters,
+        voiceMap,
+        assignments,
+      );
 
       assignments = assignments.map((a) => ({
         ...a,
@@ -682,16 +722,7 @@ export async function runConversion(
       );
 
       // Continue to TTS with assignments
-      await runTTSStage(
-        input,
-        assignments,
-        fileNames,
-        signal,
-        report,
-        services,
-        stores,
-        chunkStore,
-      );
+      await runTTSStage(input, assignments, fileNames, signal, report, services, ports, chunkStore);
     } else {
       // ==================== RESUME MODE - SKIP LLM ====================
       characters = resumedCharacters!;
@@ -699,9 +730,7 @@ export async function runConversion(
       const assignments = resumedAssignments!;
 
       // voiceMap is already the reviewed map from pipeline_state.json
-      llm.setCharacters(characters);
-      llm.setVoiceMap(voiceMap);
-      llm.setSpeakerAssignments(assignments);
+      ports.characters.push(characters, voiceMap, assignments);
 
       const remappedAssignments = assignments.map((a) => ({
         ...a,
@@ -737,28 +766,27 @@ export async function runConversion(
         signal,
         report,
         services,
-        stores,
+        ports,
         chunkStore,
       );
     }
 
     // ==================== COMPLETE ====================
-    conversion.complete();
+    ports.run.complete();
     logger.info('Conversion complete!');
   } catch (error) {
     if (error instanceof AppError && error.isCancellation()) {
-      conversion.cancel();
+      ports.run.cancel();
       logger.info('Conversion cancelled');
     } else if (
       (error as Error).message === 'Pipeline cancelled' ||
       (error as Error).message === 'Voice review cancelled'
     ) {
-      conversion.cancel();
+      ports.run.cancel();
       logger.info('Conversion cancelled');
     } else {
       const appError = AppError.fromUnknown(error);
-      conversion.setError(appError.message, appError.code);
-      llm.setError(appError.message);
+      ports.run.fail(appError.message, appError.code);
       logger.error('Conversion failed', appError);
       throw appError;
     }
@@ -774,9 +802,15 @@ async function runTTSStage(
   assignments: SpeakerAssignment[],
   fileNames: Array<[string, number]>,
   signal: AbortSignal,
-  report: (stage: string, current: number, total: number, message: string, failed?: number) => void,
+  report: (
+    stage: StageId,
+    current: number,
+    total: number,
+    message: string,
+    failed?: number,
+  ) => void,
   services: ConversionOrchestratorServices,
-  _stores: Stores,
+  ports: ConversionPorts,
   chunkStore: ChunkStore,
 ): Promise<void> {
   const { logger, workerPoolFactory, audioMergerFactory, ffmpegService } = services;
@@ -786,6 +820,7 @@ async function runTTSStage(
   // ==================== INIT CHUNKSTORE ====================
   const tempDirHandle = await directoryHandle.getDirectoryHandle('_temp_work', { create: true });
   await chunkStore.init(tempDirHandle);
+  const failureLog = new FailureLog(tempDirHandle, logger);
 
   // ==================== TTS CONVERSION ====================
   checkCancelled(signal);
@@ -821,7 +856,7 @@ async function runTTSStage(
   }
 
   if (audioMap.size > 0) {
-    _stores.conversion.setPhaseBaseline(audioMap.size);
+    ports.progress.setPhaseBaseline(audioMap.size);
     report(
       'tts-conversion',
       audioMap.size,
@@ -832,28 +867,21 @@ async function runTTSStage(
   }
 
   // Load previously failed chunks
-  try {
-    const failedHandle = await tempDirHandle.getFileHandle('failed_chunks.json');
-    const failedFile = await failedHandle.getFile();
-    const failedText = await failedFile.text();
-    const failedIndices: number[] = JSON.parse(failedText);
-    let skippedCount = 0;
-    for (const idx of failedIndices) {
-      if (!audioMap.has(idx)) {
-        audioMap.add(idx);
-        skippedCount++;
-      }
+  const previouslyFailed = await failureLog.load();
+  let skippedCount = 0;
+  for (const idx of previouslyFailed) {
+    if (!audioMap.has(idx)) {
+      audioMap.add(idx);
+      skippedCount++;
     }
-    if (skippedCount > 0) {
-      report(
-        'tts-conversion',
-        audioMap.size,
-        chunks.length,
-        `Skipping ${skippedCount} previously failed chunk(s)`,
-      );
-    }
-  } catch {
-    // No failed_chunks.json or corrupted — treat as empty set
+  }
+  if (skippedCount > 0) {
+    report(
+      'tts-conversion',
+      audioMap.size,
+      chunks.length,
+      `Skipping ${skippedCount} previously failed chunk(s)`,
+    );
   }
 
   const remainingChunks = chunks.filter((c) => !audioMap.has(c.partIndex));
@@ -908,7 +936,7 @@ async function runTTSStage(
           );
         },
         onConcurrencyChange: (concurrency) => {
-          _stores.conversion.setConcurrencyStats(0, concurrency);
+          ports.progress.setConcurrency(0, concurrency);
         },
         onAllComplete: () => {
           resolve();
@@ -942,36 +970,14 @@ async function runTTSStage(
 
     // Persist failed chunks
     if (failedTasks.size > 0) {
-      try {
-        // Load existing failed set and union with current failures
-        let existingFailed: Set<number> = new Set();
-        try {
-          const existingHandle = await tempDirHandle.getFileHandle('failed_chunks.json');
-          const existingFile = await existingHandle.getFile();
-          const existingText = await existingFile.text();
-          const existingIndices: number[] = JSON.parse(existingText);
-          existingFailed = new Set(existingIndices);
-        } catch {
-          // No existing file — start fresh
-        }
-        for (const idx of failedTasks) {
-          existingFailed.add(idx);
-        }
-        const failedJson = JSON.stringify([...existingFailed].sort((a, b) => a - b));
-        const failedFileHandle = await tempDirHandle.getFileHandle('failed_chunks.json', {
-          create: true,
-        });
-        const writable = await failedFileHandle.createWritable();
-        await writable.write(failedJson);
-        await writable.close();
+      const totalFailed = await failureLog.record(failedTasks);
+      if (totalFailed !== null) {
         report(
           'tts-conversion',
           audioMap.size,
           chunks.length,
-          `Persisted ${existingFailed.size} total failed chunk(s) to failed_chunks.json`,
+          `Persisted ${totalFailed} total failed chunk(s) to failed_chunks.json`,
         );
-      } catch (err) {
-        logger.warn(`Failed to persist failed_chunks.json: ${(err as Error).message}`);
       }
     }
   }
@@ -1034,29 +1040,4 @@ async function runTTSStage(
   // ==================== CLEANUP ====================
   await chunkStore.close();
   await cleanupTemp(directoryHandle, logger);
-}
-
-// ============================================================================
-// Status Update Helper
-// ============================================================================
-
-function updateStatus(stage: string, stores: Stores): void {
-  const { conversion, llm } = stores;
-  switch (stage) {
-    case 'character-extraction':
-      conversion.setStatus('llm-extract');
-      llm.setProcessingStatus('extracting');
-      break;
-    case 'speaker-assignment':
-      conversion.setStatus('llm-assign');
-      llm.setProcessingStatus('assigning');
-      break;
-    case 'tts-conversion':
-      conversion.setStatus('converting');
-      llm.setProcessingStatus('idle');
-      break;
-    case 'audio-merge':
-      conversion.setStatus('merging');
-      break;
-  }
 }

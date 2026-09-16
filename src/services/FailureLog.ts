@@ -35,11 +35,14 @@ export class FailureLog {
 
   /**
    * Persist chunk indices to the failure log: union with the existing set,
-   * written as a sorted JSON array. Never throws.
+   * written as a sorted JSON array. Resolves with the total set size after a
+   * successful write, or null when nothing was written (empty input or a
+   * write failure, which is warned instead of thrown). Never throws.
    */
-  async record(indices: Iterable<number>): Promise<void> {
+  async record(indices: Iterable<number>): Promise<number | null> {
     const additions = new Set(indices);
-    if (additions.size === 0) return;
+    if (additions.size === 0) return null;
+    let total: number | null = null;
     try {
       await withPermissionRetry(this.tempDir, async () => {
         const existingFailed = await this.load();
@@ -53,9 +56,12 @@ export class FailureLog {
         const writable = await failedFileHandle.createWritable();
         await writable.write(failedJson);
         await writable.close();
+        total = existingFailed.size;
       });
     } catch (err) {
       this.logger.warn(`Failed to persist failed_chunks.json: ${(err as Error).message}`);
+      return null;
     }
+    return total;
   }
 }

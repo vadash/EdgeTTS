@@ -4,6 +4,7 @@
 import type { LoggerStore } from '@/services/Logger';
 import type { MergerConfig } from './AudioMerger';
 import { AudioMerger } from './AudioMerger';
+import { ChunkStore } from './ChunkStore';
 import { FFmpegService } from './FFmpegService';
 import { createLogger, type Logger } from './Logger';
 import type { LLMServiceFactoryOptions } from './llm/LLMVoiceService';
@@ -135,6 +136,7 @@ export function getOrchestratorServices(): ConversionOrchestratorServices {
     audioMergerFactory: { create: createAudioMerger },
     voicePoolBuilder: getVoicePoolBuilder(),
     ffmpegService: getFFmpeg(),
+    chunkStoreFactory: { create: () => new ChunkStore() },
   };
 }
 
