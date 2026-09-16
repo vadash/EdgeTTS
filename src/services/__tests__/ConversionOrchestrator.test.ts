@@ -15,7 +15,7 @@ import {
 import type { FFmpegService } from '../FFmpegService';
 import type { LlmStages } from '../llm/stages';
 import type { TextBlockSplitter } from '../TextBlockSplitter';
-import type { TTSWorkerPool, WorkerPoolOptions } from '../TTSWorkerPool';
+import type { PoolOutcome, PoolTask, TTSWorkerPool, WorkerPoolOptions } from '../TTSWorkerPool';
 
 function mockStageConfig(overrides?: Partial<StageConfig>): StageConfig {
   return {
@@ -130,7 +130,11 @@ function createMockServices(failPart?: number) {
   vi.spyOn(chunkStore, 'init');
   vi.spyOn(chunkStore, 'clearAll');
   vi.spyOn(chunkStore, 'close');
-  const workerPool = { addTasks: vi.fn(), clear: vi.fn() };
+  const workerPool = {
+    run: vi.fn((_tasks: PoolTask[], _call: { signal: AbortSignal }) =>
+      Promise.resolve<PoolOutcome>({ completed: new Set<number>(), failed: [] }),
+    ),
+  };
   const merger = { mergeAndSave: vi.fn(() => Promise.resolve(1)) };
   const mergerCreate = vi.fn(
     (_config: MergerConfig & { chunkStore: ChunkStore }) => merger as unknown as AudioMerger,
@@ -161,9 +165,13 @@ function createMockServices(failPart?: number) {
       create: vi.fn((opts: WorkerPoolOptions): TTSWorkerPool => {
         if (failPart !== undefined) {
           opts.onTaskError?.(failPart, new Error('tts boom'));
+          workerPool.run.mockResolvedValue({
+            completed: new Set<number>(),
+            failed: [{ index: failPart, message: 'tts boom' }],
+          });
         }
-        opts.onAllComplete?.();
-        // Pool stand-in: the orchestrator only drives the callback surface
+        // Pool stand-in: the orchestrator drives the callback surface and
+        // awaits run() for the outcome
         return workerPool as unknown as TTSWorkerPool;
       }),
     },
@@ -261,7 +269,7 @@ describe('runConversion', () => {
     expect(ports.characters.push).not.toHaveBeenCalled();
 
     // Reviewed voiceMap flows into the TTS chunk voices
-    const tasks = workerPool.addTasks.mock.calls[0][0];
+    const tasks = workerPool.run.mock.calls[0][0];
     expect(tasks[0].voice).toBe('reviewed-alice');
 
     // LLM concurrency was announced before extraction
@@ -338,6 +346,33 @@ describe('runConversion', () => {
     expect(ports.run.complete).not.toHaveBeenCalled();
   });
 
+  it('mid-flight TTS pool abort cancels the run and records no failures', async () => {
+    const { services, workerPool } = createMockServices();
+    const ports = createMockPorts();
+    const controller = new AbortController();
+    // The pool hangs mid-run; aborting rejects with the one canonical
+    // cancellation encoding (ADR 0017) once the pool protocol forwards it.
+    workerPool.run = vi.fn(
+      (_tasks: PoolTask[], call: { signal: AbortSignal }): Promise<PoolOutcome> =>
+        new Promise<never>((_resolve, reject) => {
+          call.signal?.addEventListener('abort', () => reject(new CancellationError()), {
+            once: true,
+          });
+        }),
+    );
+
+    const pending = runConversion(services, ports, controller.signal, createMockInput());
+    await vi.waitFor(() => expect(workerPool.run).toHaveBeenCalled());
+    controller.abort();
+
+    await expect(pending).resolves.toBeUndefined();
+    expect(ports.run.cancel).toHaveBeenCalledTimes(1);
+    expect(ports.run.fail).not.toHaveBeenCalled();
+    expect(ports.run.complete).not.toHaveBeenCalled();
+    // A cancelled run writes no progress: failureLog.record never ran
+    expect(reportMessages(ports)).not.toContain(expect.stringContaining('Persisted'));
+  });
+
   it('failures route through ports.run.fail with the app error code', async () => {
     const { services } = createMockServices();
     const ports = createMockPorts();
@@ -376,7 +411,7 @@ describe('runConversion', () => {
     expect(ports.review.open).not.toHaveBeenCalled();
 
     // Cached voiceMap flows into the TTS chunk voices
-    const tasks = workerPool.addTasks.mock.calls[0][0];
+    const tasks = workerPool.run.mock.calls[0][0];
     expect(tasks[0].voice).toBe('cached-alice');
     expect(ports.run.complete).toHaveBeenCalledTimes(1);
   });
@@ -396,7 +431,7 @@ describe('runConversion', () => {
     );
 
     expect(reportMessages(ports)).toContain('Skipping 1 previously failed chunk(s)');
-    expect(workerPool.addTasks).not.toHaveBeenCalled();
+    expect(workerPool.run).not.toHaveBeenCalled();
     // The only chunk was skipped, so the merge still runs over the cached audio
     expect(reportMessages(ports)).toContain('Saved 1 file(s)');
   });

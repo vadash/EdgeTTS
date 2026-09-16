@@ -97,7 +97,7 @@ export function getTTSPreviewService(): ReusableEdgeTTSService {
  * Create a new TTS worker pool for a conversion
  */
 export function createWorkerPool(options: WorkerPoolOptions): TTSWorkerPool {
-  return new TTSWorkerPool(options);
+  return TTSWorkerPool.create(options);
 }
 
 /**

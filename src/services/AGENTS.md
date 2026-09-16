@@ -23,6 +23,7 @@ The conversion pipeline, driven by a stateless orchestrator.
 Read the ADR before changing the governed area:
 
 - Pool lifecycle, retries, cancellation → `../../docs/adr/0013-bounded-retry-tts-socket-pool.md`
+- Pool run() protocol, teardown on settle → `../../docs/adr/0018-one-shot-tts-pool-protocol.md`
 - FFmpeg, chunk storage, crash recovery → `../../docs/adr/0002-stream-audio-chunks-to-disk.md`, `../../docs/adr/0003-ffmpeg-wasm-lifecycle.md`
 - Sentence splitting, block sizes → `../../docs/adr/0001-native-sentence-segmenter-for-split.md`
 - Voice allocation, the 80/20 split, reroll invariance → `../../docs/adr/0006-80-20-unique-shared-voice-allocation.md`

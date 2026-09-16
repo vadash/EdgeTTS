@@ -5,8 +5,6 @@ export { createMockFFmpegService, MockFFmpegService } from './mocks/MockFFmpegSe
 export { createMockLLMService, MockLLMService } from './mocks/MockLLMService';
 export { createMockLogger, type LogCall, MockLogger } from './mocks/MockLogger';
 export { createMockSecureStorage, MockSecureStorage } from './mocks/MockSecureStorage';
-// Mocks
-export { createMockWorkerPool, MockWorkerPool } from './mocks/MockWorkerPool';
 
 // Utilities
 export {

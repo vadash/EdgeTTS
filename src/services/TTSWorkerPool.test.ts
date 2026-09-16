@@ -1,8 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { CancellationError } from '@/errors';
 import type { TTSConfig as VoiceConfig } from '@/state/types';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 import type { ChunkStore } from './ChunkStore';
-import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from './TTSWorkerPool';
+import {
+  type PoolOutcome,
+  type PoolTask,
+  TTSWorkerPool,
+  type WorkerPoolOptions,
+} from './TTSWorkerPool';
 
 // Mock the ReusableEdgeTTSService
 vi.mock('./ReusableEdgeTTSService', () => {
@@ -28,19 +34,15 @@ describe('TTSWorkerPool', () => {
   let pool: TTSWorkerPool;
   let defaultOptions: WorkerPoolOptions;
   let defaultVoiceConfig: VoiceConfig;
-  let mockSend: ReturnType<typeof vi.fn>;
-  let mockConnect: ReturnType<typeof vi.fn>;
-  let mockDisconnect: ReturnType<typeof vi.fn>;
-  let mockIsReady: ReturnType<typeof vi.fn>;
-  let _mockDirectoryHandle: FileSystemDirectoryHandle;
+  let mockSend: Mock;
+  let mockConnect: Mock;
+  let mockDisconnect: Mock;
+  let mockIsReady: Mock;
   let mockChunkStore: ChunkStore;
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-
-    // Create mock directory handle
-    _mockDirectoryHandle = createMockDirectoryHandle();
 
     // Create mock ChunkStore
     mockChunkStore = {
@@ -87,201 +89,66 @@ describe('TTSWorkerPool', () => {
   });
 
   const createPool = (options: Partial<WorkerPoolOptions> = {}) => {
-    return new TTSWorkerPool({ ...defaultOptions, ...options });
+    return TTSWorkerPool.create({ ...defaultOptions, ...options });
   };
 
   const createTask = (partIndex: number): PoolTask => ({
     partIndex,
     text: `Text for part ${partIndex}`,
-    filename: 'test',
-    filenum: String(partIndex + 1).padStart(4, '0'),
   });
 
-  describe('addTask', () => {
-    it('processes task through worker', async () => {
-      pool = createPool();
-      pool.addTask(createTask(0));
+  /** Run a batch under fake timers until the pool settles, then return the outcome. */
+  const runToCompletion = async (
+    p: TTSWorkerPool,
+    tasks: PoolTask[],
+    ms: number,
+  ): Promise<PoolOutcome> => {
+    const pending = p.run(tasks, { signal: new AbortController().signal });
+    await vi.advanceTimersByTimeAsync(ms);
+    return pending;
+  };
 
-      await vi.advanceTimersByTimeAsync(0);
-
-      expect(mockSend).toHaveBeenCalledTimes(1);
+  const restubService = () => {
+    MockedReusableEdgeTTSService.mockImplementation(function () {
+      return {
+        connect: mockConnect,
+        send: mockSend,
+        disconnect: mockDisconnect,
+        isReady: mockIsReady,
+        getState: vi.fn().mockReturnValue('READY'),
+      };
     });
-  });
+  };
 
-  describe('addTasks', () => {
-    it('adds multiple tasks', () => {
-      pool = createPool();
-      pool.addTasks([createTask(0), createTask(1), createTask(2)]);
-
-      expect(pool.getProgress().total).toBe(3);
-    });
-
-    it('respects maxWorkers limit', async () => {
-      // Note: With p-queue, concurrency is handled by the library
-      // This test verifies tasks are queued and processed
-      pool = createPool({ maxWorkers: 2 });
-      pool.addTasks([createTask(0), createTask(1), createTask(2), createTask(3)]);
-
-      // Process the queue
-      await vi.advanceTimersByTimeAsync(100);
-
-      // All 4 tasks should eventually be processed (p-queue handles concurrency)
-      expect(mockSend).toHaveBeenCalledTimes(4);
-    });
-  });
-
-  describe('task completion', () => {
-    it('stores completed audio by part index', async () => {
-      pool = createPool();
-      pool.addTask(createTask(0));
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      const completedAudio = pool.getCompletedAudio();
-      expect(completedAudio.size).toBe(1);
-      // With ChunkStore, we store the part index as a string reference
-      expect(completedAudio.get(0)).toBe('0');
-    });
-
-    it('calls onTaskComplete callback with part index', async () => {
+  describe('run - happy path', () => {
+    it('writes chunks through the chunk store and resolves the completed set', async () => {
       const onTaskComplete = vi.fn();
       pool = createPool({ onTaskComplete });
-      pool.addTask(createTask(0));
 
-      await vi.advanceTimersByTimeAsync(100);
+      const outcome = await runToCompletion(pool, [createTask(0), createTask(1)], 200);
 
-      // With ChunkStore, callback receives part index as string reference
-      expect(onTaskComplete).toHaveBeenCalledWith(0, '0');
-    });
-
-    it('calls onAllComplete when all tasks done', async () => {
-      const onAllComplete = vi.fn();
-      pool = createPool({ onAllComplete });
-      pool.addTask(createTask(0));
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      expect(onAllComplete).toHaveBeenCalledTimes(1);
-    });
-
-    it('updates progress on completion', async () => {
-      pool = createPool();
-      pool.addTasks([createTask(0), createTask(1)]);
-
-      expect(pool.getProgress().completed).toBe(0);
-
-      await vi.advanceTimersByTimeAsync(200);
-
-      expect(pool.getProgress().completed).toBe(2);
-    });
-
-    it('processes next task from queue after completion', async () => {
-      // With p-queue, tasks are processed sequentially when concurrency is 1
-      pool = createPool({ maxWorkers: 1 });
-      pool.addTasks([createTask(0), createTask(1)]);
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      // Both tasks should be processed (p-queue handles sequencing)
       expect(mockSend).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('task errors and retries', () => {
-    it('retries failed tasks with exponential backoff', async () => {
-      // Note: p-retry handles the actual retry logic
-      // This test verifies the task completes after retry
-      let attemptCount = 0;
-      const { RetriableError } = await import('@/errors');
-
-      mockSend = vi.fn().mockImplementation(() => {
-        attemptCount++;
-        if (attemptCount < 3) {
-          return Promise.reject(new RetriableError('Network error'));
-        }
-        return Promise.resolve(new Uint8Array([1]));
-      });
-
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('READY'),
-        };
-      });
-
-      pool = createPool();
-      pool.addTask(createTask(0));
-
-      // Run through retries with exponential backoff
-      await vi.advanceTimersByTimeAsync(10000);
-
-      // With p-retry mock executing immediately, first success wins
-      expect(attemptCount).toBeGreaterThanOrEqual(1);
+      expect(mockChunkStore.writeChunk).toHaveBeenCalledTimes(2);
+      expect(outcome).toEqual({ completed: new Set([0, 1]), failed: [] });
+      expect(onTaskComplete).toHaveBeenCalledTimes(2);
+      expect(onTaskComplete).toHaveBeenCalledWith(0);
+      expect(onTaskComplete).toHaveBeenCalledWith(1);
     });
 
-    it('calls onStatusUpdate during processing', async () => {
-      const onStatusUpdate = vi.fn();
+    it('processes tasks sequentially when maxWorkers is 1', async () => {
+      pool = createPool({ maxWorkers: 1 });
 
-      pool = createPool({ onStatusUpdate });
-      pool.addTask(createTask(0));
+      const outcome = await runToCompletion(pool, [createTask(0), createTask(1)], 200);
 
-      await vi.advanceTimersByTimeAsync(100);
-
-      // Should have processing status
-      expect(onStatusUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          partIndex: 0,
-          message: expect.stringContaining('Processing'),
-        }),
-      );
+      expect(mockSend).toHaveBeenCalledTimes(2);
+      expect(outcome.completed).toEqual(new Set([0, 1]));
     });
 
-    it('handles task failure gracefully', async () => {
-      const onTaskError = vi.fn();
-
-      // Make send always fail with non-retriable error
-      mockSend = vi.fn().mockRejectedValue(new Error('Permanent failure'));
-
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('READY'),
-        };
-      });
-
-      pool = createPool({ onTaskError });
-
-      // Set retry count to exceed max so it will fail permanently
-      const task = createTask(0);
-      // @ts-expect-error - accessing private property for testing
-      pool.retryCount.set(task.partIndex, 11);
-
-      pool.addTask(task);
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
-      expect(pool.getFailedTasks().has(0)).toBe(true);
-    });
-  });
-
-  describe('voice override', () => {
     it('uses task-specific voice when provided', async () => {
       pool = createPool();
 
-      const taskWithVoice: PoolTask = {
-        ...createTask(0),
-        voice: 'ru-RU, DmitryNeural',
-      };
-      pool.addTask(taskWithVoice);
-
-      await vi.advanceTimersByTimeAsync(0);
+      const taskWithVoice: PoolTask = { ...createTask(0), voice: 'ru-RU, DmitryNeural' };
+      await runToCompletion(pool, [taskWithVoice], 100);
 
       expect(mockSend).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -294,9 +161,8 @@ describe('TTSWorkerPool', () => {
 
     it('uses default voice when task has no override', async () => {
       pool = createPool();
-      pool.addTask(createTask(0));
 
-      await vi.advanceTimersByTimeAsync(0);
+      await runToCompletion(pool, [createTask(0)], 100);
 
       expect(mockSend).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -306,440 +172,181 @@ describe('TTSWorkerPool', () => {
         }),
       );
     });
-  });
 
-  describe('cleanup', () => {
-    it('closes chunkStore', async () => {
-      pool = createPool();
-      pool.addTask(createTask(0));
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      await pool.cleanup();
-
-      expect(mockChunkStore.close).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('clear', () => {
-    it('clears all state and resets progress', async () => {
-      pool = createPool();
-      pool.addTasks([createTask(0), createTask(1)]);
-
-      await vi.advanceTimersByTimeAsync(200);
-
-      pool.clear();
-
-      // Progress should be reset
-      expect(pool.getProgress()).toEqual({
-        completed: 0,
-        total: 0,
-        failed: 0,
-      });
-      expect(pool.getCompletedAudio().size).toBe(0);
-      expect(pool.getFailedTasks().size).toBe(0);
-    });
-  });
-
-  describe('warmup', () => {
-    it('warms up ladder workers (5), not maxWorkers', async () => {
-      pool = createPool({ maxWorkers: 5 });
-      await pool.warmup();
-
-      // Ladder starts at 5 workers (minWorkers), not maxWorkers
-      expect(mockConnect).toHaveBeenCalledTimes(5);
-    });
-
-    it('ignores connection errors during warmup', async () => {
-      mockConnect = vi.fn().mockRejectedValue(new Error('Connection failed'));
-
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('DISCONNECTED'),
-        };
-      });
-
-      pool = createPool({ maxWorkers: 10 });
-
-      // Should not throw (still warms 2 connections via ladder)
-      await expect(pool.warmup()).resolves.toBeUndefined();
-    });
-  });
-
-  describe('connection handling', () => {
-    it('connects worker if not ready before sending', async () => {
+    it('connects the worker if not ready before sending', async () => {
       mockIsReady = vi.fn().mockReturnValue(false);
-
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('DISCONNECTED'),
-        };
-      });
+      restubService();
 
       pool = createPool();
-      pool.addTask(createTask(0));
+      await runToCompletion(pool, [createTask(0)], 100);
 
-      await vi.advanceTimersByTimeAsync(100);
-
-      expect(mockConnect).toHaveBeenCalled();
-      expect(mockSend).toHaveBeenCalled();
-    });
-
-    it('creates connection via generic-pool on task execution', async () => {
-      // With generic-pool, connections are created via factory.create()
-      // which always calls connect()
-      mockIsReady = vi.fn().mockReturnValue(true);
-
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('READY'),
-        };
-      });
-
-      pool = createPool();
-      pool.addTask(createTask(0));
-
-      await vi.advanceTimersByTimeAsync(100);
-
-      // generic-pool's create() calls connect(), so it should be called
       expect(mockConnect).toHaveBeenCalled();
       expect(mockSend).toHaveBeenCalled();
     });
   });
 
-  describe('calculateRetryDelay', () => {
-    it('caps max delay at 120s (2 minutes) - attempts beyond 5 use last delay', () => {
-      pool = createPool();
-      vi.spyOn(Math, 'random').mockReturnValue(0.5);
-
-      // @ts-expect-error - accessing private method for testing
-      const calculateDelay = (attempt: number) => pool.calculateRetryDelay(attempt);
-
-      // Attempts beyond 5 should use delays[4] (120000ms) with half-max jitter
-      expect(calculateDelay(6)).toBe(90000);
-      expect(calculateDelay(7)).toBe(90000);
-      expect(calculateDelay(10)).toBe(90000);
-      expect(calculateDelay(100)).toBe(90000);
-    });
-  });
-
-  describe('logTTSFailure', () => {
-    it('writes failure log to logs/tts_fail1.json with correct content', async () => {
-      const mockDirHandle = createMockDirectoryHandle();
-
-      pool = createPool({ directoryHandle: mockDirHandle });
-
-      const task: PoolTask = {
-        partIndex: 5,
-        text: 'Sample text for TTS',
-        filename: 'test',
-        filenum: '0006',
-      };
-
-      const error = new Error('TTS service unavailable');
-
-      // @ts-expect-error - calling private method for testing
-      await pool.logTTSFailure(task, error);
-
-      // Verify the written JSON content
-      const logsDir = await mockDirHandle.getDirectoryHandle('logs');
-      const fileHandle = await logsDir.getFileHandle('tts_fail1.json');
-      const file = await fileHandle.getFile();
-      const text = await file.text();
-      const logEntry = JSON.parse(text);
-
-      expect(logEntry).toEqual({
-        partIndex: 5,
-        text: 'Sample text for TTS',
-        errorMessage: 'TTS service unavailable',
-        retryCount: 5,
-        timestamp: expect.any(String),
-      });
-
-      // Verify timestamp is a valid ISO string
-      expect(new Date(logEntry.timestamp)).toBeInstanceOf(Date);
-    });
-
-    it('increments failureLogCounter for each failure', async () => {
-      const mockDirHandle = createMockDirectoryHandle();
-
-      pool = createPool({ directoryHandle: mockDirHandle });
-
-      const task1: PoolTask = {
-        partIndex: 1,
-        text: 'First failure',
-        filename: 'test',
-        filenum: '0002',
-      };
-
-      const task2: PoolTask = {
-        partIndex: 2,
-        text: 'Second failure',
-        filename: 'test',
-        filenum: '0003',
-      };
-
-      const error = new Error('Failed');
-
-      // @ts-expect-error - calling private method for testing
-      await pool.logTTSFailure(task1, error);
-
-      // Verify first file was created
-      const logsDir = await mockDirHandle.getDirectoryHandle('logs');
-      await expect(logsDir.getFileHandle('tts_fail1.json')).resolves.toBeDefined();
-
-      // @ts-expect-error - calling private method for testing
-      await pool.logTTSFailure(task2, error);
-
-      // Verify second file was created
-      await expect(logsDir.getFileHandle('tts_fail2.json')).resolves.toBeDefined();
-    });
-
-    it('returns early when directoryHandle is null', async () => {
-      const mockDirHandle = createMockDirectoryHandle();
-
-      pool = createPool({ directoryHandle: null });
-
-      const task: PoolTask = {
-        partIndex: 0,
-        text: 'Test',
-        filename: 'test',
-        filenum: '0001',
-      };
-
-      const error = new Error('Failed');
-
-      // @ts-expect-error - calling private method for testing
-      await pool.logTTSFailure(task, error);
-
-      // Verify no logs directory was created (returned early)
-      await expect(
-        mockDirHandle
-          .getDirectoryHandle('logs')
-          .then(() => true)
-          .catch(() => false),
-      ).resolves.toBe(false);
-    });
-
-    it('handles non-Error errors by converting to string', async () => {
-      const mockDirHandle = createMockDirectoryHandle();
-
-      pool = createPool({ directoryHandle: mockDirHandle });
-
-      const task: PoolTask = {
-        partIndex: 0,
-        text: 'Test',
-        filename: 'test',
-        filenum: '0001',
-      };
-
-      const nonErrorError = 'String error message';
-
-      // @ts-expect-error - calling private method for testing
-      await pool.logTTSFailure(task, nonErrorError);
-
-      const logsDir = await mockDirHandle.getDirectoryHandle('logs');
-      const fileHandle = await logsDir.getFileHandle('tts_fail1.json');
-      const file = await fileHandle.getFile();
-      const text = await file.text();
-      const logEntry = JSON.parse(text);
-
-      expect(logEntry.errorMessage).toBe('String error message');
-    });
-
-    it('handles errors gracefully and calls logger.warn', async () => {
-      const mockDirHandle = createMockDirectoryHandle();
-      const { createMockLogger } = await import('@/test/mocks/MockLogger');
-      const logger = createMockLogger();
-
-      // Make getDirectoryHandle throw
-      vi.spyOn(mockDirHandle, 'getDirectoryHandle').mockRejectedValue(
-        new Error('Permission denied'),
-      );
-
-      pool = createPool({ directoryHandle: mockDirHandle, logger });
-
-      const task: PoolTask = {
-        partIndex: 0,
-        text: 'Test',
-        filename: 'test',
-        filenum: '0001',
-      };
-
-      const error = new Error('TTS failed');
-
-      // Should not throw
-      // @ts-expect-error - calling private method for testing
-      await expect(pool.logTTSFailure(task, error)).resolves.toBeUndefined();
-
-      // Verify logger.warn was called
-      expect(logger.warn).toHaveBeenCalledWith(
-        'Failed to write TTS failure log',
-        expect.objectContaining({
-          error: expect.any(String),
-        }),
-      );
-    });
-  });
-
-  describe('onConcurrencyChange callback', () => {
-    it('calls onConcurrencyChange during warmup with initial concurrency', async () => {
-      const onConcurrencyChange = vi.fn();
-      pool = createPool({ onConcurrencyChange });
-
-      await pool.warmup();
-
-      expect(onConcurrencyChange).toHaveBeenCalledTimes(1);
-      expect(onConcurrencyChange).toHaveBeenCalledWith(5); // Ladder starts at minWorkers (5)
-    });
-
-    it('calls onConcurrencyChange when task fails and ladder throttles', async () => {
-      const onConcurrencyChange = vi.fn();
-      pool = createPool({ onConcurrencyChange });
-
-      // Make send fail
-      mockSend = vi.fn().mockRejectedValue(new Error('Network failure'));
-
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('READY'),
-        };
-      });
-
-      pool.addTask(createTask(0));
-      await vi.advanceTimersByTimeAsync(100);
-
-      // Should be called during failure handling
-      expect(onConcurrencyChange).toHaveBeenCalled();
-    });
-
-    it('does not throw if onConcurrencyChange is not provided', async () => {
-      pool = createPool(); // No onConcurrencyChange callback
-
-      // Should not throw during warmup or task execution
-      await expect(pool.warmup()).resolves.toBeUndefined();
-
-      pool.addTask(createTask(0));
-      await vi.advanceTimersByTimeAsync(100);
-      // Test passes if no exception is thrown
-    });
-  });
-
-  describe('retry integration - observable behavior', () => {
-    it('should re-execute failed tasks after retry delay expires', async () => {
-      const onTaskComplete = vi.fn();
-      const onTaskError = vi.fn();
-      pool = createPool({ onTaskComplete, onTaskError });
-
-      // Track calls - first fails, second succeeds
+  describe('run - retries and backoff', () => {
+    it('retries a failed task after backoff and resolves it as completed', async () => {
       let callCount = 0;
-      mockSend.mockImplementation(async () => {
+      mockSend = vi.fn(async () => {
         callCount++;
-        if (callCount === 1) {
-          throw new Error('Network error');
-        }
+        if (callCount === 1) throw new Error('Network error');
         return new Uint8Array([1, 2, 3]);
       });
+      restubService();
 
-      const task = createTask(0);
-      pool.addTask(task);
+      const onRetry = vi.fn();
+      const onTaskComplete = vi.fn();
+      const onTaskError = vi.fn();
+      const onConcurrencyChange = vi.fn();
+      pool = createPool({ onRetry, onTaskComplete, onTaskError, onConcurrencyChange });
 
-      // Let the failure happen
-      await vi.advanceTimersByTimeAsync(100);
+      const outcome = await runToCompletion(pool, [createTask(0)], 10000);
 
-      // Wait for retry delay to expire (using the calculated delay from calculateRetryDelay)
-      // First retry delay is ~2.25s with half-max jitter
-      await vi.advanceTimersByTimeAsync(3000);
-
-      // Task should now complete successfully after retry
-      expect(onTaskComplete).toHaveBeenCalledWith(0, '0');
-      expect(pool.getProgress().completed).toBe(1);
-
-      // No permanent failure
+      expect(mockSend).toHaveBeenCalledTimes(2);
+      expect(onRetry).toHaveBeenCalledTimes(1);
+      expect(onRetry).toHaveBeenCalledWith(0, 1, expect.any(Number));
+      expect(onTaskComplete).toHaveBeenCalledTimes(1);
+      expect(onTaskComplete).toHaveBeenCalledWith(0);
       expect(onTaskError).not.toHaveBeenCalled();
-      expect(pool.getProgress().failed).toBe(0);
+      // The failure path throttles via the ladder before retrying
+      expect(onConcurrencyChange).toHaveBeenCalled();
+      expect(outcome).toEqual({ completed: new Set([0]), failed: [] });
     });
 
-    it('should process multiple failed tasks independently', async () => {
-      const onTaskComplete = vi.fn();
-      pool = createPool({ onTaskComplete });
+    it('backs off with capped delays reported through onRetry', async () => {
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      mockSend = vi.fn().mockRejectedValue(new Error('down'));
+      restubService();
 
-      // Add tasks - first 2 will fail initially, third succeeds
+      const onRetry = vi.fn();
+      pool = createPool({ onRetry });
+
+      await runToCompletion(pool, [createTask(0)], 900000);
+
+      randomSpy.mockRestore();
+
+      // 5 retries with half-max jitter on 3s/10s/30s/60s/120s; attempts beyond 5 stay capped
+      expect(onRetry.mock.calls.map((c) => c[2])).toEqual([2250, 7500, 22500, 45000, 90000]);
+    });
+
+    it('resolves the failed entry with its message after retries exhaust', async () => {
+      mockSend = vi.fn().mockRejectedValue(new Error('Persistent network error'));
+      restubService();
+
+      const onTaskError = vi.fn();
+      const onTaskComplete = vi.fn();
+      pool = createPool({ onTaskError, onTaskComplete });
+
+      const outcome = await runToCompletion(pool, [createTask(0)], 900000);
+
+      expect(onTaskError).toHaveBeenCalledTimes(1);
+      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
+      expect(onTaskComplete).not.toHaveBeenCalled();
+      expect(outcome.completed).toEqual(new Set());
+      expect(outcome.failed).toEqual([{ index: 0, message: 'Persistent network error' }]);
+    });
+
+    it('processes multiple failed tasks independently', async () => {
       let callCount = 0;
-      mockSend.mockImplementation(async () => {
+      mockSend = vi.fn(async () => {
         callCount++;
         // First 2 calls fail (tasks 0 and 1)
-        if (callCount <= 2) {
-          throw new Error('Network error');
-        }
+        if (callCount <= 2) throw new Error('Network error');
         return new Uint8Array([1, 2, 3]);
       });
+      restubService();
 
-      pool.addTasks([createTask(0), createTask(1), createTask(2)]);
+      pool = createPool();
 
-      // Let initial processing happen
+      // Initial pass: tasks 0 and 1 fail, task 2 succeeds
+      const pending = pool.run([createTask(0), createTask(1), createTask(2)], {
+        signal: new AbortController().signal,
+      });
       await vi.advanceTimersByTimeAsync(100);
-
-      // Task 2 should have succeeded (third call)
-      expect(pool.getProgress().completed).toBe(1);
-
-      // Now make the retry attempts succeed
       mockSend.mockResolvedValue(new Uint8Array([1, 2, 3]));
 
-      // Wait for retry delays to expire (tasks retry at different times)
-      await vi.advanceTimersByTimeAsync(5000);
+      // Wait for the retry delays to expire (tasks retry independently)
+      await vi.advanceTimersByTimeAsync(10000);
+      const outcome = await pending;
 
-      // All tasks should now be complete
-      expect(pool.getProgress().completed).toBe(3);
-      expect(pool.getProgress().failed).toBe(0);
+      expect(outcome.completed).toEqual(new Set([0, 1, 2]));
+      expect(outcome.failed).toEqual([]);
+    });
+  });
+
+  describe('run - cancellation', () => {
+    it('rejects immediately without creating work when the signal is already aborted', async () => {
+      pool = createPool();
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(pool.run([createTask(0)], { signal: controller.signal })).rejects.toThrow(
+        CancellationError,
+      );
+
+      expect(mockConnect).not.toHaveBeenCalled();
+      expect(mockSend).not.toHaveBeenCalled();
     });
 
-    it('should mark task as permanently failed after max retries', async () => {
+    it('rejects mid-flight and destroys the in-flight socket without recording progress', async () => {
+      mockSend = vi.fn(() => new Promise<Uint8Array>(() => {})); // hangs forever
+      restubService();
+
       const onTaskError = vi.fn();
-      pool = createPool({ onTaskError });
+      const onTaskComplete = vi.fn();
+      pool = createPool({ onTaskError, onTaskComplete });
 
-      // Make send always fail
-      mockSend = vi.fn().mockRejectedValue(new Error('Persistent network error'));
+      const controller = new AbortController();
+      const pending = pool.run([createTask(0)], { signal: controller.signal });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(mockSend).toHaveBeenCalledTimes(1);
 
-      MockedReusableEdgeTTSService.mockImplementation(function () {
-        return {
-          connect: mockConnect,
-          send: mockSend,
-          disconnect: mockDisconnect,
-          isReady: mockIsReady,
-          getState: vi.fn().mockReturnValue('READY'),
-        };
+      controller.abort();
+
+      await expect(pending).rejects.toThrow(CancellationError);
+
+      // In-flight socket destroyed, no failure or completion recorded
+      expect(mockDisconnect).toHaveBeenCalled();
+      expect(onTaskError).not.toHaveBeenCalled();
+      expect(onTaskComplete).not.toHaveBeenCalled();
+    });
+
+    it('rejects mid-flight and drops tasks waiting in retry backoff', async () => {
+      let callCount = 0;
+      mockSend = vi.fn(async () => {
+        callCount++;
+        if (callCount === 1) throw new Error('Network error');
+        return new Uint8Array([1, 2, 3]);
       });
+      restubService();
 
-      const task = createTask(0);
-      pool.addTask(task);
+      pool = createPool();
+      const controller = new AbortController();
+      const pending = pool.run([createTask(0)], { signal: controller.signal });
 
-      // Advance enough time for all retries to exhaust
-      // Max retries is 11, with exponential backoff up to 120s max delay
-      // Total time needed: sum of all delays = ~2.25s + 7.5s + 22.5s + 45s + 90s + (6 * 120s)
-      // ≈ 887 seconds ≈ 15 minutes
-      await vi.advanceTimersByTimeAsync(900000);
+      // First attempt fails; task now sits in a backoff timer
+      await vi.advanceTimersByTimeAsync(100);
+      expect(mockSend).toHaveBeenCalledTimes(1);
 
-      // Should be permanently failed
-      expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
-      expect(pool.getProgress().failed).toBe(1);
-      expect(pool.getFailedTasks().has(0)).toBe(true);
+      controller.abort();
+
+      await expect(pending).rejects.toThrow(CancellationError);
+
+      // The backoff timer must not wake the task after cancellation
+      await vi.advanceTimersByTimeAsync(120000);
+      expect(mockSend).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('ladder concurrency callback', () => {
+    it('reports concurrency changes while tasks run', async () => {
+      const onConcurrencyChange = vi.fn();
+      pool = createPool({ onConcurrencyChange });
+
+      await runToCompletion(pool, [createTask(0)], 100);
+
+      expect(onConcurrencyChange).toHaveBeenCalled();
     });
   });
 });

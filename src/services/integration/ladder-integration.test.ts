@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChunkStore } from '../ChunkStore';
-import { type PoolTask, TTSWorkerPool, type WorkerPoolOptions } from '../TTSWorkerPool';
+import { ReusableEdgeTTSService } from '../ReusableEdgeTTSService';
+import {
+  type PoolOutcome,
+  type PoolTask,
+  TTSWorkerPool,
+  type WorkerPoolOptions,
+} from '../TTSWorkerPool';
 
 vi.mock('../ReusableEdgeTTSService', () => ({
   ReusableEdgeTTSService: vi.fn().mockImplementation(function () {
@@ -14,8 +20,9 @@ vi.mock('../ReusableEdgeTTSService', () => ({
   }),
 }));
 
+const MockedReusableEdgeTTSService = vi.mocked(ReusableEdgeTTSService);
+
 describe('Ladder Integration - E2E', () => {
-  let pool: TTSWorkerPool;
   let options: WorkerPoolOptions;
   let mockChunkStore: ChunkStore;
 
@@ -49,52 +56,49 @@ describe('Ladder Integration - E2E', () => {
     vi.useRealTimers();
   });
 
-  it('scales up from 2 -> 3 -> 4 -> ... as tasks succeed', async () => {
-    pool = new TTSWorkerPool(options);
-
-    // Add 60 successful tasks (3 full evaluation cycles)
-    const tasks: PoolTask[] = Array.from({ length: 60 }, (_, i) => ({
-      partIndex: i,
-      text: `Text ${i}`,
-      filename: 'test',
-      filenum: String(i + 1).padStart(4, '0'),
+  const makeTasks = (count: number, startIndex = 0): PoolTask[] =>
+    Array.from({ length: count }, (_, i) => ({
+      partIndex: i + startIndex,
+      text: `Text ${i + startIndex}`,
     }));
-    pool.addTasks(tasks);
 
-    // Process all tasks
-    while (pool.getProgress().completed < 60) {
+  /** Pump fake timers until the run settles, then return its outcome. */
+  const pump = async (pending: Promise<PoolOutcome>): Promise<PoolOutcome> => {
+    let outcome: PoolOutcome | undefined;
+    void pending.then((o) => {
+      outcome = o;
+    });
+    while (!outcome) {
       await vi.advanceTimersByTimeAsync(100);
     }
+    return outcome;
+  };
 
-    // Final state: should have scaled up significantly
+  it('scales up from 2 -> 3 -> 4 -> ... as tasks succeed', async () => {
+    const onConcurrencyChange = vi.fn();
+    const pool = TTSWorkerPool.create({ ...options, onConcurrencyChange });
+
+    // 60 successful tasks (3 full evaluation cycles)
+    const outcome = await pump(pool.run(makeTasks(60), { signal: new AbortController().signal }));
+
     // Starting at 2, after 20 tasks -> 3, after 40 -> 4, after 60 -> 5
-    const progress = pool.getProgress();
-    expect(progress.completed).toBe(60);
-    expect(progress.failed).toBe(0);
+    expect(outcome.completed.size).toBe(60);
+    expect(outcome.failed).toEqual([]);
+    // The ladder raised concurrency as successes accumulated
+    const reported = onConcurrencyChange.mock.calls.map((call) => call[0]);
+    expect(reported.some((c, i) => i > 0 && c > reported[0])).toBe(true);
   });
 
   it('scales down when errors occur', async () => {
     // First, scale up with successful tasks
-    pool = new TTSWorkerPool(options);
+    const pool = TTSWorkerPool.create(options);
+    const successOutcome = await pump(
+      pool.run(makeTasks(160), { signal: new AbortController().signal }),
+    );
+    expect(successOutcome.completed.size).toBe(160);
 
-    const successTasks: PoolTask[] = Array.from({ length: 160 }, (_, i) => ({
-      partIndex: i,
-      text: `Text ${i}`,
-      filename: 'test',
-      filenum: String(i + 1).padStart(4, '0'),
-    }));
-
-    pool.addTasks(successTasks);
-
-    // Process all successful tasks
-    while (pool.getProgress().completed < 160) {
-      await vi.advanceTimersByTimeAsync(100);
-    }
-
-    // Now create a new pool with a failing mock to test error handling
-    // Mock to fail
-    const { ReusableEdgeTTSService } = await import('../ReusableEdgeTTSService');
-    vi.mocked(ReusableEdgeTTSService).mockImplementation(function () {
+    // Now create a new pool whose connections always fail
+    MockedReusableEdgeTTSService.mockImplementation(function () {
       return {
         connect: vi.fn().mockResolvedValue(undefined),
         send: vi.fn().mockRejectedValue(new Error('Rate limited')),
@@ -104,30 +108,20 @@ describe('Ladder Integration - E2E', () => {
       };
     });
 
-    // Create new pool with failing mock
-    const errorPool = new TTSWorkerPool(options);
+    const onTaskError = vi.fn();
+    const onConcurrencyChange = vi.fn();
+    const failPool = TTSWorkerPool.create({ ...options, onTaskError, onConcurrencyChange });
 
-    // Add a task that will fail
-    const failingTask: PoolTask = {
-      partIndex: 0,
-      text: 'This will fail',
-      filename: 'test',
-      filenum: '0001',
-    };
+    // A task that always fails; pump through every backoff attempt
+    const outcome = await pump(
+      failPool.run(makeTasks(1), { signal: new AbortController().signal }),
+    );
 
-    // Set retry count to exceed max so it will fail permanently
-    // @ts-expect-error - accessing private property for testing
-    errorPool.retryCount.set(failingTask.partIndex, 11);
-
-    errorPool.addTask(failingTask);
-
-    await vi.advanceTimersByTimeAsync(100);
-
-    // Verify failure was recorded
-    const progress = errorPool.getProgress();
-    expect(progress.failed).toBeGreaterThanOrEqual(1);
-
-    // Cleanup
-    await errorPool.cleanup();
+    // Failure was recorded through the outcome and the error callback
+    expect(onTaskError).toHaveBeenCalledTimes(1);
+    expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
+    expect(outcome.failed).toEqual([{ index: 0, message: 'Rate limited' }]);
+    // The ladder throttled while failures accumulated
+    expect(onConcurrencyChange).toHaveBeenCalled();
   });
 });

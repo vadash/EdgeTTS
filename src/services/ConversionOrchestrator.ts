@@ -835,90 +835,69 @@ async function runTTSStage(
   const remainingChunks = chunks.filter((c) => !audioMap.has(c.partIndex));
 
   if (remainingChunks.length > 0) {
-    await new Promise<void>((resolve, reject) => {
-      if (signal.aborted) {
-        reject(new CancellationError());
-        return;
-      }
+    const workerPool = workerPoolFactory.create({
+      maxWorkers: input.ttsThreads,
+      config: ttsConfig,
+      chunkStore: chunkStore,
+      logger: logger,
+      onTaskComplete: (partIndex) => {
+        audioMap.add(partIndex);
+        const completed = audioMap.size;
+        const percentageInterval = Math.max(1, Math.floor(chunks.length * 0.01));
+        const minInterval = 50;
+        const maxInterval = 500;
+        const step = 50;
+        const clampedInterval = Math.max(minInterval, Math.min(percentageInterval, maxInterval));
+        const reportInterval = Math.round(clampedInterval / step) * step;
+        const finalInterval = Math.max(minInterval, Math.min(reportInterval, maxInterval));
 
-      const workerPool = workerPoolFactory.create({
-        maxWorkers: input.ttsThreads,
-        config: ttsConfig,
-        chunkStore: chunkStore,
-        directoryHandle: directoryHandle,
-        logger: logger,
-        onStatusUpdate: (update) => {
-          if (update.message.includes('Retry')) {
-            report('tts-conversion', audioMap.size, chunks.length, update.message);
-          }
-        },
-        onTaskComplete: (partIndex) => {
-          audioMap.add(partIndex);
-          const completed = audioMap.size;
-          const percentageInterval = Math.max(1, Math.floor(chunks.length * 0.01));
-          const minInterval = 50;
-          const maxInterval = 500;
-          const step = 50;
-          const clampedInterval = Math.max(minInterval, Math.min(percentageInterval, maxInterval));
-          const reportInterval = Math.round(clampedInterval / step) * step;
-          const finalInterval = Math.max(minInterval, Math.min(reportInterval, maxInterval));
-
-          if (completed % finalInterval === 0 || completed === chunks.length) {
-            report(
-              'tts-conversion',
-              completed,
-              chunks.length,
-              `Written ${completed}/${chunks.length} files`,
-              failedTasks.size,
-            );
-          }
-        },
-        onTaskError: (partIndex, error) => {
-          failedTasks.add(partIndex);
+        if (completed % finalInterval === 0 || completed === chunks.length) {
           report(
             'tts-conversion',
-            audioMap.size,
+            completed,
             chunks.length,
-            `Part ${partIndex + 1} failed: ${getErrorMessage(error)}`,
+            `Written ${completed}/${chunks.length} files`,
             failedTasks.size,
           );
-        },
-        onConcurrencyChange: (concurrency) => {
-          ports.progress.setConcurrency(0, concurrency);
-        },
-        onAllComplete: () => {
-          resolve();
-        },
-      });
-
-      const abortHandler = () => workerPool.clear();
-      signal.addEventListener('abort', abortHandler);
-
-      workerPool.addTasks(
-        remainingChunks.map((chunk) => {
-          let filename = fileNames[0]?.[0] ?? 'audio';
-          for (const [name, boundaryIndex] of fileNames) {
-            if (chunk.partIndex >= boundaryIndex && boundaryIndex > 0) {
-              filename = name;
-            }
-          }
-
-          return {
-            partIndex: chunk.partIndex,
-            text: chunk.text,
-            filename: filename,
-            filenum: String(chunk.partIndex + 1).padStart(4, '0'),
-            voice: chunk.voice,
-          };
-        }),
-      );
-
-      signal.removeEventListener('abort', abortHandler);
+        }
+      },
+      onTaskError: (partIndex, error) => {
+        failedTasks.add(partIndex);
+        report(
+          'tts-conversion',
+          audioMap.size,
+          chunks.length,
+          `Part ${partIndex + 1} failed: ${getErrorMessage(error)}`,
+          failedTasks.size,
+        );
+      },
+      onRetry: (partIndex, _attempt, delayMs) => {
+        report(
+          'tts-conversion',
+          audioMap.size,
+          chunks.length,
+          `Part ${partIndex + 1}: Retry in ${Math.round(delayMs / 1000)}s...`,
+        );
+      },
+      onConcurrencyChange: (concurrency) => {
+        ports.progress.setConcurrency(0, concurrency);
+      },
     });
 
+    const ttsTasks = remainingChunks.map((chunk) => ({
+      partIndex: chunk.partIndex,
+      text: chunk.text,
+      voice: chunk.voice,
+    }));
+
+    // Settles on queue drain, or rejects with CancellationError when the
+    // signal aborts (the pool tears itself down; the orchestrator catch
+    // routes the rejection to ports.run.cancel).
+    const outcome = await workerPool.run(ttsTasks, { signal });
+
     // Persist failed chunks
-    if (failedTasks.size > 0) {
-      const totalFailed = await failureLog.record(failedTasks);
+    if (outcome.failed.length > 0) {
+      const totalFailed = await failureLog.record(outcome.failed);
       if (totalFailed !== null) {
         report(
           'tts-conversion',

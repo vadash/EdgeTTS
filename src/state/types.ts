@@ -107,12 +107,6 @@ export interface ConvertedFile {
   content: string;
 }
 
-export interface StatusUpdate {
-  partIndex: number;
-  message: string;
-  isComplete: boolean;
-}
-
 // File System Access API — partial augmentation for missing DOM lib members
 declare global {
   interface FileSystemHandle {
