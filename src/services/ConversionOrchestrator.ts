@@ -106,7 +106,7 @@ export interface ConversionOrchestratorServices {
     create(options: WorkerPoolOptions): TTSWorkerPool;
   };
   audioMergerFactory: {
-    create(config: MergerConfig & { chunkStore: ChunkStore }): AudioMerger;
+    create(config: MergerConfig): AudioMerger;
   };
   voicePoolBuilder: VoicePoolBuilder;
   ffmpegService: FFmpegService;
@@ -796,9 +796,16 @@ async function runTTSStage(
   const audioMap = new Set<number>();
   const failedTasks = new Set<number>();
 
-  // Pre-scan for cached chunks using ChunkStore
+  // Pre-scan for cached chunks using ChunkStore. Indices at or beyond the
+  // honest chunk count are stale residue from a previous Conversion — the
+  // merge iterates chunks.length exactly, so they would only lie.
+  let staleDropped = 0;
   const existingIndices = chunkStore.getExistingIndices();
   for (const index of existingIndices) {
+    if (index >= chunks.length) {
+      staleDropped++;
+      continue;
+    }
     audioMap.add(index);
   }
 
@@ -817,10 +824,17 @@ async function runTTSStage(
   const previouslyFailed = await failureLog.load();
   let skippedCount = 0;
   for (const idx of previouslyFailed) {
+    if (idx >= chunks.length) {
+      staleDropped++;
+      continue;
+    }
     if (!audioMap.has(idx)) {
       audioMap.add(idx);
       skippedCount++;
     }
+  }
+  if (staleDropped > 0) {
+    logger.debug?.(`Dropped ${staleDropped} stale chunk(s) from a previous run`);
   }
   if (skippedCount > 0) {
     report(
@@ -943,12 +957,11 @@ async function runTTSStage(
     chunkStore: chunkStore,
   });
 
-  const totalChunks = audioMap.size;
-  report('audio-merge', 0, totalChunks, 'Merging audio...');
+  const chunkCount = chunks.length;
+  report('audio-merge', 0, chunkCount, 'Merging audio...');
 
   const savedCount = await merger.mergeAndSave(
-    audioMap,
-    totalChunks,
+    chunkCount,
     fileNames,
     directoryHandle,
     (current, total, message) => {
@@ -956,7 +969,7 @@ async function runTTSStage(
     },
   );
 
-  report('audio-merge', totalChunks, totalChunks, `Saved ${savedCount} file(s)`);
+  report('audio-merge', chunkCount, chunkCount, `Saved ${savedCount} file(s)`);
 
   // ==================== CLEANUP ====================
   await chunkStore.close();

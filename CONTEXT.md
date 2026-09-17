@@ -22,6 +22,14 @@ _Avoid_: chunk, section
 A unit of synthesized speech, streamed to disk. The audio merge reads chunks to encode the final audio.
 _Avoid_: block, segment
 
+**Chunk index**:
+The position of a Chunk in the Book's pronounceable stream. Minted once per Conversion; consumed by the TTS pool, the Chunk store, the Failure log, and the audio merge.
+_Avoid_: sentence index.
+
+**Chunk count**:
+The number of Chunks in a Conversion. Upper bound of the Chunk index space.
+_Avoid_: totalSentences.
+
 **Gap**:
 Deliberate silence inserted between chunks before the filter chain runs.
 

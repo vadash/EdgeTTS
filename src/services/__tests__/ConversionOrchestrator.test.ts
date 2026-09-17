@@ -126,7 +126,8 @@ const TEST_ASSIGNMENTS = [
 function createMockServices(failPart?: number) {
   // Real ChunkStore over the shared FS mock and an in-memory IDB adapter:
   // the orchestrator now drives resume/load/save through the store itself.
-  const chunkStore = new ChunkStore(createMockChunkIdb());
+  const chunkIdb = createMockChunkIdb();
+  const chunkStore = new ChunkStore(chunkIdb);
   vi.spyOn(chunkStore, 'init');
   vi.spyOn(chunkStore, 'clearAll');
   vi.spyOn(chunkStore, 'close');
@@ -135,10 +136,12 @@ function createMockServices(failPart?: number) {
       Promise.resolve<PoolOutcome>({ completed: new Set<number>(), failed: [] }),
     ),
   };
-  const merger = { mergeAndSave: vi.fn(() => Promise.resolve(1)) };
-  const mergerCreate = vi.fn(
-    (_config: MergerConfig & { chunkStore: ChunkStore }) => merger as unknown as AudioMerger,
-  );
+  const merger = {
+    mergeAndSave: vi.fn((_chunkCount: number, _fileNames: Array<[string, number]>, _dir: unknown) =>
+      Promise.resolve(1),
+    ),
+  };
+  const mergerCreate = vi.fn((_config: MergerConfig) => merger as unknown as AudioMerger);
   // Loose record type so individual tests can swap stage implementations
   // (e.g. a hanging extract for the mid-flight abort regression).
   const llmStages: Record<string, Mock> = {
@@ -182,7 +185,7 @@ function createMockServices(failPart?: number) {
     ffmpegService: { load: vi.fn(() => Promise.resolve(true)) } as unknown as FFmpegService,
     chunkStoreFactory: { create: () => chunkStore },
   };
-  return { services, chunkStore, workerPool, merger, mergerCreate, llmStages };
+  return { services, chunkStore, chunkIdb, workerPool, merger, mergerCreate, llmStages };
 }
 
 async function writeResumeState(
@@ -434,6 +437,37 @@ describe('runConversion', () => {
     expect(workerPool.run).not.toHaveBeenCalled();
     // The only chunk was skipped, so the merge still runs over the cached audio
     expect(reportMessages(ports)).toContain('Saved 1 file(s)');
+  });
+
+  it('drops stale prescan indices beyond the honest chunk count', async () => {
+    const { services, chunkIdb, merger } = createMockServices();
+    const ports = createMockPorts();
+    ports.resume.confirm = vi.fn(() => Promise.resolve(true));
+    const dirHandle = createMockDirectoryHandle() as unknown as FileSystemDirectoryHandle;
+    await writeResumeState(dirHandle);
+
+    // A previous Conversion left a chunk beyond the current Book: the honest
+    // stream has exactly one pronounceable chunk (index 0), so index 999 is
+    // stale store residue. Index 0 is a valid cached chunk.
+    chunkIdb.store.set(0, new Uint8Array([0xff, 0xf2, 0xa4, 0xc0]));
+    chunkIdb.store.set(999, new Uint8Array([0xff, 0xf2, 0xa4, 0xc0]));
+
+    await runConversion(
+      services,
+      ports,
+      new AbortController().signal,
+      createMockInput({ directoryHandle: dirHandle }),
+    );
+
+    // The merge gets the honest count, not the store size.
+    expect(merger.mergeAndSave).toHaveBeenCalledTimes(1);
+    expect(merger.mergeAndSave.mock.calls[0][0]).toBe(1);
+    // The stale index never inflates the resume baseline...
+    expect(reportMessages(ports)).toContain('Resuming: found 1/1 cached chunks');
+    // ...and its drop is logged.
+    expect(services.logger.debug).toHaveBeenCalledWith(
+      'Dropped 1 stale chunk(s) from a previous run',
+    );
   });
 
   it('persists failed chunks via FailureLog and reports the total', async () => {

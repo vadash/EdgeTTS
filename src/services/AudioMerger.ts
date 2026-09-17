@@ -13,7 +13,8 @@ import type { ChunkStore } from './ChunkStore';
 export type MergeProgressCallback = (current: number, total: number, message: string) => void;
 
 export interface MergedFile {
-  filename: string;
+  fileName: string;
+  folderName: string;
   blob: Blob;
   fromIndex: number;
   toIndex: number;
@@ -22,9 +23,50 @@ export interface MergedFile {
 export interface MergeGroup {
   fromIndex: number;
   toIndex: number;
-  filename: string;
+  folderName: string;
+  fileName: string;
   mergeNumber: number;
   durationMs: number;
+}
+
+/**
+ * Chapter name owning `index` in the Book's chapter table, preserving the
+ * historical boundary walk exactly: start at the first entry's name (or
+ * 'audio' for an empty table), advance while the next boundary index has
+ * been reached and is greater than 0.
+ */
+export function filenameFor(fileNames: Array<[string, number]>, index: number): string {
+  let current = fileNames[0]?.[0] ?? 'audio';
+  let nextBoundaryIdx = 0;
+  while (
+    nextBoundaryIdx < fileNames.length &&
+    index >= fileNames[nextBoundaryIdx][1] &&
+    fileNames[nextBoundaryIdx][1] > 0
+  ) {
+    current = fileNames[nextBoundaryIdx][0];
+    nextBoundaryIdx++;
+  }
+  return current;
+}
+
+/**
+ * Single composer of a merge group's on-disk identity: the sanitized
+ * chapter/folder name and the final saved file name.
+ */
+function generateGroupFilename(
+  chapterName: string,
+  mergeNumber: number,
+  totalGroups: number,
+  extension: string,
+): { folderName: string; fileName: string } {
+  const folderName = sanitizeFilename(chapterName);
+
+  if (totalGroups === 1) {
+    return { folderName, fileName: `${folderName}.${extension}` };
+  }
+
+  const paddedNum = String(mergeNumber).padStart(4, '0');
+  return { folderName, fileName: `${folderName} ${paddedNum}.${extension}` };
 }
 
 export interface MergerConfig {
@@ -34,7 +76,9 @@ export interface MergerConfig {
   // Parallel encoding pool: optional FFmpegService factory (DI). Absent
   // factory => sequential behavior (pool is just the injected singleton).
   ffmpegFactory?: () => FFmpegService;
-  chunkStore?: ChunkStore | null;
+  // Availability source for the merge: the merger asks the Chunk store
+  // which chunk indices exist. The caller no longer passes audio state.
+  chunkStore: ChunkStore;
 }
 
 /**
@@ -56,12 +100,12 @@ export class AudioMerger {
   private targetDurationMs: number;
   private minDurationMs: number;
   private maxDurationMs: number;
-  private chunkStore: ChunkStore | null = null;
+  private chunkStore: ChunkStore;
 
   constructor(ffmpegService: FFmpegService, config: MergerConfig) {
     this.ffmpegService = ffmpegService;
     this.config = config;
-    this.chunkStore = config.chunkStore ?? null;
+    this.chunkStore = config.chunkStore;
 
     // Duration settings from config
     const targetMinutes = defaultConfig.audio.targetDurationMinutes;
@@ -94,9 +138,6 @@ export class AudioMerger {
    * Reads file from disk and parses MP3 headers for accurate duration
    */
   private async getDurationMs(index: number): Promise<number> {
-    if (!this.chunkStore) {
-      throw new Error('ChunkStore not configured');
-    }
     try {
       const audio = await this.chunkStore.readChunk(index);
       const parsedDuration = parseMP3Duration(audio);
@@ -115,48 +156,33 @@ export class AudioMerger {
 
   /**
    * Calculate merge groups based on duration and file boundaries
-   * Reads file sizes from disk to estimate durations
+   * Asks the Chunk store once which indices exist; missing chunks count as
+   * silence (duration 0).
    */
   async calculateMergeGroups(
-    audioMap: Set<number>,
-    totalSentences: number,
+    chunkCount: number,
     fileNames: Array<[string, number]>,
   ): Promise<MergeGroup[]> {
-    const groups: MergeGroup[] = [];
+    if (chunkCount === 0) return [];
 
-    if (totalSentences === 0) return groups;
-
-    // Create a map of index -> filename
-    const indexToFilename = new Map<number, string>();
-    let currentFilename = fileNames[0]?.[0] ?? 'audio';
-    let nextBoundaryIdx = 0;
-
-    for (let i = 0; i < totalSentences; i++) {
-      while (
-        nextBoundaryIdx < fileNames.length &&
-        i >= fileNames[nextBoundaryIdx][1] &&
-        fileNames[nextBoundaryIdx][1] > 0
-      ) {
-        currentFilename = fileNames[nextBoundaryIdx][0];
-        nextBoundaryIdx++;
-      }
-      indexToFilename.set(i, currentFilename);
-    }
+    // Availability, fetched once for the whole calculation.
+    const available = this.chunkStore.getExistingIndices();
 
     // Build merge groups based on duration
     let groupStart = 0;
     let groupDurationMs = 0;
     let mergeNumber = 1;
-    let lastFilename = indexToFilename.get(0) ?? 'audio';
+    let lastFilename = filenameFor(fileNames, 0);
+    const spans: Array<Omit<MergeGroup, 'folderName' | 'fileName'>> = [];
 
-    for (let i = 0; i < totalSentences; i++) {
-      const currentFile = indexToFilename.get(i) ?? 'audio';
+    for (let i = 0; i < chunkCount; i++) {
+      const currentFile = filenameFor(fileNames, i);
       const isFileBoundary = currentFile !== lastFilename;
-      const isLastItem = i === totalSentences - 1;
+      const isLastItem = i === chunkCount - 1;
 
       // Get actual duration from MP3 headers (with fallback to byte heuristic)
       let chunkDurationMs = 0;
-      if (audioMap.has(i)) {
+      if (available.has(i)) {
         chunkDurationMs = await this.getDurationMs(i);
       }
 
@@ -171,10 +197,9 @@ export class AudioMerger {
         const finalDuration = isFileBoundary ? groupDurationMs : groupDurationMs + chunkDurationMs;
 
         if (toIndex >= groupStart) {
-          groups.push({
+          spans.push({
             fromIndex: groupStart,
             toIndex: toIndex,
-            filename: lastFilename,
             mergeNumber: mergeNumber,
             durationMs: finalDuration,
           });
@@ -196,7 +221,18 @@ export class AudioMerger {
       }
     }
 
-    return groups;
+    // Name every group in one pass: the chapter of a group is the chapter of
+    // its first chunk (a file boundary always closes the previous group).
+    const totalGroups = spans.length;
+    return spans.map((span) => ({
+      ...span,
+      ...generateGroupFilename(
+        filenameFor(fileNames, span.fromIndex),
+        span.mergeNumber,
+        totalGroups,
+        this.config.outputFormat,
+      ),
+    }));
   }
 
   /**
@@ -206,21 +242,16 @@ export class AudioMerger {
    */
   private async mergeAudioGroupAsync(
     ffmpegService: FFmpegService,
-    audioMap: Set<number>,
+    available: Set<number>,
     group: MergeGroup,
-    totalGroups: number,
     onProgress?: (message: string) => void,
   ): Promise<MergedFile | null> {
     const chunks: (Uint8Array | null)[] = [];
     let missingCount = 0;
 
-    if (!this.chunkStore) {
-      throw new Error('ChunkStore not configured');
-    }
-
     // Read chunks one by one from disk, null for missing
     for (let i = group.fromIndex; i <= group.toIndex; i++) {
-      if (audioMap.has(i)) {
+      if (available.has(i)) {
         try {
           const audio = await this.chunkStore.readChunk(i);
           chunks.push(audio);
@@ -244,13 +275,12 @@ export class AudioMerger {
 
     const processedAudio = await ffmpegService.processAudio(chunks, this.config.audio, onProgress);
 
-    const filename = this.generateGroupFilename(group, totalGroups, this.config.outputFormat);
-
     // Create a new Uint8Array to ensure it's a standard ArrayBuffer (not SharedArrayBuffer)
     const outputArray = new Uint8Array(processedAudio);
 
     return {
-      filename,
+      fileName: group.fileName,
+      folderName: group.folderName,
       blob: new Blob([outputArray], { type: 'audio/opus' }),
       fromIndex: group.fromIndex,
       toIndex: group.toIndex,
@@ -276,34 +306,12 @@ export class AudioMerger {
   }
 
   /**
-   * Generate the expected filename for a merge group
-   */
-  private generateGroupFilename(group: MergeGroup, totalGroups: number, extension: string): string {
-    const sanitizedName = sanitizeFilename(group.filename);
-
-    if (totalGroups === 1) {
-      return `${sanitizedName}.${extension}`;
-    }
-
-    const paddedNum = String(group.mergeNumber).padStart(4, '0');
-    return `${sanitizedName} ${paddedNum}.${extension}`;
-  }
-
-  /**
-   * Get folder name from group filename
-   */
-  private getFolderName(group: MergeGroup): string {
-    return sanitizeFilename(group.filename);
-  }
-
-  /**
    * Merge and save all audio immediately to disk
    * Each file is saved as soon as it's merged to minimize RAM usage
    * Returns the number of files saved
    */
   async mergeAndSave(
-    audioMap: Set<number>,
-    totalSentences: number,
+    chunkCount: number,
     fileNames: Array<[string, number]>,
     saveDirectoryHandle: FileSystemDirectoryHandle,
     onProgress?: (current: number, total: number, message: string) => void,
@@ -321,26 +329,23 @@ export class AudioMerger {
       throw new Error(`Directory permission check failed: ${(err as Error).message}`);
     }
 
-    const groups = await this.calculateMergeGroups(audioMap, totalSentences, fileNames);
+    const groups = await this.calculateMergeGroups(chunkCount, fileNames);
+
+    // Availability, fetched once and shared by every group below.
+    const available = this.chunkStore.getExistingIndices();
 
     // Pre-pass (sequential, cheap): check existing files, collect groups that need processing.
     const pending: MergeGroup[] = [];
     let skippedCount = 0;
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
-      const expectedFilename = this.generateGroupFilename(
-        group,
-        groups.length,
-        this.config.outputFormat,
-      );
-      const folderName = this.getFolderName(group);
       const fileExists = await this.fileExistsWithContent(
         saveDirectoryHandle,
-        expectedFilename,
-        folderName,
+        group.fileName,
+        group.folderName,
       );
       if (fileExists) {
-        onProgress?.(i + 1, groups.length, `Skipping existing file: ${expectedFilename}`);
+        onProgress?.(i + 1, groups.length, `Skipping existing file: ${group.fileName}`);
         skippedCount++;
         continue;
       }
@@ -383,18 +388,14 @@ export class AudioMerger {
               `Processing part ${groupOrder}/${groups.length} (~${durationMin} min)`,
             );
 
-            const merged = await this.mergeAudioGroupAsync(
-              svc,
-              audioMap,
-              group,
-              groups.length,
-              (msg) => onProgress?.(completed + 1, groups.length, msg),
+            const merged = await this.mergeAudioGroupAsync(svc, available, group, (msg) =>
+              onProgress?.(completed + 1, groups.length, msg),
             );
 
             if (merged) {
               // Save immediately (preserves low-RAM save-as-you-go)
               await this.saveToDirectory(merged, saveDirectoryHandle);
-              onProgress?.(completed + 1, groups.length, `Saved ${merged.filename}`);
+              onProgress?.(completed + 1, groups.length, `Saved ${merged.fileName}`);
               savedCount++;
             }
             completed++;
@@ -428,13 +429,10 @@ export class AudioMerger {
     directoryHandle: FileSystemDirectoryHandle,
   ): Promise<void> {
     await withPermissionRetry(directoryHandle, async () => {
-      // Extract folder name from filename (remove extension and part number)
-      const folderName = sanitizeFilename(
-        file.filename.replace(/\s+\d{4}\.(mp3|opus)$/, '').replace(/\.(mp3|opus)$/, ''),
-      );
-
-      const folderHandle = await directoryHandle.getDirectoryHandle(folderName, { create: true });
-      const fileHandle = await folderHandle.getFileHandle(file.filename, { create: true });
+      const folderHandle = await directoryHandle.getDirectoryHandle(file.folderName, {
+        create: true,
+      });
+      const fileHandle = await folderHandle.getFileHandle(file.fileName, { create: true });
       const writableStream = await fileHandle.createWritable();
       await writableStream.write(file.blob);
       await writableStream.close();

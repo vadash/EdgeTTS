@@ -1,13 +1,31 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AudioMerger, type MergerConfig } from './AudioMerger';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { AudioMerger, filenameFor, type MergerConfig } from './AudioMerger';
+import { ChunkStore } from './ChunkStore';
 import type { FFmpegService } from './FFmpegService';
-import type { ChunkStore } from './ChunkStore';
+import { createMockChunkIdb } from '@/test/mocks/MockChunkIdb';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 
-// We need to test that mergeAudioGroupSync strips headers.
-// Since mergeAudioGroupSync is private, we test via the public mergeAndSave path
-// with MP3 format (which uses sync merge).
-// Alternatively, test at integration level by checking output blob size.
+/**
+ * Fake MP3 bytes — duration parsing is irrelevant: file boundaries
+ * force 1-chunk-per-group in the boundary tests, instead of MP3 frame
+ * duration extrapolation.
+ */
+const fakeChunk = new Uint8Array([0xff, 0xf2, 0xa4, 0xc0, 0x00, 0x00, 0x00, 0x00]);
+
+/** Audio settings shared by every config below (all processing off). */
+const AUDIO_SETTINGS = {
+  silenceRemoval: false,
+  normalization: false,
+  deEss: false,
+  silenceGapMs: 0,
+  eq: false,
+  compressor: false,
+  fadeIn: false,
+  opusMinBitrate: 24,
+  opusMaxBitrate: 64,
+  opusCompressionLevel: 10,
+  mergeConcurrency: 2,
+};
 
 /**
  * Mock FFmpegService for the parallel-merge tests. Each instance's
@@ -19,8 +37,8 @@ interface MockFFmpegService {
   label: 'primary' | 'worker';
   started: string[];
   release: () => void;
-  processAudio: ReturnType<typeof vi.fn>;
-  terminate: ReturnType<typeof vi.fn>;
+  processAudio: Mock;
+  terminate: Mock;
 }
 
 /**
@@ -79,55 +97,50 @@ function createMockFFmpegService(label: 'primary' | 'worker', gate: StartGate): 
   } as unknown as MockFFmpegService;
 }
 
-describe('AudioMerger - parallel merge pool', () => {
+describe('AudioMerger', () => {
   let chunkStore: ChunkStore;
 
-  beforeEach(() => {
-    // Fake MP3 bytes — duration parsing is irrelevant: file boundaries
-    // force 1-chunk-per-group, instead of MP3 frame duration extrapolation.
-    const fakeChunk = new Uint8Array([0xff, 0xf2, 0xa4, 0xc0, 0x00, 0x00, 0x00, 0x00]);
-    chunkStore = {
-      init: vi.fn().mockResolvedValue(undefined),
-      append: vi.fn(),
-      prepareForRead: vi.fn().mockResolvedValue(undefined),
-      readChunk: vi.fn().mockResolvedValue(fakeChunk),
-      getExistingIndices: vi.fn().mockReturnValue(new Set<number>()),
-      close: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ChunkStore;
+  beforeEach(async () => {
+    // Real ChunkStore over an in-memory IDB (ADR-0016). The merger asks
+    // this store for availability; tests seed it like the TTS stage would.
+    chunkStore = new ChunkStore(createMockChunkIdb());
+    await chunkStore.init(createMockDirectoryHandle());
   });
+
+  function makeConfig(overrides?: Partial<MergerConfig>): MergerConfig {
+    return {
+      outputFormat: 'opus',
+      audio: AUDIO_SETTINGS,
+      chunkStore,
+      ...overrides,
+    };
+  }
+
+  /** Seeds the store with the given indices, mirroring TTS-stage writes. */
+  async function seedChunks(indices: number[]): Promise<void> {
+    for (const i of indices) {
+      await chunkStore.writeChunk(i, fakeChunk);
+    }
+    // Prod ordering: the orchestrator flushes the store before merging.
+    await chunkStore.prepareForRead();
+  }
 
   it('runs groups concurrently across a 2-instance pool and terminates only the factory workers', async () => {
     const gate = createStartGate();
     const primaryMock = createMockFFmpegService('primary', gate);
     const workerMock = createMockFFmpegService('worker', gate);
-
-    const config: MergerConfig = {
-      outputFormat: 'opus',
-      audio: {
-        silenceRemoval: false,
-        normalization: false,
-        deEss: false,
-        silenceGapMs: 0,
-        eq: false,
-        compressor: false,
-        fadeIn: false,
-        opusMinBitrate: 24,
-        opusMaxBitrate: 64,
-        opusCompressionLevel: 10,
-        mergeConcurrency: 2,
-      },
-      ffmpegFactory: () => workerMock as unknown as FFmpegService,
-      chunkStore,
-    };
-
-    const merger = new AudioMerger(primaryMock as unknown as FFmpegService, config);
+    const merger = new AudioMerger(
+      primaryMock as unknown as FFmpegService,
+      makeConfig({
+        ffmpegFactory: () => workerMock as unknown as FFmpegService,
+      }),
+    );
+    await seedChunks([0, 1, 2]);
 
     // File-boundary driven grouping: 'book1' for index 0, 'book2' for
     // indices 1..2. Both filenames share start index 1, so the first
     // boundary flips index 1 onward to 'book2' (index 0 stays 'book1').
     // Result: group [0,0]='book1', group [1,2]='book2' => 2 groups.
-    const audioMap = new Set<number>([0, 1, 2]);
-    const totalSentences = 3;
     const fileNames: Array<[string, number]> = [
       ['book1', 1],
       ['book2', 1],
@@ -141,13 +154,7 @@ describe('AudioMerger - parallel merge pool', () => {
 
     // Start mergeAndSave without awaiting — the pool workers block on their
     // controllable deferreds inside processAudio.
-    const donePromise = merger.mergeAndSave(
-      audioMap,
-      totalSentences,
-      fileNames,
-      saveDir,
-      onProgress,
-    );
+    const donePromise = merger.mergeAndSave(3, fileNames, saveDir, onProgress);
 
     // Wait deterministically until both pool workers have entered processAudio.
     await gate.promise;
@@ -178,43 +185,113 @@ describe('AudioMerger - parallel merge pool', () => {
   it('degrades to concurrency 1 with the injected singleton when no ffmpegFactory is set', async () => {
     const gate = createStartGate();
     const primaryMock = createMockFFmpegService('primary', gate);
+    const merger = new AudioMerger(primaryMock as unknown as FFmpegService, makeConfig());
+    await seedChunks([0, 1, 2]);
 
-    const config: MergerConfig = {
-      outputFormat: 'opus',
-      audio: {
-        silenceRemoval: false,
-        normalization: false,
-        deEss: false,
-        silenceGapMs: 0,
-        eq: false,
-        compressor: false,
-        fadeIn: false,
-        opusMinBitrate: 24,
-        opusMaxBitrate: 64,
-        opusCompressionLevel: 10,
-        mergeConcurrency: 2,
-      },
-      chunkStore,
-    };
-
-    const merger = new AudioMerger(primaryMock as unknown as FFmpegService, config);
-    const audioMap = new Set<number>([0, 1, 2]);
-    const totalSentences = 3;
     const fileNames: Array<[string, number]> = [
       ['book1', 1],
       ['book2', 1],
     ];
 
     primaryMock.release();
-    const savedCount = await merger.mergeAndSave(
-      audioMap,
-      totalSentences,
-      fileNames,
-      createMockDirectoryHandle(),
-    );
+    const savedCount = await merger.mergeAndSave(3, fileNames, createMockDirectoryHandle());
 
     // Only the injected singleton processed groups; no worker exists.
     expect(primaryMock.processAudio).toHaveBeenCalledTimes(2);
     expect(savedCount).toBe(2);
+  });
+
+  it('covers exactly chunkCount indices, turning store gaps into silence placeholders', async () => {
+    const primaryMock = createMockFFmpegService('primary', createStartGate());
+    primaryMock.release();
+    const merger = new AudioMerger(primaryMock as unknown as FFmpegService, makeConfig());
+    // Sparse store: only 0 and 2 of 0..3 exist. No file boundaries, so all
+    // of 0..3 lands in one group; the gaps must become silence placeholders.
+    await seedChunks([0, 2]);
+
+    const savedCount = await merger.mergeAndSave(4, [['book1', 4]], createMockDirectoryHandle());
+
+    expect(savedCount).toBe(1);
+    expect(primaryMock.processAudio).toHaveBeenCalledTimes(1);
+    const [chunksArg] = primaryMock.processAudio.mock.calls[0] as [(Uint8Array | null)[]];
+    expect(chunksArg).toEqual([fakeChunk, null, fakeChunk, null]);
+  });
+
+  it('iterates chunkCount, not the store size', async () => {
+    const primaryMock = createMockFFmpegService('primary', createStartGate());
+    primaryMock.release();
+    const merger = new AudioMerger(primaryMock as unknown as FFmpegService, makeConfig());
+    // The store holds 3 chunks but the Book only has 2: the merge must cover
+    // exactly 0..chunkCount-1 and never read past the honest count.
+    await seedChunks([0, 1, 2]);
+
+    const savedCount = await merger.mergeAndSave(2, [['book1', 2]], createMockDirectoryHandle());
+
+    expect(savedCount).toBe(1);
+    expect(primaryMock.processAudio).toHaveBeenCalledTimes(1);
+    const [chunksArg] = primaryMock.processAudio.mock.calls[0] as [(Uint8Array | null)[]];
+    expect(chunksArg).toEqual([fakeChunk, fakeChunk]);
+  });
+
+  it('saves each merged group at its composed folderName/fileName', async () => {
+    const primaryMock = createMockFFmpegService('primary', createStartGate());
+    primaryMock.release();
+    const merger = new AudioMerger(primaryMock as unknown as FFmpegService, makeConfig());
+    await seedChunks([0, 1, 2]);
+
+    // 'My: Chapter' owns index 0, 'Beta' owns 1..2 (both boundaries at 1).
+    // Two groups => padded part numbers on every saved file.
+    const saveDir = createMockDirectoryHandle();
+    const savedCount = await merger.mergeAndSave(
+      3,
+      [
+        ['My: Chapter', 1],
+        ['Beta', 1],
+      ],
+      saveDir,
+    );
+
+    expect(savedCount).toBe(2);
+
+    // The saved path must be the composed folderName/fileName pair — no
+    // regex round-trip over the filename. Both lookups throw if the file
+    // landed anywhere else.
+    const chapter = await saveDir.getDirectoryHandle('My_ Chapter');
+    expect(await chapter.getFileHandle('My_ Chapter 0001.opus')).toBeTruthy();
+    const beta = await saveDir.getDirectoryHandle('Beta');
+    expect(await beta.getFileHandle('Beta 0001.opus')).toBeTruthy();
+  });
+});
+
+describe('filenameFor', () => {
+  const fileNames: Array<[string, number]> = [
+    ['book1', 1],
+    ['book2', 3],
+  ];
+
+  it('falls back to "audio" when the chapter table is empty', () => {
+    expect(filenameFor([], 0)).toBe('audio');
+    expect(filenameFor([], 7)).toBe('audio');
+  });
+
+  it('flips to the next chapter exactly at its boundary index', () => {
+    expect(filenameFor(fileNames, 0)).toBe('book1');
+    expect(filenameFor(fileNames, 2)).toBe('book1');
+    expect(filenameFor(fileNames, 3)).toBe('book2');
+  });
+
+  it('never applies a boundary at index 0', () => {
+    // The `boundaryIndex > 0` guard stops the walk at the zero entry.
+    const zeroFirst: Array<[string, number]> = [
+      ['x', 0],
+      ['y', 2],
+    ];
+    expect(filenameFor(zeroFirst, 0)).toBe('x');
+    expect(filenameFor(zeroFirst, 1)).toBe('x');
+    expect(filenameFor(zeroFirst, 2)).toBe('x');
+  });
+
+  it('keeps the last chapter past the final boundary', () => {
+    expect(filenameFor(fileNames, 99)).toBe('book2');
   });
 });
