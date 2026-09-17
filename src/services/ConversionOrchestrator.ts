@@ -4,7 +4,6 @@
 import { defaultConfig } from '@/config';
 import {
   AppError,
-  CancellationError,
   getErrorMessage,
   insufficientVoicesError,
   noContentError,

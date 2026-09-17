@@ -2,20 +2,11 @@
 // Re-exports the store surface consumed by components and hooks
 
 // Conversion store
-export {
-  cancelResume,
-  clearTabBlocked,
-  confirmResume,
-  conversion,
-  resumeInfo,
-} from './ConversionStore';
+export { clearTabBlocked, conversion } from './ConversionStore';
 // LLM store
-export {
-  cancelReview,
-  confirmReview,
-  isConfigured,
-  pendingReview,
-} from './LLMStore';
+export { isConfigured } from './LLMStore';
+// Gates
+export { resumeGate, reviewGate, type ReviewDraft } from './gates';
 // Settings store
 export {
   patchSettings,

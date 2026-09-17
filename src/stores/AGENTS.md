@@ -8,6 +8,7 @@ Global state bound to the UI with signals.
 - Two stores wrap their signals in classes, for data and language.
 - The logger store lives with the services and is re-exported here.
 - A context module bundles the stores for hook access.
+- `gates.ts` holds the Review gate and Resume gate (one `createGate` factory). UI pauses resolve through a gate; stores keep plain setters.
 
 ## Rules
 

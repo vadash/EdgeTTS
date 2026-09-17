@@ -10,20 +10,21 @@ import { useVoicePreview } from '@/hooks/useVoicePreview';
 import { importProfile } from '@/services/llm/VoiceProfile';
 import { assignUnmatchedFromPool, randomizeBelow } from '@/services/VoiceAllocator';
 import type { VoiceProfileFile } from '@/state/types';
-import { useData, useLLM, useLogs, useSettings } from '@/stores';
+import { type ReviewDraft, useData, useLogs, useSettings } from '@/stores';
 import { readJSONFile } from '@/utils/file';
 import { VoicePicker } from './VoicePicker';
 
 interface VoiceReviewModalProps {
+  draft: ReviewDraft;
+  patch: (partial: Partial<ReviewDraft>) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
 const sampleText = signal('Hello, I am testing this voice.');
 
-export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps) {
+export function VoiceReviewModal({ draft, patch, onConfirm, onCancel }: VoiceReviewModalProps) {
   const settings = useSettings();
-  const llm = useLLM();
   const logs = useLogs();
   const data = useData();
   const preview = useVoicePreview();
@@ -31,9 +32,9 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
   const [importError, setImportError] = useState<string | null>(null);
   const [mergeTarget, setMergeTarget] = useState<Record<string, string>>({});
 
-  const characters = llm.detectedCharacters.value;
-  const voiceMap = llm.characterVoiceMap.value;
-  const lineCounts = llm.characterLineCounts.value;
+  const characters = draft.characters;
+  const voiceMap = draft.voiceMap;
+  const lineCounts = draft.lineCounts;
 
   // Sort characters by line count (more lines = more prominent)
   const sortedCharacters = [...characters].sort((a, b) => {
@@ -53,29 +54,27 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
 
   const handleVoiceChange = (characterName: string, newVoice: string) => {
     const oldVoice = voiceMap.get(characterName) ?? '';
+    if (oldVoice === newVoice) return;
 
     // Find current character's index in sorted list
     const currentIndex = sortedCharacters.findIndex((c) => c.canonicalName === characterName);
 
-    // Look for characters BELOW that have the newVoice and swap them
-    if (currentIndex >= 0 && oldVoice !== newVoice) {
-      const newMap = new Map(voiceMap);
-      newMap.set(characterName, newVoice);
+    const newMap = new Map(voiceMap);
+    newMap.set(characterName, newVoice);
 
-      // Find first character below that has the newVoice
+    // Look for the first character BELOW that has the newVoice and swap:
+    // give them the old voice. Only swap one.
+    if (currentIndex >= 0) {
       for (let i = currentIndex + 1; i < sortedCharacters.length; i++) {
         const belowChar = sortedCharacters[i];
         if (newMap.get(belowChar.canonicalName) === newVoice) {
-          // Swap: give them the old voice
           newMap.set(belowChar.canonicalName, oldVoice);
-          break; // Only swap one
+          break;
         }
       }
-
-      llm.setVoiceMap(newMap);
-    } else {
-      llm.updateVoiceMapping(characterName, newVoice);
     }
+
+    patch({ voiceMap: newMap });
   };
 
   const handlePlayPreview = (voiceId: string) => {
@@ -98,24 +97,32 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
       lineCounts,
       true,
     );
-    llm.setVoiceMap(newMap);
+    patch({ voiceMap: newMap });
   };
 
   // Merge the `dropName` character into `keepName`: keep's name/gender/voice survive,
   // drop's variations plus its canonicalName are appended (deduped). Indexes resolve
-  // against the unsorted detectedCharacters array, NOT sortedCharacters display order.
+  // against the unsorted characters array, NOT sortedCharacters display order.
   const handleMerge = (keepName: string, dropName: string) => {
-    const all = llm.detectedCharacters.value;
+    const all = draft.characters;
     const keepIdx = all.findIndex((c) => c.canonicalName === keepName);
     const dropIdx = all.findIndex((c) => c.canonicalName === dropName);
     if (keepIdx < 0 || dropIdx < 0 || keepIdx === dropIdx) return;
-    const keep = all[keepIdx];
     const drop = all[dropIdx];
-    llm.updateCharacter(keepIdx, {
-      variations: [...new Set([...keep.variations, ...drop.variations, drop.canonicalName])],
-    });
-    llm.removeCharacter(dropIdx);
-    llm.removeVoiceMapping(dropName);
+
+    const mergedCharacters = all.map((c, i) =>
+      i === keepIdx
+        ? {
+            ...c,
+            variations: [...new Set([...c.variations, ...drop.variations, drop.canonicalName])],
+          }
+        : c,
+    );
+    mergedCharacters.splice(dropIdx, 1);
+    const mergedVoiceMap = new Map(voiceMap);
+    mergedVoiceMap.delete(dropName);
+
+    patch({ characters: mergedCharacters, voiceMap: mergedVoiceMap });
     setMergeTarget((prev) => ({ ...prev, [keepName]: '' }));
     logs.info(`Merged "${dropName}" into "${keepName}"`);
   };
@@ -147,11 +154,10 @@ export function VoiceReviewModal({ onConfirm, onCancel }: VoiceReviewModalProps)
         settings.narratorVoice.value,
         data.detectedLanguage.value,
       );
-      llm.setVoiceMap(newMap);
 
       // Store the parsed profile for cumulative merge during export
       const parsed = JSON.parse(json) as VoiceProfileFile;
-      llm.setLoadedProfile(parsed);
+      patch({ voiceMap: newMap, profile: parsed });
 
       // Count how many imported voices were not in enabled list
       const enabledSet = new Set(enabledVoices);

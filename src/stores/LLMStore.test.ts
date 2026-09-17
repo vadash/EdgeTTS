@@ -1,29 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CancellationError } from '@/errors';
-import type { LLMCharacter } from '@/state/types';
 import {
-  awaitReview,
-  cancelReview,
   characterLineCounts,
-  confirmReview,
   isConfigured,
   isProcessing,
   llm,
-  removeCharacter,
-  removeVoiceMapping,
   resetLLMStore,
   resetProcessingState,
   setBlockProgress,
   setCharacters,
   setError,
-  setPendingReview,
   setProcessingStatus,
   setSpeakerAssignments,
   setStageConfig,
   setStageField,
   setVoiceMap,
-  updateCharacter,
-  updateVoiceMapping,
 } from './LLMStore';
 
 // Mock SecureStorage
@@ -112,32 +102,6 @@ describe('LLMStore', () => {
     });
   });
 
-  describe('character data actions', () => {
-    const mockCharacter: LLMCharacter = {
-      canonicalName: 'Alice',
-      gender: 'female',
-      variations: ['Алиса'],
-    };
-
-    it('updates character', () => {
-      setCharacters([mockCharacter]);
-      updateCharacter(0, { canonicalName: 'Alicia' });
-      expect(llm.value.detectedCharacters[0].canonicalName).toBe('Alicia');
-    });
-
-    it('does not update character at invalid index', () => {
-      setCharacters([mockCharacter]);
-      updateCharacter(5, { canonicalName: 'Changed' });
-      expect(llm.value.detectedCharacters[0].canonicalName).toBe('Alice');
-    });
-
-    it('removes character', () => {
-      setCharacters([mockCharacter]);
-      removeCharacter(0);
-      expect(llm.value.detectedCharacters).toEqual([]);
-    });
-  });
-
   describe('voice map actions', () => {
     it('sets voice map', () => {
       const map = new Map([
@@ -147,12 +111,6 @@ describe('LLMStore', () => {
       setVoiceMap(map);
       expect(llm.value.characterVoiceMap.get('Alice')).toBe('voice-1');
       expect(llm.value.characterVoiceMap.get('Bob')).toBe('voice-2');
-    });
-
-    it('removes voice mapping', () => {
-      updateVoiceMapping('Alice', 'voice-1');
-      removeVoiceMapping('Alice');
-      expect(llm.value.characterVoiceMap.has('Alice')).toBe(false);
     });
   });
 
@@ -190,28 +148,6 @@ describe('LLMStore', () => {
     });
   });
 
-  describe('voice review', () => {
-    it('sets pending review', () => {
-      setPendingReview(true);
-      expect(llm.value.pendingReview).toBe(true);
-      expect(llm.value.processingStatus).toBe('review');
-    });
-
-    it('resolves awaitReview when confirmed', async () => {
-      setPendingReview(true);
-      const promise = awaitReview();
-      confirmReview();
-      await expect(promise).resolves.toBeUndefined();
-    });
-
-    it('rejects awaitReview with CancellationError when cancelled', async () => {
-      setPendingReview(true);
-      const promise = awaitReview();
-      cancelReview();
-      await expect(promise).rejects.toBeInstanceOf(CancellationError);
-    });
-  });
-
   describe('state management', () => {
     it('resets processing state but keeps settings', () => {
       setStageField('extract', 'apiKey', 'sk-key');
@@ -219,7 +155,7 @@ describe('LLMStore', () => {
       setBlockProgress(5, 10);
       setError('Error');
       setCharacters([{ canonicalName: 'Alice', gender: 'female', variations: [] }]);
-      updateVoiceMapping('Alice', 'voice-1');
+      setVoiceMap(new Map([['Alice', 'voice-1']]));
 
       resetProcessingState();
 

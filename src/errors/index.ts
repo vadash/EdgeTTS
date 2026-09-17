@@ -160,7 +160,7 @@ export class AppError extends Error {
  */
 export class CancellationError extends AppError {
   constructor(message?: string) {
-    super('CONVERSION_CANCELLED', message ?? errorMessages['CONVERSION_CANCELLED']);
+    super('CONVERSION_CANCELLED', message ?? errorMessages.CONVERSION_CANCELLED);
     this.name = 'CancellationError';
   }
 }

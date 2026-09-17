@@ -3,17 +3,10 @@
 
 import { computed, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
-import { CancellationError } from '@/errors';
 import type { LoggerStore } from '@/services/Logger';
 import { decryptValue, encryptValue } from '@/services/SecureStorage';
 import { saveJSON } from './persistence';
-import type {
-  LLMCharacter,
-  ReasoningLevel,
-  SpeakerAssignment,
-  StageConfig,
-  VoiceProfileFile,
-} from '@/state/types';
+import type { LLMCharacter, SpeakerAssignment, StageConfig, VoiceProfileFile } from '@/state/types';
 
 // ============================================================================
 // Types
@@ -49,7 +42,6 @@ interface LLMState {
   characterVoiceMap: Map<string, string>;
   speakerAssignments: SpeakerAssignment[];
   loadedProfile: VoiceProfileFile | null;
-  pendingReview: boolean;
 }
 
 // ============================================================================
@@ -86,7 +78,6 @@ const defaultTransientState = {
   characterVoiceMap: new Map<string, string>(),
   speakerAssignments: [],
   loadedProfile: null,
-  pendingReview: false,
 };
 
 // ============================================================================
@@ -103,8 +94,6 @@ export const characterVoiceMap = computed(() => llm.value.characterVoiceMap);
 export const loadedProfile = computed(() => llm.value.loadedProfile);
 
 // Export computed for nested state access
-export const pendingReview = computed(() => llm.value.pendingReview);
-export const detectedCharacters = computed(() => llm.value.detectedCharacters);
 export const speakerAssignments = computed(() => llm.value.speakerAssignments);
 export const processingStatus = computed(() => llm.value.processingStatus);
 export const error = computed(() => llm.value.error);
@@ -115,10 +104,6 @@ export const merge = computed(() => llm.value.merge);
 export const assign = computed(() => llm.value.assign);
 export const backup = computed(() => llm.value.backup);
 export const useVoting = computed(() => llm.value.useVoting);
-
-// Review promise resolvers (not persisted)
-let reviewResolver: (() => void) | null = null;
-let reviewRejecter: ((reason: Error) => void) | null = null;
 
 // ============================================================================
 // Computed Properties
@@ -288,34 +273,8 @@ export function setCharacters(characters: LLMCharacter[]): void {
   patchState({ detectedCharacters: characters });
 }
 
-export function updateCharacter(index: number, updates: Partial<LLMCharacter>): void {
-  const characters = [...llm.value.detectedCharacters];
-  if (index >= 0 && index < characters.length) {
-    characters[index] = { ...characters[index], ...updates };
-    patchState({ detectedCharacters: characters });
-  }
-}
-
-export function removeCharacter(index: number): void {
-  const characters = [...llm.value.detectedCharacters];
-  characters.splice(index, 1);
-  patchState({ detectedCharacters: characters });
-}
-
 export function setVoiceMap(map: Map<string, string>): void {
   patchState({ characterVoiceMap: new Map(map) });
-}
-
-export function updateVoiceMapping(characterName: string, voiceId: string): void {
-  const map = new Map(llm.value.characterVoiceMap);
-  map.set(characterName, voiceId);
-  patchState({ characterVoiceMap: map });
-}
-
-export function removeVoiceMapping(characterName: string): void {
-  const map = new Map(llm.value.characterVoiceMap);
-  map.delete(characterName);
-  patchState({ characterVoiceMap: map });
 }
 
 export function setSpeakerAssignments(assignments: SpeakerAssignment[]): void {
@@ -324,38 +283,6 @@ export function setSpeakerAssignments(assignments: SpeakerAssignment[]): void {
 
 export function setLoadedProfile(profile: VoiceProfileFile | null): void {
   patchState({ loadedProfile: profile });
-}
-
-// ============================================================================
-// Public API - Voice Review Actions
-// ============================================================================
-
-export function setPendingReview(value: boolean): void {
-  patchState({
-    pendingReview: value,
-    processingStatus: value ? 'review' : llm.value.processingStatus,
-  });
-}
-
-export function awaitReview(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    reviewResolver = resolve;
-    reviewRejecter = reject;
-  });
-}
-
-export function confirmReview(): void {
-  patchState({ pendingReview: false });
-  reviewResolver?.();
-  reviewResolver = null;
-  reviewRejecter = null;
-}
-
-export function cancelReview(): void {
-  patchState({ pendingReview: false });
-  reviewRejecter?.(new CancellationError());
-  reviewResolver = null;
-  reviewRejecter = null;
 }
 
 // ============================================================================

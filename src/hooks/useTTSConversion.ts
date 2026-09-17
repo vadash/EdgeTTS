@@ -11,7 +11,7 @@ import {
 import { getKeepAwake, KeepAwake } from '@/services/KeepAwake';
 import { type ProcessedBook, STAGE_STATUS } from '@/state/types';
 import type { Stores } from '@/stores';
-import { useStores } from '@/stores';
+import { resumeGate, reviewGate, useStores } from '@/stores';
 import {
   isProcessing,
   patchState,
@@ -138,20 +138,19 @@ export function useTTSConversion(): UseTTSConversionResult {
           setPhaseBaseline: (count) => stores.conversion.setPhaseBaseline(count),
         },
         review: {
-          open: async (characters, voiceMap, assignments) => {
-            stores.llm.setCharacters(characters);
-            stores.llm.setVoiceMap(voiceMap);
-            stores.llm.setSpeakerAssignments(assignments);
-            stores.llm.setPendingReview(true);
-            await stores.llm.awaitReview();
-            return {
-              voiceMap: stores.llm.characterVoiceMap.value,
+          open: (characters, voiceMap, assignments) => {
+            stores.llm.setProcessingStatus('review');
+            return reviewGate.open({
+              characters,
+              voiceMap,
+              assignments,
               profile: stores.llm.loadedProfile.value,
-            };
+              lineCounts: stores.llm.characterLineCounts.value,
+            });
           },
         },
         resume: {
-          confirm: (info) => stores.conversion.awaitResumeConfirmation(info),
+          confirm: (info) => resumeGate.open(info),
         },
         run: {
           begin: () => {

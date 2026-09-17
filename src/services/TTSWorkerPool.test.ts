@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { CancellationError } from '@/errors';
 import type { TTSConfig as VoiceConfig } from '@/state/types';
-import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 import type { ChunkStore } from './ChunkStore';
 import {
   type PoolOutcome,

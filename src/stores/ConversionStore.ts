@@ -42,7 +42,6 @@ interface ConversionState {
   phaseStartTime: number | null;
   phaseStartProgress: number;
   error: ConversionError | null;
-  resumeInfo: ResumeInfo | null;
   tabBlocked: boolean;
   activeLlmWorkers: number;
   activeTtsWorkers: number;
@@ -59,7 +58,6 @@ const defaultState: ConversionState = {
   phaseStartTime: null,
   phaseStartProgress: 0,
   error: null,
-  resumeInfo: null,
   tabBlocked: false,
   activeLlmWorkers: 0,
   activeTtsWorkers: 0,
@@ -70,8 +68,6 @@ const defaultState: ConversionState = {
 // ============================================================================
 
 export const conversion = signal<ConversionState>({ ...defaultState });
-
-let resumeResolve: ((confirmed: boolean) => void) | null = null;
 
 // ============================================================================
 // Computed Properties
@@ -87,7 +83,6 @@ export const progress = computed(() => conversion.value.progress);
 // Export computed for nested state access
 export const status = computed(() => conversion.value.status);
 export const error = computed(() => conversion.value.error);
-export const resumeInfo = computed(() => conversion.value.resumeInfo);
 export const activeLlmWorkers = computed(() => conversion.value.activeLlmWorkers);
 export const activeTtsWorkers = computed(() => conversion.value.activeTtsWorkers);
 
@@ -201,27 +196,8 @@ export function resetConversionStore(): void {
 }
 
 // ============================================================================
-// Public API - Resume State
+// Public API - Phase State
 // ============================================================================
-
-export function awaitResumeConfirmation(info: ResumeInfo): Promise<boolean> {
-  patchState({ resumeInfo: info });
-  return new Promise<boolean>((resolve) => {
-    resumeResolve = resolve;
-  });
-}
-
-export function confirmResume(): void {
-  resumeResolve?.(true);
-  patchState({ resumeInfo: null });
-  resumeResolve = null;
-}
-
-export function cancelResume(): void {
-  resumeResolve?.(false);
-  patchState({ resumeInfo: null });
-  resumeResolve = null;
-}
 
 export function setPhaseBaseline(count: number): void {
   patchState({ phaseStartProgress: count });

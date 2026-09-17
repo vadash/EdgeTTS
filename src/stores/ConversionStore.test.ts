@@ -2,11 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   activeLlmWorkers,
   activeTtsWorkers,
-  awaitResumeConfirmation,
   cancel,
-  cancelResume,
   complete,
-  confirmResume,
   conversion,
   estimatedTimeRemaining,
   isProcessing,
@@ -185,28 +182,6 @@ describe('ConversionStore', () => {
     it('returns null for idle status', () => {
       updateProgress(10, 100);
       expect(estimatedTimeRemaining.value).toBeNull();
-    });
-  });
-
-  describe('resume confirmation', () => {
-    it('resolves promise when confirmed', async () => {
-      const info = { cachedChunks: 5, hasLLMState: true };
-      const promise = awaitResumeConfirmation(info);
-
-      expect(conversion.value.resumeInfo).toEqual(info);
-
-      confirmResume();
-      await expect(promise).resolves.toBe(true);
-      expect(conversion.value.resumeInfo).toBeNull();
-    });
-
-    it('resolves promise when cancelled', async () => {
-      const info = { cachedChunks: 5, hasLLMState: true };
-      const promise = awaitResumeConfirmation(info);
-
-      cancelResume();
-      await expect(promise).resolves.toBe(false);
-      expect(conversion.value.resumeInfo).toBeNull();
     });
   });
 

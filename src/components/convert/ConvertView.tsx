@@ -1,13 +1,5 @@
 import { StatusPanel } from '@/components/status';
-import {
-  cancelResume,
-  cancelReview,
-  confirmResume,
-  confirmReview,
-  isConfigured,
-  pendingReview,
-  resumeInfo,
-} from '@/stores';
+import { isConfigured, resumeGate, reviewGate } from '@/stores';
 import { Text } from 'preact-i18n';
 import { NotificationBanner } from '@/components/common';
 import { isEdgeBrowser } from '@/stores/UISettingsStore';
@@ -87,16 +79,21 @@ export function ConvertView() {
       </div>
 
       {/* Voice Review Modal */}
-      {pendingReview.value && (
-        <VoiceReviewModal onConfirm={() => confirmReview()} onCancel={() => cancelReview()} />
+      {reviewGate.state.value.open && reviewGate.state.value.draft && (
+        <VoiceReviewModal
+          draft={reviewGate.state.value.draft}
+          patch={(partial) => reviewGate.patch(partial)}
+          onConfirm={() => reviewGate.confirm()}
+          onCancel={() => reviewGate.decline()}
+        />
       )}
 
       {/* Resume Modal */}
-      {resumeInfo.value && (
+      {resumeGate.state.value.open && resumeGate.state.value.draft && (
         <ResumeModal
-          info={resumeInfo.value}
-          onContinue={() => confirmResume()}
-          onCancel={() => cancelResume()}
+          info={resumeGate.state.value.draft}
+          onContinue={() => resumeGate.confirm()}
+          onCancel={() => resumeGate.decline()}
         />
       )}
     </div>

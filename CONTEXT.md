@@ -32,6 +32,14 @@ _Avoid_: audio config, filter chain config
 **Failure log**:
 The file where permanently failed chunks are recorded.
 
+**Review gate**:
+The pause mid-Conversion where the user confirms or edits the draft Voice map. The draft lives in the gate; the store is written once on confirm.
+_Avoid_: pendingReview, voice review modal state
+
+**Resume gate**:
+The pause asking whether to continue a previous Conversion from the Chunk store. Declining starts fresh; decline is an answer, not a cancellation.
+_Avoid_: resumeInfo, resume modal state
+
 ### LLM passes
 
 **Extract**:
