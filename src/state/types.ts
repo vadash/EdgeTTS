@@ -55,20 +55,10 @@ export interface AppSettings {
   lexxRegister: boolean;
   // Audio processing settings
   outputFormat: 'opus';
-  silenceRemovalEnabled: boolean;
-  normalizationEnabled: boolean;
-  deEssEnabled: boolean;
-  silenceGapMs: number;
-  // Broadcast voice audio enhancement
-  eqEnabled: boolean;
-  compressorEnabled: boolean;
-  fadeInEnabled: boolean;
-  // Opus encoding settings
+  // Opus encoding preset (bitrate/compression detail lives in audio)
   opusPreset: AudioPreset;
-  opusMinBitrate: number;
-  opusMaxBitrate: number;
-  opusCompressionLevel: number;
-  mergeConcurrency: number;
+  /** Audio tab processing + encoding settings, carried as one object into the merge */
+  audio: AudioSettings;
 }
 
 /**

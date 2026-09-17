@@ -1,7 +1,12 @@
 import { useRef, useState } from 'preact/hooks';
 import { Text } from 'preact-i18n';
 import { Button, Callout } from '@/components/common';
-import { STAGE_EXPORT_FIELDS, type AppSettings, type StageConfig } from '@/state/types';
+import {
+  STAGE_EXPORT_FIELDS,
+  type AppSettings,
+  type AudioSettings,
+  type StageConfig,
+} from '@/state/types';
 import { useData, useLLM, useLogs, useSettings } from '@/stores';
 import { downloadFile } from '@/utils/file';
 import type { LLMStage } from '@/stores/LLMStore';
@@ -100,10 +105,28 @@ export function ExportImportTab() {
       if (s.llmThreads !== undefined) settings.setLlmThreads(s.llmThreads as number);
       // outputFormat is always 'opus' now, skip importing
 
-      if (s.silenceRemovalEnabled !== undefined)
-        settings.setSilenceRemovalEnabled(s.silenceRemovalEnabled as boolean);
-      if (s.normalizationEnabled !== undefined)
-        settings.setNormalizationEnabled(s.normalizationEnabled as boolean);
+      // Audio settings: accept both the nested `audio` shape and the legacy
+      // flat keys from pre-nesting exports.
+      const nested = (s.audio ?? {}) as Record<string, unknown>;
+      const flat = s as Record<string, unknown>;
+      const audioPatch: Partial<AudioSettings> = {};
+      const pickAudio = (key: keyof AudioSettings, flatKey: string): void => {
+        const value = nested[key] ?? flat[flatKey];
+        if (value !== undefined) (audioPatch as Record<string, unknown>)[key] = value;
+      };
+      pickAudio('silenceRemoval', 'silenceRemovalEnabled');
+      pickAudio('normalization', 'normalizationEnabled');
+      pickAudio('deEss', 'deEssEnabled');
+      pickAudio('silenceGapMs', 'silenceGapMs');
+      pickAudio('eq', 'eqEnabled');
+      pickAudio('compressor', 'compressorEnabled');
+      pickAudio('fadeIn', 'fadeInEnabled');
+      pickAudio('opusMinBitrate', 'opusMinBitrate');
+      pickAudio('opusMaxBitrate', 'opusMaxBitrate');
+      pickAudio('opusCompressionLevel', 'opusCompressionLevel');
+      pickAudio('mergeConcurrency', 'mergeConcurrency');
+      if (Object.keys(audioPatch).length > 0) settings.patchAudio(audioPatch);
+
       if (s.lexxRegister !== undefined) settings.setLexxRegister(s.lexxRegister as boolean);
 
       // Import LLM settings (excluding API key)

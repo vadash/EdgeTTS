@@ -2,8 +2,9 @@
 // Manages user preferences and application settings
 
 import { computed, effect, signal } from '@preact/signals';
+import { defaultAudioSettings } from '@/config';
 import { StorageKeys } from '@/config/storage';
-import type { AppSettings, AudioPreset } from '@/state/types';
+import type { AppSettings, AudioPreset, AudioSettings } from '@/state/types';
 import { AUDIO_PRESETS } from '@/state/types';
 import { loadJSON, saveJSON } from './persistence';
 
@@ -63,19 +64,52 @@ const defaultSettings: AppSettings = {
   llmThreads: 2,
   lexxRegister: true,
   outputFormat: 'opus',
-  silenceRemovalEnabled: true,
-  normalizationEnabled: true,
-  deEssEnabled: true,
-  silenceGapMs: 100,
-  eqEnabled: false,
-  compressorEnabled: false,
-  fadeInEnabled: true,
   opusPreset: 'pc' as AudioPreset,
-  opusMinBitrate: 24,
-  opusMaxBitrate: 48,
-  opusCompressionLevel: 10,
-  mergeConcurrency: 2,
+  audio: defaultAudioSettings,
 };
+
+// Legacy flat audio keys -> AudioSettings field names. The fold is kept forever
+// so saves written before the nested shape keep loading.
+const LEGACY_AUDIO_KEYS = {
+  silenceRemovalEnabled: 'silenceRemoval',
+  normalizationEnabled: 'normalization',
+  deEssEnabled: 'deEss',
+  silenceGapMs: 'silenceGapMs',
+  eqEnabled: 'eq',
+  compressorEnabled: 'compressor',
+  fadeInEnabled: 'fadeIn',
+  opusMinBitrate: 'opusMinBitrate',
+  opusMaxBitrate: 'opusMaxBitrate',
+  opusCompressionLevel: 'opusCompressionLevel',
+  mergeConcurrency: 'mergeConcurrency',
+} as const;
+
+/** Collect legacy flat audio values still present on a loaded settings object. */
+function foldLegacyFlatAudio(s: AppSettings): Partial<AudioSettings> {
+  const flat = s as unknown as Record<string, unknown>;
+  const folded: Partial<AudioSettings> = {};
+  for (const [flatKey, audioKey] of Object.entries(LEGACY_AUDIO_KEYS)) {
+    const value = flat[flatKey];
+    if (value !== undefined) {
+      (folded as Record<string, unknown>)[audioKey] = value;
+    }
+  }
+  return folded;
+}
+
+/**
+ * Normalize loaded settings to the nested `audio` shape:
+ * - Fold: legacy saves (no `audio` of their own) map flat keys into `audio`.
+ *   loadJSON shallow-merges over defaults, so such saves leave `audio` pointing
+ *   at the shared default object; migrated saves bring their own parsed object.
+ * - Merge depth: `audio` always merges one level over the defaults so partial
+ *   nested saves gain fields added later.
+ */
+function normalizeAudio(s: AppSettings): AppSettings {
+  const override: Partial<AudioSettings> =
+    s.audio !== defaultAudioSettings ? s.audio : foldLegacyFlatAudio(s);
+  return { ...s, audio: { ...defaultAudioSettings, ...override } };
+}
 
 function loadFromStorage(): AppSettings {
   const parsed = loadJSON(StorageKeys.settings, defaultSettings);
@@ -83,7 +117,7 @@ function loadFromStorage(): AppSettings {
   if (parsed.enabledVoices && parsed.enabledVoices.length === 0) {
     parsed.enabledVoices = [...DEFAULT_ENABLED_VOICES];
   }
-  return parsed;
+  return normalizeAudio(parsed);
 }
 
 // ============================================================================
@@ -110,18 +144,18 @@ export const ttsThreads = computed(() => settings.value.ttsThreads);
 export const llmThreads = computed(() => settings.value.llmThreads);
 export const lexxRegister = computed(() => settings.value.lexxRegister);
 export const outputFormat = computed(() => settings.value.outputFormat);
-export const silenceRemovalEnabled = computed(() => settings.value.silenceRemovalEnabled);
-export const normalizationEnabled = computed(() => settings.value.normalizationEnabled);
-export const deEssEnabled = computed(() => settings.value.deEssEnabled);
-export const silenceGapMs = computed(() => settings.value.silenceGapMs);
-export const eqEnabled = computed(() => settings.value.eqEnabled);
-export const compressorEnabled = computed(() => settings.value.compressorEnabled);
-export const fadeInEnabled = computed(() => settings.value.fadeInEnabled);
+export const silenceRemovalEnabled = computed(() => settings.value.audio.silenceRemoval);
+export const normalizationEnabled = computed(() => settings.value.audio.normalization);
+export const deEssEnabled = computed(() => settings.value.audio.deEss);
+export const silenceGapMs = computed(() => settings.value.audio.silenceGapMs);
+export const eqEnabled = computed(() => settings.value.audio.eq);
+export const compressorEnabled = computed(() => settings.value.audio.compressor);
+export const fadeInEnabled = computed(() => settings.value.audio.fadeIn);
 export const opusPreset = computed(() => settings.value.opusPreset);
-export const opusMinBitrate = computed(() => settings.value.opusMinBitrate);
-export const opusMaxBitrate = computed(() => settings.value.opusMaxBitrate);
-export const opusCompressionLevel = computed(() => settings.value.opusCompressionLevel);
-export const mergeConcurrency = computed(() => settings.value.mergeConcurrency);
+export const opusMinBitrate = computed(() => settings.value.audio.opusMinBitrate);
+export const opusMaxBitrate = computed(() => settings.value.audio.opusMaxBitrate);
+export const opusCompressionLevel = computed(() => settings.value.audio.opusCompressionLevel);
+export const mergeConcurrency = computed(() => settings.value.audio.mergeConcurrency);
 
 // ============================================================================
 // Persistence Effect
@@ -172,32 +206,9 @@ export function setOutputFormat(value: 'opus'): void {
   settings.value = { ...settings.value, outputFormat: value };
 }
 
-export function setSilenceRemovalEnabled(value: boolean): void {
-  settings.value = { ...settings.value, silenceRemovalEnabled: value };
-}
-
-export function setNormalizationEnabled(value: boolean): void {
-  settings.value = { ...settings.value, normalizationEnabled: value };
-}
-
-export function setDeEssEnabled(value: boolean): void {
-  settings.value = { ...settings.value, deEssEnabled: value };
-}
-
-export function setSilenceGapMs(value: number): void {
-  settings.value = { ...settings.value, silenceGapMs: value };
-}
-
-export function setEqEnabled(value: boolean): void {
-  settings.value = { ...settings.value, eqEnabled: value };
-}
-
-export function setCompressorEnabled(value: boolean): void {
-  settings.value = { ...settings.value, compressorEnabled: value };
-}
-
-export function setFadeInEnabled(value: boolean): void {
-  settings.value = { ...settings.value, fadeInEnabled: value };
+/** Merge a partial patch into the nested audio settings. */
+export function patchAudio(patch: Partial<AudioSettings>): void {
+  settings.value = { ...settings.value, audio: { ...settings.value.audio, ...patch } };
 }
 
 export function applyOpusPreset(preset: AudioPreset): void {
@@ -207,9 +218,12 @@ export function applyOpusPreset(preset: AudioPreset): void {
   settings.value = {
     ...settings.value,
     opusPreset: preset,
-    opusMinBitrate: config.minBitrate,
-    opusMaxBitrate: config.maxBitrate,
-    opusCompressionLevel: config.compressionLevel,
+    audio: {
+      ...settings.value.audio,
+      opusMinBitrate: config.minBitrate,
+      opusMaxBitrate: config.maxBitrate,
+      opusCompressionLevel: config.compressionLevel,
+    },
   };
 }
 
@@ -217,7 +231,7 @@ export function setOpusMinBitrate(value: number): void {
   settings.value = {
     ...settings.value,
     opusPreset: 'custom' as AudioPreset,
-    opusMinBitrate: value,
+    audio: { ...settings.value.audio, opusMinBitrate: value },
   };
 }
 
@@ -225,7 +239,7 @@ export function setOpusMaxBitrate(value: number): void {
   settings.value = {
     ...settings.value,
     opusPreset: 'custom' as AudioPreset,
-    opusMaxBitrate: value,
+    audio: { ...settings.value.audio, opusMaxBitrate: value },
   };
 }
 
@@ -233,12 +247,12 @@ export function setOpusCompressionLevel(value: number): void {
   settings.value = {
     ...settings.value,
     opusPreset: 'custom' as AudioPreset,
-    opusCompressionLevel: value,
+    audio: { ...settings.value.audio, opusCompressionLevel: value },
   };
 }
 
 export function setMergeConcurrency(value: number): void {
-  settings.value = { ...settings.value, mergeConcurrency: value };
+  patchAudio({ mergeConcurrency: value });
 }
 
 export function resetSettings(): void {

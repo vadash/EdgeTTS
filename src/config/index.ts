@@ -1,6 +1,8 @@
 // Application Configuration
 // Centralized configuration extracted from magic numbers across services
 
+import type { AudioSettings } from '@/state/types';
+
 export interface TTSConfig {
   /** Maximum concurrent WebSocket workers */
   maxWorkers: number;
@@ -8,7 +10,12 @@ export interface TTSConfig {
   errorCooldown: number;
 }
 
-export interface AudioConfig {
+/**
+ * FFmpeg chain constants used as fallbacks by
+ * buildFilterChain/AudioMerger/FFmpegService. Extends AudioSettings so the
+ * config literal can carry the user-facing defaults via one spread.
+ */
+export interface AudioConfig extends AudioSettings {
   /** Target merge duration in minutes */
   targetDurationMinutes: number;
   /** Tolerance percent for merge duration */
@@ -79,6 +86,24 @@ export interface AppConfig {
 }
 
 /**
+ * The one AudioSettings default value object — single source for the
+ * SettingsStore; spread into defaultConfig.audio below.
+ */
+export const defaultAudioSettings: AudioSettings = {
+  silenceRemoval: true,
+  normalization: true,
+  deEss: true,
+  silenceGapMs: 100,
+  eq: false,
+  compressor: false,
+  fadeIn: true,
+  opusMinBitrate: 24,
+  opusMaxBitrate: 48,
+  opusCompressionLevel: 10,
+  mergeConcurrency: 2,
+};
+
+/**
  * Default application configuration
  */
 export const defaultConfig: AppConfig = {
@@ -88,6 +113,9 @@ export const defaultConfig: AppConfig = {
   },
 
   audio: {
+    ...defaultAudioSettings,
+
+    // FFmpeg chain constants
     targetDurationMinutes: 15,
     tolerancePercent: 10,
     bytesPerMs: 12, // 96kbps = 12 bytes/ms

@@ -16,7 +16,7 @@ export function AudioTab() {
       hintId: 'settings.eqHint',
       hint: 'Add warmth and reduce digital harshness',
       enabled: settings.eqEnabled,
-      set: settings.setEqEnabled,
+      set: (v: boolean) => settings.patchAudio({ eq: v }),
     },
     {
       labelId: 'settings.deEss',
@@ -24,7 +24,7 @@ export function AudioTab() {
       hintId: 'settings.deEssHint',
       hint: 'Reduce harsh sibilant sounds',
       enabled: settings.deEssEnabled,
-      set: settings.setDeEssEnabled,
+      set: (v: boolean) => settings.patchAudio({ deEss: v }),
     },
     {
       labelId: 'settings.silenceRemoval',
@@ -32,7 +32,7 @@ export function AudioTab() {
       hintId: 'settings.silenceRemovalHint',
       hint: 'Remove long pauses from audio',
       enabled: settings.silenceRemovalEnabled,
-      set: settings.setSilenceRemovalEnabled,
+      set: (v: boolean) => settings.patchAudio({ silenceRemoval: v }),
     },
     {
       labelId: 'settings.compressor',
@@ -40,7 +40,7 @@ export function AudioTab() {
       hintId: 'settings.compressorHint',
       hint: 'Smooth out volume differences for consistent listening',
       enabled: settings.compressorEnabled,
-      set: settings.setCompressorEnabled,
+      set: (v: boolean) => settings.patchAudio({ compressor: v }),
     },
     {
       labelId: 'settings.normalization',
@@ -48,7 +48,7 @@ export function AudioTab() {
       hintId: 'settings.normalizationHint',
       hint: 'Balance audio levels (includes limiter)',
       enabled: settings.normalizationEnabled,
-      set: settings.setNormalizationEnabled,
+      set: (v: boolean) => settings.patchAudio({ normalization: v }),
     },
     {
       labelId: 'settings.fadeIn',
@@ -56,7 +56,7 @@ export function AudioTab() {
       hintId: 'settings.fadeInHint',
       hint: 'Smooth 100ms fade-in to prevent clicks',
       enabled: settings.fadeInEnabled,
-      set: settings.setFadeInEnabled,
+      set: (v: boolean) => settings.patchAudio({ fadeIn: v }),
     },
   ];
 
@@ -216,7 +216,7 @@ export function AudioTab() {
           min={0}
           max={500}
           step={10}
-          onChange={(v) => settings.setSilenceGapMs(v)}
+          onChange={(v) => settings.patchAudio({ silenceGapMs: v })}
         />
       </div>
 
@@ -243,19 +243,8 @@ export function AudioTab() {
                 narratorVoice: settings.narratorVoice.value,
                 rate: settings.rate.value,
                 pitch: settings.pitch.value,
-                config: {
-                  eq: settings.eqEnabled.value,
-                  deEss: settings.deEssEnabled.value,
-                  silenceRemoval: settings.silenceRemovalEnabled.value,
-                  compressor: settings.compressorEnabled.value,
-                  normalization: settings.normalizationEnabled.value,
-                  fadeIn: settings.fadeInEnabled.value,
-                  silenceGapMs: 0,
-                  opusMinBitrate: settings.opusMinBitrate.value,
-                  opusMaxBitrate: settings.opusMaxBitrate.value,
-                  opusCompressionLevel: settings.opusCompressionLevel.value,
-                  mergeConcurrency: settings.mergeConcurrency.value,
-                },
+                // Current audio values, except the gap: meaningless for a single chunk
+                config: { ...settings.toObject().audio, silenceGapMs: 0 },
               })
             }
           >

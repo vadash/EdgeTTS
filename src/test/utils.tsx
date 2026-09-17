@@ -10,7 +10,8 @@ import { createStores, StoreProvider, type Stores } from '@/stores';
 import { updateProgress } from '@/stores/ConversionStore';
 import { setStageField } from '@/stores/LLMStore';
 // Import signal-based store actions for test setup
-import { patchSettings } from '@/stores/SettingsStore';
+import { patchSettings, settings } from '@/stores/SettingsStore';
+import type { AudioSettings } from '@/state/types';
 
 export interface TestRenderOptions {
   stores?: Partial<TestStoresState>;
@@ -25,8 +26,7 @@ export interface TestStoresState {
     pitch?: number;
     maxThreads?: number;
     outputFormat?: 'opus';
-    silenceRemovalEnabled?: boolean;
-    normalizationEnabled?: boolean;
+    audio?: Partial<AudioSettings>;
     lexxRegister?: boolean;
   };
   conversion?: {
@@ -68,10 +68,8 @@ export function renderWithProviders(ui: VNode, options: TestRenderOptions = {}):
     if (s.pitch !== undefined) settingsPatch.pitch = s.pitch;
     if (s.maxThreads !== undefined) settingsPatch.ttsThreads = s.maxThreads;
     if (s.outputFormat !== undefined) settingsPatch.outputFormat = s.outputFormat;
-    if (s.silenceRemovalEnabled !== undefined)
-      settingsPatch.silenceRemovalEnabled = s.silenceRemovalEnabled;
-    if (s.normalizationEnabled !== undefined)
-      settingsPatch.normalizationEnabled = s.normalizationEnabled;
+    // Nested audio overrides merge over current audio (patchSettings is shallow)
+    if (s.audio) settingsPatch.audio = { ...settings.value.audio, ...s.audio };
     if (s.lexxRegister !== undefined) settingsPatch.lexxRegister = s.lexxRegister;
     if (Object.keys(settingsPatch).length > 0) {
       patchSettings(settingsPatch);

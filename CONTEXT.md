@@ -37,6 +37,10 @@ Deliberate silence inserted between chunks before the filter chain runs.
 The processing and encoding flags configured on the Audio tab, carried as one object from Conversion input into the audio merge.
 _Avoid_: audio config, filter chain config
 
+**Opus preset**:
+A named package of Opus encoding values. Selecting one sets the matching Audio settings fields; a manual field edit marks it custom. The preset itself is not carried into the merge.
+_Avoid_: treating the preset as an Audio setting
+
 **Failure log**:
 The file where permanently failed chunks are recorded.
 
