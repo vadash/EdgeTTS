@@ -1,5 +1,3 @@
-// Persistence helper tests
-
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadJSON, saveJSON } from './persistence';
 

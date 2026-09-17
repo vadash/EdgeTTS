@@ -71,7 +71,6 @@ describe('LanguageStore', () => {
 
     it('defaults to English for invalid localStorage value', () => {
       localStorage.setItem(StorageKeys.language, 'invalid');
-      // Mock navigator.language to English
       vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US');
       store.load();
       expect(store.locale.value).toBe('en');

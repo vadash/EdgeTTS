@@ -8,16 +8,14 @@ function createFakeDeployDir(): string {
   const dir = resolve(tmpdir(), `deploy-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(dir, { recursive: true });
 
-  // Create sha subdirs
   mkdirSync(join(dir, 'sha', 'aaa1111111111111111111111111111111111111'), { recursive: true });
   mkdirSync(join(dir, 'sha', 'bbb2222222222222222222222222222222222222'), { recursive: true });
   mkdirSync(join(dir, 'sha', 'ccc3333333333333333333333333333333333333'), { recursive: true });
 
-  // Create tag subdirs
   mkdirSync(join(dir, 'v1.0.0'), { recursive: true });
   mkdirSync(join(dir, 'v2.0.0'), { recursive: true });
 
-  // Put a logo in the current sha dir
+  // The favicon test expects this logo in the current SHA dir
   writeFileSync(join(dir, 'sha', 'ccc3333333333333333333333333333333333333', 'logo.png'), 'fake');
 
   return dir;

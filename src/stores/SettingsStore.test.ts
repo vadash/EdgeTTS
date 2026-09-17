@@ -1,6 +1,3 @@
-// SettingsStore Tests
-// Test the SettingsStore signal-based API
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultAudioSettings } from '@/config';
 import { StorageKeys } from '@/config/storage';
@@ -19,7 +16,6 @@ import {
 describe('SettingsStore', () => {
   beforeEach(() => {
     localStorage.clear();
-    // Reset to defaults before each test
     resetSettings();
   });
 
@@ -70,7 +66,7 @@ describe('SettingsStore', () => {
       applyOpusPreset(AudioPreset.PC);
       setMergeConcurrency(3);
       expect(settings.value.audio.mergeConcurrency).toBe(3);
-      // Must NOT switch the opus preset to CUSTOM — concurrency is independent
+      // Concurrency is independent, so the opus preset must not switch to CUSTOM
       expect(settings.value.opusPreset).toBe(AudioPreset.PC);
     });
   });
@@ -101,7 +97,7 @@ describe('SettingsStore', () => {
     it('changes are persisted to localStorage via effect', async () => {
       patchSettings({ rate: 50, ttsThreads: 10 });
 
-      // The effect uses batched writes, but let's just verify the signal changed
+      // The effect batches writes, so the test asserts the signal value rather than localStorage
       expect(settings.value.rate).toBe(50);
       expect(settings.value.ttsThreads).toBe(10);
     });
@@ -141,7 +137,6 @@ describe('SettingsStore', () => {
     it('merges with existing settings', () => {
       patchSettings({ rate: 50 });
       expect(settings.value.rate).toBe(50);
-      // Other settings remain unchanged
       expect(settings.value.pitch).toBe(0);
       expect(settings.value.ttsThreads).toBe(20);
     });

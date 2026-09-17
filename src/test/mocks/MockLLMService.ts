@@ -1,5 +1,4 @@
 // Mock LLM stages (LlmStages record shape, ADR 0015)
-// Used for testing components that depend on LLM voice assignment
 
 import { vi } from 'vitest';
 import type { LlmStages, StageCall } from '@/services/llm/stages';

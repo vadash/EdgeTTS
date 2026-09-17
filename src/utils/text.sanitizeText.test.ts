@@ -99,7 +99,8 @@ You have learnt a new ability: Concentration
 ...`;
 
       const actual = sanitizeText(input);
-      // Replace leading whitespace in both for comparison since original has indentation
+      // The input keeps its source indentation, so strip leading whitespace
+      // from both sides before comparing.
       const normalize = (s: string) =>
         s
           .split('\n')
@@ -129,14 +130,12 @@ You have learnt a new ability: Concentration
     });
 
     it('strips standalone asterisks after markdown processing', () => {
-      // After markdown stripping, standalone asterisk runs become decorative
       expect(sanitizeText('***')).toBe('...');
       expect(sanitizeText('****')).toBe('...');
       expect(sanitizeText('text *** more text')).toBe('text ... more text');
     });
 
     it('strips standalone underscores after markdown processing', () => {
-      // After markdown stripping, standalone underscore runs become decorative
       expect(sanitizeText('___')).toBe('...');
       expect(sanitizeText('____')).toBe('...');
       expect(sanitizeText('text ___ more text')).toBe('text ... more text');

@@ -1,6 +1,3 @@
-// Mock FFmpeg Service
-// Used for testing components that depend on FFmpeg functionality
-
 import { vi } from 'vitest';
 import type { FFmpegProgressCallback } from '@/services/FFmpegService';
 import type { AudioSettings } from '@/state/types';

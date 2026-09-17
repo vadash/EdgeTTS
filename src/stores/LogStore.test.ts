@@ -1,6 +1,3 @@
-// LoggerStore Tests
-// Test the LoggerStore functionality
-
 import { beforeEach, describe, expect, it } from 'vitest';
 import { LoggerStore } from '@/services/Logger';
 

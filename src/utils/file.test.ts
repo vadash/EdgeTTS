@@ -23,7 +23,7 @@ describe('sanitizeFilename', () => {
     expect(sanitizeFilename('NUL')).toBe('_NUL');
     expect(sanitizeFilename('COM1')).toBe('_COM1');
     expect(sanitizeFilename('LPT5')).toBe('_LPT5');
-    expect(sanitizeFilename('CON.txt')).toBe('CON.txt'); // Should not prefix if has extension
+    expect(sanitizeFilename('CON.txt')).toBe('CON.txt'); // Only a bare reserved name gets the prefix.
   });
 
   it('should return "untitled" for empty or whitespace-only input', () => {

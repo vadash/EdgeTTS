@@ -134,24 +134,23 @@ Reasoning here
   });
 
   it('prevents catastrophic backtracking on large unclosed tags', () => {
-    // This test verifies that index-based extraction prevents regex DoS
-    // Previous regex-based implementation could hang on 50KB+ unclosed tags
+    // Index-based extraction avoids regex backtracking, so even a huge
+    // unclosed tag must complete fast.
     const largeContent = 'x'.repeat(50000);
-    // This is a TRULY unclosed tag (no closing tag), so it should be preserved
     const text = `start <think>\n${largeContent}\n end`;
 
     const start = Date.now();
     const result = stripThinkingTags(text);
     const elapsed = Date.now() - start;
 
-    // Should complete in under 100ms (previously could take 30+ seconds)
     expect(elapsed).toBeLessThan(100);
-    // Unclosed tags are NOT removed by stripThinkingTags (only paired tags are)
+    // Unclosed tags stay in the output; stripThinkingTags removes only paired tags.
     expect(result).toBe(text);
   });
 
   it('handles various orphaned closing tag formats', () => {
-    // These test orphaned closing tags from assistant prefill scenarios
+    // In assistant prefill the request already opened the tag, so the
+    // response carries only the closing tag.
     const variants = ['</thinking>content', '</thinking>content', '</THINK>content'];
     for (const v of variants) {
       expect(stripThinkingTags(v)).toBe('content');
@@ -159,7 +158,6 @@ Reasoning here
   });
 
   it('handles multiline orphaned closing tags', () => {
-    // Orphaned close tags may span multiple lines
     const text = '\n\n</thinking>\n{"result": true}';
     expect(stripThinkingTags(text)).toBe('{"result": true}');
   });
@@ -255,7 +253,6 @@ Step 1: John speaks.
     expect(result.data?.characters[0].canonicalName).toBe('John');
   });
 
-  // Array-at-root recovery tests
   it('wraps naked array as {reasoning: null, items: [...]}', () => {
     const TestSchema = z.object({
       reasoning: z.string().nullable().default(null),
@@ -297,7 +294,6 @@ Step 1: John speaks.
     expect(result.success).toBe(false);
   });
 
-  // Flattened assignments recovery tests
   it('wraps flattened numeric-key object as {reasoning: null, assignments: {...}}', () => {
     const result = safeParseJSON('{"0": "A", "1": "B", "2": "A"}', {
       schema: AssignSchema,
@@ -331,7 +327,6 @@ Step 1: John speaks.
     expect(result.success).toBe(false);
   });
 
-  // Real schema tests
   it('recovers ExtractSchema from naked array', () => {
     const json = '[{"canonicalName": "John", "variations": ["Johnny"], "gender": "male"}]';
     const result = safeParseJSON(json, { schema: ExtractSchema });
@@ -387,7 +382,8 @@ Step 1: John speaks.
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error?.message).toMatch(/no JSON/i);
-      // Must NOT be a Zod invalid_type error about characters
+      // The failure must come from the missing-delimiters short circuit,
+      // not a Zod invalid_type error about characters.
       expect(result.error?.message).not.toMatch(/expected object, received string/);
     }
   });

@@ -1,6 +1,3 @@
-// Mock Logger Service
-// Used for testing components that depend on logging
-
 import { vi } from 'vitest';
 import { Logger } from '@/services/Logger';
 

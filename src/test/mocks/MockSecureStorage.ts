@@ -1,6 +1,3 @@
-// Mock Secure Storage
-// Used for testing components that depend on encrypted storage
-
 import { vi } from 'vitest';
 
 export interface ISecureStorage {

@@ -1,9 +1,3 @@
-// Test Factories - Text Data
-// Factory functions for creating test text content
-
-/**
- * Create sample narrative text
- */
 export function createTestText(): string {
   return `The Story Begins
 
@@ -16,9 +10,6 @@ It was a dark and stormy night. John walked into the room.
 They sat down at the table. The conversation was about to begin.`;
 }
 
-/**
- * Create sample dialogue text
- */
 export function createTestDialogue(): string {
   return `"I have something important to tell you," John said.
 
@@ -31,17 +22,11 @@ She looked at him with concern. "What do you mean?"
 "You'll see," he said with a knowing smile.`;
 }
 
-/**
- * Create sample text with dictionary words to replace
- */
 export function createTestTextWithReplacements(): string {
   return `Dr. Smith arrived at the lab. He checked the temp readings.
 The exp showed promising results. Prof. Johnson was impressed.`;
 }
 
-/**
- * Create sample dictionary rules
- */
 export function createTestDictionaryRules(): string[] {
   return [
     'Dr.=Doctor',
@@ -52,9 +37,6 @@ export function createTestDictionaryRules(): string[] {
   ];
 }
 
-/**
- * Create sample long text for block splitting tests
- */
 export function createLongTestText(paragraphs: number = 10): string {
   const sampleParagraph = `This is a sample paragraph for testing. It contains multiple sentences.
 The text should be long enough to trigger block splitting.

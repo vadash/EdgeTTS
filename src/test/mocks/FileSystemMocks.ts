@@ -1,6 +1,3 @@
-// Mock file system handles for testing
-// Provides mock FileSystemDirectoryHandle and FileSystemFileHandle implementations
-
 interface SharedMockState {
   files: Map<string, Uint8Array>;
   subdirs: Map<string, FileSystemDirectoryHandle>;
@@ -150,8 +147,7 @@ function createMockDirectoryHandleWithState(
 }
 
 /**
- * Create a mock FileSystemDirectoryHandle for testing
- * Supports nested directories with shared state
+ * Create a mock FileSystemDirectoryHandle that supports nested directories with shared state
  */
 export function createMockDirectoryHandle(): FileSystemDirectoryHandle {
   const state: SharedMockState = {

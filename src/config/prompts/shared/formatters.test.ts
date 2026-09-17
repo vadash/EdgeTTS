@@ -30,7 +30,7 @@ describe('formatExamples', () => {
     const result = formatExamples(examples, 'en');
     expect(result).toContain('EN input');
     expect(result).not.toContain('CN input');
-    expect(result).toContain('No label'); // auto mode includes unlabelled
+    expect(result).toContain('No label'); // Unlabelled examples pass every language filter.
   });
 
   it('returns all examples when language is auto', () => {
@@ -82,7 +82,8 @@ describe('assembleUserConstraints', () => {
     const rules = 'Do this.';
     const schema = '{ "type": "object" }';
     const result = assembleUserConstraints(rules, schema);
-    // Order: MIRROR_LANGUAGE_RULES → task_rules → output_schema → EXECUTION_TRIGGER
+    // The message topology fixes this order: language rule, task rules,
+    // output schema, then trigger.
     const langPos = result.indexOf('<language_rules>');
     const taskPos = result.indexOf('<task_rules>');
     const schemaPos = result.indexOf('<output_schema>');
@@ -96,13 +97,13 @@ describe('assembleUserConstraints', () => {
 describe('buildMessages', () => {
   it('resolves auto to no prefill since compliance presets removed', () => {
     const result = buildMessages('system body', 'user body', 'auto');
-    // auto resolves to cn_compliance which no longer exists, so no assistant message
     expect(result).toHaveLength(2);
   });
 
   it('defaults to none prefill when not specified', () => {
     const result = buildMessages('system body', 'user body');
-    // DEFAULT_PREFILL is 'none', which returns empty string, so no assistant message
+    // DEFAULT_PREFILL is 'none'. A 'none' prefill resolves to an empty
+    // string, so the builder appends no assistant message.
     expect(result).toHaveLength(2);
   });
 
@@ -120,8 +121,8 @@ describe('buildMessages', () => {
   });
 
   it('places duplicated user message before assistant prefill', () => {
-    // Use a prefill that actually produces a message — 'none' doesn't,
-    // so just verify ordering: system, user, user
+    // The 'none' prefill produces no assistant message, so this verifies
+    // only the message order.
     const result = buildMessages('sys', 'user body', 'none', undefined, true);
     expect(result[0].role).toBe('system');
     expect(result[1].role).toBe('user');

@@ -10,7 +10,7 @@ export interface ExpectedCharacter {
 }
 
 export interface ExpectedDialogue {
-  textContains: string; // sentence must contain this text
+  textContains: string;
   speaker: string; // expected speaker name - matches canonicalName or any variation (case-insensitive)
   strict?: boolean; // if true, fail test on mismatch; if false, just log warning
 }
@@ -89,7 +89,7 @@ export const fixtures: TestFixture[] = [
 ];
 
 /**
- * Helper to find a character by name (case-insensitive partial match)
+ * Find a character by name (case-insensitive partial match)
  * Checks both canonicalName and all variations
  */
 export function findCharacter(characters: LLMCharacter[], name: string): LLMCharacter | undefined {
@@ -101,16 +101,12 @@ export function findCharacter(characters: LLMCharacter[], name: string): LLMChar
   );
 }
 
-/**
- * Helper to check if a character exists in the list
- */
 export function hasCharacter(characters: LLMCharacter[], name: string): boolean {
   return findCharacter(characters, name) !== undefined;
 }
 
 /**
  * Check if a speaker name matches a character (by canonicalName or any variation)
- * Returns true if the speaker matches the expected name considering all aliases
  */
 export function speakerMatchesCharacter(
   speaker: string,
@@ -120,7 +116,6 @@ export function speakerMatchesCharacter(
   const speakerLower = speaker.toLowerCase();
   const expectedLower = expectedName.toLowerCase();
 
-  // Direct match (narrator or simple case)
   if (
     speakerLower === expectedLower ||
     speakerLower.includes(expectedLower) ||
@@ -129,13 +124,11 @@ export function speakerMatchesCharacter(
     return true;
   }
 
-  // Find the character that expectedName refers to
   const expectedChar = findCharacter(characters, expectedName);
   if (!expectedChar) {
     return false;
   }
 
-  // Check if speaker matches any of the character's names
   const allNames = [expectedChar.canonicalName, ...expectedChar.variations];
   return allNames.some((name) => {
     const nameLower = name.toLowerCase();

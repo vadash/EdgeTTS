@@ -1,6 +1,3 @@
-// Test Module Exports
-// Export all test utilities and mocks
-
 export { createMockFFmpegService, MockFFmpegService } from './mocks/MockFFmpegService';
 export { createMockLLMService, MockLLMService } from './mocks/MockLLMService';
 export { createMockLogger, type LogCall, MockLogger } from './mocks/MockLogger';

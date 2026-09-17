@@ -1,11 +1,5 @@
-// Test Factories - Character Data
-// Factory functions for creating test LLMCharacter objects
-
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 
-/**
- * Create a test character
- */
 export function createTestCharacter(overrides: Partial<LLMCharacter> = {}): LLMCharacter {
   return {
     canonicalName: 'John',
@@ -15,9 +9,6 @@ export function createTestCharacter(overrides: Partial<LLMCharacter> = {}): LLMC
   };
 }
 
-/**
- * Create multiple test characters
- */
 export function createTestCharacters(count: number = 3): LLMCharacter[] {
   const names = [
     { name: 'John', gender: 'male' as const, variations: ['John', 'Johnny'] },
@@ -34,9 +25,6 @@ export function createTestCharacters(count: number = 3): LLMCharacter[] {
   }));
 }
 
-/**
- * Create a test speaker assignment
- */
 export function createTestAssignment(
   overrides: Partial<SpeakerAssignment> = {},
 ): SpeakerAssignment {
@@ -49,9 +37,6 @@ export function createTestAssignment(
   };
 }
 
-/**
- * Create multiple test speaker assignments
- */
 export function createTestAssignments(count: number = 5): SpeakerAssignment[] {
   const samples = [
     { speaker: 'narrator', text: 'The story begins on a dark night.' },
@@ -69,9 +54,6 @@ export function createTestAssignments(count: number = 5): SpeakerAssignment[] {
   }));
 }
 
-/**
- * Create a voice map from characters
- */
 export function createTestVoiceMap(characters: LLMCharacter[]): Map<string, string> {
   const voiceMap = new Map<string, string>();
   const maleVoices = ['en-US-GuyNeural', 'en-US-ChristopherNeural', 'en-US-EricNeural'];

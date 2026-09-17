@@ -30,7 +30,6 @@ describe('Ladder Integration - E2E', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
 
-    // Create mock ChunkStore
     mockChunkStore = {
       init: vi.fn().mockResolvedValue(undefined),
       writeChunk: vi.fn().mockResolvedValue(undefined),
@@ -84,7 +83,6 @@ describe('Ladder Integration - E2E', () => {
     // Starting at 2, after 20 tasks -> 3, after 40 -> 4, after 60 -> 5
     expect(outcome.completed.size).toBe(60);
     expect(outcome.failed).toEqual([]);
-    // The ladder raised concurrency as successes accumulated
     const reported = onConcurrencyChange.mock.calls.map((call) => call[0]);
     expect(reported.some((c, i) => i > 0 && c > reported[0])).toBe(true);
   });
@@ -117,11 +115,9 @@ describe('Ladder Integration - E2E', () => {
       failPool.run(makeTasks(1), { signal: new AbortController().signal }),
     );
 
-    // Failure was recorded through the outcome and the error callback
     expect(onTaskError).toHaveBeenCalledTimes(1);
     expect(onTaskError).toHaveBeenCalledWith(0, expect.any(Error));
     expect(outcome.failed).toEqual([{ index: 0, message: 'Rate limited' }]);
-    // The ladder throttled while failures accumulated
     expect(onConcurrencyChange).toHaveBeenCalled();
   });
 });

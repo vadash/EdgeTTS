@@ -6,15 +6,15 @@ import type { ChunkIdbAdapter } from '@/services/ChunkIDB';
 export type MockChunkIdb = {
   [K in keyof ChunkIdbAdapter]: Mock<ChunkIdbAdapter[K]>;
 } & {
-  /** Backing store — inspect or seed it directly in tests. */
+  /** Backing store that tests can inspect or seed directly. */
   store: Map<number, Uint8Array>;
 };
 
 /**
  * In-memory ChunkIdbAdapter fake backed by a Map. Every method is an async
- * vi.fn so promises always resolve asynchronously (repo rule: IDB mocks must
- * fire async or promises hang — see src/test/AGENTS.md) and can be spied on
- * or overridden per test.
+ * vi.fn so promises always resolve asynchronously (repo rule in
+ * src/test/AGENTS.md: IDB mocks must fire async or promises hang) and can be
+ * spied on or overridden per test.
  */
 export function createMockChunkIdb(): MockChunkIdb {
   const store = new Map<number, Uint8Array>();

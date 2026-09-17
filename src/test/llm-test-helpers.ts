@@ -8,9 +8,6 @@ import { testConfig } from '../../test.config.local';
 import type { ExpectedDialogue } from './fixtures';
 import { speakerMatchesCharacter } from './fixtures';
 
-/**
- * Console logger for tests
- */
 const testLogger: ILogger = {
   debug: (message: string, data?: Record<string, unknown>) =>
     console.log(`[DEBUG] ${message}`, data || ''),
@@ -21,10 +18,6 @@ const testLogger: ILogger = {
   error: (message: string, error?: Error, data?: Record<string, unknown>) =>
     console.error(`[ERROR] ${message}`, error, data || ''),
 };
-
-/**
- * Test helpers for LLM real API tests
- */
 
 export interface ExtractResult {
   characters: LLMCharacter[];
@@ -47,9 +40,6 @@ export interface DialogueCheckResult {
   text: string | null;
 }
 
-/**
- * Validate test config is populated
- */
 export function validateConfig(): void {
   if (!testConfig.apiKey || !testConfig.apiUrl || !testConfig.model) {
     throw new Error(
@@ -58,10 +48,6 @@ export function validateConfig(): void {
   }
 }
 
-/**
- * Get repeatPrompt setting from environment variable
- * @returns boolean value from REPEAT_PROMPT env var (default: false)
- */
 export function getRepeatPrompt(): boolean {
   const envVal = process.env.REPEAT_PROMPT;
   if (envVal === undefined || envVal === '') {
@@ -71,8 +57,8 @@ export function getRepeatPrompt(): boolean {
 }
 
 /**
- * Get useVoting (QA pass) setting from environment variable
- * @returns boolean value from USE_QA env var (default: testConfig.useVoting)
+ * Read the USE_QA env var, which overrides useVoting (the Assign QA pass).
+ * Unset or empty falls back to testConfig.useVoting.
  */
 export function getUseQA(): boolean {
   const envVal = process.env.USE_QA;
@@ -83,7 +69,7 @@ export function getUseQA(): boolean {
 }
 
 /**
- * Create LLM stages instance
+ * Create LLM stages wired to the real API config
  * @param repeatPrompt - Optional override for repeatPrompt (defaults to REPEAT_PROMPT env var)
  */
 export function createService(repeatPrompt?: boolean): LlmStages {
@@ -109,24 +95,15 @@ export function createService(repeatPrompt?: boolean): LlmStages {
   });
 }
 
-/**
- * Create TextBlockSplitter instance
- */
 export function createSplitter(): TextBlockSplitter {
   return new TextBlockSplitter();
 }
 
-/**
- * Load fixture text file
- */
 export function loadFixtureText(filename: string): string {
   const fixturePath = path.resolve(__dirname, 'fixtures', filename);
   return fs.readFileSync(fixturePath, 'utf-8');
 }
 
-/**
- * Run Extract (character extraction)
- */
 export async function runExtract(
   service: LlmStages,
   splitter: TextBlockSplitter,
@@ -156,9 +133,6 @@ export async function runExtract(
   };
 }
 
-/**
- * Run Assign (speaker assignment)
- */
 export async function runAssign(
   service: LlmStages,
   splitter: TextBlockSplitter,
@@ -168,7 +142,6 @@ export async function runAssign(
 ): Promise<AssignResult> {
   const blocks = splitter.createAssignBlocks(text);
 
-  // Build character voice map
   const characterVoiceMap = new Map<string, string>();
   characters.forEach((char, i) => {
     characterVoiceMap.set(char.canonicalName, `voice-${i}`);
@@ -200,7 +173,6 @@ export async function runAssign(
 
 /**
  * Normalize quotes for text matching (smart quotes -> straight quotes)
- * Handles: " " ' ' ` ` and various Unicode quote characters
  */
 function normalizeQuotes(text: string): string {
   return (
@@ -209,7 +181,7 @@ function normalizeQuotes(text: string): string {
       .replace(/[\u201C\u201D\u201E\u00AB\u00BB]/g, '"')
       // Single quotes/apostrophes (right single quote is most common apostrophe)
       .replace(/[\u2018\u2019\u201A\u201B\u2039\u203A\u02BC\u2032\uFF07]/g, "'")
-      // Em dash -> hyphen
+      // Em dash, horizontal bar, and minus signs become a hyphen
       .replace(/[\u2014\u2015\u2212]/g, '-')
   );
 }
@@ -248,10 +220,8 @@ export function checkDialogue(
 
   let matched: boolean;
   if (characters && characters.length > 0) {
-    // Use alias-aware matching
     matched = speakerMatchesCharacter(assignment.speaker, expected.speaker, characters);
   } else {
-    // Fall back to simple string matching
     const actualLower = assignment.speaker.toLowerCase();
     const expectedLower = expected.speaker.toLowerCase();
     matched = actualLower.includes(expectedLower) || expectedLower.includes(actualLower);
@@ -266,9 +236,6 @@ export function checkDialogue(
   };
 }
 
-/**
- * Log Extract results
- */
 export function logExtractResults(result: ExtractResult): void {
   console.log('\n  === Extract Results ===');
   console.log(`  Duration: ${result.durationMs}ms`);
@@ -281,16 +248,12 @@ export function logExtractResults(result: ExtractResult): void {
   });
 }
 
-/**
- * Log Assign results
- */
 export function logAssignResults(result: AssignResult): void {
   console.log('\n  === Assign Results ===');
   console.log(`  Duration: ${result.durationMs}ms`);
   console.log(`  Total sentences: ${result.assignments.length}`);
   console.log(`  Dialogue sentences: ${result.dialogueCount}`);
 
-  // Group by speaker
   const bySpeaker = new Map<string, number>();
   result.assignments.forEach((a) => {
     bySpeaker.set(a.speaker, (bySpeaker.get(a.speaker) || 0) + 1);
@@ -304,9 +267,6 @@ export function logAssignResults(result: AssignResult): void {
     });
 }
 
-/**
- * Log dialogue check results
- */
 export function logDialogueChecks(results: DialogueCheckResult[]): void {
   console.log('\n  === Dialogue Attribution Checks ===');
 
@@ -340,7 +300,8 @@ export function logDialogueChecks(results: DialogueCheckResult[]): void {
 }
 
 /**
- * Get valid speaker set for a fixture
+ * Speakers the Assign pass can emit besides the extracted characters:
+ * the narrator plus the unnamed labels for dialogue it cannot attribute
  */
 export function getValidSpeakers(canonicalNames: string[]): Set<string> {
   return new Set([

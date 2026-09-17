@@ -1,6 +1,3 @@
-// Test setup file for Vitest
-// Configures the testing environment with mocks and utilities
-
 import { afterEach, vi } from 'vitest';
 
 // Mock p-retry - executes immediately without retry
@@ -203,7 +200,6 @@ Object.defineProperty(window, 'IntersectionObserver', {
   value: MockIntersectionObserver,
 });
 
-// Clear all mocks after each test
 afterEach(() => {
   vi.clearAllMocks();
   localStorageMock.clear();

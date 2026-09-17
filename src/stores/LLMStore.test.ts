@@ -16,7 +16,6 @@ import {
   setVoiceMap,
 } from './LLMStore';
 
-// Mock SecureStorage
 vi.mock('@/services/SecureStorage', () => ({
   encryptValue: vi.fn((value: string) => Promise.resolve(`encrypted:${value}`)),
   decryptValue: vi.fn((value: string) => {
@@ -36,9 +35,8 @@ describe('LLMStore', () => {
   describe('computed properties', () => {
     describe('isConfigured', () => {
       it('reflects whether any stage has an API key set', () => {
-        // No API key → not configured
         expect(isConfigured.value).toBe(false);
-        // Setting any one stage's key flips the gate on, for each stage
+        // A key on any one stage is enough, so the test checks each stage
         resetLLMStore();
         setStageField('extract', 'apiKey', 'sk-test-key');
         expect(isConfigured.value).toBe(true);
@@ -165,7 +163,6 @@ describe('LLMStore', () => {
       expect(llm.value.error).toBeNull();
       expect(llm.value.detectedCharacters).toEqual([]);
       expect(llm.value.characterVoiceMap.size).toBe(0);
-      // Settings preserved
       expect(llm.value.extract.apiKey).toBe('sk-key');
     });
 

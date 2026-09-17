@@ -4,7 +4,6 @@ import type { LLMCharacter } from '@/state/types';
 import { llm, resetLLMStore } from './LLMStore';
 import { createGate, resumeGate, reviewGate, type ReviewDraft } from './gates';
 
-// Mock SecureStorage
 vi.mock('@/services/SecureStorage', () => ({
   encryptValue: vi.fn((value: string) => Promise.resolve(`encrypted:${value}`)),
   decryptValue: vi.fn((value: string) => {

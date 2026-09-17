@@ -39,7 +39,6 @@ describe('LLM Real API Tests', () => {
     splitter = createSplitter();
   });
 
-  // Run tests for each fixture
   describe.each(fixtures)('Fixture: $name', (fixture: TestFixture) => {
     let text: string;
     let extractResult: ExtractResult;
@@ -51,14 +50,11 @@ describe('LLM Real API Tests', () => {
       console.log(`File: ${fixture.file}`);
       console.log('='.repeat(60));
 
-      // Load fixture text
       text = loadFixtureText(fixture.file);
 
-      // Run Extract
       extractResult = await runExtract(service, splitter, text);
       logExtractResults(extractResult);
 
-      // Run Assign
       assignResult = await runAssign(service, splitter, text, extractResult.characters);
       logAssignResults(assignResult);
     }, 180000); // 3 min timeout for both passes
@@ -109,7 +105,6 @@ describe('LLM Real API Tests', () => {
 
         logDialogueChecks(results);
 
-        // Check strict assertions
         const strictFailures = results.filter((r) => r.expected.strict && !r.matched);
         for (const failure of strictFailures) {
           expect.fail(

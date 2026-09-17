@@ -1,6 +1,3 @@
-// UISettingsStore Tests
-// Test the UISettingsStore for dismissed notification state
-
 import { beforeEach, describe, expect, it } from 'vitest';
 import { StorageKeys } from '@/config/storage';
 import {
@@ -109,11 +106,9 @@ describe('UISettingsStore', () => {
 
   describe('persistence across reloads', () => {
     it('dismissed state should survive simulated page reload', () => {
-      // Dismiss a notification
       dismissNotification('llmRequired');
 
-      // Simulate page reload by creating a new store instance via loadFromStorage
-      // The signal was already updated, so we can directly check localStorage
+      // The signal already holds the state, so the test reads localStorage directly to verify persistence
       const saved = localStorage.getItem(StorageKeys.uiSettings);
       expect(saved).toBeTruthy();
       if (saved) {

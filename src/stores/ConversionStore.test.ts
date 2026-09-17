@@ -104,7 +104,6 @@ describe('ConversionStore', () => {
       setStatus('converting');
       updateProgress(0, 100);
 
-      // Advance time by 10 seconds, complete 10 items
       vi.spyOn(Date, 'now').mockReturnValue(startTime + 10000);
       updateProgress(10, 100);
 
@@ -121,7 +120,6 @@ describe('ConversionStore', () => {
       startConversion();
       setStatus('merging');
 
-      // Advance time by 30 seconds, complete 1 item
       vi.spyOn(Date, 'now').mockReturnValue(startTime + 30000);
       updateProgress(1, 5);
 
@@ -139,17 +137,14 @@ describe('ConversionStore', () => {
       setStatus('llm-extract');
       updateProgress(0, 50);
 
-      // Do some work in extract phase
-      vi.spyOn(Date, 'now').mockReturnValue(startTime + 60000); // 1 minute later
+      vi.spyOn(Date, 'now').mockReturnValue(startTime + 60000);
       updateProgress(50, 50);
 
-      // Now transition to assign phase - phaseStartTime should reset
       const assignStartTime = startTime + 60000;
       vi.spyOn(Date, 'now').mockReturnValue(assignStartTime);
       setStatus('llm-assign');
       updateProgress(0, 100);
 
-      // Advance 10 seconds into assign phase, complete 10 items
       vi.spyOn(Date, 'now').mockReturnValue(assignStartTime + 10000);
       updateProgress(10, 100);
 
@@ -167,7 +162,6 @@ describe('ConversionStore', () => {
       setStatus('converting');
       updateProgress(0, 100, 0);
 
-      // Advance time by 10 seconds, complete 10 items with 5 failed
       vi.spyOn(Date, 'now').mockReturnValue(startTime + 10000);
       updateProgress(10, 100, 5);
 
@@ -196,13 +190,10 @@ describe('ConversionStore', () => {
       const initialPhaseStartTime = conversion.value.phaseStartTime;
       expect(initialPhaseStartTime).toBe(startTime);
 
-      // Advance time
       vi.spyOn(Date, 'now').mockReturnValue(startTime + 5000);
 
-      // Call setStatus again with same status
       setStatus('converting');
 
-      // phaseStartTime should NOT have been reset
       expect(conversion.value.phaseStartTime).toBe(initialPhaseStartTime);
 
       vi.restoreAllMocks();
@@ -226,11 +217,9 @@ describe('ConversionStore', () => {
       const extractStartTime = conversion.value.phaseStartTime;
       expect(extractStartTime).toBe(startTime);
 
-      // Advance time and transition to different status
       vi.spyOn(Date, 'now').mockReturnValue(startTime + 10000);
       setStatus('llm-assign');
 
-      // phaseStartTime SHOULD be reset when status changes
       expect(conversion.value.phaseStartTime).toBe(startTime + 10000);
       expect(conversion.value.phaseStartTime).not.toBe(extractStartTime);
 

@@ -4,9 +4,9 @@ import { buildAssignPrompt } from '../assign/builder';
 import { buildQAPrompt } from '../qa/builder';
 import { formatOverlapContext, formatSpeakerCodeList } from './speakerCodes';
 
-// Representative input for the golden pins below. The goldens were captured
-// from the builders before the shared-helper extraction; the user message
-// tail after each golden is the constraint block covered by formatters.test.ts.
+// Representative input for the golden pins below. The goldens capture builder
+// output. The user message tail after each golden is the constraint block
+// covered by formatters.test.ts.
 const characters: LLMCharacter[] = [
   { canonicalName: 'Alice', variations: ['Alice', 'Alice Chen'], gender: 'female' },
   { canonicalName: 'Bob', variations: ['Bob'], gender: 'male' },
