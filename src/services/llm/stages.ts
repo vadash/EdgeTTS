@@ -1,7 +1,7 @@
 // src/services/llm/stages.ts
 // Stage-aware LLM pipeline: a closure factory over per-stage configs (ADR 0015).
 // The returned record is the interface; the injected transport is the seam
-// (ADR 0014). Cancellation has one channel — the caller's signal on each
+// (same ADR). Cancellation has one channel — the caller's signal on each
 // stage call — so there is no stored controller and no cancel().
 
 import { defaultConfig } from '@/config';
@@ -83,7 +83,7 @@ export interface LlmStageDeps {
   /** Deterministic speaker-code source for tests; defaults to random hex codes. */
   speakerCodeFactory?: () => string;
   /**
-   * Transport seam (ADR 0014): routes one structured call through an arbitrary
+   * Transport seam (ADR 0015): routes one structured call through an arbitrary
    * adapter. When present, no LLMApiClient (OpenAI SDK) is constructed — stage
    * tests stub this with canned parsed responses instead of mocking the SDK.
    */
@@ -846,7 +846,7 @@ export interface LlmConnectionDeps {
   /** Cross-stage CORS proxy fallback when the stage config omits its own. */
   corsMiddleware?: string;
   logger: ILogger;
-  /** The transport seam has no SDK client to probe (ADR 0014). */
+  /** The transport seam has no SDK client to probe (ADR 0015). */
   transport?: LlmStageDeps['transport'];
 }
 

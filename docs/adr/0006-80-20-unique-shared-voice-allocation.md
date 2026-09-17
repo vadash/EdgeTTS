@@ -8,7 +8,5 @@ Each gender pool splits once at construction: the first 80% are unique slots, th
 - Gender routing is strict for declared genders. Unknown-gender characters borrow from whichever gender pool is less used, then cross-borrow if that pool is empty.
 - Rerolling a subset of characters is deterministic unless the pool order is shuffled. Reservation strips the voices already held by frozen rows (narrator plus rows above the clicked index) from the front of the pool, so an unshuffled reroll hands each lower row back the voice it already had — a no-op.
 - Shuffle must stay inside a priority tier, so a native voice is never passed over for a multilingual one for the same locale.
+- The frequency sort runs inside the single allocation entry `allocateVoices` (absent frequency = input order); the `topSpeakerPoolPercent` config key is deleted and the split is fixed at `UNIQUE_POOL_RATIO` 0.8 — one source for allocation and the run log (amended 2026-09-17).
 
-## Addendum (2026-09-17, architecture follow-up)
-
-The frequency sort moved inside the single allocation entry `allocateVoices` (absent frequency = input order); `topSpeakerPoolPercent` config key deleted — the split is fixed at `UNIQUE_POOL_RATIO` 0.8, one source for allocation and the run log. Semantics unchanged.

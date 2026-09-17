@@ -2,7 +2,7 @@
 
 Date: 2026-09-16
 Status: Accepted
-Supersedes the class form of [ADR-0014](0014-llm-stage-transport-seam.md) (transport seam retained unchanged).
+Absorbs the former llm-stage-transport-seam ADR in full: that file kept a duplicate number 0014 and is deleted; its live wording is folded in below.
 
 ## Context
 
@@ -24,11 +24,13 @@ export interface LlmStages {
 }
 ```
 
-- **Stage methods are the interface; the injected transport is the seam** (ADR-0014 wording, unchanged in spirit). `transport?: (config, opts) => Promise<T>` on `LlmStageDeps` swaps the whole SDK path; when absent, `LLMApiClient` adapters are built and cached per resolved config.
+- **Stage methods are the interface; the injected transport is the seam** (the former transport-seam ADR's wording, kept verbatim). `transport?: (config, opts) => Promise<T>` on `LlmStageDeps` swaps the whole SDK path; when absent, `LLMApiClient` adapters are built and cached per resolved config.
 - **Per-stage raw configs** (`extract`/`assign`/`merge`/`backup?`) use the nested config shape: connection triple required, tuning optional. The module resolves its own adapter slices; callers no longer flatten per-stage option bags.
 - **Cancellation has one channel**: every stage takes `p?: StageCall` with `{ signal?, onProgress? }`. The caller's signal is the only cancellation path; `cancel()` is deleted, and the orchestrator's abort bridge (`addEventListener`/`finally`) is gone with it.
 - **Stage tags ride the transport options** (`opts.stage: LlmPassId`, distinguishing `'assign'` from `'qa'`), so one injected transport can route or observe per pass.
 - **Speaker-code numbering helpers** (`formatNumberedParagraphs`, `renumberParagraphs`, `shiftAssignmentKey`, `[i]` prefix) moved to `src/config/prompts/shared/numbering.ts` beside the prompt builders that consume them.
+- **Speaker codes are injectable** via `speakerCodeFactory` on `LlmStageDeps`, so tests pin the code mapping without patching `CharacterUtils`.
+- **The rate-limit gate stays process-global inside the adapter** ([ADR-0012](0012-process-global-rate-limit-gate.md) is unaffected); `testLlmConnection` on the transport path reports `no client` — no SDK client exists to probe.
 - **Connection testing** (`testLlmConnection({ config, logger }, streaming?)`) is a standalone function; `LLMTab` probes a config directly instead of constructing a throwaway service.
 
 ## Consequences

@@ -9,11 +9,11 @@ Cancellation reached the orchestrator's catch block through four different encod
 
 ## Decision
 
-`CancellationError` (extends `AppError`, code `CONVERSION_CANCELLED`) is the one encoding for a user cancellation, and `throwIfAborted(signal)` is the standard pre-check. Every producer throws it: the orchestrator's `checkCancelled` and TTS pre-abort reject, `collectVotes`, `runWithConcurrency`, `rateLimitGate` (`waitTurn` pre-check and the cooldown-sleep abort listener), and the review gate's `cancelReview`. The one translation point is `withRetry`: when p-retry rejects with anything else while the signal has aborted (the abort-during-backoff window), it throws `CancellationError`. The orchestrator's string-equality catch branch is deleted — the type-only branch is the only path.
+`CancellationError` (extends `AppError`, code `CONVERSION_CANCELLED`) is the one encoding for a user cancellation, and `throwIfAborted(signal)` is the standard pre-check. Every producer throws it: the orchestrator's `checkCancelled` and TTS pre-abort reject, `collectVotes`, `runWithConcurrency`, `rateLimitGate` (`waitTurn` pre-check and the cooldown-sleep abort listener), and the review gate's decline (`reviewGate.decline` — named `cancelReview` when this ADR landed, renamed by ADR-0019). The one translation point is `withRetry`: when p-retry rejects with anything else while the signal has aborted (the abort-during-backoff window), it throws `CancellationError`. The orchestrator's string-equality catch branch is deleted — the type-only branch is the only path.
 
 ## Consequences
 
 - The catch branch is type-only (`isCancellation`), so a new cancellation producer cannot silently degrade into a recorded failure by picking the wrong message string.
 - Abort during retry backoff is translated once, inside `withRetry`; callers never see p-retry's abort reason.
-- Closes the "one Gate + one cancellation encoding" debt named in [ADR-0014](0014-ports-not-stores-in-pipeline.md) on the cancellation half; the review gate still reaches `LLMStore` through its adapter.
-- The dead TTS abort-listener wiring in `runTTSStage` is untouched; it remains debt for a separate change.
+- Closes the "one Gate + one cancellation encoding" debt named in [ADR-0014](0014-ports-not-stores-in-pipeline.md) on the cancellation half; the review-gate half closed with [ADR-0019](0019-gate-factory-replaces-promise-protocols.md).
+- The dead TTS abort-listener wiring in `runTTSStage`, still present when this ADR landed, is gone: [ADR-0018](0018-one-shot-tts-pool-protocol.md) replaced the pool lifecycle and left no listener to wire.

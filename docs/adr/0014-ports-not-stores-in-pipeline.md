@@ -7,5 +7,5 @@
 - A pipeline stage that needs something new from a store widens one port interface in `ConversionOrchestrator.ts`; never pass `Stores` deeper, and never import store modules from the orchestrator.
 - Orchestration tests fake ports (a few `vi.fn()` lines each) instead of hand-mocking the whole store bundle; `ChunkStore` arrives via `chunkStoreFactory`, so no prototype spies.
 - A new `StageId` fails typecheck at the adapter until `STAGE_STATUS` maps it (`Record` exhaustiveness), so the deleted `updateStatus` switch cannot lose a case silently.
-- `FailureLog` and `savePipelineState` own the `_temp_work` JSON files; the orchestrator holds no OPFS JSON code.
-- The review gate still reaches `LLMStore` through its adapter, and cancellation is still reconciled by string comparison in the catch block; both are pre-existing debt (the "one Gate + one cancellation encoding" candidate). The `ReviewGate` port makes that future swap local to the adapter.
+- `FailureLog` and `savePipelineState` own the `_temp_work` JSON files; the orchestrator's only remaining OPFS JSON is the voice-profile sidecar it writes to the book output folder (`saveVoiceProfile`, [ADR-0002](0002-stream-audio-chunks-to-disk.md)).
+- Closed since: cancellation has one typed encoding ([ADR-0017](0017-one-cancellation-encoding.md)), and the gates are a factory whose settle side never touches the pipeline ([ADR-0019](0019-gate-factory-replaces-promise-protocols.md)). Both swaps stayed local to the adapter, as this port intended.

@@ -21,7 +21,7 @@ API orchestration and structured JSON parsing.
 Read the ADR before changing the governed area:
 
 - JSON parsing or repair → `../../../docs/adr/0007-tiered-json-parse-and-repair.md`
-- Voting, QA pass, culling → `../../../docs/adr/0008-character-merge-voting.md`, `../../../docs/adr/0009-assign-draft-and-qa-pass.md`
-- Model fallback and degradation → `../../../docs/adr/0010-primary-then-backup-fallback.md`, `../../../docs/adr/0011-degrade-on-exhaustion.md`
+- Voting and culling → `../../../docs/adr/0008-character-merge-voting.md`
+- Pass failure policy: fallback, degrade, QA → `../../../docs/adr/0010-llm-pass-failure-policy.md`
 - Rate-limit handling, concurrency, backoff → `../../../docs/adr/0012-process-global-rate-limit-gate.md`
-- Stage tests, transport seam → `../../../docs/adr/0014-llm-stage-transport-seam.md`
+- Stage tests, transport seam → `../../../docs/adr/0015-llm-stages-closure-factory.md`

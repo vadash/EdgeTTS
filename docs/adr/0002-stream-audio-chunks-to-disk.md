@@ -1,6 +1,6 @@
 # Stream audio chunks to disk
 
-Audio never lives in RAM. Synthesized chunks stream straight to the chunk store in the temporary work folder, because holding a long book's audio in memory caused out-of-memory failures.
+Audio never lives in RAM. Synthesized chunks stream straight to the Chunk store, because holding a long book's audio in memory caused out-of-memory failures.
 
 ## Consequences
 
