@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { LLMCharacter, VoiceOption, VoicePool } from '@/state/types';
 import {
-  allocateTieredVoices,
+  allocateVoices,
   assignUnmatchedFromPool,
   buildPriorityPool,
   randomizeBelow,
+  uniqueSlotCount,
   VoicePoolTracker,
 } from './VoiceAllocator';
 
@@ -133,6 +134,11 @@ describe('randomizeBelow', () => {
     gender,
   });
 
+  // Mirrors the ordering the deleted in-function fallback synthesized (1000 - 10*index)
+  // so existing assertions hold unchanged now that frequency is required.
+  const freq = (chars: LLMCharacter[]): Map<string, number> =>
+    new Map(chars.map((c, i) => [c.canonicalName, 1000 - i * 10]));
+
   it('assigns native voices before Multilingual voices', () => {
     const chars = [
       mkChar('Alice', 'female'), // index 0 — frozen
@@ -162,6 +168,7 @@ describe('randomizeBelow', () => {
       enabledVoices,
       'en-US, NarratorNeural',
       'en',
+      freq(chars),
     );
 
     // Bob (index 1) should get a native voice, not a Multilingual one
@@ -196,6 +203,7 @@ describe('randomizeBelow', () => {
       enabledVoices,
       'en-US, NarratorNeural',
       'en',
+      freq(chars),
     );
 
     const assignedVoices = [...result.values()];
@@ -229,7 +237,7 @@ describe('randomizeBelow', () => {
       enabledVoices,
       'narrator',
       'en',
-      undefined,
+      freq(chars),
       true,
     );
     const firstOrder = [first.get('A'), first.get('B'), first.get('C'), first.get('D')].join(',');
@@ -243,7 +251,7 @@ describe('randomizeBelow', () => {
         enabledVoices,
         'narrator',
         'en',
-        undefined,
+        freq(chars),
         true,
       );
       const order = [run.get('A'), run.get('B'), run.get('C'), run.get('D')].join(',');
@@ -274,7 +282,7 @@ describe('randomizeBelow', () => {
         enabledVoices,
         'narrator',
         'en',
-        undefined,
+        freq(chars),
         true,
       );
       const assigned = [result.get('A')!, result.get('B')!, result.get('C')!];
@@ -370,7 +378,7 @@ describe('assignUnmatchedFromPool', () => {
   });
 });
 
-describe('allocateTieredVoices', () => {
+describe('allocateVoices', () => {
   const _vo = (fullValue: string, gender: 'male' | 'female'): VoiceOption => {
     const [locale, name] = fullValue.split(', ');
     return { locale, name, fullValue, gender };
@@ -382,7 +390,25 @@ describe('allocateTieredVoices', () => {
     gender,
   });
 
-  it('assigns unique voices to top 20% of characters, rest cycle pool', () => {
+  it('assigns voices in input order when frequency is absent', () => {
+    const chars = [mkChar('Bob', 'male'), mkChar('Alice', 'female')];
+    const pool: VoicePool = {
+      male: ['en-US, AndrewNeural', 'en-US, BrianNeural'],
+      female: ['en-US, JennyNeural', 'en-US, AvaNeural'],
+    };
+
+    const result = allocateVoices({
+      characters: chars,
+      pool,
+      narratorVoice: 'en-US, NarratorNeural',
+    });
+
+    // Without frequency, characters keep input order (no frequency analysis)
+    expect(result.voiceMap.get('Bob')).toBe('en-US, AndrewNeural');
+    expect(result.voiceMap.get('Alice')).toBe('en-US, JennyNeural');
+  });
+
+  it('assigns unique voices to the top 80% of characters, rest cycle pool', () => {
     const chars = [
       mkChar('Alice', 'female'), // 100 lines - top speaker
       mkChar('Bob', 'male'), // 80 lines
@@ -408,8 +434,8 @@ describe('allocateTieredVoices', () => {
       ['Henry', 1],
     ]);
 
-    // Pool size = 5, 20% = 1 unique slot
-    const result = allocateTieredVoices({
+    // Pool size = 5 -> uniqueSlotCount = 4 unique slots, shared tail cycles
+    const result = allocateVoices({
       characters: chars,
       frequency,
       pool,
@@ -444,7 +470,7 @@ describe('allocateTieredVoices', () => {
     ]);
     const reserved = new Set(['en-US, AndrewNeural']);
 
-    const result = allocateTieredVoices({
+    const result = allocateVoices({
       characters: chars,
       frequency,
       pool,
@@ -470,7 +496,7 @@ describe('allocateTieredVoices', () => {
       chars.map((c) => [c.canonicalName, Math.floor(Math.random() * 100)]),
     );
 
-    const result = allocateTieredVoices({
+    const result = allocateVoices({
       characters: chars,
       frequency,
       pool,
@@ -493,7 +519,7 @@ describe('allocateTieredVoices', () => {
     };
     const frequency = new Map<string, number>([['Alice', 100]]);
 
-    const result = allocateTieredVoices({
+    const result = allocateVoices({
       characters: chars,
       frequency,
       pool,
@@ -524,7 +550,7 @@ describe('allocateTieredVoices', () => {
     );
 
     // Multiple voices should be used (not just 1)
-    const result = allocateTieredVoices({
+    const result = allocateVoices({
       characters: chars,
       frequency,
       pool,
@@ -534,5 +560,15 @@ describe('allocateTieredVoices', () => {
     // Multiple voices should be used (not just 1)
     const assignedVoices = [...result.voiceMap.values()].filter((v) => !v.includes('UNNAMED'));
     expect(new Set(assignedVoices).size).toBeGreaterThan(1);
+  });
+});
+
+describe('uniqueSlotCount', () => {
+  it('is 80% of the pool size, rounded up', () => {
+    expect(uniqueSlotCount(5)).toBe(4);
+  });
+
+  it('never drops below one voice', () => {
+    expect(uniqueSlotCount(1)).toBe(1);
   });
 });

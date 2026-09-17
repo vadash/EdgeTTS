@@ -1,7 +1,6 @@
 // Conversion Orchestrator - Plain function orchestrator
 // Runs the TTS conversion workflow as a single async function
 
-import { defaultConfig } from '@/config';
 import {
   AppError,
   getErrorMessage,
@@ -40,10 +39,13 @@ import {
 import type { TextBlockSplitter } from './TextBlockSplitter';
 import type { TTSWorkerPool, WorkerPoolOptions } from './TTSWorkerPool';
 import {
-  allocateByGender,
-  allocateTieredVoices,
+  allocateVoices,
+  frequencyFromAssignments,
   remapAssignments,
   shortVoiceId,
+  sortByFrequency,
+  UNIQUE_POOL_RATIO,
+  uniqueSlotCount,
 } from './VoiceAllocator';
 import type { VoicePoolBuilder } from './VoicePoolBuilder';
 
@@ -281,33 +283,25 @@ function logVoiceSummary(
   assignments: SpeakerAssignment[],
   voiceMap: Map<string, string>,
   rareVoices: { male: string; female: string; unknown: string },
-  _uniqueCount: number,
   pool: VoicePool,
   narratorVoice: string,
   logger: ILogger,
 ): void {
-  const frequency = new Map<string, number>();
-  for (const a of assignments) {
-    if (a.speaker !== 'narrator') {
-      frequency.set(a.speaker, (frequency.get(a.speaker) ?? 0) + 1);
-    }
-  }
+  const frequency = frequencyFromAssignments(assignments);
 
   const poolSize = pool.male.length + pool.female.length;
-  const topPercent = Math.round(defaultConfig.llm.topSpeakerPoolPercent * 100);
-  const uniqueSlots = Math.max(1, Math.ceil(defaultConfig.llm.topSpeakerPoolPercent * poolSize));
+  const uniqueSlots = uniqueSlotCount(poolSize);
 
-  const sorted = [...characters].sort((a, b) => {
-    const freqA = frequency.get(a.canonicalName) ?? 0;
-    const freqB = frequency.get(b.canonicalName) ?? 0;
-    return freqB - freqA;
-  });
+  // Same helper as allocation, so display order can never drift from it
+  const sorted = sortByFrequency(characters, frequency);
 
   const report = (msg: string) => logger.info(msg);
 
   report('');
   report('══════ Voice Assignment ══════');
-  report(`Pool: ${poolSize} | Top ${topPercent}%: ${uniqueSlots} unique | Cycle: rest`);
+  report(
+    `Pool: ${poolSize} | Top ${Math.round(UNIQUE_POOL_RATIO * 100)}%: ${uniqueSlots} unique | Cycle: rest`,
+  );
   report('');
 
   const narratorLines = assignments.filter((a) => a.speaker === 'narrator').length;
@@ -527,9 +521,10 @@ export async function runConversion(
 
       // ==================== VOICE ASSIGNMENT (initial) ====================
       checkCancelled(signal);
-      const initialAllocation = allocateByGender(characters, {
-        narratorVoice: input.narratorVoice,
+      const initialAllocation = allocateVoices({
+        characters,
         pool,
+        narratorVoice: input.narratorVoice,
       });
       voiceMap = initialAllocation.voiceMap;
       report(
@@ -591,16 +586,10 @@ export async function runConversion(
       // ==================== VOICE REMAPPING (by frequency) ====================
       checkCancelled(signal);
 
-      // Count speaking frequency for tiered allocation
-      const frequency = new Map<string, number>();
-      for (const a of assignments) {
-        if (a.speaker !== 'narrator') {
-          frequency.set(a.speaker, (frequency.get(a.speaker) ?? 0) + 1);
-        }
-      }
+      const frequency = frequencyFromAssignments(assignments);
 
-      // Use tiered allocation for better voice distribution
-      const frequencyAllocation = allocateTieredVoices({
+      // Re-allocation by speaking frequency: top speakers reach the unique slice first
+      const frequencyAllocation = allocateVoices({
         characters,
         frequency,
         pool,
@@ -614,7 +603,6 @@ export async function runConversion(
         assignments,
         voiceMap,
         frequencyAllocation.rareVoices,
-        frequencyAllocation.uniqueCount,
         pool,
         input.narratorVoice,
         logger,

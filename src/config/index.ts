@@ -57,8 +57,6 @@ export interface LLMConfig {
   maxMergeRetries: number;
   /** Number of merge votes for consensus */
   mergeVoteCount: number;
-  /** Percentage of voice pool allocated to top speakers (0.2 = 20%) */
-  topSpeakerPoolPercent: number;
 }
 
 export interface RetryConfig {
@@ -138,8 +136,6 @@ export const defaultConfig: AppConfig = {
     maxAssignRetries: 3,
     maxMergeRetries: 5,
     mergeVoteCount: 5,
-    /** Percentage of voice pool allocated to top speakers (0.2 = 20%) */
-    topSpeakerPoolPercent: 0.2,
   },
 
   retry: {
