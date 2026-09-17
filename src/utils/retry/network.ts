@@ -1,7 +1,5 @@
 import { getCooldownRemainingMs } from '@/services/llm/rateLimitGate';
 
-// Network retry utilities with exponential backoff
-
 import pRetry from 'p-retry';
 import { CancellationError, isRetriableError, throwIfAborted } from '@/errors';
 
@@ -15,9 +13,9 @@ export interface RetryOptions {
 }
 
 /**
- * Executes a function with exponential backoff retry logic.
- * Handles network jitters, sleep mode recovery, and rate limiting.
- * Uses p-retry internally for battle-tested retry behavior.
+ * Repo rule: every network call goes through this helper (AGENTS.md,
+ * Boundaries). The defaults handle network jitter, sleep mode recovery,
+ * and rate limiting.
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
@@ -38,33 +36,32 @@ export async function withRetry<T>(
   try {
     return await pRetry(
       async () => {
-        // Check for cancellation before each attempt
         throwIfAborted(signal);
         return operation();
       },
       {
         retries,
         // When a 429 cooldown is in flight, the rate-limit gate inside the
-        // operation already waited the provider's full deadline; p-retry must
-        // not stack its own backoff on top — its timers are capped at maxDelay
+        // operation already waited the provider's full deadline. p-retry must
+        // not stack its own backoff on top, because its timers cap at maxDelay
         // (60s) and would only delay the next attempt pointlessly. Zero the
         // timers so the gate owns the wait and the retry resumes the instant
         // the cooldown releases.
         minTimeout: getCooldownRemainingMs() > 0 ? 0 : baseDelay,
         maxTimeout: getCooldownRemainingMs() > 0 ? 0 : maxDelay,
-        factor: 2, // Exponential backoff factor
-        randomize: true, // Adds jitter to prevent thundering herd
+        factor: 2,
+        randomize: true, // Jitter prevents a thundering herd of retries
         signal,
         onFailedAttempt: (context) => {
-          // p-retry 7.x passes a context object {error, attemptNumber, retriesLeft, ...}
           const actualError = context.error;
 
-          // Check if error should be retried
           if (shouldRetry && !shouldRetry(actualError)) {
-            throw actualError; // Don't retry - rethrow to stop
+            // A throw here makes p-retry stop retrying.
+            throw actualError;
           }
 
-          // Calculate delay for callback (p-retry handles actual delay)
+          // The delay here only feeds the onRetry callback. p-retry applies
+          // its own backoff.
           const jitter = Math.random() * 1000;
           const nextDelay = Math.min(
             baseDelay * 2 ** (context.attemptNumber - 1) + jitter,

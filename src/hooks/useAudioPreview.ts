@@ -57,7 +57,6 @@ export function useAudioPreview(onReset?: () => void) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Refs to hold non-reactive instances
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
 
@@ -77,7 +76,6 @@ export function useAudioPreview(onReset?: () => void) {
     onResetRef.current?.();
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => cleanup, [cleanup]);
 
   const stop = useCallback(() => {
@@ -91,7 +89,6 @@ export function useAudioPreview(onReset?: () => void) {
    */
   const play = useCallback(
     async (produce: () => Promise<Blob>, options: StartOptions = {}) => {
-      // Stop any existing playback
       cleanup();
 
       if (options.shouldStart && !options.shouldStart()) return;

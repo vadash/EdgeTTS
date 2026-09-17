@@ -1,5 +1,4 @@
 // src/config/prompts/qa/rules.ts
-// Quality Assurance rules for correcting draft assignments
 
 export const QA_RULES = `1. REVIEW THE DRAFT:
    Check every assignment in the draft against the original text. Look for these common LLM errors:

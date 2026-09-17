@@ -59,7 +59,7 @@ export default (_env, argv) => {
 
     plugins: [
       new CleanWebpackPlugin({
-        // Only clean the specific version subfolder, not entire dist
+        // Patterns resolve against output.path, so **/* cleans only this version subfolder, not the whole dist tree
         cleanOnceBeforeBuildPatterns: ['**/*'],
       }),
       new HtmlWebpackPlugin({
@@ -91,7 +91,7 @@ export default (_env, argv) => {
 
     devtool: isProduction ? 'source-map' : 'eval-source-map',
 
-    // Suppress FFmpeg dynamic import warnings (expected behavior)
+    // The app passes coreURL and wasmURL to ffmpeg.load() itself, so the dynamic import warning from @ffmpeg/ffmpeg's ESM build is expected and safe to ignore
     ignoreWarnings: [
       {
         module: /@ffmpeg[\\/]ffmpeg[\\/]dist[\\/]esm/,

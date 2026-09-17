@@ -1,6 +1,3 @@
-// useTTSConversion - Simplified hook using runConversion function
-// Orchestrator is now a plain function with external AbortSignal
-
 import { useCallback, useRef } from 'preact/hooks';
 import { getOrchestratorServices } from '@/services';
 import {
@@ -20,31 +17,19 @@ import {
   updateProgress,
 } from '@/stores/ConversionStore';
 import { isConfigured, llm } from '@/stores/LLMStore';
-// Import signal-based stores directly for snapshot access
 import { settings } from '@/stores/SettingsStore';
 
-/**
- * Hook return type
- */
 export interface UseTTSConversionResult {
-  /** Start conversion with text and optional book metadata */
   startConversion: (text: string, existingBook?: ProcessedBook | null) => Promise<void>;
-  /** Cancel ongoing conversion */
   cancel: () => void;
-  /** Select directory for saving files */
   selectDirectory: () => Promise<boolean>;
-  /** Whether conversion is in progress */
   isProcessing: boolean;
-  /** Current progress */
   progress: {
     current: number;
     total: number;
   };
 }
 
-/**
- * Build OrchestratorInput snapshot from signal-based stores
- */
 function buildInput(stores: Stores, text: string): OrchestratorInput {
   const s = settings.value;
   const l = llm.value;
@@ -73,42 +58,29 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
   };
 }
 
-/**
- * Main TTS conversion hook
- * Uses ConversionOrchestrator for the actual conversion workflow
- */
 export function useTTSConversion(): UseTTSConversionResult {
   const stores = useStores();
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  /**
-   * Start conversion
-   */
   const startConversion = useCallback(
     async (text: string, existingBook?: ProcessedBook | null) => {
-      // Check if already processing
       if (isProcessing.value) {
         stores.logs.info('Conversion already in progress');
         return;
       }
 
-      // Check if conversion is running in another tab
       const blocked = await KeepAwake.isConversionRunning();
       if (blocked) {
         patchState({ tabBlocked: true, status: 'idle' });
         return;
       }
 
-      // Clear any previous tab-blocked state
       patchState({ tabBlocked: false });
 
-      // Build input snapshot from current store state
       const input = buildInput(stores, text);
 
-      // Create abort controller for this conversion
       abortControllerRef.current = new AbortController();
 
-      // Get orchestrator services bundle
       const orchestratorServices = getOrchestratorServices();
 
       // Adapters bridging the orchestrator ports to the signal-based stores.
@@ -164,7 +136,7 @@ export function useTTSConversion(): UseTTSConversionResult {
         },
       };
 
-      // Start keep-awake to prevent background throttling
+      // Hold a wake lock so the browser does not throttle the tab mid-Conversion.
       const keepAwake = getKeepAwake();
       await keepAwake.start();
 
@@ -177,13 +149,11 @@ export function useTTSConversion(): UseTTSConversionResult {
           existingBook,
         );
       } catch (error) {
-        // Error is already logged by orchestrator
-        // Just ensure we're not in processing state
+        // The orchestrator already logged the error; this only exits the processing state.
         if (isProcessing.value) {
           setError((error as Error).message);
         }
       } finally {
-        // Stop keep-awake when conversion ends
         keepAwake.stop();
         abortControllerRef.current = null;
       }
@@ -191,21 +161,16 @@ export function useTTSConversion(): UseTTSConversionResult {
     [stores],
   );
 
-  /**
-   * Cancel conversion
-   */
   const cancel = useCallback(() => {
     abortControllerRef.current?.abort();
     stores.logs.info('Conversion cancelled');
   }, [stores.logs]);
 
-  /**
-   * Select directory for saving files
-   */
   const selectDirectory = useCallback(async (): Promise<boolean> => {
     const currentHandle = stores.data.directoryHandle.value;
 
-    // If already have a handle, verify it's still valid
+    // Directory handle permissions do not survive a page reload, so request
+    // readwrite again before reusing the handle.
     if (currentHandle) {
       try {
         const permission = await currentHandle.requestPermission({ mode: 'readwrite' });
@@ -218,7 +183,6 @@ export function useTTSConversion(): UseTTSConversionResult {
       }
     }
 
-    // Check for directory picker support
     if (!window.showDirectoryPicker) {
       stores.logs.error('Directory picker not supported. Please use Chrome, Edge, or Opera.');
       return false;

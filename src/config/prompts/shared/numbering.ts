@@ -1,6 +1,5 @@
-// src/config/prompts/shared/numbering.ts
 // The [i] numbering contract between the assign/QA prompts and the pipeline:
-// paragraphs are tagged 0-based ("[0] and above" — see the assign rules), and
+// paragraphs are tagged 0-based ("[0] and above"; see the assign rules), and
 // negative indices are read-only overlap context the model must not assign
 // (see speakerCodes.formatOverlapContext). The prompt text owns the contract;
 // these helpers are its single encoding/formatting implementation.
@@ -13,8 +12,8 @@ export function formatNumberedParagraphs(sentences: string[]): string {
 }
 
 /**
- * Renumber already-tagged lines from [0] — second half of a backup 2-way
- * split, so each half looks like a fresh block to the model.
+ * Renumber already-tagged lines from [0] for the second half of a backup
+ * 2-way split, so each half looks like a fresh block to the model.
  */
 export function renumberParagraphs(lines: string[]): string[] {
   return lines.map((line, i) => line.replace(/^\[\d+\]/, `[${i}]`));

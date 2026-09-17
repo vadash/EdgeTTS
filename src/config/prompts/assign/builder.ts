@@ -1,6 +1,5 @@
 // src/config/prompts/assign/builder.ts
-// Pipeline stage 3 of 3: Extract -> Merge -> Assign
-// Builds the complete message array for speaker attribution prompts.
+// Pipeline stage 3 of 4: Extract -> Merge -> Assign -> QA
 
 import type { LLMCharacter } from '@/state/types';
 import {

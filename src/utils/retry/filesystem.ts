@@ -1,11 +1,10 @@
-// Filesystem retry utilities for permission recovery
-
 import { filePermissionError } from '@/errors';
 
 /**
- * Wraps a File System Access API operation with permission recovery.
- * On NotAllowedError, re-requests permission once, then retries.
- * Shows a notification before re-requesting permission.
+ * Repo rule: every file system call goes through this helper, because the
+ * browser can drop the security context at any time (AGENTS.md,
+ * Boundaries). A NotAllowedError gets exactly one permission re-request
+ * and one retry.
  */
 export async function withPermissionRetry<T>(
   directoryHandle: FileSystemDirectoryHandle,
@@ -19,7 +18,6 @@ export async function withPermissionRetry<T>(
       throw error;
     }
 
-    // Notify user that permission was lost
     notify?.('File system permission lost. Re-requesting access...');
 
     const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
@@ -27,7 +25,6 @@ export async function withPermissionRetry<T>(
       throw filePermissionError(directoryHandle.name);
     }
 
-    // Single retry after re-grant
     return await operation();
   }
 }

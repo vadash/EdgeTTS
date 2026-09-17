@@ -1,16 +1,12 @@
 // Gates
-// Promise-completion isolated behind a per-instance signal, replacing the
-// promise-over-module-global review/resume protocols in LLMStore/ConversionStore.
+// Each gate keeps its pending promise behind a per-instance signal, so
+// open(), confirm(), and decline() touch no module-global state.
 
 import { signal, type Signal } from '@preact/signals';
 import { CancellationError } from '@/errors';
 import type { LLMCharacter, SpeakerAssignment, VoiceProfileFile } from '@/state/types';
 import type { ResumeInfo } from './ConversionStore';
 import { setCharacters, setLoadedProfile, setSpeakerAssignments, setVoiceMap } from './LLMStore';
-
-// ============================================================================
-// Gate Factory
-// ============================================================================
 
 /** Side effects deciding what open() settles with. */
 export interface GateIo<P, T> {
@@ -92,10 +88,6 @@ export function createGate<P, T>(io: GateIo<P, T>): Gate<P, T> {
   };
 }
 
-// ============================================================================
-// Review Gate
-// ============================================================================
-
 export interface ReviewDraft {
   characters: LLMCharacter[];
   voiceMap: Map<string, string>;
@@ -121,10 +113,6 @@ export const reviewGate = createGate<ReviewDraft, ReviewOutcome>({
     throw new CancellationError();
   },
 });
-
-// ============================================================================
-// Resume Gate
-// ============================================================================
 
 export const resumeGate = createGate<ResumeInfo, boolean>({
   settle: () => true,

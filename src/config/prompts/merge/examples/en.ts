@@ -1,6 +1,4 @@
-// src/config/prompts/merge/examples/en.ts
-// 4 few-shot examples for character merge/deduplication -- EN language
-// Progresses: shared variation -> system linking -> no merges -> protagonist + ordering
+// Example order is deliberate: shared variation, system linking, no merges, then protagonist linking with ordering.
 
 import type { PromptExample } from '../../shared/formatters';
 

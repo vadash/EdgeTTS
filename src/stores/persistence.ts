@@ -1,5 +1,5 @@
 // Shared localStorage JSON persistence for signal stores.
-// Keys must come from @/config/storage -- never inline a key string.
+// Keys must come from @/config/storage; never inline a key string.
 
 /**
  * Reads a JSON object from localStorage, shallow-merging it over `fallback`.
@@ -17,7 +17,6 @@ export function loadJSON<T extends object>(key: string, fallback: T): T {
   return { ...fallback };
 }
 
-/** Serializes a value to localStorage as JSON. */
 export function saveJSON(key: string, value: unknown): void {
   localStorage.setItem(key, JSON.stringify(value));
 }

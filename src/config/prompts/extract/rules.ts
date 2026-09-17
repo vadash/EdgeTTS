@@ -1,6 +1,3 @@
-// src/config/prompts/extract/rules.ts
-// Pipeline stage 1 of 3: Extract -> Merge -> Assign
-
 export const EXTRACT_RULES = `1. HOW TO FIND SPEECH:
    - Look for quotes: "Hello", 'Hi', <<Привет>>, „Hallo"
    - Look for game system messages in brackets: [Level Up!], [Quest]

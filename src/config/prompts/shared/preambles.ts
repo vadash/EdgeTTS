@@ -1,5 +1,4 @@
-// src/config/prompts/shared/preambles.ts
-// System preambles, assistant prefill presets, and resolve helpers
+// System preambles and assistant prefill presets.
 
 /**
  * Chinese-language system preamble applied to ALL prompts.
@@ -31,16 +30,14 @@ export const SYSTEM_PREAMBLE_CN = `<system_config>
  * Injected as a 3rd message to bias the model into the correct reasoning track.
  */
 export const PREFILL_PRESETS = {
-  /** No prefill */
   none: '',
   /** Auto-select based on detected language */
-  auto: '', // Placeholder - dynamically resolved
+  auto: '',
 } as const;
 
 export type PrefillPreset = keyof typeof PREFILL_PRESETS;
 
 /**
- * Default prefill -- pure_think is safest for unknown models.
- * Can be overridden per-provider in settings.
+ * Default prefill; can be overridden per-provider in settings.
  */
 export const DEFAULT_PREFILL: PrefillPreset = 'none';

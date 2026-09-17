@@ -1,6 +1,3 @@
-// Application Configuration
-// Centralized configuration extracted from magic numbers across services
-
 import type { AudioSettings } from '@/state/types';
 
 export interface TTSConfig {
@@ -26,13 +23,11 @@ export interface AudioConfig extends AudioSettings {
   sampleRate: number;
   /** Normalization LUFS target */
   normLufs: number;
-  /** Normalization LRA */
   normLra: number;
   /** Normalization true peak (dB) */
   normTruePeak: number;
   /** Silence removal threshold (dB) */
   silenceThreshold: number;
-  /** Silence start periods */
   silenceStartPeriods: number;
   /** Silence start duration (seconds) */
   silenceStartDuration: number;
@@ -47,7 +42,6 @@ export interface LLMConfig {
   extractBlockTokens: number;
   /** Token limit for Assign blocks */
   assignBlockTokens: number;
-  /** Maximum concurrent API requests */
   maxConcurrentRequests: number;
   /** Maximum tokens for API response */
   maxTokens: number;
@@ -60,18 +54,16 @@ export interface LLMConfig {
 }
 
 export interface RetryConfig {
-  /** Retry delays in ms - after exhausted, stays on last value forever */
+  /** Retry delays in ms. After the array is exhausted, every attempt uses the last value. */
   delays: number[];
 }
 
 export interface EdgeTTSApiConfig {
   /** WebSocket base URL */
   baseUrl: string;
-  /** Trusted client token */
   trustedClientToken: string;
   /** Security version header */
   secMsGecVersion: string;
-  /** Audio format */
   audioFormat: string;
 }
 
@@ -84,8 +76,8 @@ export interface AppConfig {
 }
 
 /**
- * The one AudioSettings default value object — single source for the
- * SettingsStore; spread into defaultConfig.audio below.
+ * Single source of AudioSettings defaults for the SettingsStore;
+ * defaultConfig.audio spreads it below.
  */
 export const defaultAudioSettings: AudioSettings = {
   silenceRemoval: true,
@@ -101,9 +93,6 @@ export const defaultAudioSettings: AudioSettings = {
   mergeConcurrency: 2,
 };
 
-/**
- * Default application configuration
- */
 export const defaultConfig: AppConfig = {
   tts: {
     maxWorkers: 15,
@@ -129,8 +118,8 @@ export const defaultConfig: AppConfig = {
   },
 
   llm: {
-    extractBlockTokens: 8000, // Free models love to reason for same amount of tokens
-    assignBlockTokens: 4000, // Assign is hard job so we send less
+    extractBlockTokens: 8000, // Free models love to reason, spending a similar token budget
+    assignBlockTokens: 4000, // Assign is a hard task, so we send fewer tokens
     maxConcurrentRequests: 2,
     maxTokens: 8000,
     maxAssignRetries: 3,
@@ -139,8 +128,8 @@ export const defaultConfig: AppConfig = {
   },
 
   retry: {
-    // Shared retry delays for TTS and LLM - stays on last value forever
-    // Extended to 10 minutes max to handle rate limiting
+    // Shared by TTS and LLM. After the last value, every attempt reuses it.
+    // The 10-minute final delay rides out provider rate limiting.
     delays: [5000, 10000, 30000, 60000, 120000, 300000, 600000],
   },
 
@@ -152,18 +141,13 @@ export const defaultConfig: AppConfig = {
   },
 };
 
-/**
- * Load configuration with localStorage overrides (if needed in future)
- */
 export function loadConfig(): AppConfig {
-  // For now, return default config
-  // In future, could merge with localStorage overrides
   return { ...defaultConfig };
 }
 
 /**
- * Get retry delay based on attempt number (shared by TTS and LLM)
- * After exhausting the delays array, stays on the last value forever
+ * Retry delay for an attempt number, shared by TTS and LLM.
+ * After the delays array is exhausted, every attempt uses the last value.
  */
 export function getRetryDelay(attempt: number, config: RetryConfig = defaultConfig.retry): number {
   const index = Math.min(attempt, config.delays.length - 1);

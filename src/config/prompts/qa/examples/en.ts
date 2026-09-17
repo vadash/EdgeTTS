@@ -1,5 +1,4 @@
 // src/config/prompts/qa/examples/en.ts
-// QA examples showing flawed drafts being corrected
 
 import type { PromptExample } from '../../shared/formatters';
 

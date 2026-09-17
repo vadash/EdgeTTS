@@ -74,7 +74,6 @@ for (const [speaker, count] of Object.entries(speakerCounts).sort((a, b) => b[1]
 }
 console.log('');
 
-// Top 10 offenders by length
 const offenders = assignments
   .map((a) => ({ idx: a.sentenceIndex, text: a.text, len: a.text.length, speaker: a.speaker }))
   .sort((a, b) => b.len - a.len)

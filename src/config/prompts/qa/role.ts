@@ -1,5 +1,4 @@
 // src/config/prompts/qa/role.ts
-// Quality Assurance stage: Review and correct draft speaker assignments
 
 export const QA_ROLE = `You are an expert dialogue editor and quality assurance bot.
 Your job is to review a draft speaker attribution for a text, find mistakes, and output the corrected mapping.

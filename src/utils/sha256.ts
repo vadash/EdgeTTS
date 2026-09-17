@@ -1,5 +1,6 @@
 // SHA-256 implementation for Sec-MS-GEC token generation
 // Based on original socket_edge_tts.js
+// Returns '' when any character code exceeds 255; the Sec-MS-GEC input is ASCII only.
 
 interface SHA256Cache {
   h?: number[];

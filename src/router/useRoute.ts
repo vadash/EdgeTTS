@@ -10,23 +10,19 @@ export const routes = {
 export type RouteKey = keyof typeof routes;
 export type RouteHash = (typeof routes)[RouteKey];
 
-// Current hash signal
 const currentHash = signal(window.location.hash || routes.convert);
 
-// Listen to hash changes
 if (typeof window !== 'undefined') {
   window.addEventListener('hashchange', () => {
     currentHash.value = window.location.hash || routes.convert;
   });
 }
 
-// Navigate function
 export function navigate(route: RouteKey | RouteHash): void {
   const hash = route.startsWith('#') ? route : routes[route as RouteKey];
   window.location.hash = hash;
 }
 
-// Computed route helpers
 export const isConvertRoute = computed(
   () =>
     currentHash.value === routes.convert || currentHash.value === '' || currentHash.value === '#',
@@ -35,7 +31,6 @@ export const isSettingsRoute = computed(() => currentHash.value === routes.setti
 export const isLogsRoute = computed(() => currentHash.value === routes.logs);
 export const isAboutRoute = computed(() => currentHash.value === routes.about);
 
-// Hook for current route
 export function useRoute() {
   return {
     hash: currentHash.value,

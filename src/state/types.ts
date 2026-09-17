@@ -1,9 +1,7 @@
-// TypeScript interfaces for EdgeTTS application
-
 import type { ConversionStatus } from '@/stores/ConversionStore';
 import type { LLMProcessingStatus } from '@/stores/LLMStore';
 
-// Audio Presets for Opus encoding
+// Opus preset names; AUDIO_PRESETS holds the values each one selects.
 export enum AudioPreset {
   PC = 'pc',
   MOBILE = 'mobile',
@@ -53,7 +51,6 @@ export interface AppSettings {
   ttsThreads: number;
   llmThreads: number;
   lexxRegister: boolean;
-  // Audio processing settings
   outputFormat: 'opus';
   // Opus encoding preset (bitrate/compression detail lives in audio)
   opusPreset: AudioPreset;
@@ -97,7 +94,7 @@ export interface ConvertedFile {
   content: string;
 }
 
-// File System Access API — partial augmentation for missing DOM lib members
+// File System Access API: partial augmentation for members the DOM lib lacks.
 declare global {
   interface FileSystemHandle {
     requestPermission(descriptor?: { mode?: 'read' | 'readwrite' }): Promise<PermissionState>;
@@ -124,8 +121,6 @@ export interface VoicePool {
   female: string[];
 }
 
-// LLM Stage Configuration
-
 export type ReasoningLevel = 'auto' | 'high' | 'medium' | 'low';
 
 export interface StageConfig {
@@ -138,7 +133,7 @@ export interface StageConfig {
   topP: number;
   repeatPrompt: boolean;
   corsMiddleware: string;
-  /** Retry attempts for this stage before giving up (backup model takes over) */
+  /** Retry attempts for this stage before the Backup model takes over */
   maxRetries: number;
 }
 
@@ -164,7 +159,6 @@ export const STAGE_COPY_FIELDS = [
   'maxRetries',
 ] as const satisfies readonly (keyof StageConfig)[];
 
-// LLM Voice Assignment Types
 export interface LLMCharacter {
   canonicalName: string;
   variations: string[];
@@ -185,7 +179,6 @@ export interface SpeakerAssignment {
   voiceId: string;
 }
 
-// Voice Profile Types (v2)
 export interface VoiceProfileFile {
   version: 2;
   narrator: string;
@@ -204,13 +197,12 @@ export interface CharacterEntry {
   bookAppearances: number;
 }
 
-// Voice Profile Constants
 export const IMPORTANCE_THRESHOLD = 0.005; // 0.5%
 export const MAX_NAME_EDITS = 2;
 export const MIN_NAME_PAIRINGS = 2;
 
 // Pipeline stage identifiers and their conversion/LLM status projection.
-// Both stores import this module for types only — no runtime cycle.
+// Both stores import this module for types only, so no runtime cycle.
 export type StageId =
   | 'character-extraction'
   | 'voice-assignment'

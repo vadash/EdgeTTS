@@ -1,6 +1,3 @@
-// src/config/prompts/merge/rules.ts
-// Pipeline stage 2 of 3: Extract -> Merge -> Assign
-
 export const MERGE_RULES = `1. CHECK VARIATIONS AND CONTEXT:
    If Character A and Character B share a name in their variations, MERGE them.
    If they do not share an exact name, but context clearly proves they are the same entity (e.g., "The Purple Man" and "The Registrar" in the same scene), MERGE them.

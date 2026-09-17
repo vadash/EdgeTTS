@@ -1,5 +1,4 @@
 // src/config/prompts/qa/builder.ts
-// Builds the QA prompt that reviews draft assignments
 
 import type { LLMCharacter } from '@/state/types';
 import {

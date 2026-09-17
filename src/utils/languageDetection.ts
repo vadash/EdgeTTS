@@ -1,7 +1,3 @@
-/**
- * Multi-language detection using Unicode script analysis and stopword disambiguation
- */
-
 import { STOPWORDS } from './stopwords';
 
 export type DetectedLanguage = string;
@@ -152,7 +148,7 @@ function detectDominantScript(text: string): ScriptDef | null {
     const script = classifyChar(char.charCodeAt(0));
     if (script) counts[script] = (counts[script] || 0) + 1;
   }
-  // Special case: if both CJK and hiragana/katakana present, it's Japanese
+  // Japanese text mixes kanji with kana, so CJK plus kana means Japanese, not Chinese
   if (counts.hiragana_katakana && counts.cjk) {
     return SCRIPTS.find((s) => s.name === 'hiragana_katakana')!;
   }
@@ -222,7 +218,6 @@ export function detectLanguage(
   if (script.directLanguage) {
     return { language: script.directLanguage, confidence: 'high', method: 'script' };
   }
-  // Use stopword disambiguation for shared scripts
   if (script.candidateLanguages && script.fallbackLanguage) {
     return disambiguateByStopwords(sample, script.candidateLanguages, script.fallbackLanguage);
   }

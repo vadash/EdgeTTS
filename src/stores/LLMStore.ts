@@ -1,6 +1,3 @@
-// LLM Store
-// Manages LLM settings and character detection state
-
 import { computed, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
 import type { LoggerStore } from '@/services/Logger';
@@ -89,16 +86,13 @@ export const llm = signal<LLMState>({
   ...defaultTransientState,
 });
 
-// Export direct signal references for the orchestrator
 export const characterVoiceMap = computed(() => llm.value.characterVoiceMap);
 export const loadedProfile = computed(() => llm.value.loadedProfile);
 
-// Export computed for nested state access
 export const speakerAssignments = computed(() => llm.value.speakerAssignments);
 export const processingStatus = computed(() => llm.value.processingStatus);
 export const error = computed(() => llm.value.error);
 
-// Export computed for stage config access
 export const extract = computed(() => llm.value.extract);
 export const merge = computed(() => llm.value.merge);
 export const assign = computed(() => llm.value.assign);

@@ -1,4 +1,3 @@
-// src/config/prompts/shared/speakerCodes.ts
 // Shared body sections for the assign and QA stage prompts.
 // Both stages embed the same speaker-code roster, trailing overlap context,
 // and numbered-paragraph skeleton; only the stage-specific block differs.

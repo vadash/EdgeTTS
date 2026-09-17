@@ -1,5 +1,5 @@
 /**
- * Top 20 stopwords per language (lowercase).
+ * Most common stopwords per language (lowercase).
  * Only for scripts shared by multiple languages.
  * Used for disambiguation when Unicode script alone is insufficient.
  */

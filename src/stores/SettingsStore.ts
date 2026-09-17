@@ -1,6 +1,3 @@
-// Settings Store
-// Manages user preferences and application settings
-
 import { computed, effect, signal } from '@preact/signals';
 import { defaultAudioSettings } from '@/config';
 import { StorageKeys } from '@/config/storage';
@@ -8,7 +5,6 @@ import type { AppSettings, AudioPreset, AudioSettings } from '@/state/types';
 import { AUDIO_PRESETS } from '@/state/types';
 import { loadJSON, saveJSON } from './persistence';
 
-/** Default enabled voices curated list */
 const DEFAULT_ENABLED_VOICES = [
   'en-US, AndrewMultilingualNeural',
   'en-US, AvaMultilingualNeural',
@@ -84,7 +80,6 @@ const LEGACY_AUDIO_KEYS = {
   mergeConcurrency: 'mergeConcurrency',
 } as const;
 
-/** Collect legacy flat audio values still present on a loaded settings object. */
 function foldLegacyFlatAudio(s: AppSettings): Partial<AudioSettings> {
   const flat = s as unknown as Record<string, unknown>;
   const folded: Partial<AudioSettings> = {};
@@ -113,7 +108,7 @@ function normalizeAudio(s: AppSettings): AppSettings {
 
 function loadFromStorage(): AppSettings {
   const parsed = loadJSON(StorageKeys.settings, defaultSettings);
-  // Migration: [] used to mean "default enabled" -- convert to explicit list
+  // Migration: an empty list used to mean "default enabled".
   if (parsed.enabledVoices && parsed.enabledVoices.length === 0) {
     parsed.enabledVoices = [...DEFAULT_ENABLED_VOICES];
   }
@@ -126,7 +121,6 @@ function loadFromStorage(): AppSettings {
 
 export const settings = signal<AppSettings>(loadFromStorage());
 
-// Computed display values
 export const rateDisplay = computed(() =>
   settings.value.rate >= 0 ? `+${settings.value.rate}%` : `${settings.value.rate}%`,
 );
@@ -135,7 +129,8 @@ export const pitchDisplay = computed(() =>
   settings.value.pitch >= 0 ? `+${settings.value.pitch}Hz` : `${settings.value.pitch}Hz`,
 );
 
-// Computed for each setting (for component access)
+// Per-setting computeds so components subscribe to one value instead of the
+// whole settings object.
 export const narratorVoice = computed(() => settings.value.narratorVoice);
 export const enabledVoices = computed(() => settings.value.enabledVoices);
 export const rate = computed(() => settings.value.rate);
@@ -206,7 +201,6 @@ export function setOutputFormat(value: 'opus'): void {
   settings.value = { ...settings.value, outputFormat: value };
 }
 
-/** Merge a partial patch into the nested audio settings. */
 export function patchAudio(patch: Partial<AudioSettings>): void {
   settings.value = { ...settings.value, audio: { ...settings.value.audio, ...patch } };
 }

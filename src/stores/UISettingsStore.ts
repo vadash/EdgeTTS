@@ -1,31 +1,18 @@
-// UI Settings Store
-// Signal-based store for UI preferences (dismissed notifications, etc.)
-// Independent from audio/LLM settings - not affected by settings reset
+// Independent from audio/LLM settings; settings reset does not touch this store.
 
 import { computed, signal } from '@preact/signals';
 import { StorageKeys } from '@/config/storage';
 import { saveJSON } from './persistence';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export interface DismissedNotifications {
-  /** LLM required notification dismissed */
   llmRequired: boolean;
-  /** Resume feature tip notification dismissed */
   resumeFeatureTip: boolean;
-  /** Browser compatibility warning dismissed */
   browserCompatibility: boolean;
 }
 
 export interface UISettings {
   dismissedNotifications: DismissedNotifications;
 }
-
-// ============================================================================
-// Defaults
-// ============================================================================
 
 export const defaultState: UISettings = {
   dismissedNotifications: {
@@ -35,16 +22,12 @@ export const defaultState: UISettings = {
   },
 };
 
-// ============================================================================
-// Storage Functions
-// ============================================================================
-
 export function loadFromStorage(): UISettings {
   try {
     const saved = localStorage.getItem(StorageKeys.uiSettings);
     if (saved) {
       const parsed: Partial<UISettings> = JSON.parse(saved);
-      // Merge with defaults to handle missing keys
+      // Merge over defaults so saved data from older schemas stays valid.
       return {
         dismissedNotifications: {
           ...defaultState.dismissedNotifications,
@@ -58,18 +41,9 @@ export function loadFromStorage(): UISettings {
   return { ...defaultState };
 }
 
-// ============================================================================
-// Store Definition
-// ============================================================================
-
 export const uiSettings = signal<UISettings>(loadFromStorage());
 
-// Computed values
 export const dismissedNotifications = computed(() => uiSettings.value.dismissedNotifications);
-
-// ============================================================================
-// Actions
-// ============================================================================
 
 export function dismissNotification(key: keyof DismissedNotifications): void {
   uiSettings.value = {
@@ -87,13 +61,8 @@ export function resetUISettings(): void {
   localStorage.removeItem(StorageKeys.uiSettings);
 }
 
-// ============================================================================
-// Browser Detection
-// ============================================================================
-
-/** Detects if the user is running Microsoft Edge browser */
 export function isEdgeBrowser(): boolean {
   const ua = navigator.userAgent.toLowerCase();
-  // Edge includes 'edg' in user agent but not 'chrome' alone
+  // The 'chrome' token also appears in Edge and Opera UAs, so detection keys on 'edg'.
   return ua.includes('edg') && !ua.includes('opr') && !ua.includes('opera');
 }

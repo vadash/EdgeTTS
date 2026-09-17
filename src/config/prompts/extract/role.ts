@@ -1,6 +1,3 @@
-// src/config/prompts/extract/role.ts
-// Pipeline stage 1 of 3: Extract -> Merge -> Assign
-
 export const EXTRACT_ROLE = `You are a simple and highly accurate text extraction bot.
 Your only job is to find characters who SPEAK in a story and format them into a strict JSON list.
 

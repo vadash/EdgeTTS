@@ -1,6 +1,3 @@
-// Conversion Store
-// Manages conversion process state and progress
-
 import { computed, effect, signal } from '@preact/signals';
 import { formatHMS } from '@/utils/time';
 
@@ -80,7 +77,6 @@ export const isProcessing = computed(() => {
 
 export const progress = computed(() => conversion.value.progress);
 
-// Export computed for nested state access
 export const status = computed(() => conversion.value.status);
 export const error = computed(() => conversion.value.error);
 export const activeLlmWorkers = computed(() => conversion.value.activeLlmWorkers);
@@ -155,7 +151,7 @@ export function startConversion(): void {
 }
 
 export function setStatus(status: ConversionStatus): void {
-  // Idempotent guard: do nothing if status hasn't changed
+  // Re-entering the same status must not restart the phase timer or reset progress.
   if (conversion.value.status === status) return;
 
   const newState = { ...conversion.value, status };

@@ -1,5 +1,5 @@
 // src/config/prompts/assign/rules.ts
-// Pipeline stage 3 of 3: Extract -> Merge -> Assign
+// Pipeline stage 3 of 4: Extract -> Merge -> Assign -> QA
 
 export const ASSIGN_RULES = `1. SKIP NON-DIALOGUE:
    If a paragraph is just narration and NO ONE is speaking or thinking, IGNORE IT. Do not put its number in the JSON.

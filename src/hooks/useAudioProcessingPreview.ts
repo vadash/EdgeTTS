@@ -7,25 +7,25 @@ import { SAMPLE_PHRASES, synthesizeSample, useAudioPreview } from './useAudioPre
 export type PreviewStage = 'tts' | 'ffmpeg' | null;
 
 export interface AudioProcessingPreviewInput {
-  /** Narrator voice short name, e.g. "en-US-AriaNeural" */
+  /** Narrator Voice short name, e.g. "en-US-AriaNeural" */
   narratorVoice: string;
   /** Rate in percent points, e.g. 0 -> "+0%" */
   rate?: number;
   /** Pitch in Hz points, e.g. 0 -> "+0Hz" */
   pitch?: number;
-  /** Filter chain config; silenceGapMs is always forced to 0 (single chunk) */
+  /** Audio settings for the preview; silenceGapMs is always forced to 0 (single Chunk) */
   config: AudioSettings;
 }
 
 /**
  * Live filter-chain preview for the Audio settings tab.
  *
- * Synthesizes a short voice sample with the narrator voice, runs it through
- * FFmpegService.processAudio with the current filter settings, and plays the
+ * Synthesizes a short voice sample with the Narrator Voice, runs it through
+ * FFmpegService.processAudio with the current Audio settings, and plays the
  * processed result. Playback lifecycle lives in src/hooks/useAudioPreview.ts.
  *
- * stage: 'tts' while synthesizing the sample, 'ffmpeg' while processing,
- * or null when idle — drives the button label / spinner text.
+ * stage is 'tts' while synthesizing the sample, 'ffmpeg' while processing,
+ * and null when idle. It drives the button label and spinner text.
  */
 export function useAudioProcessingPreview() {
   const [stage, setStage] = useState<PreviewStage>(null);
@@ -36,7 +36,6 @@ export function useAudioProcessingPreview() {
     (input: AudioProcessingPreviewInput) =>
       playCore(
         async () => {
-          // ---- TTS: synthesize the sample with the narrator voice ----
           const text = SAMPLE_PHRASES[Math.floor(Math.random() * SAMPLE_PHRASES.length)];
           const ttsBytes = await synthesizeSample(
             text,
@@ -45,10 +44,10 @@ export function useAudioProcessingPreview() {
             input.pitch,
           );
 
-          // ---- FFmpeg: process through the filter chain ----
           setStage('ffmpeg');
 
-          // silenceGapMs is meaningless for a single chunk — always force 0
+          // silenceGapMs inserts a Gap between Chunks; the sample is one
+          // Chunk, so force 0.
           const processConfig: AudioSettings = { ...input.config, silenceGapMs: 0 };
 
           const ffmpeg = getFFmpeg();
@@ -57,7 +56,6 @@ export function useAudioProcessingPreview() {
             { maxRetries: 1 },
           );
 
-          // ---- Play the processed (opus/ogg) result ----
           setStage(null);
 
           return new Blob([processed as BlobPart], { type: 'audio/ogg; codecs=opus' });

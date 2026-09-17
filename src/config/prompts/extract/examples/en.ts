@@ -1,5 +1,5 @@
-// 4 few-shot examples for character extraction -- EN language, SFW content
-// Progresses: simple dialogue -> system messages -> vocative trap -> gender inference + variations
+// Example order is deliberate: simple dialogue, system messages, the vocative trap, then gender inference with variations.
+// Keep example content SFW.
 
 import type { PromptExample } from '../../shared/formatters';
 

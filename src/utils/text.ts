@@ -10,17 +10,11 @@ import type { z } from 'zod';
 export function normalizeText(text: string): string {
   if (!text || typeof text !== 'string') return text;
 
-  return (
-    text
-      // Replace smart double quotes
-      .replace(/[""]/g, '"')
-      // Replace smart single quotes
-      .replace(/['']/g, "'")
-      // Strip Unicode line/paragraph separators
-      .replace(/[\u2028\u2029]/g, '')
-      // Strip unescaped control characters (preserve \n \r \t)
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
-  );
+  return text
+    .replace(/[""]/g, '"')
+    .replace(/['']/g, "'")
+    .replace(/[\u2028\u2029]/g, '')
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 }
 
 /**
@@ -63,13 +57,13 @@ export function sanitizeText(text: string): string {
   result = result.replace(/─{3,}/g, '...');
   result = result.replace(/═{3,}/g, '...');
 
-  // 7. Special Unicode
+  // 7. Zero-width characters and byte order mark
   result = result.replace(/[\u200B-\u200D\uFEFF]/g, '');
 
   // 8. Control characters (except newlines, tabs)
   result = result.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 
-  // 9. Remaining special characters
+  // 9. Remaining symbols; "&" becomes the word "and"
   result = result.replace(/[|\\^]/g, '');
   result = result.replace(/&/g, ' and ');
 
@@ -81,7 +75,8 @@ export function sanitizeText(text: string): string {
 
 /**
  * Extract all balanced JSON blocks from a string.
- * Correctly handles strings, escape sequences, and nested structures.
+ * The scanner tracks string literals and escape sequences, so brackets
+ * inside strings do not affect nesting.
  */
 export function extractJsonBlocks(
   text: string,
@@ -93,7 +88,6 @@ export function extractJsonBlocks(
   let i = 0;
 
   while (i < text.length) {
-    // Find opening bracket
     if (text[i] !== '{' && text[i] !== '[') {
       i++;
       continue;
@@ -123,7 +117,6 @@ export function extractJsonBlocks(
         continue;
       }
 
-      // String delimiter handling
       if ((ch === '"' || ch === "'" || ch === '`') && !inString) {
         inString = true;
         stringDelim = ch;
@@ -143,7 +136,6 @@ export function extractJsonBlocks(
         continue;
       }
 
-      // Bracket counting
       if (ch === openChar) {
         depth++;
       } else if (ch === closeChar) {
@@ -167,7 +159,7 @@ export function extractJsonBlocks(
       });
       i++;
     } else {
-      // Unbalanced - move past opening bracket and continue
+      // No matching close: move past the opening bracket and rescan
       i = startIdx + 1;
     }
   }
@@ -177,8 +169,8 @@ export function extractJsonBlocks(
 
 /**
  * Fix string concatenation hallucinations from LLMs.
- * Only runs at Tier 4 (desperation) - applies strict patterns to avoid
- * damaging valid content like mathematical expressions.
+ * Runs only at Tier 4 of safeParseJSON; the strict patterns avoid damaging
+ * valid content such as mathematical expressions.
  */
 export function scrubConcatenation(text: string): string {
   if (!text || typeof text !== 'string') return text;
@@ -234,7 +226,7 @@ export function stripThinkingTags(text: string): string {
 
   // 1. Regex for small/orphaned tags that don't span massive text blocks
   let result = text
-    // Unwrap rogue tool_call tags to preserve inner JSON (CRITICAL: before stripping other tags!)
+    // Unwrap rogue tool_call tags to preserve the inner JSON; run this before the other strips
     // Pattern: <tool_call ...>content</tool_call> -> content
     .replace(/<(?:json_)?tool_call(?:\s+[^>]*)?>\s*([\s\S]*?)\s*<\/(?:json_)?tool_call>/gi, '$1')
     // Strip orphaned tool_call opening tags
@@ -279,9 +271,9 @@ export function stripThinkingTags(text: string): string {
       if (closeIdx !== -1) {
         // Remove the entire block: from '<tag...' to '</tag>'
         result = result.slice(0, openIdx) + result.slice(closeIdx + closeTag.length);
-        // Don't advance searchStart - the slice shifted content, re-scan from same position
+        // Do not advance searchStart: the slice shifted the content, so rescan this position
       } else {
-        // Unclosed tag - preserve text per test design, move past this tag
+        // Unclosed tag: the text stays by test design; move past this tag
         searchStart = gtIdx + 1;
       }
     }
@@ -299,10 +291,8 @@ export function stripThinkingTags(text: string): string {
  * Detects when LLM returns a naked array instead of {reasoning: null, items: [...]} structure.
  */
 function applyArrayAtRootRecovery<T>(parsed: unknown, schema: z.ZodType<T>): unknown {
-  // Only apply if parsed is an array and schema is a ZodObject with shape
   if (!Array.isArray(parsed)) return parsed;
 
-  // Check if schema is a ZodObject with a shape property
   const zodObj = schema as unknown as { _def?: { shape?: Record<string, unknown> } };
   if (!zodObj._def?.shape) return parsed;
 
@@ -313,7 +303,8 @@ function applyArrayAtRootRecovery<T>(parsed: unknown, schema: z.ZodType<T>): unk
     return fieldDef?.type === 'array';
   });
 
-  // Only recover if there's exactly one array field in the schema
+  // With zero or several array fields, the target field is ambiguous, so keep
+  // the value as parsed
   if (arrayFields.length === 1) {
     const [fieldName] = arrayFields[0];
     return { reasoning: null, [fieldName]: parsed };
@@ -328,12 +319,10 @@ function applyArrayAtRootRecovery<T>(parsed: unknown, schema: z.ZodType<T>): unk
  * Detects when LLM returns {"0": "A", "1": "B"} instead of {reasoning: null, assignments: {"0": "A", "1": "B"}}.
  */
 function applyFlattenedAssignmentsRecovery<T>(parsed: unknown, schema: z.ZodType<T>): unknown {
-  // Only apply if parsed is a plain object (not array, not null)
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return parsed;
   }
 
-  // Check if schema is a ZodObject with a shape property
   const zodObj = schema as unknown as { _def?: { shape?: Record<string, unknown> } };
   if (!zodObj._def?.shape) return parsed;
 
@@ -343,13 +332,11 @@ function applyFlattenedAssignmentsRecovery<T>(parsed: unknown, schema: z.ZodType
   // If object has recognized keys, it's already structured correctly
   if (hasRecognizedKey) return parsed;
 
-  // Check if all keys are numeric strings
   const keys = Object.keys(parsed);
   if (keys.length === 0) return parsed;
 
   const allNumeric = keys.every((key) => /^\d+$/.test(key));
 
-  // If all keys are numeric strings, wrap as flattened assignments
   if (allNumeric) {
     return { reasoning: null, assignments: parsed };
   }
@@ -391,12 +378,9 @@ function selectBlockText(blocks: Array<{ text: string }>, minimumBlockSize: numb
 }
 
 /**
- * Safely parse JSON with progressive fallback waterfall.
- * Returns Zod-style result object for maximum reusability.
- *
- * Flow:
- *   Input Validation -> stripThinkingTags -> Strip Fences -> Tier 1 (JSON.parse)
- *   -> Tier 2 (jsonrepair) -> Tier 3 (Normalize + Extract) -> Tier 4 (Scrub) -> Tier 5 (Failure)
+ * Safely parse JSON with a progressive fallback waterfall: each tier applies
+ * a more aggressive repair than the last. The first successful tier returns;
+ * total failure returns success: false instead of throwing.
  */
 export function safeParseJSON<T>(
   input: unknown,
@@ -422,7 +406,7 @@ export function safeParseJSON<T>(
     return { success: false, error, errorContext: context };
   }
 
-  // Already an object/array - return as-is
+  // Objects and arrays skip the string tiers and go straight to schema validation
   if (typeof input === 'object') {
     const data = input as T;
     if (schema) {
@@ -436,10 +420,8 @@ export function safeParseJSON<T>(
     return { success: true, data };
   }
 
-  // Coerce primitives to string
   let text = String(input);
 
-  // Empty string check
   if (text.trim().length === 0) {
     const error = new Error('Input is empty or whitespace-only');
     const context = { tier: 0, originalLength, error };

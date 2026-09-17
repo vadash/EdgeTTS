@@ -1,6 +1,5 @@
 import type { VoiceOption } from '../../state/types';
 
-// Voice definition helper
 function v(fullValue: string, gender: 'male' | 'female'): VoiceOption {
   const [locale, name] = fullValue.split(', ');
   return { locale, name, fullValue, gender };
@@ -411,7 +410,7 @@ export const availableLocales: readonly string[] = [
   ...new Set(voices.map((voice) => voice.locale.split('-')[0])),
 ].sort();
 
-/** True for Multilingual variant voices (e.g., 'en-US, AndrewMultilingualNeural'). */
+/** True for Multilingual variant Voices (e.g. 'en-US, AndrewMultilingualNeural'); the language picker lists them under every language. */
 export function isMultilingual(voice: VoiceOption): boolean {
   return voice.name.includes('Multilingual');
 }
@@ -420,9 +419,9 @@ export function isMultilingual(voice: VoiceOption): boolean {
 export type GroupedVoice = VoiceOption & { isSeparator: boolean };
 
 /**
- * Group voices for a language picker: every Multilingual voice first, then a
- * disabled separator entry, then the voices whose locale starts with `language`.
- * Entry order and separator shape are part of the rendered UI contract.
+ * Entry order and separator shape are part of the rendered language-picker
+ * contract: every Multilingual Voice first, then a disabled separator entry,
+ * then the Voices whose locale starts with `language`.
  */
 export function groupVoicesForLanguage(all: VoiceOption[], language: string): GroupedVoice[] {
   return [

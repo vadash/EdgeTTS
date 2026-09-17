@@ -1,5 +1,4 @@
 // src/config/prompts/assign/examples/en.ts
-// 5 few-shot examples for speaker attribution -- EN language
 // Progresses: simple assignment -> vocative trap -> first person + context -> system messages + mixed -> dialogue with long narration tail
 
 import type { PromptExample } from '../../shared/formatters';

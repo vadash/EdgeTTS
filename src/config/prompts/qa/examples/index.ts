@@ -4,6 +4,6 @@ import type { PromptExample } from '../../shared/formatters';
 import { qaExamplesEN } from './en';
 
 export function getQAExamples(_language: string = 'en'): PromptExample[] {
-  // Currently only English examples exist
+  // Only English examples exist
   return qaExamplesEN;
 }

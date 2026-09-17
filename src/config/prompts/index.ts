@@ -1,6 +1,5 @@
-// src/config/prompts/index.ts
-// LLM Prompts Configuration -- OpenVault-style architecture
-// Pipeline: Extract -> Merge -> Assign
+// LLM prompt configuration, in the OpenVault style.
+// Stage order: extract, merge, assign, QA.
 
 export { buildAssignPrompt } from './assign/builder';
 export { buildExtractPrompt } from './extract/builder';

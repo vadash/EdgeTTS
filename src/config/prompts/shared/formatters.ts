@@ -1,4 +1,3 @@
-// src/config/prompts/shared/formatters.ts
 // Message assembly functions for the 3-message prompt topology.
 // System = Preamble + Role + Examples
 // User = Content + Constraints (language rules + task rules + schema + trigger)
@@ -93,7 +92,8 @@ export function assembleUserConstraints(rules: string, schemaText: string): stri
  *
  * When `repeatPrompt` is true, the user message is duplicated (`<QUERY><QUERY>`)
  * so later tokens can attend to the full context bidirectionally during prefill.
- * Based on Google Research arXiv:2512.14982 — ~4.5% accuracy gain, zero latency cost.
+ * Based on Google Research arXiv:2512.14982, which reports about a 4.5%
+ * accuracy gain at zero latency cost.
  *
  * @param systemBody - Task-specific system prompt (role + examples)
  * @param userBody - The actual content (text/characters/paragraphs) + constraints
@@ -117,7 +117,7 @@ export function buildMessages(
     messages.push({ role: 'user', content: userBody });
   }
 
-  // Resolve 'auto' - both zh and non-zh result in no prefill since compliance presets were removed
+  // Resolve 'auto' to 'none'; zh and non-zh both result in no prefill.
   let actualPrefill = prefill;
   if (prefill === 'auto') {
     actualPrefill = 'none';

@@ -10,24 +10,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const deployDir = process.argv[2] || resolve(__dirname, '..', 'dist');
 const currentSha = process.argv[3] || null;
 
-// Collect sha/ directories
 let shaDirs = [];
 const shaDir = resolve(deployDir, 'sha');
 try {
   shaDirs = readdirSync(shaDir)
     .filter((name) => statSync(resolve(shaDir, name)).isDirectory())
     .sort()
-    .reverse(); // most recent first
+    .reverse(); // SHA names do not sort chronologically, so this list is not newest-first
 } catch {
   // sha/ directory doesn't exist yet
 }
 
-// Collect v* tag directories (top-level)
 const tagDirs = readdirSync(deployDir)
   .filter((name) => /^v/.test(name) && statSync(resolve(deployDir, name)).isDirectory())
   .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
 
-// Split sha dirs into current vs previous
 const currentEntry = currentSha
   ? shaDirs.find((d) => d === currentSha || d.startsWith(currentSha))
   : null;
@@ -54,11 +51,9 @@ ${renderList(items, prefix)}
     </div>`;
 }
 
-// Favicon: prefer current SHA, else first sha dir, else fallback
 const faviconSha = currentEntry || shaDirs[0] || 'latest';
 const faviconPath = `./sha/${faviconSha}/logo.png`;
 
-// Auto-redirect script: redirect after 4s unless user interacts
 const redirectScript = currentEntry
   ? `  <script>
     var t = setTimeout(function(){ window.location.replace('./sha/${currentEntry}/index.html'); }, 4000);
@@ -67,7 +62,6 @@ const redirectScript = currentEntry
   </script>\n`
   : '';
 
-// Current build section with Latest badge
 const buildTimestamp = currentEntry ? getTimestampEpoch(resolve(shaDir, currentEntry)) : '';
 const currentSection = currentEntry
   ? `
