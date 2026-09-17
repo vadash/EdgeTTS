@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Unmock p-queue for this test file to test real concurrency behavior
+// The global setup mocks p-queue with immediate execution. Unmock it here
+// to exercise real concurrency.
 vi.unmock('p-queue');
 
 import { runWithConcurrency } from './runWithConcurrency';
@@ -71,7 +72,6 @@ describe('runWithConcurrency', () => {
         activeCount++;
         maxActiveCount = Math.max(maxActiveCount, activeCount);
 
-        // Simulate async work
         await new Promise((resolve) => setTimeout(resolve, duration));
 
         activeCount--;
@@ -80,11 +80,11 @@ describe('runWithConcurrency', () => {
     };
 
     const tasks = [
-      createTask(50), // will finish first
-      createTask(100), // will finish second
-      createTask(150), // will finish third
-      createTask(200), // will finish fourth
-      createTask(250), // will finish fifth
+      createTask(50),
+      createTask(100),
+      createTask(150),
+      createTask(200),
+      createTask(250),
     ];
 
     const results = await runWithConcurrency(tasks, {
@@ -92,11 +92,8 @@ describe('runWithConcurrency', () => {
       signal: null as unknown as AbortSignal,
     });
 
-    // Verify all tasks completed
     expect(results).toHaveLength(5);
 
-    // Verify concurrency limit was respected
-    // With concurrency: 2, we should never have more than 2 tasks running at once
     expect(maxActiveCount).toBeLessThanOrEqual(2);
   });
 

@@ -40,7 +40,7 @@ describe('LlmStages - Merge with Structured Outputs', () => {
   it('merges characters using structured output', async () => {
     const mergeResponse = {
       reasoning: 'Alice and Alicia are the same person',
-      merges: [[0, 1]], // Merge Alice (0) and Alicia (1)
+      merges: [[0, 1]],
     };
 
     service = makeService({
@@ -49,14 +49,13 @@ describe('LlmStages - Merge with Structured Outputs', () => {
 
     const result = await service.merge(testCharacters);
 
-    // After merging 0 and 1, we should have 2 characters (Alice/Alicia merged, Bob separate)
     expect(result.length).toBeLessThanOrEqual(2);
   });
 
   it('handles empty merges (no duplicates)', async () => {
     const mergeResponse = {
       reasoning: null,
-      merges: [], // No merges needed
+      merges: [],
     };
 
     service = makeService({
@@ -65,7 +64,6 @@ describe('LlmStages - Merge with Structured Outputs', () => {
 
     const result = await service.merge(testCharacters);
 
-    // No merges means all characters remain
     expect(result).toHaveLength(testCharacters.length);
   });
 });

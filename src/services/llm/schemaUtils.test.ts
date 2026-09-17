@@ -23,10 +23,8 @@ describe('schemaUtils', () => {
     const schema = z.object({ test: z.string() });
     const result = zodToJsonSchema(schema, 'Test');
 
-    // Draft 7 uses required array, not required property per field
     const schemaDef = result.json_schema.schema;
     expect(schemaDef).toBeDefined();
-    // Should have properties with type annotations
     expect(schemaDef.properties).toBeDefined();
   });
 
@@ -52,13 +50,12 @@ describe('schemaUtils', () => {
     const result = zodToJsonSchema(schema, 'NullableTest');
     const props = result.json_schema.schema.properties as Record<string, unknown>;
 
-    // Both fields should be in properties
     expect(props.reasoning).toBeDefined();
     expect(props.content).toBeDefined();
   });
 
   it('uses z.record() with 2-arg form', () => {
-    // This ensures we're using Zod 4 compatible record syntax
+    // Zod 4 requires both key and value schemas in z.record().
     const schema = z.object({
       assignments: z.record(z.string(), z.string()),
     });
@@ -111,7 +108,7 @@ describe('schemaUtils', () => {
       };
       const out = cleanSchemaForXGrammar(input) as Record<string, unknown>;
       const x = (out.properties as Record<string, Record<string, unknown>>).x;
-      // No null branch → anyOf must survive so it remains visible.
+      // The union has no null branch to collapse, so anyOf must survive.
       expect(x.anyOf).toBeDefined();
     });
 

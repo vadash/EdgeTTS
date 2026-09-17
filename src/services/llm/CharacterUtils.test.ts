@@ -32,7 +32,7 @@ describe('cullByFrequency', () => {
       'Catherine fought. Cat won. Catherine Foundling returned. Cat slept. Catherine smiled.';
     const characters = [makeChar('Catherine', ['Catherine', 'Cat', 'Catherine Foundling'])];
 
-    // Catherine=3, Cat=2, "Catherine Foundling"=1 → total=6
+    // Catherine=3, Cat=2, "Catherine Foundling"=1, total=6
     const result = cullByFrequency(characters, text.toLowerCase(), 5);
 
     expect(result).toHaveLength(1);
@@ -43,7 +43,7 @@ describe('cullByFrequency', () => {
     const text = 'I went there. I came back. I saw. me too. I know.';
     const characters = [makeChar('Protagonist', ['I', 'me', 'my'])];
 
-    // "I" (1 char), "me" (2 chars), "my" (2 chars) all skipped → 0 mentions
+    // "I", "me", "my" are all shorter than 3 characters, so the mention count is 0
     const result = cullByFrequency(characters, text.toLowerCase(), 3);
 
     expect(result).toHaveLength(0);
@@ -53,7 +53,6 @@ describe('cullByFrequency', () => {
     const text = 'Hakram nodded. Hakram smiled. Hakram left.';
     const characters = [makeChar('Hakram', ['Hakram'])];
 
-    // Hakram appears exactly 3 times
     const result = cullByFrequency(characters, text.toLowerCase(), 3);
 
     expect(result).toHaveLength(1);
@@ -91,7 +90,6 @@ describe('cullByFrequency', () => {
     const text = 'Alice and Bob sat. Alice spoke. Bob replied. Alice nodded. Bob agreed.';
     const characters = [makeChar('Alice', ['Alice']), makeChar('Bob', ['Bob'])];
 
-    // Alice=3, Bob=3
     const result = cullByFrequency(characters, text.toLowerCase(), 3);
 
     expect(result).toHaveLength(2);
@@ -111,14 +109,13 @@ describe('cullByFrequency', () => {
     const text = 'Alice appeared once.';
     const characters = [makeChar('Alice', ['Alice'])];
 
-    // Alice mentioned 1 time, default threshold is 3
     const result = cullByFrequency(characters, text.toLowerCase());
 
     expect(result).toHaveLength(0);
   });
 
   it('does not count substring matches inside other words', () => {
-    // "eva" appears 3x inside "evaluation" but only 2x standalone → below threshold 3
+    // "eva" appears inside "evaluation" 3 times but standalone only 2 times, below the threshold of 3
     const text = 'evaluation evaluates evaluation eva eva';
     const characters = [makeChar('Eva', ['Eva'])];
 
@@ -128,7 +125,7 @@ describe('cullByFrequency', () => {
   });
 
   it('counts standalone mentions beside substring matches', () => {
-    // 3 standalone "eva" survive the cull even though "evaluation" still present
+    // 3 standalone "eva" mentions pass the cull even though "evaluation" is still present
     const text = 'evaluation evaluates evaluation eva eva eva';
     const characters = [makeChar('Eva', ['Eva'])];
 
@@ -159,11 +156,10 @@ describe('buildCodeMappingFromNames', () => {
     expect(nameToCode.has('MALE_UNNAMED')).toBe(true);
     expect(nameToCode.has('FEMALE_UNNAMED')).toBe(true);
     expect(nameToCode.has('UNKNOWN_UNNAMED')).toBe(true);
-    // All unnamed codes must be unique 4-hex
+    // Unnamed codes use the same 4-hex format.
     for (const name of ['MALE_UNNAMED', 'FEMALE_UNNAMED', 'UNKNOWN_UNNAMED']) {
       expect(nameToCode.get(name)).toMatch(/^[0-9A-F]{4}$/);
     }
-    // Reverse lookup works
     for (const [name, code] of nameToCode) {
       expect(codeToName.get(code)).toBe(name);
     }

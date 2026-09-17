@@ -34,7 +34,7 @@ describe('DebugLogger', () => {
 
   it('does nothing when no directory handle', async () => {
     const logger = new DebugLogger(null);
-    // Should not throw
+    // The call must not throw.
     await logger.saveLog('test.json', { data: 1 });
   });
 
@@ -59,11 +59,9 @@ describe('DebugLogger', () => {
 
     await logger.saveErrorLog({ model: 'gpt-4', messages: [] }, '{"invalid": json}');
 
-    // First error should be r1.json and a1.json
     expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('r1.json', { create: true });
     expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('a1.json', { create: true });
 
-    // Verify content was written
     const writeCalls = mockWritable.write.mock.calls;
     expect(writeCalls[0][0]).toContain('gpt-4'); // request content
     expect(writeCalls[1][0]).toContain('"content"'); // response has wrapped content
@@ -91,9 +89,7 @@ describe('DebugLogger', () => {
     logger.resetLogging();
     await logger.saveErrorLog({ req: 2 }, 'response 2');
 
-    // After reset, should start at 1 again
     expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('r1.json', { create: true });
-    // Should NOT have r2.json
     const r2Calls = mockLogsFolder.getFileHandle.mock.calls.filter(
       (call: any[]) => call[0] === 'r2.json',
     );
@@ -102,7 +98,7 @@ describe('DebugLogger', () => {
 
   it('saveErrorLog does nothing when no directory handle', async () => {
     const logger = new DebugLogger(null);
-    // Should not throw
+    // The call must not throw.
     await logger.saveErrorLog({ req: 1 }, 'response');
   });
 
@@ -112,7 +108,6 @@ describe('DebugLogger', () => {
 
     await logger.savePhaseLog('extract', { model: 'gpt-4', messages: [] }, { characters: [] });
 
-    // Should save extract_request.json and extract_response.json
     expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', {
       create: true,
     });
@@ -120,7 +115,6 @@ describe('DebugLogger', () => {
       create: true,
     });
 
-    // Verify content was written
     const writeCalls = mockWritable.write.mock.calls;
     expect(writeCalls[0][0]).toContain('gpt-4'); // request content
     expect(writeCalls[1][0]).toContain('characters'); // response content
@@ -130,7 +124,6 @@ describe('DebugLogger', () => {
     const { mockDirHandle, mockLogsFolder } = createMockDirectoryHandle();
     const logger = new DebugLogger(mockDirHandle);
 
-    // First call should save
     await logger.savePhaseLog('extract', { req: 1 }, { res: 1 });
     expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', {
       create: true,
@@ -139,10 +132,9 @@ describe('DebugLogger', () => {
       create: true,
     });
 
-    // Reset the mock to check second call
+    // Clear the mock so only the second call is observed.
     mockLogsFolder.getFileHandle.mockClear();
 
-    // Second call for same phase should be ignored
     await logger.savePhaseLog('extract', { req: 2 }, { res: 2 });
     expect(mockLogsFolder.getFileHandle).not.toHaveBeenCalled();
   });
@@ -151,7 +143,6 @@ describe('DebugLogger', () => {
     const { mockDirHandle, mockLogsFolder } = createMockDirectoryHandle();
     const logger = new DebugLogger(mockDirHandle);
 
-    // Log extract phase
     await logger.savePhaseLog('extract', { phase: 'extract' }, { result: 'extract' });
     expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('extract_request.json', {
       create: true,
@@ -160,7 +151,6 @@ describe('DebugLogger', () => {
       create: true,
     });
 
-    // Log merge phase - should also save
     await logger.savePhaseLog('merge', { phase: 'merge' }, { result: 'merge' });
     expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('merge_request.json', {
       create: true,
@@ -169,7 +159,6 @@ describe('DebugLogger', () => {
       create: true,
     });
 
-    // Log assign phase - should also save
     await logger.savePhaseLog('assign', { phase: 'assign' }, { result: 'assign' });
     expect(mockLogsFolder.getFileHandle).toHaveBeenCalledWith('assign_request.json', {
       create: true,
@@ -183,23 +172,20 @@ describe('DebugLogger', () => {
     const { mockDirHandle, mockLogsFolder } = createMockDirectoryHandle();
     const logger = new DebugLogger(mockDirHandle);
 
-    // First call saves
     await logger.savePhaseLog('extract', { req: 1 }, { res: 1 });
     expect(mockLogsFolder.getFileHandle).toHaveBeenCalledTimes(2); // request + response
 
     mockLogsFolder.getFileHandle.mockClear();
 
-    // Reset logging
     logger.resetLogging();
 
-    // After reset, should save again
     await logger.savePhaseLog('extract', { req: 2 }, { res: 2 });
     expect(mockLogsFolder.getFileHandle).toHaveBeenCalledTimes(2); // request + response
   });
 
   it('savePhaseLog does nothing when no directory handle', async () => {
     const logger = new DebugLogger(null);
-    // Should not throw
+    // The call must not throw.
     await logger.savePhaseLog('extract', { req: 1 }, { res: 1 });
   });
 });

@@ -9,7 +9,6 @@ import {
   type WorkerPoolOptions,
 } from './TTSWorkerPool';
 
-// Mock the ReusableEdgeTTSService
 vi.mock('./ReusableEdgeTTSService', () => {
   return {
     ReusableEdgeTTSService: vi.fn().mockImplementation(function () {
@@ -24,7 +23,6 @@ vi.mock('./ReusableEdgeTTSService', () => {
   };
 });
 
-// Get the mocked class for access in tests
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 
 const MockedReusableEdgeTTSService = vi.mocked(ReusableEdgeTTSService);
@@ -43,7 +41,6 @@ describe('TTSWorkerPool', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
 
-    // Create mock ChunkStore
     mockChunkStore = {
       init: vi.fn().mockResolvedValue(undefined),
       writeChunk: vi.fn().mockResolvedValue(undefined),
@@ -53,7 +50,8 @@ describe('TTSWorkerPool', () => {
       close: vi.fn().mockResolvedValue(undefined),
     } as unknown as ChunkStore;
 
-    // Get fresh mock functions for each test
+    // Tests assert on these handles, so bind fresh ones into the service
+    // each test instead of the factory's own mocks.
     mockSend = vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]));
     mockConnect = vi.fn().mockResolvedValue(undefined);
     mockDisconnect = vi.fn();
@@ -225,7 +223,9 @@ describe('TTSWorkerPool', () => {
 
       randomSpy.mockRestore();
 
-      // 5 retries with half-max jitter on 3s/10s/30s/60s/120s; attempts beyond 5 stay capped
+      // Half-max jitter on the 3s/10s/30s/60s/120s base ladder, so each
+      // delay is 3/4 of its base. Retries stop at the cap of 5, so exactly
+      // five delays appear.
       expect(onRetry.mock.calls.map((c) => c[2])).toEqual([2250, 7500, 22500, 45000, 90000]);
     });
 
@@ -324,7 +324,7 @@ describe('TTSWorkerPool', () => {
       const controller = new AbortController();
       const pending = pool.run([createTask(0)], { signal: controller.signal });
 
-      // First attempt fails; task now sits in a backoff timer
+      // The first attempt fails, so the task now sits in a backoff timer
       await vi.advanceTimersByTimeAsync(100);
       expect(mockSend).toHaveBeenCalledTimes(1);
 

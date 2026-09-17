@@ -8,10 +8,10 @@ import type { LLMClientConfig, LlmStageDeps, LlmStages } from './stages';
 import { AssignSchema, ExtractSchema, MergeSchema } from './schemas';
 import type { StructuredCallOptions } from './schemaUtils';
 
-// Real LLM request capture from an actual Infinite Regressor conversion. The
-// `messages` block is exactly what the pipeline built on the wire; we replay it
-// against the injected transport to exercise the stage fallback behaviour
-// without network. Files are git-added under src/test/fixtures/llm-real-data/.
+// Captured requests from an Infinite Regressor conversion. The `messages` block
+// is what the pipeline built on the wire; the tests replay it against the injected
+// transport to exercise stage fallback without network. Fixture files live under
+// src/test/fixtures/llm-real-data/.
 const FIXTURES = path.resolve(
   __dirname,
   '..',
@@ -89,9 +89,9 @@ type TransportCall = { config: LLMClientConfig; opts: CallArg };
 type Transport = NonNullable<LlmStageDeps['transport']>;
 type TransportBehavior = 'reject' | object;
 
-// Injected transport stub: primary/merge vs backup behaviour is routed by
-// config.model (the resolved stage config the service hands to the seam),
-// and every call is captured for wire-shape and routing assertions.
+// Injected transport stub. Routing between the primary/merge config and the backup
+// config keys on config.model, the resolved stage config that the service hands to
+// the seam. Every call is captured for wire-shape and routing assertions.
 function makeTransport(primary: TransportBehavior, backup: TransportBehavior = 'reject') {
   const calls: TransportCall[] = [];
   const transport: Transport = async (config, opts) => {
@@ -116,8 +116,6 @@ describe('LlmStages - per-stage fallback (real request data)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
-  // --------------------------------------------------------------------- extract
 
   it('extract: primary succeeds -> returns characters from that block, no backup call', async () => {
     const { transport, calls } = makeTransport(EXTRACT_OK);
@@ -180,8 +178,6 @@ describe('LlmStages - per-stage fallback (real request data)', () => {
     expect(wire[0].messages[1].role).toBe('user');
   });
 
-  // --------------------------------------------------------------------- assign
-
   it('assign: primary succeeds -> speakers assigned, no backup call', async () => {
     const { transport, calls } = makeTransport(ASSIGN_OK);
     service = createLlmStages(baseDeps({ backup: { ...backupOpts }, transport }));
@@ -234,8 +230,6 @@ describe('LlmStages - per-stage fallback (real request data)', () => {
     expect(wire[0].schema).toBe(AssignSchema);
     expect(wire[0].schemaName).toBe('AssignSchema');
   });
-
-  // ----------------------------------------------------------------------- merge
 
   it('merge: never falls back to backup — failed votes are skipped (no backup call)', async () => {
     const { transport, calls } = makeTransport('reject');
@@ -319,13 +313,11 @@ describe('LlmStages - per-stage fallback (real request data)', () => {
     ];
     await service.merge(chars);
 
-    // budget = 5 × (1 + 0) = 5 temps; every vote succeeds, so exactly 5 calls
-    // — no replacement budget, no retries.
+    // Budget: 5 temps x (1 + 0 retries) = 5 calls. Every vote succeeds, so no
+    // failed attempt needs a replacement.
     expect(calls.length).toBe(5);
   });
 });
-
-// ----------------------------------------------------------------- stage tags
 
 describe('LlmStages - stage tags on transport options', () => {
   let service: LlmStages;
@@ -389,8 +381,6 @@ describe('LlmStages - stage tags on transport options', () => {
     for (const c of calls) expect(c.opts.stage).toBe('merge');
   });
 });
-
-// ----------------------------------------------------------------- transport seam
 
 describe('LlmStages - public merge via injected transport', () => {
   beforeEach(() => vi.clearAllMocks());

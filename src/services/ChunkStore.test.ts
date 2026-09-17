@@ -30,7 +30,6 @@ describe('ChunkStore', () => {
     store = new ChunkStore(idb);
   });
 
-  /** Creates _temp_work under root and writes the given entries into it. */
   async function seedWorkFolder(entries: Record<string, string | Uint8Array<ArrayBuffer>>) {
     const work = await root.getDirectoryHandle('_temp_work', { create: true });
     for (const [name, data] of Object.entries(entries)) {
@@ -229,11 +228,9 @@ describe('ChunkStore', () => {
 
       await store.writeChunk(0, new Uint8Array([0]));
 
-      // Verify numbered files were created inside _temp_work (flush triggered)
       await expect(work.getFileHandle('chunks_data_0.bin')).resolves.toBeDefined();
       await expect(work.getFileHandle('chunks_index_0.jsonl')).resolves.toBeDefined();
 
-      // Verify deleteKeys was called with the snapshot keys
       expect(idb.deleteKeys).toHaveBeenCalledWith(expect.anything(), expect.arrayContaining(keys));
     });
   });
@@ -254,13 +251,9 @@ describe('ChunkStore', () => {
         await store.writeChunk(k, new Uint8Array([k * 10]));
       }
 
-      // Manually flush by calling prepareForRead
       await store.prepareForRead();
 
-      // Verify getChunksByKeys was called for batch retrieval
       expect(idb.getChunksByKeys).toHaveBeenCalled();
-
-      // Verify getAllChunks was NOT called during flush — only getAllKeys + getChunksByKeys
       expect(idb.getAllChunks).not.toHaveBeenCalled();
     });
 
@@ -277,13 +270,13 @@ describe('ChunkStore', () => {
         })),
       );
 
+      // The written data is irrelevant because getChunksByKeys is mocked.
       for (const k of keys) {
-        await store.writeChunk(k, new Uint8Array([1])); // data doesn't matter, mocked
+        await store.writeChunk(k, new Uint8Array([1]));
       }
 
       await store.prepareForRead();
 
-      // Read the index file
       const indexHandle = await work.getFileHandle('chunks_index_0.jsonl');
       const indexFile = await indexHandle.getFile();
       const indexText = await indexFile.text();
@@ -313,7 +306,6 @@ describe('ChunkStore', () => {
 
       await store.prepareForRead();
 
-      // After prepareForRead, all data should be on disk
       await expect(work.getFileHandle('chunks_data_0.bin')).resolves.toBeDefined();
     });
   });
@@ -334,7 +326,7 @@ describe('ChunkStore', () => {
 
       await store.writeChunk(0, new Uint8Array([5, 6, 7]));
 
-      // Don't call prepareForRead — chunk should still be readable from IDB
+      // No prepareForRead call here, so the chunk must come from IDB.
       const result = await store.readChunk(0);
       expect(result).toEqual(new Uint8Array([5, 6, 7]));
     });
@@ -381,7 +373,7 @@ describe('ChunkStore', () => {
       ]);
       await store.prepareForRead();
 
-      // Read in sequential order (merge phase)
+      // The audio merge reads chunks in chunk-index order.
       expect(await store.readChunk(0)).toEqual(new Uint8Array([0, 0, 0]));
       expect(await store.readChunk(2)).toEqual(new Uint8Array([2, 2, 2]));
       expect(await store.readChunk(5)).toEqual(new Uint8Array([5, 5, 5]));
@@ -390,12 +382,12 @@ describe('ChunkStore', () => {
     });
 
     it('should resume from existing state across sessions', async () => {
-      // First session: write some chunks, then prepareForRead to flush to disk
+      // First session.
       const store1 = new ChunkStore(idb);
       await store1.init(root);
       await store1.writeChunk(0, new Uint8Array([1, 2, 3]));
       await store1.writeChunk(1, new Uint8Array([4, 5, 6]));
-      await store1.prepareForRead(); // flush to disk
+      await store1.prepareForRead();
       await store1.close();
 
       // Second session: same IDB, folder state parsed from disk

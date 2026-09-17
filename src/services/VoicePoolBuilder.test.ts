@@ -15,7 +15,6 @@ describe('VoicePoolBuilder', () => {
 
       expect(pool.male.length).toBeGreaterThan(0);
       expect(pool.female.length).toBeGreaterThan(0);
-      // Should include English voices or multilingual voices
       const hasEnglishOrMultilingual = pool.male.some(
         (v) => v.startsWith('en') || v.includes('Multilingual'),
       );
@@ -94,7 +93,6 @@ describe('VoicePoolBuilder', () => {
       const pool = buildVoicePool({ language: 'en', includeMultilingual: true });
       const all = [...pool.male, ...pool.female];
 
-      // AndrewNeural should be present, not AndrewMultilingualNeural
       expect(all).toContain('en-US, AndrewNeural');
       expect(all).not.toContain('en-US, AndrewMultilingualNeural');
     });
@@ -103,10 +101,8 @@ describe('VoicePoolBuilder', () => {
       const pool = buildVoicePool({ language: 'ru', includeMultilingual: true });
       const all = [...pool.male, ...pool.female];
 
-      // Russian native voices present
       expect(all).toContain('ru-RU, DmitryNeural');
       expect(all).toContain('ru-RU, SvetlanaNeural');
-      // Multilingual voices present (no non-Multilingual EN voice leaks in)
       expect(all).toContain('en-US, AndrewMultilingualNeural');
       expect(all).not.toContain('en-US, AndrewNeural');
     });
@@ -155,7 +151,6 @@ describe('VoicePoolBuilder', () => {
 });
 
 describe('deduplicateVariants', () => {
-  // Helper to create VoiceOption objects for testing
   const vo = (fullValue: string, gender: 'male' | 'female'): VoiceOption => {
     const [locale, name] = fullValue.split(', ');
     return { locale, name, fullValue, gender };
@@ -202,7 +197,6 @@ describe('deduplicateVariants', () => {
     ];
     const result = deduplicateVariants(candidates, 'ru');
 
-    // DmitryNeural (native, non-multi) should come before AndrewMultilingualNeural
     const dmitryIdx = result.findIndex((v) => v.name === 'DmitryNeural');
     const andrewIdx = result.findIndex((v) => v.name === 'AndrewMultilingualNeural');
     expect(dmitryIdx).toBeLessThan(andrewIdx);
@@ -225,12 +219,10 @@ describe('deduplicateVariants', () => {
     const result = deduplicateVariants(candidates, 'en');
 
     const names = result.map((v) => v.fullValue);
-    // Non-Multilingual variants kept for EN book
     expect(names).toContain('en-US, AndrewNeural');
     expect(names).toContain('en-US, BrianNeural');
     expect(names).toContain('en-US, AvaNeural');
     expect(names).toContain('en-US, AriaNeural');
-    // Multilingual variants removed
     expect(names).not.toContain('en-US, AndrewMultilingualNeural');
     expect(names).not.toContain('en-US, BrianMultilingualNeural');
     expect(names).not.toContain('en-US, AvaMultilingualNeural');

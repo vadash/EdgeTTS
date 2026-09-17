@@ -46,7 +46,7 @@ describe('findMaxPairings', () => {
   });
 
   it('pairs closest matches greedily', () => {
-    // May->Mae (1), May->Mai (1), Mae->Mae (0), Mae->Mai (2)
+    // May->Mae (1), May->Mai (1), Mae->Mae (0), Mae->Mai (1)
     // Greedy picks (Mae,Mae)=0 first, then (May,Mai)=1
     const result = findMaxPairings(['May', 'Mae'], ['Mae', 'Mai'], 2);
     expect(result.length).toBe(2);
@@ -54,9 +54,9 @@ describe('findMaxPairings', () => {
   });
 
   it('does not reuse names from same set', () => {
-    // With "May" matched to "Mae", can't match "Mae" to "Mai" if "Mae" already used
+    // With "May" matched to "Mae", the name "Mae" is used and cannot pair again
     const result = findMaxPairings(['May', 'Mae', 'The May'], ['Mae', 'Mai'], 2);
-    expect(result.length).toBeLessThanOrEqual(2); // Max 2 pairings (only 2 in set B)
+    expect(result.length).toBeLessThanOrEqual(2); // Set B has only 2 names
   });
 
   it('handles empty sets', () => {
@@ -66,8 +66,8 @@ describe('findMaxPairings', () => {
   });
 
   it('filters by maxEdits correctly', () => {
-    // "Smith" vs "Smythe" = distance 1
-    // "Smith" vs "Schmidt" = distance > 2
+    // "Smith" vs "Smythe" = distance 2, within maxEdits
+    // "Smith" vs "Schmidt" = distance 4, above maxEdits
     const result = findMaxPairings(['Smith'], ['Smythe', 'Schmidt'], 2);
     expect(result.length).toBe(1);
     expect(result[0][1]).toBe(0); // Pairs with Smythe (index 0)
@@ -75,7 +75,6 @@ describe('findMaxPairings', () => {
 });
 
 describe('matchCharacter', () => {
-  // Helper to create test profile
   const createProfile = (
     entries: Array<{ name: string; aliases: string[] }>,
   ): Record<string, CharacterEntry> => {
@@ -141,8 +140,8 @@ describe('matchCharacter', () => {
   });
 
   it('does not match when only a variation matches (not canonical)', () => {
-    // "Dad" is a variation of current char, matches alias in profile,
-    // but canonical "John" doesn't match anything — no shortcut
+    // "Dad" is a variation of the Character and matches a profile alias,
+    // but the canonical name "John" matches nothing, so the exact-name shortcut does not apply
     const profile = createProfile([
       {
         name: 'Erick Flatt',
@@ -151,7 +150,7 @@ describe('matchCharacter', () => {
     ]);
     const char: LLMCharacter = { canonicalName: 'John', variations: ['Dad'], gender: 'male' };
     const result = matchCharacter(char, profile);
-    // Falls through to fuzzy matching, which won't find 2 pairings
+    // Falls through to fuzzy matching, which does not reach the pairing threshold
     expect(result).toBeUndefined();
   });
 
@@ -187,8 +186,6 @@ describe('matchCharacter', () => {
 
   describe('dynamic pairing threshold', () => {
     it('requires 3 pairings when comparing 4 names vs 9 names (min(4,9)-1=3, not capped)', () => {
-      // M=4, N=9, min=4, min-1=3, which is > MIN_NAME_PAIRINGS, so required=3
-      // Use truly unrelated names with distances > 2
       const profile = createProfile([
         {
           name: 'Alexander',
@@ -210,30 +207,25 @@ describe('matchCharacter', () => {
         gender: 'male',
       };
 
-      // With min(4,9)-1 = 3, need 3 pairings to match
-      // These names are very different, so we won't get 3 pairings
+      // The name sets share no close pairs, so the pairing count stays below the threshold
       const result = matchCharacter(char, profile);
       expect(result).toBeUndefined();
     });
 
     it('requires 3 pairings when comparing 4 names vs 4 names (min(4,4)-1=3)', () => {
-      // M=4, N=4, min=4, min-1=3, required=3
-      const profile = createProfile([
-        { name: 'Alpha', aliases: ['Bravo', 'Charlie'] }, // 4 names total
-      ]);
+      const profile = createProfile([{ name: 'Alpha', aliases: ['Bravo', 'Charlie'] }]);
       const char: LLMCharacter = {
         canonicalName: 'Apple',
         variations: ['Bat', 'Cat'],
         gender: 'male',
-      }; // 4 names total
+      };
 
-      // Only 2 good pairings at best (Apple/Alpha=5, Bat/Bravo=4, Cat/Charlie=5 - all > MAX_EDITS=2)
+      // Every pairing exceeds MAX_NAME_EDITS (Apple/Alpha=3, Bat/Bravo=3, Cat/Charlie=5), so nothing pairs
       const result = matchCharacter(char, profile);
       expect(result).toBeUndefined();
     });
 
     it('matches with 3 pairings when comparing 4 names vs 9 names', () => {
-      // Create a scenario where we get exactly 3 good pairings
       const profile = createProfile([
         {
           name: 'Tom',
@@ -247,7 +239,6 @@ describe('matchCharacter', () => {
       };
 
       // Tom->Tom (0), Tim->Tim (0), Tam->Tam (0) = 3 pairings
-      // M=4, N=9, required = max(2, 4-1) = 3
       const result = matchCharacter(char, profile);
       expect(result?.canonicalName).toBe('Tom');
     });

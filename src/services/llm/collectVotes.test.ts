@@ -29,7 +29,6 @@ describe('collectVotes', () => {
       // Yield so the worker loop re-checks the quota between attempts.
       await new Promise<void>((resolve) => setTimeout(resolve, 5));
       live--;
-      // Failing temps: 0 and 1. Everything else succeeds.
       if (temp < 2) return null;
       return [temp];
     });
@@ -38,7 +37,6 @@ describe('collectVotes', () => {
     await vi.runAllTimersAsync();
     const results = await pending;
 
-    // Exactly `need` successes.
     expect(results).toHaveLength(need);
 
     // Every temp handed to run was unique (the core invariant: no same-temp retry).
@@ -48,7 +46,6 @@ describe('collectVotes', () => {
     expect(run).toHaveBeenCalledTimes(seen.length);
     expect(seen.length).toBeGreaterThan(need);
 
-    // Never exceeded the parallel cap.
     expect(peakLive).toBeLessThanOrEqual(parallel);
 
     // All returned results came from succeeding temps.
@@ -58,7 +55,7 @@ describe('collectVotes', () => {
   });
 
   it('returns all successes when budget runs out before need is met', async () => {
-    // Temps 0 and 1 fail; 3 and 4 succeed. need=5 but budget has only 2 winners.
+    // Only 2 of the 4 temps succeed, so the budget runs out before need is met.
     const failTemps = new Set([0, 1]);
     const run = vi.fn(async (temp: number, _signal: AbortSignal) =>
       failTemps.has(temp) ? null : [temp],
@@ -106,7 +103,7 @@ describe('collectVotes', () => {
         await Promise.resolve();
         return [temp];
       }
-      // Loser: never resolves on its own — must be aborted.
+      // Loser: never resolves on its own, so it must be aborted.
       return new Promise<number[] | null>((resolve) => {
         if (signal.aborted) return resolve(null);
         signal.addEventListener('abort', () => resolve(null), { once: true });

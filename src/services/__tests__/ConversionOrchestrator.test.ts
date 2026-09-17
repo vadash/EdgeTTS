@@ -125,7 +125,7 @@ const TEST_ASSIGNMENTS = [
  */
 function createMockServices(failPart?: number) {
   // Real ChunkStore over the shared FS mock and an in-memory IDB adapter:
-  // the orchestrator now drives resume/load/save through the store itself.
+  // the orchestrator drives resume/load/save through the store itself.
   const chunkIdb = createMockChunkIdb();
   const chunkStore = new ChunkStore(chunkIdb);
   vi.spyOn(chunkStore, 'init');
@@ -278,7 +278,6 @@ describe('runConversion', () => {
     // LLM concurrency was announced before extraction
     expect(ports.progress.setConcurrency).toHaveBeenCalledWith(1, 0);
 
-    // TTS progress is reported under the tts-conversion stage
     const ttsReported = ports.progress.report.mock.calls.some(
       (call) => call[0] === 'tts-conversion',
     );

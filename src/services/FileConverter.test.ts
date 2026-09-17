@@ -62,7 +62,6 @@ describe('FileConverter', () => {
     it('extracts text from EPUB via toc.ncx', async () => {
       const zip = new JSZip();
 
-      // Add toc.ncx
       zip.file(
         'OEBPS/toc.ncx',
         `<?xml version="1.0" encoding="UTF-8"?>
@@ -75,7 +74,6 @@ describe('FileConverter', () => {
 </ncx>`,
       );
 
-      // Add chapter content
       zip.file(
         'OEBPS/chapter1.xhtml',
         `<?xml version="1.0" encoding="UTF-8"?>
@@ -344,7 +342,6 @@ describe('FileConverter', () => {
   });
 
   describe('convertFileToTxt', () => {
-    // Helper to create a File-like object with text() method
     const createMockFile = (content: string, name: string): File => {
       const blob = new Blob([content], { type: 'text/plain' });
       const file = new File([blob], name);

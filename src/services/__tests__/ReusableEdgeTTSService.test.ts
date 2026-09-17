@@ -4,7 +4,6 @@ import type { TTSConfig } from '@/state/types';
 
 describe('ReusableEdgeTTSService', () => {
   describe('makeSSML', () => {
-    // Helper to access private method for testing
     const getMakeSSML = (service: ReusableEdgeTTSService) => {
       return (service as any).makeSSML.bind(service);
     };
@@ -31,8 +30,6 @@ describe('ReusableEdgeTTSService', () => {
 
       const result = makeSSML('A & B < C', defaultConfig);
 
-      // Should be: A &amp; B &lt; C
-      // NOT: A &amp;amp; B &lt; C (double-escaped)
       expect(result).toContain('A &amp; B &lt; C');
       expect(result).not.toContain('&amp;amp;');
       expect(result).not.toContain('&amp;lt;');
@@ -53,7 +50,7 @@ describe('ReusableEdgeTTSService', () => {
 
       const result = makeSSML('&lt;tag&gt;', defaultConfig);
 
-      // The & in &lt; and &gt; should be escaped to &amp;
+      // The & in &lt; and &gt; escapes again to &amp;
       expect(result).toContain('&amp;lt;tag&amp;gt;</prosody>');
     });
 
@@ -61,23 +58,18 @@ describe('ReusableEdgeTTSService', () => {
       const service = new ReusableEdgeTTSService();
       const makeSSML = getMakeSSML(service);
 
-      // Cyrillic
       let result = makeSSML('Привет', defaultConfig);
       expect(result).toContain("'>\nПривет</prosody>");
 
-      // Chinese
       result = makeSSML('你好', defaultConfig);
       expect(result).toContain("'>\n你好</prosody>");
 
-      // Japanese
       result = makeSSML('こんにちは', defaultConfig);
       expect(result).toContain("'>\nこんにちは</prosody>");
 
-      // Arabic
       result = makeSSML('مرحبا', defaultConfig);
       expect(result).toContain("'>\nمرحبا</prosody>");
 
-      // Emoji
       result = makeSSML('Hello 👋', defaultConfig);
       expect(result).toContain("'>\nHello 👋</prosody>");
     });
@@ -88,7 +80,7 @@ describe('ReusableEdgeTTSService', () => {
 
       const result = makeSSML('', defaultConfig);
 
-      // Should produce valid SSML with no text content between prosody tags
+      // Empty text still yields valid SSML with no content between the prosody tags
       expect(result).toContain('</prosody></voice></speak>');
       expect(result).toMatch(/<prosody[^>]*>\s*<\/prosody>/);
     });

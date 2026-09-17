@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '@/config';
 import { TextBlockSplitter } from './TextBlockSplitter';
 
-// Helper: create a string that estimates to exactly N tokens (4 chars per token)
+// The splitter estimates one token per 4 chars, so this builds exactly N tokens.
 function tokenFill(n: number): string {
   return 'a'.repeat(n * 4);
 }
@@ -19,7 +19,7 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       ['___', 'drops ___ divider at threshold'],
     ])('%s', (divider, _description) => {
       const maxTokens = 100;
-      // 86 tokens = 344 chars > 85 threshold (100 * 0.85 = 85)
+      // 86 tokens is 344 chars, just past the 85-token threshold (100 * 0.85).
       const filler = tokenFill(86);
       const newScene = 'New scene begins here.';
 
@@ -27,7 +27,6 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
 
       expect(blocks).toHaveLength(2);
       expect(blocks[0].sentences).toEqual([filler]);
-      // divider dropped, newScene starts block 1
       expect(blocks[1].sentences).toEqual([newScene]);
     });
   });
@@ -84,12 +83,11 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     it('does NOT treat long text starting with Chapter as header', () => {
       const maxTokens = 100;
       const filler = tokenFill(86);
-      // 60 chars — too long for a header (< 50 chars)
+      // 60 chars exceeds the 50-char header limit, so this is not a header.
       const longChapter = 'Chapter 1 was about the time he went to the store';
 
       const blocks = splitter.splitIntoBlocks([filler, longChapter], maxTokens);
 
-      // Should NOT split — not recognized as header, hard cut applies
       expect(blocks[0].sentences).toContain(filler);
     });
   });
@@ -98,23 +96,21 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     it('ends current block at long narration sentence (no dialogue symbols)', () => {
       const maxTokens = 100;
       const filler = tokenFill(86);
-      // 200 chars, no quotes — pure narration
+      // 200 chars with no quotes crosses the 150-char narration threshold.
       const narration = 'a'.repeat(200);
       const nextContent = 'The dialogue resumes here.';
 
       const blocks = splitter.splitIntoBlocks([filler, narration, nextContent], maxTokens);
 
       expect(blocks).toHaveLength(2);
-      // Narration ends block 0
       expect(blocks[0].sentences).toEqual([filler, narration]);
-      // Next content starts block 1
       expect(blocks[1].sentences).toEqual([nextContent]);
     });
 
     it('does NOT break on narration that contains dialogue', () => {
       const maxTokens = 100;
       const filler = tokenFill(86);
-      // Long text but has quotes — it's dialogue, not narration
+      // The quotes make this dialogue, so the narration break does not apply.
       const dialogue =
         `She looked at him and said "I don't know what you mean" and then walked away`.padEnd(
           200,
@@ -123,20 +119,17 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
 
       const blocks = splitter.splitIntoBlocks([filler, dialogue], maxTokens);
 
-      // Should NOT split at this sentence — it has dialogue symbols
-      // Falls through to hard token limit
       expect(blocks[0].sentences).toContain(filler);
     });
 
     it('does NOT break on short narration (< 150 chars)', () => {
       const maxTokens = 100;
       const filler = tokenFill(86);
-      // 100 chars, no quotes — but too short
+      // 100 chars stays below the 150-char narration threshold.
       const shortNarration = 'a'.repeat(100);
 
       const blocks = splitter.splitIntoBlocks([filler, shortNarration], maxTokens);
 
-      // Should NOT split — narration too short (< 150 chars)
       expect(blocks[0].sentences).toContain(filler);
     });
   });
@@ -144,12 +137,11 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
   describe('Edge Cases', () => {
     it('does NOT break at divider when below threshold', () => {
       const maxTokens = 100;
-      // Only 50 tokens — well below 85 threshold
+      // 50 tokens stays well below the 85-token threshold.
       const shortFiller = tokenFill(50);
 
       const blocks = splitter.splitIntoBlocks([shortFiller, '***', 'After divider.'], maxTokens);
 
-      // All in one block — threshold not reached, divider is just content
       expect(blocks).toHaveLength(1);
       expect(blocks[0].sentences).toEqual([shortFiller, '***', 'After divider.']);
     });
@@ -166,12 +158,9 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
 
     it('falls through to hard token cut when no break candidate found', () => {
       const maxTokens = 100;
-      // 60 tokens of dialogue, then 60 more of dialogue — no break candidates
-      const dialogue1 = `"Hello there." `.repeat(30); // ~450 chars ≈ 113 tokens
-      // This single sentence exceeds maxTokens on its own after the first is added
+      const dialogue1 = `"Hello there." `.repeat(30); // about 450 chars and 113 tokens, over maxTokens on its own
       const blocks = splitter.splitIntoBlocks([tokenFill(86), dialogue1.trim()], maxTokens);
 
-      // Hard cut at token limit — dialogue1 causes split
       expect(blocks.length).toBeGreaterThanOrEqual(2);
     });
 
@@ -186,7 +175,6 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
 
       expect(blocks).toHaveLength(2);
       expect(blocks[0].sentences).toEqual([filler]);
-      // Both dividers dropped
       expect(blocks[1].sentences).toEqual(['Content after dividers.']);
     });
 
@@ -194,12 +182,10 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       const maxTokens = 100;
       const filler = tokenFill(86);
 
-      // After cut, next sentence is a divider, then content
       const blocks = splitter.splitIntoBlocks([filler, '***', '***', 'Real content.'], maxTokens);
 
       expect(blocks).toHaveLength(2);
       expect(blocks[1].sentences).toEqual(['Real content.']);
-      // No empty blocks
       for (const block of blocks) {
         expect(block.sentences.length).toBeGreaterThan(0);
       }
@@ -212,7 +198,7 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       const blocks = splitter.splitIntoBlocks([filler, '***', 'Content.'], maxTokens);
 
       expect(blocks[0].sentenceStartIndex).toBe(0);
-      // Content is at index 2, divider (index 1) was dropped
+      // The divider at index 1 still occupies the index space after the drop.
       expect(blocks[1].sentenceStartIndex).toBe(2);
     });
 
@@ -224,7 +210,6 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
 
       // splitLongSentence handles it
       expect(blocks.length).toBeGreaterThanOrEqual(1);
-      // No crash, blocks are created
       for (const block of blocks) {
         expect(block.sentences.length).toBeGreaterThan(0);
       }
@@ -241,13 +226,11 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
 
     it('splits long paragraph at last space before 2000 chars', () => {
-      // Create a paragraph with a space at position 1999
       const longPara = `${'a'.repeat(1999)} bbb`;
       const result = (splitter as any).forceSplitLongParagraphs([longPara]);
       expect(result).toHaveLength(2);
       expect(result[0].length).toBeLessThanOrEqual(2000);
       expect(result[1].length).toBeLessThanOrEqual(2000);
-      // Should have trimmed whitespace
       expect(result[0]).not.toMatch(/^\s/);
       expect(result[0]).not.toMatch(/\s$/);
       expect(result[1]).not.toMatch(/^\s/);
@@ -255,12 +238,11 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
 
     it('splits at comma if better than space', () => {
-      // Space at 1500, comma at 1800 (better - closer to 2000)
-      // Total length: 2500 chars (exceeds limit)
+      // The space sits at 1500 and the comma at 1800, closer to the 2000 limit.
+      // Total length is 2500 chars, past the limit.
       const longPara = `${'a'.repeat(1500)} ${'b'.repeat(299)},${'c'.repeat(701)}`;
       const result = (splitter as any).forceSplitLongParagraphs([longPara]);
       expect(result).toHaveLength(2);
-      // Should split at comma (1800), not at space (1500)
       expect(result[0].length).toBeGreaterThan(1500);
       expect(result[0].length).toBeLessThanOrEqual(2000);
     });
@@ -278,16 +260,14 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
       const para1 = 'a'.repeat(2500);
       const para2 = 'b'.repeat(3000);
       const result = (splitter as any).forceSplitLongParagraphs([para1, para2]);
-      // First paragraph splits into 2
       expect(result[0]).toBe('a'.repeat(2000));
       expect(result[1]).toBe('a'.repeat(500));
-      // Second paragraph splits into 2
       expect(result[2]).toBe('b'.repeat(2000));
       expect(result[3]).toBe('b'.repeat(1000));
     });
 
     it('handles paragraph that needs multiple splits', () => {
-      // 6000 chars with no spaces/commas = 3 hard cuts
+      // 6000 chars with no spaces or commas means 3 hard cuts.
       const longPara = 'a'.repeat(6000);
       const result = (splitter as any).forceSplitLongParagraphs([longPara]);
       expect(result).toHaveLength(3);
@@ -330,12 +310,9 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
 
       const blocks = splitter.createAssignBlocks(text);
 
-      // Should produce multiple blocks, with a clean split at the divider
       expect(blocks.length).toBeGreaterThan(1);
-      // No block should contain the raw '***' divider
       const allSentences = blocks.flatMap((b) => b.sentences);
       expect(allSentences).not.toContain('***');
-      // Last block should contain the new scene text
       const lastBlock = blocks[blocks.length - 1];
       expect(lastBlock.sentences).toContain('New scene after the break.');
     });
@@ -365,10 +342,8 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
 
       const blocks = splitter.createAssignBlocks(text);
 
-      // Find the block containing "Chapter 10"
       const chapterBlock = blocks.find((b) => b.sentences.includes('Chapter 10'));
       expect(chapterBlock).toBeDefined();
-      // Chapter 10 should be the first sentence in its block
       expect(chapterBlock!.sentences[0]).toBe('Chapter 10');
     });
   });
@@ -377,12 +352,10 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     const splitter = new TextBlockSplitter();
 
     it('splits multiple sentences inside curly quotes', () => {
-      // Curly quotes wrapping multiple sentences — each should be its own sentence
       const text =
         '\u201CAlchemical mana is classified in three ways. One is usefulness to humans. Remember, this form of classification is archaic, but it\u2019s still used everywhere so you need to know it.\u201D';
       const result = (splitter as any).splitParagraphIntoSentences(text);
 
-      // Should split at least at the period boundaries inside the quotes
       expect(result.length).toBeGreaterThanOrEqual(3);
       for (const sentence of result) {
         expect(sentence.length).toBeLessThan(300);
@@ -400,15 +373,14 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
 
     it('handles WALL OF TEXT: real royalroad sample (Seneca lecture)', () => {
-      // Real text from sample_3_en_royalroad.txt — sentence index 47 (711 chars)
+      // Real text from sample_3_en_royalroad.txt, sentence index 47 (711 chars).
       const text =
         '\u201CAlchemical mana is classified in three ways: One is usefulness to humans. Remember, this form of classification is archaic, but it\u2019s still used everywhere so you need to know it. A-class mana is the only mana that is safe to channel. Classes go A through D, and D-class mana will kill you instantly. Again, a metaphor: You can get energy from eating plants. A-class mana is like a carrot. Great. Eat as many as you want. Using B-class mana is like eating plants that will give you diarrhea; you can do it a little bit, but it will hurt. Using D-class mana is like eating a piece of anthracite coal. Yes, it used to be a plant. Yes, there\u2019s lots of energy in there. No, you can\u2019t use it; don\u2019t eat toxic rocks.\u201D';
       const result = (splitter as any).splitParagraphIntoSentences(text);
 
-      // Must produce many sentences, not one 711-char block
+      // The result must be many sentences, not one 711-char block.
       expect(result.length).toBeGreaterThanOrEqual(10);
       for (const sentence of result) {
-        // No sentence should be a WALL OF TEXT
         expect(sentence.length).toBeLessThan(200);
       }
     });
@@ -418,9 +390,7 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
         'The motto above the Alchemistry Building door read \u201CRespect for the Fundamental Forces of the Universe,\u201D and below that, \u201CIn Memoriam,\u201D and the four names of the deceased, at least two of whom had not respected the magical chemistry they studied in the building.';
       const result = (splitter as any).splitParagraphIntoSentences(text);
 
-      // Should split into at least 2 sentences
       expect(result.length).toBeGreaterThanOrEqual(1);
-      // No individual chunk should be a WALL OF TEXT
       for (const sentence of result) {
         expect(sentence.length).toBeLessThan(300);
       }
@@ -429,12 +399,11 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
 
   describe('splitIntoParagraphs with forceSplitLongParagraphs guard', () => {
     it('splits 10000-char paragraph with no punctuation into 5 chunks of ≤2000 chars', () => {
-      // A paragraph with no punctuation — splitParagraphIntoSentences will fail
-      // and return the entire paragraph as-is. The guard should force-split it.
+      // A paragraph with no punctuation defeats splitParagraphIntoSentences, which
+      // returns the whole paragraph as-is. The guard then force-splits it.
       const longPara = 'a'.repeat(10000);
       const result = splitter.splitIntoParagraphs(longPara);
 
-      // Should split into 5 chunks of exactly 2000 chars each
       expect(result).toHaveLength(5);
       for (const chunk of result) {
         expect(chunk.length).toBeLessThanOrEqual(2000);
@@ -447,12 +416,12 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
 
     it('force-splits paragraph entirely inside quotes correctly', () => {
-      // A paragraph with only quotes — splitParagraphIntoSentences will fail
-      // because it can't find sentence boundaries. The guard should handle it.
+      // A paragraph of only quotes defeats splitParagraphIntoSentences because it
+      // finds no sentence boundaries. The guard then force-splits it.
       const quotedPara = `"${'a'.repeat(9998)}"`;
       const result = splitter.splitIntoParagraphs(quotedPara);
 
-      // Should split into 5 chunks (including the quote characters)
+      // The quote characters count toward the length, so the result is 5 chunks.
       expect(result).toHaveLength(5);
       for (const chunk of result) {
         expect(chunk.length).toBeLessThanOrEqual(2000);
@@ -460,8 +429,8 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
 
     it('normal paragraphs with punctuation still work as before', () => {
-      // Normal text with punctuation — should be handled by
-      // splitParagraphIntoSentences, and the guard should pass it through.
+      // Punctuation lets splitParagraphIntoSentences handle the text, so the
+      // guard passes it through unchanged.
       const text = 'First paragraph.\nSecond paragraph.\nThird paragraph.';
       const result = splitter.splitIntoParagraphs(text);
 
@@ -470,17 +439,13 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
 
     it('mixed long and normal paragraphs are handled correctly', () => {
-      // One long paragraph without punctuation, one normal paragraph
       const text = `aaa${'a'.repeat(9997)}\nNormal paragraph.`;
       const result = splitter.splitIntoParagraphs(text);
 
-      // First paragraph splits into 5 chunks, second stays as-is
       expect(result.length).toBeGreaterThanOrEqual(6);
-      // All chunks should be ≤2000 chars
       for (const chunk of result) {
         expect(chunk.length).toBeLessThanOrEqual(2000);
       }
-      // Last chunk should be the normal paragraph
       expect(result[result.length - 1]).toBe('Normal paragraph.');
     });
   });
@@ -494,7 +459,7 @@ describe('TextBlockSplitter — Semantic Chunking', () => {
     });
 
     it('falls back to en for a non-constructible locale (invalid BCP-47) without throwing', () => {
-      // 'x' is rejected by Intl.Segmenter; getSegmenter catches and retries with 'en'.
+      // Intl.Segmenter rejects 'x'. getSegmenter catches the error and retries with 'en'.
       const text = 'First sentence. Second sentence.';
       const result = splitter.splitIntoParagraphs(text, 'x');
 

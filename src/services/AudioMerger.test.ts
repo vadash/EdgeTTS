@@ -6,9 +6,9 @@ import { createMockChunkIdb } from '@/test/mocks/MockChunkIdb';
 import { createMockDirectoryHandle } from '@/test/mocks/FileSystemMocks';
 
 /**
- * Fake MP3 bytes — duration parsing is irrelevant: file boundaries
- * force 1-chunk-per-group in the boundary tests, instead of MP3 frame
- * duration extrapolation.
+ * Fake MP3 bytes. Group boundaries in these tests come from the chapter
+ * table, not from duration extrapolation, so the bytes need no valid MP3
+ * frame durations.
  */
 const fakeChunk = new Uint8Array([0xff, 0xf2, 0xa4, 0xc0, 0x00, 0x00, 0x00, 0x00]);
 
@@ -90,7 +90,7 @@ function createMockFFmpegService(label: 'primary' | 'worker', gate: StartGate): 
           started.push(label);
           gate.onStarted();
           await pendingPromise;
-          return new Uint8Array([0x4f, 0x70, 0x75, 0x73]); // 'Opus' — non-empty
+          return new Uint8Array([0x4f, 0x70, 0x75, 0x73]); // 'Opus', non-empty so the group counts as saved
         },
       ),
     terminate: vi.fn(),
@@ -102,7 +102,8 @@ describe('AudioMerger', () => {
 
   beforeEach(async () => {
     // Real ChunkStore over an in-memory IDB (ADR-0016). The merger asks
-    // this store for availability; tests seed it like the TTS stage would.
+    // this store for availability, and tests seed it the way the TTS
+    // stage does.
     chunkStore = new ChunkStore(createMockChunkIdb());
     await chunkStore.init(createMockDirectoryHandle());
   });
@@ -152,15 +153,14 @@ describe('AudioMerger', () => {
       progress.push([current, total, message]);
     };
 
-    // Start mergeAndSave without awaiting — the pool workers block on their
+    // Start mergeAndSave without awaiting. The pool workers block on their
     // controllable deferreds inside processAudio.
     const donePromise = merger.mergeAndSave(3, fileNames, saveDir, onProgress);
 
-    // Wait deterministically until both pool workers have entered processAudio.
     await gate.promise;
 
-    // ANCHOR CONTRACT: both pool workers entered processAudio before either
-    // would have resolved — i.e. they were encoding concurrently.
+    // ANCHOR CONTRACT: both pool workers entered processAudio while both
+    // were still pending, which proves concurrent encoding.
     expect(primaryMock.processAudio).toHaveBeenCalledTimes(1);
     expect(workerMock.processAudio).toHaveBeenCalledTimes(1);
 
@@ -173,12 +173,12 @@ describe('AudioMerger', () => {
     // Both groups produced non-null output => exactly 2 saved.
     expect(savedCount).toBe(2);
 
-    // The factory-produced worker is terminated after the merge; the
-    // injected primary singleton is NOT (its lifecycle is owned upstream).
+    // The factory-produced worker is terminated after the merge. The
+    // injected primary singleton is not, because the merger does not own
+    // its lifecycle.
     expect(workerMock.terminate).toHaveBeenCalledTimes(1);
     expect(primaryMock.terminate).not.toHaveBeenCalled();
 
-    // Progress reported processing for the group range.
     expect(progress.length).toBeGreaterThan(0);
   });
 
@@ -196,7 +196,7 @@ describe('AudioMerger', () => {
     primaryMock.release();
     const savedCount = await merger.mergeAndSave(3, fileNames, createMockDirectoryHandle());
 
-    // Only the injected singleton processed groups; no worker exists.
+    // No ffmpegFactory is set, so only the injected singleton processes groups.
     expect(primaryMock.processAudio).toHaveBeenCalledTimes(2);
     expect(savedCount).toBe(2);
   });
@@ -222,7 +222,7 @@ describe('AudioMerger', () => {
     primaryMock.release();
     const merger = new AudioMerger(primaryMock as unknown as FFmpegService, makeConfig());
     // The store holds 3 chunks but the Book only has 2: the merge must cover
-    // exactly 0..chunkCount-1 and never read past the honest count.
+    // exactly 0..chunkCount-1 and never read past it.
     await seedChunks([0, 1, 2]);
 
     const savedCount = await merger.mergeAndSave(2, [['book1', 2]], createMockDirectoryHandle());
@@ -253,7 +253,7 @@ describe('AudioMerger', () => {
 
     expect(savedCount).toBe(2);
 
-    // The saved path must be the composed folderName/fileName pair — no
+    // The saved path must be the composed folderName/fileName pair, not a
     // regex round-trip over the filename. Both lookups throw if the file
     // landed anywhere else.
     const chapter = await saveDir.getDirectoryHandle('My_ Chapter');

@@ -28,7 +28,6 @@ describe('LadderController', () => {
         },
         10,
       );
-      // Record 20 successful tasks
       for (let i = 0; i < 20; i++) {
         ladder.recordTask(true, 0);
       }
@@ -71,12 +70,12 @@ describe('LadderController', () => {
         },
         15,
       );
-      // Only 10 tasks
+      // 10 tasks, below sampleSize (20).
       for (let i = 0; i < 10; i++) {
         ladder.recordTask(true, 0);
       }
       ladder.evaluate();
-      expect(ladder.getCurrentWorkers()).toBe(5); // unchanged
+      expect(ladder.getCurrentWorkers()).toBe(5);
     });
 
     it('uses hysteresis: scales up at 0.8 but scales down at 0.9', () => {
@@ -90,7 +89,7 @@ describe('LadderController', () => {
         },
         15,
       );
-      // 85% success (17 successes, 3 failures) - should scale up (>= 0.8)
+      // 85% success (17 successes, 3 failures), at or above the 0.8 scale-up threshold.
       for (let i = 0; i < 17; i++) {
         ladder.recordTask(true, 0);
       }
@@ -100,18 +99,16 @@ describe('LadderController', () => {
       ladder.evaluate();
       expect(ladder.getCurrentWorkers()).toBe(7); // 5 -> 7
 
-      // After scale up, history is cleared. Need to record sampleSize tasks again.
-      // Record 20 successes to scale up again
+      // History clears after a scale event, so record a full sampleSize
+      // (20 successes) to scale up again.
       for (let i = 0; i < 20; i++) {
         ladder.recordTask(true, 0);
       }
       ladder.evaluate();
       expect(ladder.getCurrentWorkers()).toBe(9); // 7 -> 9
 
-      // After scale up, history is cleared again.
-      // Record 89% success (below 0.9 threshold, should scale down)
-      // 18 successes + 2 failures = 90% success rate
-      // Need < 90% to trigger scale down
+      // History clears after another scale event, so record a full sample
+      // again: 17 successes and 3 failures (85%).
       for (let i = 0; i < 17; i++) {
         ladder.recordTask(true, 0);
       }
@@ -119,12 +116,11 @@ describe('LadderController', () => {
         ladder.recordTask(false, 1);
       }
       ladder.evaluate();
-      // 85% success is >= 0.8, so it scales UP (hysteresis - optimistic)
-      // not down. The test name says "scales down at 0.9" meaning
-      // you need to be BELOW 0.9 AND below 0.8 to scale down.
+      // 85% is at or above the 0.8 scale-up threshold, so the ladder scales
+      // up. The scale-up check runs before the scale-down check, so a rate
+      // in the 0.8 to 0.9 band never scales down.
       expect(ladder.getCurrentWorkers()).toBe(11); // 9 -> 11 (scales up, not down)
 
-      // Now demonstrate scale down: need < 80% success
       for (let i = 0; i < 20; i++) {
         ladder.recordTask(true, 0);
       }
@@ -139,7 +135,7 @@ describe('LadderController', () => {
         ladder.recordTask(false, 1);
       }
       ladder.evaluate();
-      // 70% is below 0.9 threshold, so it scales down
+      // 70% is below 0.8, so the scale-down branch runs.
       expect(ladder.getCurrentWorkers()).toBe(6); // 13 * 0.5 = 6.5 -> floor to 6
     });
   });
@@ -165,8 +161,9 @@ describe('LadderController', () => {
         ladder.evaluate();
       }
       expect(ladder.getCurrentWorkers()).toBe(11);
-      // After scale up, history is cleared. Need sampleSize tasks to evaluate.
-      // Record 19 successes and 1 hard failure
+      // History clears after a scale event, so a full sampleSize is needed
+      // to evaluate. The failing task carries 5 retries, and retries >= 5
+      // is a hard failure that trips the circuit breaker.
       for (let i = 0; i < 19; i++) {
         ladder.recordTask(true, 0);
       }
@@ -186,7 +183,6 @@ describe('LadderController', () => {
         },
         15,
       );
-      // At 5 workers, scale down should stay at 5
       ladder.recordTask(false, 11);
       ladder.evaluate();
       expect(ladder.getCurrentWorkers()).toBe(5);
@@ -205,7 +201,6 @@ describe('LadderController', () => {
         },
         15,
       );
-      // Add 10 tasks
       for (let i = 0; i < 10; i++) {
         ladder.recordTask(true, 0);
       }
@@ -234,7 +229,6 @@ describe('LadderController', () => {
       }
       ladder.evaluate();
 
-      // Workers should have scaled up
       expect(ladder.getCurrentWorkers()).toBe(7);
 
       // Record only 2 more mixed results (below sampleSize)
@@ -243,7 +237,6 @@ describe('LadderController', () => {
       ladder.recordTask(false, 1);
       ladder.evaluate();
 
-      // Workers should NOT have scaled down because we don't have enough samples yet
       expect(ladder.getCurrentWorkers()).toBe(7);
     });
 
@@ -282,7 +275,6 @@ describe('LadderController', () => {
       ladder.recordTask(true, 0);
       ladder.evaluate();
 
-      // Workers should NOT have scaled up because we don't have enough samples yet
       expect(ladder.getCurrentWorkers()).toBe(5);
     });
   });

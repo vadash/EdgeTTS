@@ -98,7 +98,7 @@ describe('LLMApiClient header handling', () => {
 
       await triggerRequest(client);
 
-      // At minimum, nothing should crash with any header format
+      // The plain-object header format must at least reach fetch without crashing.
       expect(globalThis.fetch).toHaveBeenCalled();
     } finally {
       globalThis.fetch = originalFetch;

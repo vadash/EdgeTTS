@@ -29,7 +29,6 @@ describe('checkResumeState', () => {
   it('returns ResumeInfo when pipeline_state.json exists', async () => {
     const tempDir = await root.getDirectoryHandle('_temp_work', { create: true });
 
-    // Write pipeline state
     const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
     const stateWritable = await stateFile.createWritable();
     await stateWritable.write(
@@ -50,7 +49,6 @@ describe('checkResumeState', () => {
   it('counts cached chunk files using new format', async () => {
     const tempDir = await root.getDirectoryHandle('_temp_work', { create: true });
 
-    // Write pipeline state
     const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
     const stateWritable = await stateFile.createWritable();
     await stateWritable.write(
@@ -62,7 +60,6 @@ describe('checkResumeState', () => {
     );
     await stateWritable.close();
 
-    // Write chunks using new ChunkStore format
     const dataFile = await tempDir.getFileHandle('chunks_data_0.bin', { create: true });
     const dataWritable = await dataFile.createWritable();
     await dataWritable.write(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9]));
@@ -83,7 +80,6 @@ describe('checkResumeState', () => {
   it('wipes legacy format chunk files', async () => {
     const tempDir = await root.getDirectoryHandle('_temp_work', { create: true });
 
-    // Write pipeline state
     const stateFile = await tempDir.getFileHandle('pipeline_state.json', { create: true });
     const stateWritable = await stateFile.createWritable();
     await stateWritable.write(
@@ -95,7 +91,6 @@ describe('checkResumeState', () => {
     );
     await stateWritable.close();
 
-    // Write legacy chunk files (old format)
     for (const name of ['chunk_0001.bin', 'chunk_0002.bin', 'chunk_0003.bin']) {
       const f = await tempDir.getFileHandle(name, { create: true });
       const w = await f.createWritable();
@@ -107,11 +102,9 @@ describe('checkResumeState', () => {
     const log = (msg: string) => logs.push(msg);
 
     const result = await checkResumeState(store, root, log);
-    // Should return null because legacy format is detected and wiped
     expect(result).toBeNull();
     expect(logs.some((msg) => msg.includes('legacy format detected'))).toBe(true);
 
-    // Verify _temp_work was removed
     let tempWorkExists = false;
     try {
       await root.getDirectoryHandle('_temp_work');

@@ -99,8 +99,8 @@ describe('LlmStages - Extract with Structured Outputs', () => {
   });
 
   it('skips block on refusal during extract (no backup)', async () => {
-    // The adapter throws the retriable refusal error on the wire; the service
-    // exhausts retries and the per-block handler skips the block.
+    // The transport throws the retriable refusal error. The service exhausts
+    // retries, and the per-block handler skips the block.
     service = makeService({
       transport: async () => {
         throw new RetriableError('LLM refused: Content policy violation');
@@ -116,7 +116,7 @@ describe('LlmStages - Extract with Structured Outputs', () => {
     ];
 
     const result = await service.extract(blocks);
-    expect(result).toEqual([]); // refusal skips the block, no throw
+    expect(result).toEqual([]);
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('failed after all retries, skipping'),
     );

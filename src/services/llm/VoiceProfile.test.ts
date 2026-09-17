@@ -77,16 +77,13 @@ describe('exportToProfile', () => {
     );
     const profile = JSON.parse(json) as VoiceProfileFile;
 
-    // Harry should have updated counts
     expect(profile.characters.harry.lines).toBe(51);
     expect(profile.characters.harry.bookAppearances).toBe(2);
     expect(profile.characters.harry.lastSeenIn).toBe('BOOK2');
 
-    // Ron should be added
     expect(profile.characters.ron.canonicalName).toBe('Ron');
     expect(profile.characters.ron.lines).toBe(1);
 
-    // Total should include previous + current
     expect(profile.totalLines).toBe(102); // 100 + 2
   });
 
@@ -141,7 +138,7 @@ describe('exportToProfile', () => {
     const existingProfile: VoiceProfileFile = {
       version: 2,
       narrator: 'en-US-GuyNeural',
-      totalLines: 100, // Harry has 50 lines = 50%
+      totalLines: 100,
       characters: {
         harry: {
           canonicalName: 'Harry',
@@ -248,7 +245,7 @@ describe('importProfile', () => {
       },
     };
 
-    // May/Mae/TheMay vs Mae/Mai - should match with 2 pairings
+    // May/Mae/The May against Mae/Mai yields exactly the 2 pairings the matcher requires.
     const characters: LLMCharacter[] = [
       { canonicalName: 'May', variations: ['Mae', 'The May'], gender: 'female' },
     ];
@@ -330,7 +327,7 @@ describe('isCharacterVisible', () => {
       gender: 'male',
       aliases: [],
       lines: 1,
-      percentage: 0.003, // Below 0.5% (0.5% = 0.005)
+      percentage: 0.003, // below IMPORTANCE_THRESHOLD (0.005 = 0.5%)
       lastSeenIn: 'BOOK1',
       bookAppearances: 1,
     };
@@ -345,7 +342,7 @@ describe('isCharacterVisible', () => {
       gender: 'male',
       aliases: [],
       lines: 10,
-      percentage: 0.5, // Exactly threshold
+      percentage: 0.5,
       lastSeenIn: 'BOOK1',
       bookAppearances: 1,
     };
@@ -400,8 +397,7 @@ describe('randomizeBelow', () => {
     { canonicalName: 'Carol', variations: [], gender: 'female' },
   ];
 
-  // Mirrors the ordering the deleted in-function fallback synthesized (1000 - 10*index)
-  // so existing assertions hold unchanged now that frequency is required.
+  // Distinct descending frequencies, so the frequency sort keeps the list order.
   const freq = (chars: LLMCharacter[]): Map<string, number> =>
     new Map(chars.map((c, i) => [c.canonicalName, 1000 - i * 10]));
 
@@ -409,8 +405,8 @@ describe('randomizeBelow', () => {
     const currentMap = new Map([
       ['Narrator', 'en-US, GuyNeural'],
       ['Alice', 'en-US, JennyNeural'],
-      ['Bob', 'en-US, GuyNeural'], // duplicate - will be randomized
-      ['Carol', 'en-US, GuyNeural'], // duplicate - will be randomized
+      ['Bob', 'en-US, GuyNeural'], // duplicate of the Narrator voice, so it is randomized
+      ['Carol', 'en-US, GuyNeural'], // duplicate of the Narrator voice, so it is randomized
     ]);
 
     const result = randomizeBelow(
@@ -423,16 +419,15 @@ describe('randomizeBelow', () => {
       freq(characters),
     );
 
-    // Narrator and Alice should be unchanged
     expect(result.get('Narrator')).toBe('en-US, GuyNeural');
     expect(result.get('Alice')).toBe('en-US, JennyNeural');
 
-    // Bob should get a male voice (not GuyNeural - reserved by Narrator, not JennyNeural - reserved by Alice)
+    // Bob gets a male voice: the Narrator row reserves GuyNeural and Alice reserves JennyNeural.
     const bobVoice = result.get('Bob');
     expect(bobVoice).toBeDefined();
     expect(['en-US, DavisNeural', 'en-US, TonyNeural']).toContain(bobVoice);
 
-    // Carol should get a female voice (not JennyNeural - reserved by Alice)
+    // Carol gets a female voice because Alice reserves JennyNeural.
     const carolVoice = result.get('Carol');
     expect(carolVoice).toBe('en-US, AriaNeural');
   });
@@ -488,7 +483,7 @@ describe('randomizeBelow', () => {
 
     // 2-voice pool: 80% cut rounds up to 2, split forces unique=[Guy], shared=[Davis].
     expect(result.get('Bob')).toBe('en-US, GuyNeural'); // unique slot
-    // Dan and Eve must come from the shared tail — repeats allowed, never re-uses the unique.
+    // Charlie, Dan and Eve draw from the shared tail, which repeats; the unique slot is never handed out twice.
     expect(['en-US, GuyNeural', 'en-US, DavisNeural']).toContain(result.get('Charlie'));
     expect(['en-US, GuyNeural', 'en-US, DavisNeural']).toContain(result.get('Dan'));
     expect(['en-US, GuyNeural', 'en-US, DavisNeural']).toContain(result.get('Eve'));
@@ -522,7 +517,7 @@ describe('randomizeBelow', () => {
     );
 
     const assigned = chars.slice(1).map((c) => result.get(c.canonicalName)!);
-    expect(new Set(assigned).size).toBe(9); // 9 unique + 1-voice shared tail
+    expect(new Set(assigned).size).toBe(9); // 7 unique slots left after the Narrator row takes one + the 2 shared-tail voices
     expect(assigned.every((v) => v.startsWith('en-US, M'))).toBe(true);
     expect(assigned.every((v) => v !== 'en-US, NarratorNeural')).toBe(true);
   });
@@ -556,7 +551,7 @@ describe('randomizeBelow', () => {
 
     const top = chars.slice(1, 9).map((c) => result.get(c.canonicalName)!); // 8 unique slots
     const tail = chars.slice(9).map((c) => result.get(c.canonicalName)!); // 5 overflow
-    expect(new Set(top).size).toBe(8); // top 8 all distinct
+    expect(new Set(top).size).toBe(8);
     // Tail voices may repeat but must come from the pool, not the narrator.
     expect(tail.every((v) => v.startsWith('en-US, M'))).toBe(true);
   });
@@ -583,7 +578,6 @@ describe('randomizeBelow', () => {
       freq(femaleChar),
     );
 
-    // Female Alice gets male voice since no female voices available
     expect(result.get('Alice')).toBe('en-US, GuyNeural');
   });
 
@@ -626,7 +620,7 @@ describe('randomizeBelow', () => {
     expect(result.get('Carol')).toContain('F');
     expect(result.get('Bob')).toContain('M');
     expect(result.get('Dan')).toContain('M');
-    // unknown just gets *some* pool voice, never narrator, never empty
+    // unknown gender gets some pool voice, never the narrator and never empty
     expect(result.get('Group')).toMatch(/^en-US, [MF]/);
     expect(result.get('Group')).not.toBe('OTHER');
   });

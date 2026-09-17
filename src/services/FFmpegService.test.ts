@@ -8,11 +8,10 @@ describe('FFmpegService Opus integration', () => {
     const logStore = new LoggerStore();
     const service = new FFmpegService(logStore);
 
-    // Mock FFmpeg for testing - collect all args into a flat array
     const allCalls: string[] = [];
     (service as any).ffmpeg = {
       exec: async (args: string[]) => {
-        allCalls.push(...args); // Spread the array of args
+        allCalls.push(...args);
         return;
       },
       writeFile: () => {},
@@ -37,39 +36,34 @@ describe('FFmpegService Opus integration', () => {
 
     await service.processAudio([new Uint8Array()], config);
 
-    // The last exec call should be the main processing one
-    // Find the index of '-c:a' followed by 'libopus' which starts the Opus encoding args
     const codecIdx = allCalls.indexOf('-c:a');
     expect(codecIdx).toBeGreaterThan(-1);
     expect(allCalls[codecIdx + 1]).toBe('libopus');
 
-    // Check that custom bitrate args are present (after codec)
     const bitrateIdx = allCalls.indexOf('-b:a');
     expect(bitrateIdx).toBeGreaterThan(-1);
     expect(allCalls[bitrateIdx + 1]).toBe('48k');
 
-    // Check that compression level is present
     const compressionIdx = allCalls.indexOf('-compression_level');
     expect(compressionIdx).toBeGreaterThan(-1);
     expect(allCalls[compressionIdx + 1]).toBe('5');
 
-    // Check that VBR is on
     expect(allCalls).toContain('-vbr');
     expect(allCalls).toContain('on');
 
-    // Check maxrate is present when max > min
     expect(allCalls).toContain('-maxrate');
     expect(allCalls[allCalls.indexOf('-maxrate') + 1]).toBe('64k');
   });
 });
 
 /**
- * Minimal fake IndexedDB that supports the event-based IDB patterns
- * used by FFmpegBlobCache (onsuccess/onerror/onupgradeneeded on open request,
- * oncomplete/onerror on transaction).
+ * Minimal fake IndexedDB for FFmpegBlobCache. It supports the event-based
+ * patterns the cache uses: onsuccess/onerror/onupgradeneeded on the open
+ * request, oncomplete/onerror on the transaction.
  *
- * Uses setTimeout(0) to simulate async event delivery, ensuring handlers
- * are registered before events fire.
+ * Events fire asynchronously (queueMicrotask for requests, setTimeout(0)
+ * for transaction completion) so the caller registers handlers before
+ * the events fire.
  */
 function createFakeIDB() {
   const store = new Map<string, Blob>();
@@ -189,14 +183,11 @@ describe('FFmpegBlobCache', () => {
   it('should survive IndexedDB being unavailable', async () => {
     (window as any).indexedDB = undefined;
 
-    // store should not throw
     await expect(FFmpegBlobCache.store(new Blob([]), new Blob([]))).resolves.toBeUndefined();
 
-    // load should return null
     const result = await FFmpegBlobCache.load();
     expect(result).toBeNull();
 
-    // clear should not throw
     await expect(FFmpegBlobCache.clear()).resolves.toBeUndefined();
   });
 

@@ -47,8 +47,8 @@ describe('LlmStages - Assign with Structured Outputs', () => {
     const assignResponse = {
       reasoning: 'Assigning speakers to dialogue',
       assignments: {
-        '0': 'A', // Code for Alice
-        '1': 'B', // Code for Bob
+        '0': 'A',
+        '1': 'B',
       },
     };
 
@@ -73,7 +73,7 @@ describe('LlmStages - Assign with Structured Outputs', () => {
     const assignResponse = {
       reasoning: null,
       assignments: {
-        '0': 'A', // Only sentence 0 assigned (A = Alice)
+        '0': 'A',
       },
     };
 
@@ -91,7 +91,7 @@ describe('LlmStages - Assign with Structured Outputs', () => {
 
     expect(result).toHaveLength(2);
     expect(result[0].speaker).toBe('Alice');
-    expect(result[1].speaker).toBe('narrator'); // Unassigned gets narrator
+    expect(result[1].speaker).toBe('narrator');
   });
 
   it('passes overlap sentences from previous block to processAssignBlock', async () => {
@@ -100,7 +100,7 @@ describe('LlmStages - Assign with Structured Outputs', () => {
       assignments: { '0': 'A' },
     };
 
-    // Spy on buildAssignPrompt to capture the overlapSentences argument
+    // Spy on buildAssignPrompt to capture the overlapSentences argument (fourth parameter).
     const spy = vi.spyOn(assignBuilder, 'buildAssignPrompt');
 
     service = makeService({ transport: async () => assignResponse as never });
@@ -125,13 +125,12 @@ describe('LlmStages - Assign with Structured Outputs', () => {
 
     await service.assign(blocks, voiceMap, characters);
 
-    // buildAssignPrompt should have been called twice
     expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2);
 
-    // First call (block 0) — no overlap
+    // Block 0 has no previous block, so the first call gets no overlap.
     expect(spy.mock.calls[0][3]).toBeUndefined();
 
-    // Second call (block 1) — overlap from block 0's last 5 sentences (block 0 only has 2)
+    // Block 1 gets block 0's tail as overlap. The window is the last 5 sentences, and block 0 has only 2.
     expect(spy.mock.calls[1][3]).toEqual(['"Hello," said Alice.', '"Hi," replied Bob.']);
 
     spy.mockRestore();

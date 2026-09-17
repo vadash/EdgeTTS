@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { LLMApiClient } from './LLMApiClient';
 import { getLimit, resetRateLimitGate } from './rateLimitGate';
 
-// Mock OpenAI client factory
 const mockCreate = vi.fn();
 vi.mock('openai', () => ({
   default: vi.fn().mockImplementation(function () {
@@ -219,7 +218,6 @@ describe('LLMApiClient.callStructured', () => {
   it('streams structured response when streaming enabled', async () => {
     const TestSchema = z.object({ value: z.string() });
 
-    // Mock async iterable stream
     const chunks = [
       { choices: [{ delta: { content: '{"val' }, finish_reason: null }], model: 'gpt-4o-mini' },
       { choices: [{ delta: { content: 'ue":"str' }, finish_reason: null }], model: 'gpt-4o-mini' },
@@ -259,7 +257,6 @@ describe('LLMApiClient.callStructured', () => {
 
     expect(result).toEqual({ value: 'streamed' });
 
-    // Verify stream: true was passed
     expect(mockCreate).toHaveBeenCalled();
     const callArgs = mockCreate.mock.calls[0][0];
     expect(callArgs).toMatchObject({ stream: true });
@@ -355,7 +352,7 @@ describe('LLMApiClient.callStructured', () => {
       choices: [
         {
           message: {
-            content: '{"missing": "field"}', // Missing requiredField
+            content: '{"missing": "field"}',
             refusal: null,
           },
         },
@@ -389,7 +386,6 @@ describe('LLMApiClient.callStructured', () => {
       }),
     ).rejects.toThrow();
 
-    // Should have saved error logs
     expect(mockSaveErrorLog).toHaveBeenCalledTimes(1);
     const [requestBody, responseContent] = mockSaveErrorLog.mock.calls[0];
     expect(requestBody).toHaveProperty('model', 'gpt-4o-mini');
@@ -399,7 +395,6 @@ describe('LLMApiClient.callStructured', () => {
   it('does NOT save debug logs on infrastructure errors', async () => {
     const TestSchema = z.object({ value: z.string() });
 
-    // Simulate network error
     mockCreate.mockRejectedValue(new Error('Network Error'));
 
     const mockSaveErrorLog = vi.fn();
@@ -427,14 +422,14 @@ describe('LLMApiClient.callStructured', () => {
       }),
     ).rejects.toThrow('Network Error');
 
-    // Should NOT have saved error logs for infrastructure errors
     expect(mockSaveErrorLog).not.toHaveBeenCalled();
   });
 
   it('trips the rate-limit gate on a 429-shaped provider rejection', async () => {
     const TestSchema = z.object({ value: z.string() });
 
-    // SDK-shaped error: status on the error object, not in the message alone.
+    // SDK-shaped error: the classifier trusts error.status first and reads the
+    // message only as a fallback.
     mockCreate.mockRejectedValue(
       Object.assign(new Error('429 Too Many Requests'), { status: 429 }),
     );
@@ -500,7 +495,6 @@ describe('LLMApiClient.callStructured', () => {
     });
 
     expect(result).toEqual({ value: 'success' });
-    // Should NOT have saved error logs on success
     expect(mockSaveErrorLog).not.toHaveBeenCalled();
   });
 
@@ -519,7 +513,7 @@ describe('LLMApiClient.callStructured', () => {
         apiKey: 'test-key',
         apiUrl: 'https://api.openai.com/v1',
         model: 'gpt-4o-mini',
-        reasoning: undefined, // not set
+        reasoning: undefined,
         logger: mockLogger,
       });
 
@@ -616,7 +610,6 @@ describe('LLMApiClient.callStructured', () => {
       expect(callArgs.chat_template_kwargs).toEqual({ enable_thinking: false });
       expect(callArgs.enable_thinking).toBeUndefined();
       expect(callArgs.reasoning_effort).toBeUndefined();
-      // /no_think appended to both system and user
       expect(callArgs.messages[0].content).toMatch(/\/no_think$/);
       expect(callArgs.messages[1].content).toMatch(/\/no_think$/);
     });

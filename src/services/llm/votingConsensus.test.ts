@@ -22,7 +22,6 @@ describe('buildMergeConsensus', () => {
     ];
     expect(buildMergeConsensus(insufficientVotes)).toHaveLength(0);
 
-    // Empty votes
     expect(buildMergeConsensus([])).toHaveLength(0);
   });
 });

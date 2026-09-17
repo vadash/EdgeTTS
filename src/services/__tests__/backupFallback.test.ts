@@ -64,7 +64,6 @@ describe('LlmStages - Backup fallback', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('falls back to backup model when primary exhausts retries', async () => {
-    // Primary rejects, backup succeeds
     const alice = { canonicalName: 'Alice', variations: ['Alice'], gender: 'female' as const };
     const { transport, calls } = captureTransport((config) =>
       config.model === 'backup-model' ? { characters: [alice] } : 'reject',
@@ -96,8 +95,8 @@ describe('LlmStages - Backup fallback', () => {
       { blockIndex: 0, sentenceStartIndex: 0, sentences: ['"Hi," said Alice.'] },
     ]);
 
-    // No backup: the primary failure degrades to a skipped block — never a
-    // fallback call, never a rethrow out of the stage.
+    // No backup: the primary failure degrades to a skipped block, so the
+    // stage makes no fallback call and never rethrows.
     expect(result).toEqual([]);
     expect(calls.filter((c) => c.config.model === 'gpt-4o-mini')).toHaveLength(1);
     expect(calls.filter((c) => c.config.model === 'backup-model')).toHaveLength(0);
@@ -173,7 +172,7 @@ describe('LlmStages - Backup fallback', () => {
         calls.push({ config, opts });
         if (config.model === 'backup-model') throw BACKUP_REJECT;
         // Abort mid-flight so the in-progress primary attempt sees an
-        // aborted signal when it fails — an aborted request never backs up.
+        // aborted signal when it fails. An aborted request never falls back.
         controller.abort();
         throw Object.assign(new Error('aborted'), { name: 'AbortError' });
       },
@@ -186,7 +185,6 @@ describe('LlmStages - Backup fallback', () => {
       ),
     ).rejects.toBeInstanceOf(CancellationError);
 
-    // Backup should never be called because the signal was aborted
     expect(calls.some((c) => c.config.model === 'backup-model')).toBe(false);
   });
 
@@ -195,7 +193,7 @@ describe('LlmStages - Backup fallback', () => {
       .find((m) => m.role === 'user')!
       .content.match(/<input_text>\n([\s\S]*?)<\/input_text>/)![1];
     // 'Sinnoa' appears 5 times in the block, so both halves' characters
-    // survive the post-extract frequency cull — their variations concatenate.
+    // survive the post-extract frequency culling. Their variations concatenate.
     let half = 0;
     const { transport, calls } = captureTransport((config) => {
       if (config.model !== 'backup-model') return 'reject';
@@ -308,7 +306,7 @@ describe('LlmStages - Backup fallback', () => {
 
     const result = await service.assign(blocks, new Map(), characters);
 
-    // QA must never touch the backup model — only the primary is retried.
+    // QA never touches the backup model; only the primary is retried.
     expect(calls.some((c) => c.config.model === 'backup-model')).toBe(false);
     // Draft ran, then QA was attempted on the primary (and failed there).
     expect(callCount).toBeGreaterThan(1);

@@ -19,15 +19,12 @@ describe('VoicePoolTracker', () => {
     it('picks voices sequentially from pool (first available, not random)', () => {
       const tracker = new VoicePoolTracker(pool, 'en-US, NarratorNeural');
 
-      // Should always pick first available = AndrewNeural
       const first = tracker.pickVoice('male');
       expect(first).toBe('en-US, AndrewNeural');
 
-      // Second pick should be BrianNeural (AndrewNeural now used)
       const second = tracker.pickVoice('male');
       expect(second).toBe('en-US, BrianNeural');
 
-      // Third pick should be AndrewMultilingualNeural
       const third = tracker.pickVoice('male');
       expect(third).toBe('en-US, AndrewMultilingualNeural');
     });
@@ -36,7 +33,6 @@ describe('VoicePoolTracker', () => {
       const reserved = new Set(['en-US, AndrewNeural']);
       const tracker = new VoicePoolTracker(pool, 'en-US, NarratorNeural', reserved);
 
-      // AndrewNeural is reserved, should skip to BrianNeural
       const first = tracker.pickVoice('male');
       expect(first).toBe('en-US, BrianNeural');
     });
@@ -44,11 +40,10 @@ describe('VoicePoolTracker', () => {
     it('cycles through pool when exhausted', () => {
       const tracker = new VoicePoolTracker(pool, 'en-US, NarratorNeural');
 
-      // Exhaust female pool
-      tracker.pickVoice('female'); // AvaNeural
-      tracker.pickVoice('female'); // JennyNeural
+      tracker.pickVoice('female');
+      tracker.pickVoice('female');
 
-      // Pool exhausted — should cycle from beginning
+      // The pool is exhausted, so this pick cycles back to the start.
       const reused = tracker.pickVoice('female');
       expect(pool.female).toContain(reused);
     });
@@ -60,7 +55,6 @@ describe('VoicePoolTracker', () => {
       };
       const tracker = new VoicePoolTracker(smallPool, 'en-US, NarratorNeural');
 
-      // Should skip narrator, pick BrianNeural
       const first = tracker.pickVoice('male');
       expect(first).toBe('en-US, BrianNeural');
     });
@@ -99,7 +93,6 @@ describe('buildPriorityPool', () => {
     const result = buildPriorityPool(voices, 'ru', new Set());
 
     const maleNames = result.male.map((v) => v.fullValue);
-    // DmitryNeural (native, non-multi) before AndrewMultilingualNeural
     expect(maleNames.indexOf('ru-RU, DmitryNeural')).toBeLessThan(
       maleNames.indexOf('en-US, AndrewMultilingualNeural'),
     );
@@ -134,17 +127,16 @@ describe('randomizeBelow', () => {
     gender,
   });
 
-  // Mirrors the ordering the deleted in-function fallback synthesized (1000 - 10*index)
-  // so existing assertions hold unchanged now that frequency is required.
+  // Frequencies descend in list order, so the allocation order is deterministic.
   const freq = (chars: LLMCharacter[]): Map<string, number> =>
     new Map(chars.map((c, i) => [c.canonicalName, 1000 - i * 10]));
 
   it('assigns native voices before Multilingual voices', () => {
     const chars = [
-      mkChar('Alice', 'female'), // index 0 — frozen
-      mkChar('Bob', 'male'), // index 1 — randomized
-      mkChar('Charlie', 'male'), // index 2 — randomized
-      mkChar('Dave', 'male'), // index 3 — randomized
+      mkChar('Alice', 'female'), // at the clicked index, so her voice is frozen
+      mkChar('Bob', 'male'), // randomized
+      mkChar('Charlie', 'male'), // randomized
+      mkChar('Dave', 'male'), // randomized
     ];
     const currentMap = new Map([
       ['Alice', 'en-US, JennyNeural'],
@@ -171,11 +163,9 @@ describe('randomizeBelow', () => {
       freq(chars),
     );
 
-    // Bob (index 1) should get a native voice, not a Multilingual one
     const bobVoice = result.get('Bob')!;
     expect(bobVoice).not.toContain('Multilingual');
 
-    // All non-Multilingual male voices should be used before any Multilingual
     const assignedMales = [result.get('Bob')!, result.get('Charlie')!, result.get('Dave')!];
     const firstMultiIdx = assignedMales.findIndex((v) => v.includes('Multilingual'));
     const lastNativeIdx = assignedMales.reduce(
@@ -209,13 +199,12 @@ describe('randomizeBelow', () => {
     const assignedVoices = [...result.values()];
     const hasAndrew = assignedVoices.includes('en-US, AndrewNeural');
     const hasAndrewMulti = assignedVoices.includes('en-US, AndrewMultilingualNeural');
-    // At most one of the pair should be assigned
     expect(hasAndrew && hasAndrewMulti).toBe(false);
   });
 
   it('shuffle=true produces different ordering across runs (statistical)', () => {
-    // With enough voices, the probability of getting the same order 10 times
-    // in a row is astronomically low (1/n! per run).
+    // Repeating one exact order across runs has probability about 1/n!, so a
+    // different order appears within a few runs.
     const chars = [
       mkChar('A', 'male'),
       mkChar('B', 'male'),
@@ -312,10 +301,7 @@ describe('assignUnmatchedFromPool', () => {
 
   it('assigns unmatched characters from priority pool sequentially', () => {
     const chars = [mkChar('Alice', 'female'), mkChar('Bob', 'male'), mkChar('Charlie', 'male')];
-    const importedMap = new Map([
-      ['Alice', 'en-US, JennyNeural'],
-      // Bob and Charlie are unmatched
-    ]);
+    const importedMap = new Map([['Alice', 'en-US, JennyNeural']]);
     const enabledVoices = [
       vo('en-US, AndrewNeural', 'male'),
       vo('en-US, BrianNeural', 'male'),
@@ -330,9 +316,9 @@ describe('assignUnmatchedFromPool', () => {
       'en',
     );
 
-    expect(result.get('Alice')).toBe('en-US, JennyNeural'); // preserved
-    expect(result.get('Bob')).toBe('en-US, AndrewNeural'); // first available male
-    expect(result.get('Charlie')).toBe('en-US, BrianNeural'); // second available male
+    expect(result.get('Alice')).toBe('en-US, JennyNeural');
+    expect(result.get('Bob')).toBe('en-US, AndrewNeural');
+    expect(result.get('Charlie')).toBe('en-US, BrianNeural');
   });
 
   it('replaces imported voices not in enabled list', () => {
@@ -350,13 +336,12 @@ describe('assignUnmatchedFromPool', () => {
       'en',
     );
 
-    // Alice's voice should be replaced with an enabled voice
     expect(result.get('Alice')).toBe('en-US, JennyNeural');
   });
 
   it('deduplicates Multilingual pairs in assignment', () => {
     const chars = [mkChar('Bob', 'male'), mkChar('Charlie', 'male')];
-    const importedMap = new Map<string, string>(); // all unmatched
+    const importedMap = new Map<string, string>();
     const enabledVoices = [
       vo('en-US, AndrewNeural', 'male'),
       vo('en-US, AndrewMultilingualNeural', 'male'),
@@ -403,21 +388,20 @@ describe('allocateVoices', () => {
       narratorVoice: 'en-US, NarratorNeural',
     });
 
-    // Without frequency, characters keep input order (no frequency analysis)
     expect(result.voiceMap.get('Bob')).toBe('en-US, AndrewNeural');
     expect(result.voiceMap.get('Alice')).toBe('en-US, JennyNeural');
   });
 
   it('assigns unique voices to the top 80% of characters, rest cycle pool', () => {
     const chars = [
-      mkChar('Alice', 'female'), // 100 lines - top speaker
-      mkChar('Bob', 'male'), // 80 lines
-      mkChar('Charlie', 'male'), // 60 lines
-      mkChar('David', 'male'), // 40 lines
-      mkChar('Eve', 'female'), // 20 lines
-      mkChar('Frank', 'male'), // 10 lines
-      mkChar('Grace', 'female'), // 5 lines
-      mkChar('Henry', 'male'), // 1 line
+      mkChar('Alice', 'female'),
+      mkChar('Bob', 'male'),
+      mkChar('Charlie', 'male'),
+      mkChar('David', 'male'),
+      mkChar('Eve', 'female'),
+      mkChar('Frank', 'male'),
+      mkChar('Grace', 'female'),
+      mkChar('Henry', 'male'),
     ];
     const pool: VoicePool = {
       male: ['en-US, AndrewNeural', 'en-US, BrianNeural', 'en-US, GuyNeural'],
@@ -434,7 +418,7 @@ describe('allocateVoices', () => {
       ['Henry', 1],
     ]);
 
-    // Pool size = 5 -> uniqueSlotCount = 4 unique slots, shared tail cycles
+    // A pool of 5 gives 4 unique slots (80%), so the shared tail cycles.
     const result = allocateVoices({
       characters: chars,
       frequency,
@@ -442,13 +426,11 @@ describe('allocateVoices', () => {
       narratorVoice: 'en-US, NarratorNeural',
     });
 
-    // Top 1 character (Alice) gets unique voice
     const aliceVoice = result.voiceMap.get('Alice');
     expect(aliceVoice).toBeTruthy();
 
-    // Rest cycle through pool
     const allVoices = [...result.voiceMap.values()].filter((v) => !v.includes('UNNAMED'));
-    expect(new Set(allVoices).size).toBeGreaterThan(1); // Multiple voices used
+    expect(new Set(allVoices).size).toBeGreaterThan(1);
   });
 
   it('respects reserved voices when pool has sufficient alternatives', () => {
@@ -478,10 +460,10 @@ describe('allocateVoices', () => {
       reservedVoices: reserved,
     });
 
-    // Bob and Charlie should not get the reserved voice (there are alternatives available)
     expect(result.voiceMap.get('Bob')).not.toBe('en-US, AndrewNeural');
     expect(result.voiceMap.get('Charlie')).not.toBe('en-US, AndrewNeural');
-    // David might cycle to the reserved voice when pool is exhausted - that's expected
+    // David can cycle to the reserved voice once the pool exhausts, so no
+    // assertion pins him.
   });
 
   it('cycles pool when exhausted for many characters', () => {
@@ -503,10 +485,9 @@ describe('allocateVoices', () => {
       narratorVoice: 'en-US, NarratorNeural',
     });
 
-    // All characters should have voices (cycling through pool)
     expect(result.voiceMap.size).toBeGreaterThan(0);
 
-    // Check that voices are reused (pool is smaller than char count)
+    // The pool is smaller than the character count, so voices must be reused.
     const assignedVoices = [...result.voiceMap.values()].filter((v) => !v.includes('UNNAMED'));
     expect(new Set(assignedVoices).size).toBeLessThan(chars.length);
   });
@@ -526,7 +507,6 @@ describe('allocateVoices', () => {
       narratorVoice: 'en-US, NarratorNeural',
     });
 
-    // Check rare voices are assigned
     expect(result.voiceMap.get('MALE_UNNAMED')).toBe('en-US, AndrewNeural');
     expect(result.rareVoices.male).toBeTruthy();
     expect(result.rareVoices.female).toBeTruthy();
@@ -549,7 +529,6 @@ describe('allocateVoices', () => {
       chars.map((c, i) => [c.canonicalName, (chars.length - i) * 10]),
     );
 
-    // Multiple voices should be used (not just 1)
     const result = allocateVoices({
       characters: chars,
       frequency,
@@ -557,7 +536,6 @@ describe('allocateVoices', () => {
       narratorVoice: 'en-US, NarratorNeural',
     });
 
-    // Multiple voices should be used (not just 1)
     const assignedVoices = [...result.voiceMap.values()].filter((v) => !v.includes('UNNAMED'));
     expect(new Set(assignedVoices).size).toBeGreaterThan(1);
   });

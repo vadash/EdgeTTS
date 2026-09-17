@@ -98,7 +98,7 @@ describe('rateLimitGate', (t) => {
     expect(getCooldownRemainingMs()).toBeLessThanOrEqual(10 * 60_000 + 1000);
   });
   t('climbs one slot per clean call after a 429', () => {
-    noteRateLimit(0); // -> limit 1
+    noteRateLimit(0);
     expect(getLimit()).toBe(1);
     noteSuccess();
     expect(getLimit()).toBe(2);
@@ -108,7 +108,7 @@ describe('rateLimitGate', (t) => {
 
   t('recovers to the configured ceiling and stops', () => {
     setCeiling(15);
-    noteRateLimit(0); // -> limit 1
+    noteRateLimit(0);
     for (let i = 0; i < 20; i++) noteSuccess();
     expect(getLimit()).toBe(15);
   });
@@ -116,7 +116,7 @@ describe('rateLimitGate', (t) => {
   t('setCeiling snaps a live limit above the new ceiling down', () => {
     setCeiling(32);
     noteRateLimit(0);
-    for (let i = 0; i < 10; i++) noteSuccess(); // -> limit 11
+    for (let i = 0; i < 10; i++) noteSuccess();
     expect(getLimit()).toBe(11);
     setCeiling(5);
     expect(getLimit()).toBe(5);
@@ -173,8 +173,6 @@ describe('rateLimitGate', (t) => {
     controller.abort();
     await expect(waitTurn(controller.signal)).rejects.toBeInstanceOf(CancellationError);
   });
-
-  // noteError integration ------------------------------------------------
 
   t('noteError trips the gate on a tagged 429 and honors the deadline', () => {
     noteError(
