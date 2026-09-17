@@ -1,16 +1,15 @@
 import { afterEach, beforeEach, describe, expect, vi } from 'vitest';
+import { ZodError } from 'zod';
 
-import { CancellationError } from '@/errors';
+import { CancellationError, RetriableError } from '@/errors';
 
 import {
   getCooldownRemainingMs,
   getLimit,
-  isRateLimitError,
   noteError,
   noteRateLimit,
   noteSuccess,
   onLimitChange,
-  parseRetryAfterMs,
   resetRateLimitGate,
   setCeiling,
   waitTurn,
@@ -175,97 +174,35 @@ describe('rateLimitGate', (t) => {
     await expect(waitTurn(controller.signal)).rejects.toBeInstanceOf(CancellationError);
   });
 
-  // parseRetryAfterMs ----------------------------------------------------
-
-  t('parseRetryAfterMs reads retry-after-ms header', () => {
-    const headers = new Headers({ 'retry-after-ms': '119000' });
-    expect(parseRetryAfterMs({ headers })).toBe(119_000);
-  });
-
-  t('parseRetryAfterMs reads retry-after header (seconds)', () => {
-    const headers = new Headers({ 'retry-after': '120' });
-    expect(parseRetryAfterMs({ headers })).toBe(120_000);
-  });
-
-  t('parseRetryAfterMs reads retry-after-ms from a plain record header', () => {
-    const headers = { 'retry-after-ms': '5000' } as const;
-    expect(parseRetryAfterMs({ headers })).toBe(5_000);
-  });
-
-  t('parseRetryAfterMs extracts retry-after-ms=NNN from the wrapped message', () => {
-    const err = {
-      message:
-        'LLM API call failed: 429 sidecar: pool z-ai/glm-5.2 rate-limited, circuit open retry-after-ms=119000',
-      cause: { status: 429 },
-    };
-    expect(parseRetryAfterMs(err)).toBe(119_000);
-  });
-
-  t('parseRetryAfterMs walks the cause chain for an embedded deadline', () => {
-    const err = {
-      message: 'LLM API call failed: something broke',
-      cause: { message: 'sidecar: circuit open retry-after-ms=60000' },
-    };
-    expect(parseRetryAfterMs(err)).toBe(60_000);
-  });
-
-  t('parseRetryAfterMs returns null when nothing is parseable', () => {
-    expect(parseRetryAfterMs(new Error('Request timed out.'))).toBeNull();
-    expect(parseRetryAfterMs({ message: '429 provider API error (status 429)' })).toBeNull();
-  });
-
-  // isRateLimitError -----------------------------------------------------
-
-  t('isRateLimitError detects a raw 429 status', () => {
-    expect(isRateLimitError({ status: 429, message: 'rate limited' })).toBe(true);
-  });
-
-  t('isRateLimitError detects 429 via the cause chain', () => {
-    const err = { message: 'LLM API call failed: 429', cause: { status: 429 } };
-    expect(isRateLimitError(err)).toBe(true);
-  });
-
-  t('isRateLimitError detects "429" in the wrapped message', () => {
-    const err = new Error('LLM API call failed: 429 provider API error (status 429)');
-    expect(isRateLimitError(err)).toBe(true);
-  });
-
-  t('isRateLimitError detects rate_limit_error type wording', () => {
-    expect(isRateLimitError(new Error('rate_limit_error: too many requests'))).toBe(true);
-  });
-
-  t('isRateLimitError ignores unrelated errors', () => {
-    expect(isRateLimitError(new Error('Request timed out.'))).toBe(false);
-    expect(isRateLimitError(new Error('Empty response from LLM'))).toBe(false);
-    expect(isRateLimitError({ status: 500, message: 'Server Error' })).toBe(false);
-  });
-
   // noteError integration ------------------------------------------------
 
-  t('noteError trips the gate on 429 and parses the deadline', () => {
-    const err = {
-      message: '429 sidecar: pool z-ai/glm-5.2 rate-limited, circuit open retry-after-ms=119000',
-      cause: { status: 429 },
-    };
-    noteError(err);
+  t('noteError trips the gate on a tagged 429 and honors the deadline', () => {
+    noteError(
+      new RetriableError('LLM API call failed: 429', undefined, {
+        kind: 'rate-limit',
+        retryAfterMs: 119_000,
+      }),
+    );
     expect(getLimit()).toBe(1);
     expect(getCooldownRemainingMs()).toBeCloseTo(120_000, -2);
   });
 
-  t('noteError is a no-op for non-rate-limit errors', () => {
+  t('noteError is a no-op for non-RetriableError errors', () => {
     noteError(new Error('Request timed out.'));
     expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
     expect(getCooldownRemainingMs()).toBe(0);
   });
-  t('noteError trips the gate on network-down errors for a 1-minute probe', () => {
-    noteError(new Error('LLM API call failed: 502 failed to execute HTTP request to provider API'));
+
+  t('noteError trips the gate on a tagged network-down for a 1-minute probe', () => {
+    noteError(new RetriableError('LLM API call failed: 502', undefined, { kind: 'network-down' }));
     expect(getLimit()).toBe(1);
     expect(getCooldownRemainingMs()).toBeGreaterThan(60_000);
   });
 
-  t('noteError ignores timeouts and data-quality errors', () => {
-    noteError(new Error('Request timed out.'));
-    noteError(new Error('Empty response from LLM'));
+  t('noteError ignores untagged and data-quality errors', () => {
+    noteError(new RetriableError('Request timed out.'));
+    noteError(new RetriableError('Empty response from LLM', undefined, { kind: 'data' }));
+    noteError(new ZodError([]));
     expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
     expect(getCooldownRemainingMs()).toBe(0);
   });

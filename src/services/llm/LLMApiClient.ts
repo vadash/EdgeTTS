@@ -5,6 +5,7 @@ import { RetriableError } from '@/errors';
 import { safeParseJSON } from '@/utils/text';
 import type { ILogger } from '../Logger';
 import type { DebugLogger } from './DebugLogger';
+import { classifyProviderError } from './providerError';
 import { noteError, noteSuccess, waitTurn } from './rateLimitGate';
 import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
 
@@ -427,11 +428,14 @@ export class LLMApiClient {
             throw new RetriableError(
               `Streaming failed: ${(error as Error).message}`,
               error as Error,
+              classifyProviderError(error),
             );
           }
 
           if (finishReason === 'content_filter') {
-            throw new RetriableError('Response refused by content filter');
+            throw new RetriableError('Response refused by content filter', undefined, {
+              kind: 'data',
+            });
           }
 
           // Some OpenAI-compatible proxies emit the whole payload on the
@@ -442,7 +446,7 @@ export class LLMApiClient {
           }
 
           if (!accumulated) {
-            throw new RetriableError('Empty response from LLM');
+            throw new RetriableError('Empty response from LLM', undefined, { kind: 'data' });
           }
 
           content = accumulated;
@@ -450,6 +454,7 @@ export class LLMApiClient {
           throw new RetriableError(
             `LLM API call failed: ${(error as Error).message}`,
             error as Error,
+            classifyProviderError(error),
           );
         }
       } else {
@@ -464,6 +469,7 @@ export class LLMApiClient {
           throw new RetriableError(
             `LLM API call failed: ${(error as Error).message}`,
             error as Error,
+            classifyProviderError(error),
           );
         }
 
@@ -477,7 +483,9 @@ export class LLMApiClient {
           | undefined;
 
         if (message?.refusal) {
-          throw new RetriableError(`LLM refused: ${message.refusal}`);
+          throw new RetriableError(`LLM refused: ${message.refusal}`, undefined, {
+            kind: 'data',
+          });
         }
 
         // Mirror the streaming fallback: some proxies emit the payload on the
@@ -488,7 +496,7 @@ export class LLMApiClient {
         } else if (message?.content) {
           content = message.content;
         } else {
-          throw new RetriableError('Empty response from LLM');
+          throw new RetriableError('Empty response from LLM', undefined, { kind: 'data' });
         }
       }
     } catch (error) {
@@ -506,7 +514,9 @@ export class LLMApiClient {
     try {
       const result = safeParseJSON(content, { schema });
       if (!result.success) {
-        throw new RetriableError(`JSON parse failed: ${result.error!.message}`);
+        throw new RetriableError(`JSON parse failed: ${result.error!.message}`, undefined, {
+          kind: 'data',
+        });
       }
       return result.data!;
     } catch (error) {
@@ -528,9 +538,9 @@ export class LLMApiClient {
     if (error instanceof ZodError) {
       return true;
     }
-    // RetriableError with JSON/Empty response indicates data quality issue
+    // RetriableError carries a data-quality tag when thrown from a payload path
     if (error instanceof RetriableError) {
-      return error.message.includes('JSON') || error.message.includes('Empty response');
+      return error.kind === 'data';
     }
     return false;
   }

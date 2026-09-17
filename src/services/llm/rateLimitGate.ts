@@ -1,5 +1,5 @@
 import type { ILogger } from '../Logger';
-import { CancellationError, throwIfAborted } from '@/errors';
+import { CancellationError, RetriableError, throwIfAborted } from '@/errors';
 
 /**
  * Global adaptive rate-limit governor for LLM calls (AIMD).
@@ -24,9 +24,6 @@ const SAFETY_MARGIN_MS = 1000;
 const DEFAULT_COOLDOWN_MS = 60_000;
 /** Guard against a bogus/hostile Retry-After wedging the app indefinitely. */
 const MAX_COOLDOWN_MS = 10 * 60_000;
-/** Transport-level failure wording: outage, DNS, refused/blocked connection, gateway down. */
-const NETWORK_DOWN =
-  /\b50[234]\b|failed to execute http request|failed to fetch|fetch failed|networkerror|network error|load failed|internet disconnected/i;
 /** Consecutive successes required before opening one more slot. */
 const SUCCESSES_PER_STEP = 1;
 /** Ceiling used before a caller declares the configured one. */
@@ -87,96 +84,17 @@ export function resetRateLimitGate(): void {
 }
 
 /**
- * Extract the provider's requested wait in milliseconds.
- *
- * Handles, in order of trust: `retry-after-ms` / `retry-after` response
- * headers (OpenAI SDK exposes these on `APIError.headers`), then the same
- * fields embedded in the error message, which is how our sidecar reports
- * them (`... rate-limited, circuit open retry-after-ms=119000`).
+ * Inspect a failure and trip the gate on a rate limit or a network outage.
+ * Reads only the tags `LLMApiClient` attaches via `classifyProviderError` —
+ * the gate never inspects messages or walks cause chains itself.
  */
-export function parseRetryAfterMs(error: unknown): number | null {
-  const candidate = error as {
-    headers?: Headers | Record<string, string>;
-    message?: string;
-  };
-
-  const readHeader = (name: string): string | null => {
-    const headers = candidate?.headers;
-    if (!headers) return null;
-    if (typeof (headers as Headers).get === 'function') {
-      return (headers as Headers).get(name);
-    }
-    const record = headers as Record<string, string>;
-    return record[name] ?? record[name.toLowerCase()] ?? null;
-  };
-
-  const headerMs = Number(readHeader('retry-after-ms'));
-  if (Number.isFinite(headerMs) && headerMs > 0) return headerMs;
-
-  const headerSeconds = Number(readHeader('retry-after'));
-  if (Number.isFinite(headerSeconds) && headerSeconds > 0) return headerSeconds * 1000;
-
-  // Walk the message and the cause chain for an embedded deadline.
-  for (const message of collectMessages(error)) {
-    const ms = /retry[-_ ]?after[-_ ]?ms["'\s]*[=:]\s*["']?(\d+)/i.exec(message);
-    if (ms) return Number(ms[1]);
-    const seconds = /retry[-_ ]?after["'\s]*[=:]\s*["']?(\d+)/i.exec(message);
-    if (seconds) return Number(seconds[1]) * 1000;
-  }
-
-  return null;
-}
-
-/** Collect messages from an error and its `cause` chain (depth-capped). */
-function collectMessages(error: unknown): string[] {
-  const messages: string[] = [];
-  let current: unknown = error;
-  for (let depth = 0; current && depth < 5; depth++) {
-    const node = current as { message?: string; cause?: unknown };
-    if (typeof node.message === 'string') messages.push(node.message);
-    current = node.cause;
-  }
-  return messages;
-}
-
-/**
- * Detect a rate-limit rejection. Checks the HTTP status when the SDK error is
- * intact, and otherwise falls back to the wrapped message, because
- * `LLMApiClient` re-throws as `RetriableError('LLM API call failed: ...')`.
- */
-export function isRateLimitError(error: unknown): boolean {
-  let current: unknown = error;
-  for (let depth = 0; current && depth < 5; depth++) {
-    const node = current as { status?: number; cause?: unknown };
-    if (node.status === 429) return true;
-    current = node.cause;
-  }
-
-  return collectMessages(error).some((message) => {
-    if (/\b429\b/.test(message)) return true;
-    const lower = message.toLowerCase();
-    return (
-      lower.includes('rate_limit') || lower.includes('rate-limit') || lower.includes('rate limit')
-    );
-  });
-}
-
-/**
- * Detect a transport-level failure where the request never got a real provider
- * answer (local internet down, DNS, gateway 502/503/504). Parked the same way
- * as a 429, with the default one-minute cooldown acting as the probe interval.
- */
-export function isNetworkDownError(error: unknown): boolean {
-  return collectMessages(error).some((message) => NETWORK_DOWN.test(message));
-}
-
-/** Inspect a failure and trip the gate on a rate limit or a network outage. */
 export function noteError(error: unknown, logger?: ILogger): void {
-  if (isRateLimitError(error)) {
-    noteRateLimit(parseRetryAfterMs(error), logger);
+  if (!(error instanceof RetriableError)) return;
+  if (error.kind === 'rate-limit') {
+    noteRateLimit(error.retryAfterMs ?? null, logger);
     return;
   }
-  if (isNetworkDownError(error)) noteRateLimit(null, logger, 'network down');
+  if (error.kind === 'network-down') noteRateLimit(null, logger, 'network down');
 }
 
 /**

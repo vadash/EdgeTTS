@@ -208,15 +208,26 @@ export function insufficientVoicesError(maleCount: number, femaleCount: number):
 // ============================================================================
 
 /**
+ * Why a call is retriable: provider throttling, transport outage, or bad payload.
+ */
+export type RetriableKind = 'rate-limit' | 'network-down' | 'data';
+
+/**
  * Retriable error - signals the caller should retry with a new connection
  */
 export class RetriableError extends Error {
+  public readonly kind?: RetriableKind;
+  public readonly retryAfterMs?: number;
+
   constructor(
     message: string,
     public readonly cause?: Error,
+    info?: { kind?: RetriableKind; retryAfterMs?: number },
   ) {
     super(message);
     this.name = 'RetriableError';
+    this.kind = info?.kind;
+    this.retryAfterMs = info?.retryAfterMs;
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, RetriableError);
     }

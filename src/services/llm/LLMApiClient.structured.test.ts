@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { LLMApiClient } from './LLMApiClient';
-import { resetRateLimitGate } from './rateLimitGate';
+import { getLimit, resetRateLimitGate } from './rateLimitGate';
 
 // Mock OpenAI client factory
 const mockCreate = vi.fn();
@@ -429,6 +429,35 @@ describe('LLMApiClient.callStructured', () => {
 
     // Should NOT have saved error logs for infrastructure errors
     expect(mockSaveErrorLog).not.toHaveBeenCalled();
+  });
+
+  it('trips the rate-limit gate on a 429-shaped provider rejection', async () => {
+    const TestSchema = z.object({ value: z.string() });
+
+    // SDK-shaped error: status on the error object, not in the message alone.
+    mockCreate.mockRejectedValue(
+      Object.assign(new Error('429 Too Many Requests'), { status: 429 }),
+    );
+
+    const client = new LLMApiClient({
+      apiKey: 'test-key',
+      apiUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o-mini',
+      logger: mockLogger,
+    });
+
+    await expect(
+      (client as any).callStructured({
+        messages: [
+          { role: 'system' as const, content: 'test' },
+          { role: 'user' as const, content: 'test' },
+        ],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      }),
+    ).rejects.toThrow('LLM API call failed: 429 Too Many Requests');
+
+    expect(getLimit()).toBe(1);
   });
 
   it('does NOT save debug logs on successful parse', async () => {
