@@ -9,8 +9,8 @@ import { countSpeakingFrequency } from './CharacterUtils';
 import { matchCharacter } from './NameMatcher';
 
 /**
- * Export to cumulative profile format (version 2)
- * Merges existing profile + current session's characters
+ * Export the cumulative Voice profile (format version 2): the existing
+ * profile merged with the current Conversion's characters.
  */
 export function exportToProfile(
   existingProfile: VoiceProfileFile | null,
@@ -20,15 +20,12 @@ export function exportToProfile(
   narratorVoice: string,
   sessionName: string,
 ): string {
-  // 1. Count current session's dialogue per character
   const currentCounts = countSpeakingFrequency(assignments);
   const currentTotalLines = assignments.length;
 
-  // 2. Calculate new global total
   const previousTotalLines = existingProfile?.totalLines ?? 0;
   const newTotalLines = previousTotalLines + currentTotalLines;
 
-  // 3. Start with existing characters or empty
   const merged: Record<string, CharacterEntry> = {};
   if (existingProfile) {
     for (const [key, entry] of Object.entries(existingProfile.characters)) {
@@ -36,32 +33,26 @@ export function exportToProfile(
     }
   }
 
-  // 4. Update/add current session's characters
   for (const char of currentCharacters) {
     const currentLines = currentCounts.get(char.canonicalName) ?? 0;
 
-    // Try to find matching entry in existing profile
     const matchedEntry = existingProfile ? matchCharacter(char, merged) : undefined;
 
     if (matchedEntry) {
-      // Existing: update counts
       matchedEntry.lines += currentLines;
       matchedEntry.percentage = (matchedEntry.lines / newTotalLines) * 100;
       matchedEntry.lastSeenIn = sessionName;
       matchedEntry.bookAppearances++;
 
-      // Update voice if changed
       const newVoice = currentVoiceMap.get(char.canonicalName);
       if (newVoice) matchedEntry.voice = newVoice;
 
-      // Merge aliases (both ways: from profile and from current extraction)
       for (const alias of char.variations) {
         if (!matchedEntry.aliases.includes(alias)) {
           matchedEntry.aliases.push(alias);
         }
       }
     } else {
-      // New character - use canonical name as key
       const key = char.canonicalName.toLowerCase().replace(/\s+/g, '_');
       merged[key] = {
         canonicalName: char.canonicalName,
@@ -76,7 +67,6 @@ export function exportToProfile(
     }
   }
 
-  // 5. Build output
   const output: VoiceProfileFile = {
     version: 2,
     narrator: narratorVoice,
@@ -88,9 +78,8 @@ export function exportToProfile(
 }
 
 /**
- * Import profile and match against current session's characters
  * @param profileJson JSON string from voices.json file
- * @param currentCharacters Characters extracted from current session
+ * @param currentCharacters Characters extracted from the current Conversion
  * @returns Object with voiceMap, matchedCharacters, and unmatchedCharacters
  */
 export function importProfile(
@@ -113,12 +102,10 @@ export function importProfile(
   const unmatchedCharacters: string[] = [];
 
   for (const char of currentCharacters) {
-    // First try exact canonical name match
     let matchedEntry = Object.values(voiceProfile.characters).find(
       (entry) => entry.canonicalName === char.canonicalName,
     );
 
-    // If no exact match, try fuzzy matching via matchCharacter
     if (!matchedEntry) {
       matchedEntry = matchCharacter(char, voiceProfile.characters);
     }
@@ -135,7 +122,6 @@ export function importProfile(
 }
 
 /**
- * Check if character should be visible in UI
  * @param entry Character entry from profile
  * @returns true if percentage >= IMPORTANCE_THRESHOLD
  */

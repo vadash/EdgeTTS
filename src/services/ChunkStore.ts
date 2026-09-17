@@ -3,6 +3,7 @@ import { withPermissionRetry } from '@/utils/retry/filesystem';
 import * as ChunkIDB from './ChunkIDB';
 import type { ChunkIdbAdapter } from './ChunkIDB';
 
+/** Chunks buffered in IDB before the next flush to disk. */
 const FLUSH_THRESHOLD = 2000;
 
 /** Numbered index file names: chunks_index_N.jsonl (capture = file index). */
@@ -18,6 +19,12 @@ function dataFileName(fileIndex: number): string {
   return `chunks_data_${fileIndex}.bin`;
 }
 
+/**
+ * Chunk store for one Conversion. Chunks buffer in IDB and flush to
+ * numbered data/index file pairs under `_temp_work`. The store owns the
+ * folder lifecycle; the Failure log and pipeline state are tenants in
+ * the folder.
+ */
 export class ChunkStore {
   private idb: ChunkIdbAdapter;
   private directoryHandle: FileSystemDirectoryHandle | null = null;
@@ -58,9 +65,10 @@ export class ChunkStore {
   }
 
   /**
-   * Folder scan only — never opens IDB. Safe before init().
-   * chunkCount: number of chunks recorded in current-format JSONL index files.
-   * legacyOnly: legacy chunk_*.bin files present AND no current-format index.
+   * Folder scan only; it never opens IDB, so it is safe before init().
+   * chunkCount: number of chunks recorded in current-format JSONL index
+   * files. legacyOnly: legacy chunk_*.bin files present and no
+   * current-format index.
    */
   async snapshot(
     root: FileSystemDirectoryHandle,
@@ -87,7 +95,7 @@ export class ChunkStore {
 
   /**
    * Best-effort recursive removal of `_temp_work`. A missing folder is not
-   * an error. Never touches IDB — that is clearAll().
+   * an error. Never touches IDB; clearAll() does that.
    * Returns true when removal succeeded, false when it was swallowed.
    */
   async wipe(root: FileSystemDirectoryHandle): Promise<boolean> {
@@ -95,13 +103,12 @@ export class ChunkStore {
       await root.removeEntry('_temp_work', { recursive: true });
       return true;
     } catch {
-      // Expected when _temp_work does not exist
       return false;
     }
   }
 
   /**
-   * Fresh start: wipe the work folder AND clear the IDB chunk store.
+   * Fresh start: wipe the work folder and clear the IDB chunk store.
    * The IDB clear runs even when the folder is already gone.
    */
   async clearAll(root: FileSystemDirectoryHandle): Promise<void> {
@@ -141,7 +148,6 @@ export class ChunkStore {
         hasOldFormat = true;
       }
 
-      // Collect old-format files, crswap files, and any numbered chunk files
       if (
         name === 'chunks_data.bin' ||
         name === 'chunks_index.jsonl' ||
@@ -159,7 +165,8 @@ export class ChunkStore {
         try {
           await this.directoryHandle!.removeEntry(name);
         } catch {
-          // Ignore errors
+          // Best-effort: one unremovable file must not abort the
+          // migration.
         }
       }
       if (this.db) {
@@ -183,7 +190,6 @@ export class ChunkStore {
           maxFileIndex = fileIndex;
         }
 
-        // Parse the index file
         const fileHandle = await this.directoryHandle!.getFileHandle(entry.name);
         const file = await fileHandle.getFile();
         const text = await file.text();
@@ -213,7 +219,6 @@ export class ChunkStore {
 
     this.fileCounter = maxFileIndex + 1;
 
-    // Also load IDB entries
     if (this.db) {
       const idbChunks = await this.idb.getAllChunks(this.db);
       for (const { key, data } of idbChunks) {
@@ -228,7 +233,6 @@ export class ChunkStore {
     await this.idb.putChunk(this.db, index, data);
     this.ramIndex.set(index, { file: 'idb', offset: 0, length: data.byteLength });
 
-    // Check if we should auto-flush
     const keys = await this.idb.getAllKeys(this.db);
     if (keys.length >= FLUSH_THRESHOLD && !this.flushing) {
       await this.flushToDisk();
@@ -236,8 +240,7 @@ export class ChunkStore {
   }
 
   /**
-   * Flush IDB chunks to numbered disk files.
-   * Streams one chunk at a time via getChunk() to keep RAM flat.
+   * Flush IDB chunks to numbered data and index files.
    */
   private async flushToDisk(): Promise<void> {
     this.flushing = true;
@@ -278,7 +281,6 @@ export class ChunkStore {
         const indexLine = `${JSON.stringify(indexEntry)}\n`;
         await indexStream.write(indexLine);
 
-        // Update RAM index to point to disk file
         this.ramIndex.set(key, {
           file: dataName,
           offset: byteOffset,
@@ -292,12 +294,11 @@ export class ChunkStore {
       await dataStream.close();
       await indexStream.close();
 
-      // Delete flushed keys from IDB
       await this.idb.deleteKeys(this.db!, flushedKeys);
 
       this.fileCounter++;
 
-      // Recurse if more chunks accumulated during flush
+      // Chunks can accumulate while flushing, so re-check the threshold.
       const remaining = await this.idb.getAllKeys(this.db!);
       if (remaining.length >= FLUSH_THRESHOLD) {
         await this.flushToDisk();
@@ -307,11 +308,13 @@ export class ChunkStore {
     }
   }
 
+  /**
+   * Flushes IDB chunks to disk and caches the File object of every data
+   * file in the RAM index. readChunk() needs that cache for disk chunks.
+   */
   async prepareForRead(): Promise<void> {
-    // Flush any remaining IDB chunks to disk
     await this.flushToDisk();
 
-    // Cache File objects for all unique data files in RAM index
     const uniqueFiles = new Set<string>();
     for (const entry of this.ramIndex.values()) {
       if (entry.file !== 'idb') {

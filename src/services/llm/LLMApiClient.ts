@@ -50,9 +50,6 @@ export interface LLMApiClientOptions {
   logger?: ILogger;
 }
 
-/**
- * Detect provider from API URL or model name
- */
 function detectProvider(apiUrl: string, model: string): 'mistral' | 'openai' | 'unknown' {
   const lower = `${apiUrl} ${model}`.toLowerCase();
   if (lower.includes('mistral')) return 'mistral';
@@ -60,9 +57,6 @@ function detectProvider(apiUrl: string, model: string): 'mistral' | 'openai' | '
   return 'unknown';
 }
 
-/**
- * Apply provider-specific fixes to request body
- */
 function applyProviderFixes(requestBody: StructuredRequestBody, provider: string): void {
   if (provider === 'mistral') {
     // Mistral requires top_p=1 when temperature=0 (greedy sampling)
@@ -81,7 +75,7 @@ function applyProviderFixes(requestBody: StructuredRequestBody, provider: string
 /**
  * Reasoning kill switch for thinking-by-default models (Nemotron, Qwen3).
  * The template kwarg alone is not honoured by every proxy, so the inline
- * marker is appended to system and user turns as a belt-and-braces fallback.
+ * marker is appended to system and user turns as a fallback.
  */
 function disableThinking(requestBody: StructuredRequestBody): void {
   requestBody.chat_template_kwargs = { enable_thinking: false };
@@ -96,9 +90,6 @@ function disableThinking(requestBody: StructuredRequestBody): void {
   });
 }
 
-/**
- * LLMApiClient - Handles LLM API communication with retry logic
- */
 export class LLMApiClient {
   private options: LLMApiClientOptions;
   private logger?: ILogger;
@@ -112,8 +103,6 @@ export class LLMApiClient {
     this.debugLogger = options.debugLogger;
     this.provider = detectProvider(options.apiUrl, options.model);
 
-    // Custom fetch that adds essential headers and strips problematic ones
-    // for browser->API requests.
     // new Headers(init?.headers) copies ALL existing headers (including Authorization
     // set by the OpenAI SDK), so no manual per-header copy is needed.
     const corsMiddleware = options.corsMiddleware?.trim() || '';
@@ -122,11 +111,9 @@ export class LLMApiClient {
     const customFetch: typeof fetch = async (url, init) => {
       let fetchUrl = url as string | URL;
 
-      // Rewrite URL through CORS middleware if configured
       if (corsMiddleware) {
         const middlewareBase = corsMiddleware.replace(/\/+$/, '');
         const urlStr = typeof fetchUrl === 'string' ? fetchUrl : fetchUrl.toString();
-        // Strip the API base from the request URL path
         const afterBase = urlStr.replace(apiBase, '');
         fetchUrl = middlewareBase + afterBase;
       }
@@ -137,11 +124,10 @@ export class LLMApiClient {
         headers.set('Content-Type', 'application/json');
       }
 
-      // Detect test mode (Node.js environment)
       const isTestMode = typeof window === 'undefined' || typeof navigator === 'undefined';
 
       if (!isTestMode) {
-        // Browser mode — add headers that strict CORS servers accept.
+        // Browser mode: add headers that strict CORS servers accept.
         headers.set('Accept', 'application/json, text/event-stream');
         if (navigator.language) {
           headers.set('Accept-Language', `${navigator.language},en;q=0.9`);
@@ -153,7 +139,7 @@ export class LLMApiClient {
       // preflight's Access-Control-Request-Headers). The Headers API is
       // case-insensitive, so delete() works regardless of casing.
       const stripped = [
-        'referer', // explicitly set here — becomes author request header in preflight
+        'referer', // when explicitly set, it becomes an author request header in the preflight
         'origin', // forbidden header; browser sends its own, this set() is a no-op
         'user-agent', // forbidden header; OpenAI SDK sets it but browser ignores
         'openai-organization',
@@ -177,7 +163,7 @@ export class LLMApiClient {
       return fetch(fetchUrl, {
         ...init,
         headers,
-        // No credentials: 'include' — no LLM API returns
+        // No credentials: 'include' because no LLM API returns
         // Access-Control-Allow-Credentials: true, so including credentials
         // would cause the browser to reject the response even if the preflight passes.
       });
@@ -188,21 +174,15 @@ export class LLMApiClient {
       baseURL: options.apiUrl,
       dangerouslyAllowBrowser: true,
       maxRetries: 0, // We handle retries ourselves
-      timeout: 240000, // 4 minutes — large prompts on slow local models exceed 3
+      timeout: 240000, // 4 minutes: large prompts on slow local models exceed 3 minutes
       fetch: customFetch,
     });
   }
 
-  /**
-   * Reset logging flags for new conversion
-   */
   resetLogging(): void {
     this.debugLogger?.resetLogging();
   }
 
-  /**
-   * Test API connection with a real completion request (streaming endpoint when requested)
-   */
   async testConnection(
     streaming = false,
   ): Promise<{ success: boolean; error?: string; model?: string }> {
@@ -254,9 +234,6 @@ export class LLMApiClient {
     }
   }
 
-  /**
-   * Format API error for user display
-   */
   private formatApiError(e: unknown): string {
     // OpenAI SDK error structure
     const apiError = e as {
@@ -269,7 +246,6 @@ export class LLMApiClient {
     if (apiError.error?.message) {
       return apiError.error.message;
     }
-    // HTTP status errors
     if (typeof apiError.status === 'number') {
       const statusMap: Record<number, string> = {
         400: 'Bad Request - Check API URL format',
@@ -285,18 +261,16 @@ export class LLMApiClient {
         statusMap[apiError.status] || `HTTP ${apiError.status}: ${apiError.statusText || 'Error'}`
       );
     }
-    // Network/fetch errors
     if (apiError.cause?.code === 'ENOTFOUND' || apiError.message?.includes('fetch')) {
       return 'Network Error - Check API URL and internet connection';
     }
-    // Timeout
     if (apiError.message?.includes('timeout') || apiError.message?.includes('Timeout')) {
       return 'Request Timeout - Server took too long to respond';
     }
-    // CORS - check message directly or walk the cause chain.
+    // CORS: check the message directly, then walk the cause chain.
     // When the browser blocks a CORS preflight, fetch() throws a TypeError.
     // The OpenAI SDK wraps it as APIConnectionError with the generic message
-    // "Connection error." — so we must inspect the cause chain for CORS indicators.
+    // "Connection error.", so we inspect the cause chain for CORS indicators.
     const corsErrorMessage =
       'CORS Error - API does not allow browser requests. Start a local CORS proxy and set the proxy URL in Advanced Settings.';
     if (apiError.message?.includes('CORS') || apiError.message?.includes('cors')) {
@@ -323,11 +297,9 @@ export class LLMApiClient {
     ) {
       return corsErrorMessage;
     }
-    // Generic Error object
     if (e instanceof Error) {
       return e.message;
     }
-    // String error
     if (typeof e === 'string') {
       return e;
     }
@@ -335,12 +307,7 @@ export class LLMApiClient {
   }
 
   /**
-   * Call LLM with structured output enforcement.
-   * Returns validated, typed result directly.
-   *
-   * @param options - Structured call options including prompt, schema, schema name
-   * @returns Parsed and validated result matching the schema
-   * @throws Error if LLM refuses or returns empty response
+   * @throws Error if the LLM refuses or returns an empty response
    */
   async callStructured<T>({
     messages,
@@ -391,7 +358,6 @@ export class LLMApiClient {
 
     try {
       if (useStreaming) {
-        // Streaming path: accumulate SSE chunks
         try {
           const streamResult = await this.client.chat.completions.create({
             ...requestBody,
@@ -458,7 +424,6 @@ export class LLMApiClient {
           );
         }
       } else {
-        // Non-streaming path
         let response: ChatCompletion;
         try {
           response = await this.client.chat.completions.create({
@@ -510,7 +475,6 @@ export class LLMApiClient {
 
     this.logger?.info(`[structured] API call completed (${content.length} chars)`);
 
-    // Try to parse and validate the response
     try {
       const result = safeParseJSON(content, { schema });
       if (!result.success) {
@@ -520,7 +484,6 @@ export class LLMApiClient {
       }
       return result.data!;
     } catch (error) {
-      // Save debug logs only for data-quality errors
       if (this.isDataQualityError(error)) {
         await this.debugLogger?.saveErrorLog(requestBody, content);
       }
@@ -528,13 +491,7 @@ export class LLMApiClient {
     }
   }
 
-  /**
-   * Check if an error is a data-quality error that should trigger debug logging.
-   * Data-quality errors: Zod validation errors, JSON parse errors, empty responses.
-   * Infrastructure errors (network, timeout, rate limit) return false.
-   */
   private isDataQualityError(error: unknown): boolean {
-    // Zod validation errors indicate schema mismatch
     if (error instanceof ZodError) {
       return true;
     }

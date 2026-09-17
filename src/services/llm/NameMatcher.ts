@@ -2,7 +2,6 @@ import type { CharacterEntry, LLMCharacter } from '@/state/types';
 import { MAX_NAME_EDITS, MIN_NAME_PAIRINGS } from '@/state/types';
 
 /**
- * Calculate Levenshtein distance between two strings
  * @param a First string
  * @param b Second string
  * @returns Number of edits (insertions, deletions, substitutions) needed
@@ -34,7 +33,8 @@ export function levenshtein(a: string, b: string): number {
 }
 
 /**
- * Find maximum pairings between two sets of names using greedy bipartite matching
+ * Greedy bipartite matching between the two name sets: smallest distances
+ * are taken first, so the result can fall short of a true maximum matching.
  * @param setA First set of names
  * @param setB Second set of names
  * @param maxEdits Maximum Levenshtein distance for a valid pairing
@@ -45,7 +45,6 @@ export function findMaxPairings(
   setB: string[],
   maxEdits: number,
 ): [number, number][] {
-  // Build adjacency matrix: distance for each pair
   const matrix: number[][] = [];
   for (let i = 0; i < setA.length; i++) {
     matrix[i] = [];
@@ -68,7 +67,7 @@ export function findMaxPairings(
       }
     }
   }
-  cells.sort((a, b) => a[2] - b[2]); // Sort by distance ascending
+  cells.sort((a, b) => a[2] - b[2]);
 
   for (const [row, col] of cells) {
     if (!usedRows.has(row) && !usedCols.has(col)) {
@@ -82,7 +81,8 @@ export function findMaxPairings(
 }
 
 /**
- * Match character against profile using multi-pairing algorithm
+ * Matches by exact canonical name first, then by fuzzy name-set pairing
+ * against each profile entry.
  * @param char Character from current session
  * @param profile Existing character entries from previous sessions
  * @returns Matching entry only if at least requiredPairings valid pairings found
@@ -97,15 +97,12 @@ export function matchCharacter(
   for (const entry of Object.values(profile)) {
     const entryNames = [entry.canonicalName, ...entry.aliases];
 
-    // Shortcut: if canonical name exactly matches any profile name, immediate match
     if (entryNames.some((n) => n.toLowerCase() === canonicalLower)) {
       return entry;
     }
 
-    // Fuzzy: find maximum pairings between the two name sets
     const pairings = findMaxPairings(charNames, entryNames, MAX_NAME_EDITS);
 
-    // Calculate dynamic threshold: max(MIN_NAME_PAIRINGS, min(M, N) - 1)
     const requiredPairings = Math.max(
       MIN_NAME_PAIRINGS,
       Math.min(charNames.length, entryNames.length) - 1,

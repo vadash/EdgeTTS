@@ -1,27 +1,18 @@
-/**
- * VoiceAllocator - Unified voice assignment and allocation logic
- * Consolidates logic from VoiceAssigner, VoiceRemappingStep, and VoiceProfile
- */
-
 import type { LLMCharacter, SpeakerAssignment, VoiceOption, VoicePool } from '@/state/types';
 import type { DetectedLanguage } from '@/utils/languageDetection';
 import { deduplicateVariants } from './VoicePoolBuilder';
 
-/**
- * Voice allocation result
- */
 export interface VoiceAllocation {
   /** Map of character name -> voice ID */
   voiceMap: Map<string, string>;
   /** Voices reserved for rare/unassigned speakers */
   rareVoices: { male: string; female: string; unknown: string };
-  /** Number of unique voices assigned */
   uniqueCount: number;
 }
 
 /**
- * Build a priority-ordered, deduplicated voice pool.
- * Used by all voice assignment paths (initial, randomize, JSON import).
+ * Shared by every voice assignment path (initial allocation, randomize, JSON import),
+ * so all of them get the same ordering and dedup.
  *
  * Order: native non-Multilingual -> native Multilingual -> foreign Multilingual
  * Dedup: variant pairs resolved (only one of Andrew/AndrewMultilingual survives)
@@ -43,8 +34,6 @@ export function buildPriorityPool(
 export const UNIQUE_POOL_RATIO = 0.8;
 
 /**
- * Tracks used voices during allocation.
- *
  * Each gender pool is split once at construction: the first 80% are unique slots,
  * handed out one per character, and the remaining 20% is a shared tail that cycles
  * and may repeat. Callers sort characters by line count, so the top speakers reach
@@ -80,10 +69,6 @@ export class VoicePoolTracker {
     this.shared = { male: sharedMale, female: sharedFemale };
   }
 
-  /**
-   * Pick a voice for the given gender: an unused one from the 80% unique slice,
-   * else cycle the shared 20% tail (repeats allowed).
-   */
   pickVoice(gender: 'male' | 'female' | 'unknown'): string {
     const key = this.poolKey(gender);
 
@@ -107,7 +92,6 @@ export class VoicePoolTracker {
     return this.cycle(key);
   }
 
-  /** Round-robin over the shared tail, falling back to the whole pool if it is empty. */
   private cycle(key: 'male' | 'female'): string {
     const tail = this.shared[key].length > 0 ? this.shared[key] : this.pool[key];
     if (tail.length === 0) return '';
@@ -124,23 +108,15 @@ export class VoicePoolTracker {
       : 'female';
   }
 
-  /**
-   * Reserve a specific voice (won't be picked by pickVoice)
-   */
+  /** Mark a voice as used so pickVoice never hands it out. */
   reserve(voice: string): void {
     this.used.add(voice);
   }
 
-  /**
-   * Check if a voice is already used
-   */
   isUsed(voice: string): boolean {
     return this.used.has(voice);
   }
 
-  /**
-   * Get all currently used voices
-   */
   getUsed(): Set<string> {
     return new Set(this.used);
   }
@@ -150,15 +126,10 @@ export class VoicePoolTracker {
   }
 }
 
-/**
- * Voice allocation options
- */
 export interface AllocateVoicesOptions {
-  /** Characters to assign voices to */
   characters: LLMCharacter[];
   /** Speaking frequency per character (name -> line count); absent/empty keeps input order */
   frequency?: Map<string, number>;
-  /** Voice pool to allocate from */
   pool: VoicePool;
   /** Narrator voice (reserved, never assigned) */
   narratorVoice: string;
@@ -182,8 +153,8 @@ export function sortByFrequency(
 }
 
 /**
- * Count non-narrator speaking frequency from speaker assignments
- * (name -> number of assigned sentences)
+ * Speaking frequency per character (name -> number of assigned sentences);
+ * the narrator is not counted.
  */
 export function frequencyFromAssignments(assignments: SpeakerAssignment[]): Map<string, number> {
   const frequency = new Map<string, number>();
@@ -220,7 +191,7 @@ export function allocateVoices(options: AllocateVoicesOptions): VoiceAllocation 
     const voice = tracker.pickVoice(char.gender);
     voiceMap.set(char.canonicalName, voice);
 
-    // Map all variations to same voice
+    // Variations are alternate names of the same character; they share its voice.
     for (const variation of char.variations) {
       if (variation !== char.canonicalName) {
         voiceMap.set(variation, voice);
@@ -228,7 +199,6 @@ export function allocateVoices(options: AllocateVoicesOptions): VoiceAllocation 
     }
   }
 
-  // Assign rare speaker voices (unnamed/unassigned)
   const rareVoices = {
     male: tracker.pickVoice('male'),
     female: tracker.pickVoice('female'),
@@ -247,11 +217,9 @@ export function allocateVoices(options: AllocateVoicesOptions): VoiceAllocation 
 }
 
 /**
- * Shuffle voices in place within priority tiers.
- *
- * Tier order (native non-Multilingual before Multilingual) is a hard guarantee of
- * `buildPriorityPool`, so shuffling must happen *inside* each tier — never across
- * them, or a book would get a Multilingual voice while a native one sat unused.
+ * Shuffle voices inside priority tiers. buildPriorityPool orders native voices
+ * before Multilingual ones, and shuffling must not break that order. Shuffling
+ * across tiers would give a book a Multilingual voice while a native one sat unused.
  */
 function shuffleWithinTiers(pool: VoiceOption[]): VoiceOption[] {
   const native: VoiceOption[] = [];
@@ -269,20 +237,16 @@ function shuffleWithinTiers(pool: VoiceOption[]): VoiceOption[] {
 }
 
 /**
- * Randomize allocations for characters below a given index
- * Uses the same tiered logic as allocateVoices
+ * Reroll the voices of characters below a clicked row, with the same tiered logic
+ * as allocateVoices.
  *
- * @param sortedCharacters - Characters sorted by line count (descending)
- * @param currentVoiceMap - Current voice assignments
- * @param clickedIndex - Index of row where button clicked (randomize BELOW this)
- * @param enabledVoices - All enabled voices
- * @param narratorVoice - Narrator voice to reserve
- * @param bookLanguage - Detected book language
- * @param frequency - Speaking frequency per character (name -> line count)
- * @param shuffle - Randomize pool order within priority tiers. Without this the
- *   allocation is fully deterministic: reserving rows 0..clickedIndex strips exactly
- *   the voices they consumed off the front of the pool, so every row below is handed
- *   back the voice it already had and the operation looks like a no-op.
+ * @param sortedCharacters - Characters sorted by line count, descending.
+ * @param clickedIndex - Row where the user clicked; only rows below it are rerolled.
+ * @param frequency - Speaking frequency per character (name -> line count).
+ * @param shuffle - Shuffle the pool order within priority tiers first. Without it the
+ *   reroll is fully deterministic: reserving rows 0..clickedIndex strips exactly the
+ *   voices they consumed off the front of the pool, so every row below is handed back
+ *   the voice it already had and the operation looks like a no-op.
  */
 export function randomizeBelow(
   sortedCharacters: LLMCharacter[],
@@ -300,26 +264,19 @@ export function randomizeBelow(
     return newMap;
   }
 
-  // Collect reserved voices (narrator + all voices up to and including clickedIndex)
   const reserved = new Set<string>([narratorVoice]);
   for (let i = 0; i <= clickedIndex; i++) {
     const voice = currentVoiceMap.get(sortedCharacters[i].canonicalName);
     if (voice) reserved.add(voice);
   }
 
-  // Build priority pool with deduplication (excludes reserved voices)
   const pool = buildPriorityPool(enabledVoices, bookLanguage, reserved);
-
-  // Convert VoiceOption[] to VoicePool format
   const voicePool: VoicePool = {
     male: (shuffle ? shuffleWithinTiers(pool.male) : pool.male).map((v) => v.fullValue),
     female: (shuffle ? shuffleWithinTiers(pool.female) : pool.female).map((v) => v.fullValue),
   };
 
-  // Get characters below clicked index
   const charsBelow = sortedCharacters.slice(clickedIndex + 1);
-
-  // Allocate voices for characters below
   const allocation = allocateVoices({
     characters: charsBelow,
     frequency,
@@ -328,9 +285,9 @@ export function randomizeBelow(
     reservedVoices: reserved,
   });
 
-  // Update voice map with new allocations
   for (const [char, voice] of allocation.voiceMap.entries()) {
-    // Skip unnamed speakers
+    // allocateVoices also returns UNNAMED entries for the subset; keep the
+    // rare-voice bindings of the full allocation instead.
     if (!char.includes('UNNAMED')) {
       newMap.set(char, voice);
     }
@@ -340,12 +297,8 @@ export function randomizeBelow(
 }
 
 /**
- * Assign voices to unmatched characters from priority pool.
- * Used after JSON import to fill gaps.
- *
- * - Characters in importedMap with valid (enabled) voices are preserved
- * - Characters with invalid voices or missing from importedMap get assigned from pool
- * - Uses buildPriorityPool for dedup + ordering
+ * Fill voice gaps after a JSON import. A character with a valid (enabled) voice in
+ * importedMap keeps it; every other character is assigned from the priority pool.
  */
 export function assignUnmatchedFromPool(
   characters: LLMCharacter[],
@@ -358,7 +311,6 @@ export function assignUnmatchedFromPool(
   const result = new Map<string, string>();
   const reserved = new Set<string>([narratorVoice]);
 
-  // First pass: collect valid imported voices
   for (const char of characters) {
     const imported = importedMap.get(char.canonicalName);
     if (imported && enabledSet.has(imported)) {
@@ -367,17 +319,14 @@ export function assignUnmatchedFromPool(
     }
   }
 
-  // Build priority pool excluding reserved voices
   const pool = buildPriorityPool(enabledVoices, bookLanguage, reserved);
-
-  // Second pass: assign unmatched characters
   const malePool = pool.male;
   const femalePool = pool.female;
   let maleIdx = 0;
   let femaleIdx = 0;
 
   for (const char of characters) {
-    if (result.has(char.canonicalName)) continue; // already assigned
+    if (result.has(char.canonicalName)) continue;
 
     const genderPool =
       char.gender === 'female' && femalePool.length > 0
@@ -396,9 +345,6 @@ export function assignUnmatchedFromPool(
   return result;
 }
 
-/**
- * Remap voiceId in speaker assignments
- */
 export function remapAssignments(
   assignments: SpeakerAssignment[],
   voiceMap: Map<string, string>,
@@ -410,9 +356,6 @@ export function remapAssignments(
   }));
 }
 
-/**
- * Format voice ID for display (shorten long format)
- */
 export function shortVoiceId(voice: string): string {
   // "ru-RU, DmitryNeural" -> "ru-RU-DmitryNeural"
   if (voice.includes(', ') && !voice.includes('(')) {

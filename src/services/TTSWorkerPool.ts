@@ -13,7 +13,6 @@ import { LadderController } from './LadderController';
 import type { ILogger } from './Logger';
 import { ReusableEdgeTTSService } from './ReusableEdgeTTSService';
 
-// Maximum retry attempts per task before permanent failure
 const MAX_TTS_RETRIES = 5;
 
 export interface PoolTask {
@@ -40,20 +39,10 @@ export interface WorkerPoolOptions {
 }
 
 /**
- * TTSWorkerPool - one-shot pool for a single conversion run
- *
- * Features:
- * - p-queue handles concurrency and task scheduling
- * - generic-pool manages WebSocket connections with acquire/release semantics
- * - Centralized retry logic with exponential backoff
- * - Handles sleep mode recovery via reconnection
- * - Writes audio chunks to ChunkStore immediately to prevent OOM
- * - run() settles when the queue drains (resolving PoolOutcome) or rejects
- *   with CancellationError when the signal aborts (fast teardown, no
- *   graceful drain wait)
+ * One-shot pool: one conversion run per instance. A second run() does no
+ * work because executeTask drops tasks once the pool has settled.
  */
 export class TTSWorkerPool {
-  /** Create a one-shot pool for a single run() */
   static create(config: WorkerPoolOptions): TTSWorkerPool {
     return new TTSWorkerPool(config);
   }
@@ -65,7 +54,6 @@ export class TTSWorkerPool {
   private failed: Array<{ index: number; message: string }> = [];
   private chunkStore: ChunkStore | null = null;
 
-  // Progress
   private totalTasks = 0;
   private processedCount = 0;
   private maxWorkers: number;
@@ -77,15 +65,13 @@ export class TTSWorkerPool {
   private onConcurrencyChange?: (concurrency: number) => void;
   private logger?: ILogger;
 
-  // Retry state management
   private retryCount = new Map<number, number>();
   private retryTimers = new Map<number, NodeJS.Timeout>();
 
-  // Network event handlers
   private handleOnline?: () => void;
   private handleOffline?: () => void;
 
-  // Connections currently executing a send (sockets destroyed on abort)
+  // Connections executing a send (sockets destroyed on abort)
   private inFlight = new Set<ReusableEdgeTTSService>();
   // Set once run() settles or aborts; executeTask stops recording progress
   private settled = false;
@@ -102,12 +88,11 @@ export class TTSWorkerPool {
     this.logger = options.logger;
     this.maxWorkers = options.maxWorkers;
 
-    // Initialize ladder controller for adaptive scaling
     this.ladder = new LadderController(
       {
         sampleSize: 20,
-        successThreshold: 0.8, // Drop concurrency if success is < 80%
-        scaleUpThreshold: 0.95, // Increase concurrency only if success is >= 95%
+        successThreshold: 0.8,
+        scaleUpThreshold: 0.95,
         scaleUpIncrement: 2,
         scaleDownFactor: 0.5,
       },
@@ -115,10 +100,9 @@ export class TTSWorkerPool {
       this.logger,
     );
 
-    // Initialize p-queue with ladder's starting concurrency (minWorkers, not maxWorkers)
+    // Start at the ladder's current concurrency, not maxWorkers
     this.queue = new PQueue({ concurrency: this.ladder.getCurrentWorkers() });
 
-    // Initialize generic-pool for WebSocket connections
     const logger = this.logger;
     this.connectionPool = createPool(
       {
@@ -138,13 +122,13 @@ export class TTSWorkerPool {
         max: options.maxWorkers,
         min: 0, // Create connections on demand
         testOnBorrow: true, // Validate connection before use
-        // Note: evictionRunIntervalMillis disabled - uses Node.js setTimeout().unref()
-        // which doesn't exist in browsers. Idle connections are reclaimed by the
-        // pool's idle timeout after run() settles.
+        // Do not set evictionRunIntervalMillis: it relies on Node.js
+        // setTimeout().unref(), which browsers lack. Idle connections are
+        // reclaimed by the pool's idle timeout after run() settles.
       },
     );
 
-    // Network Offline/Online Handling - pause queue when offline to preserve retry budget
+    // Pause the queue while offline to preserve the retry budget
     this.handleOnline = () => {
       this.logger?.info('Network restored. Resuming TTS queue.');
       this.queue.start();
@@ -159,7 +143,6 @@ export class TTSWorkerPool {
       window.addEventListener('offline', this.handleOffline);
     }
 
-    // Pause immediately if starting offline
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       this.logger?.warn('Started offline. TTS queue paused.');
       this.queue.pause();
@@ -195,8 +178,6 @@ export class TTSWorkerPool {
         if (this.settled) return;
         this.settled = true;
         signal.removeEventListener('abort', onAbort);
-        // Fast settle: destroy in-flight sockets, drop queued and backoff
-        // tasks; never wait for the graceful drain.
         this.teardown();
         this.queue.clear();
         for (const service of this.inFlight) {
@@ -224,8 +205,8 @@ export class TTSWorkerPool {
   }
 
   /**
-   * Executes a single task with direct error handling (no withRetry wrapper)
-   * Acquires connection from pool, executes, releases back
+   * Runs one task to a terminal state. Retry and permanent-failure decisions
+   * live here, not in the shared withRetry wrapper.
    */
   private async executeTask(task: PoolTask): Promise<void> {
     if (this.settled) return;
@@ -239,7 +220,6 @@ export class TTSWorkerPool {
       }
       this.inFlight.add(service);
 
-      // Build config with task-specific voice
       const taskConfig: VoiceConfig = task.voice
         ? {
             ...this.voiceConfig,
@@ -247,13 +227,12 @@ export class TTSWorkerPool {
           }
         : this.voiceConfig;
 
-      // Ensure connected (Reusable service handles idempotency)
-      // If PC slept, state is likely disconnected, this reconnects.
+      // connect() is idempotent; a suspended PC or network drop leaves the
+      // state DISCONNECTED, so reconnect before sending.
       if (!service.isReady()) {
         await service.connect();
       }
 
-      // Send request directly (no withRetry wrapper)
       const audioData = await service.send({
         text: task.text,
         config: taskConfig,
@@ -264,7 +243,8 @@ export class TTSWorkerPool {
         return;
       }
 
-      // Save to ChunkStore
+      // Write the chunk to the Chunk store immediately so audio never
+      // accumulates in memory (ADR-0002).
       await this.chunkStore!.writeChunk(task.partIndex, audioData);
       if (this.settled) {
         // Cancelled run writes no progress
@@ -272,26 +252,21 @@ export class TTSWorkerPool {
         return;
       }
 
-      // Read actual retry count from Map (defaults to 0 if not tracked)
       const actualRetries = this.retryCount.get(task.partIndex) ?? 0;
 
-      // Record success for ladder with actual retry count
       this.ladder.recordTask(true, actualRetries);
       this.ladder.evaluate();
 
-      // Sync p-queue concurrency with the ladder
       this.queue.concurrency = this.ladder.getCurrentWorkers();
       this.onConcurrencyChange?.(this.queue.concurrency);
 
       this.completed.add(task.partIndex);
       this.processedCount++;
 
-      // Cleanup: delete retryCount to prevent memory leaks
       this.retryCount.delete(task.partIndex);
 
       this.onTaskComplete?.(task.partIndex);
 
-      // Release connection back to pool on success
       await this.connectionPool.release(service);
       this.inFlight.delete(service);
 
@@ -302,7 +277,6 @@ export class TTSWorkerPool {
       }
       if (this.settled) return;
 
-      // Delegate to handleTaskFailure for retry logic
       await this.handleTaskFailure(task, error);
       this.checkSettled?.();
     }
@@ -314,19 +288,18 @@ export class TTSWorkerPool {
     try {
       await this.connectionPool.destroy(service);
     } catch {
-      // Socket may already be dead - ignore error
+      // The socket may already be dead, so ignore destroy errors.
     }
   }
 
   /**
-   * Calculate retry delay with custom progression and jitter
-   * Progression: 1.5-3s → 5-10s → 15-30s → 30-60s → 60-120s (capped)
-   * Uses half-max jitter to prevent thundering herd (baseDelay/2 to baseDelay)
-   * @param attempt - Retry attempt number (1-indexed, max 5)
+   * Delay for one retry attempt: half the base delay plus jitter up to half
+   * again, so simultaneous failures do not retry as one thundering herd.
+   * @param attempt - 1-indexed retry attempt number
    * @returns Delay in milliseconds
    */
   private calculateRetryDelay(attempt: number): number {
-    const delays = [3_000, 10_000, 30_000, 60_000, 120_000]; // 3s, 10s, 30s, 60s, 120s
+    const delays = [3_000, 10_000, 30_000, 60_000, 120_000];
     const baseDelay = delays[Math.min(attempt - 1, delays.length - 1)];
     const halfDelay = baseDelay / 2;
     const jitter = Math.random() * halfDelay;
@@ -334,33 +307,23 @@ export class TTSWorkerPool {
     return halfDelay + jitter;
   }
 
-  /**
-   * Handle task failure with retry state management and permanent failure handling
-   * @param task - The failed task
-   * @param error - The error that caused the failure
-   */
   private async handleTaskFailure(task: PoolTask, error: unknown): Promise<void> {
-    // Get current retry count (default to 0 if not tracked)
     const currentCount = this.retryCount.get(task.partIndex) ?? 0;
     const attempt = currentCount + 1;
 
-    // Update retry count
     this.retryCount.set(task.partIndex, attempt);
 
-    // Record intermediate failures to ladder for immediate throttling
-    // This happens BEFORE the max retries check so rate limits are caught early
+    // Record the failure with the ladder before the max-retries check so the
+    // first failure already throttles concurrency.
     this.ladder.recordTask(false, attempt);
     this.ladder.evaluate();
     this.queue.concurrency = this.ladder.getCurrentWorkers();
     this.onConcurrencyChange?.(this.queue.concurrency);
 
-    // Check if we've exceeded max retries
     if (attempt > MAX_TTS_RETRIES) {
-      // Permanent failure
       this.failed.push({ index: task.partIndex, message: getErrorMessage(error) });
       this.processedCount++;
 
-      // Call error callback with the original error
       this.onTaskError?.(task.partIndex, error instanceof Error ? error : new Error(String(error)));
 
       this.logger?.error(
@@ -368,12 +331,10 @@ export class TTSWorkerPool {
         error as Error,
       );
 
-      // Cleanup: delete retryCount to prevent memory leaks
       this.retryCount.delete(task.partIndex);
       return;
     }
 
-    // Calculate delay for this attempt
     const delay = this.calculateRetryDelay(attempt);
 
     this.onRetry?.(task.partIndex, attempt, delay);
@@ -382,7 +343,6 @@ export class TTSWorkerPool {
       `Task ${task.partIndex} failed (attempt ${attempt}/${MAX_TTS_RETRIES}). Retrying in ${Math.round(delay / 1000)}s`,
     );
 
-    // Schedule retry with setTimeout; re-enqueue after the delay expires
     const timer = setTimeout(() => {
       this.retryTimers.delete(task.partIndex);
       if (this.settled) return;
@@ -393,11 +353,7 @@ export class TTSWorkerPool {
     this.retryTimers.set(task.partIndex, timer);
   }
 
-  /**
-   * Shared teardown: remove network listeners and cancel pending retry timers
-   */
   private teardown(): void {
-    // Remove network event listeners
     if (typeof window !== 'undefined') {
       if (this.handleOnline) window.removeEventListener('online', this.handleOnline);
       if (this.handleOffline) window.removeEventListener('offline', this.handleOffline);
@@ -412,8 +368,8 @@ export class TTSWorkerPool {
   }
 
   /**
-   * Internal teardown on the normal settle path: timers, offline listeners,
-   * then a graceful socket pool drain.
+   * Settle-path teardown: the shared teardown, then a graceful socket pool
+   * drain before run() resolves.
    */
   private async shutdown(): Promise<void> {
     this.teardown();

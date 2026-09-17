@@ -42,14 +42,15 @@ export class LadderController {
     this.history.push(result);
     this.tasksSinceLastScaleUp++;
 
-    // Keep only sampleSize entries (ring buffer)
+    // Keep only the most recent sampleSize results.
     if (this.history.length > this.config.sampleSize) {
       this.history.shift();
     }
   }
 
   evaluate(): void {
-    // 1. Instant circuit breaker: evaluate hard failures IMMEDIATELY
+    // Circuit breaker first: retries >= 5 means the task exhausted its
+    // retries, so scale down at once instead of waiting for a full sample.
     const hasHardFailure = this.history.some((h) => !h.success && h.retries >= 5);
     if (hasHardFailure) {
       this.scaleDown();
@@ -57,7 +58,7 @@ export class LadderController {
       return;
     }
 
-    // 2. Need at least sampleSize tasks to evaluate normal success rates
+    // Wait for a full sample before judging the success rate.
     if (this.history.length < this.config.sampleSize) {
       return;
     }
@@ -65,16 +66,13 @@ export class LadderController {
     const successes = this.history.filter((h) => h.success).length;
     const successRate = successes / this.history.length;
 
-    // 3. Evaluate rates safely
     if (
       successRate >= this.config.scaleUpThreshold &&
       this.tasksSinceLastScaleUp >= this.config.sampleSize
     ) {
-      // Scale up if success rate is high AND we've processed enough tasks since last scale up
       this.scaleUp();
       this.resetMetrics();
     } else if (successRate < this.config.successThreshold) {
-      // Below threshold means significant failure rate
       this.scaleDown();
       this.resetMetrics();
     }

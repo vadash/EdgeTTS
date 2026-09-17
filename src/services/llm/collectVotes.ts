@@ -2,11 +2,10 @@
  * Gather N successful votes by keeping a pool of concurrent attempts full,
  * each attempt at a distinct temperature.
  *
- * Replaces the old sequential "vote, retry same temp on failure" loop: a
- * 4-minute timeout used to cost 4 minutes of wall clock per retry, serially,
- * and re-sending the temperature that just timed out is the least likely
- * value to succeed. Here a failure is replaced by an unused temperature from
- * the budget, so the pool stays busy until `need` votes land.
+ * A failed attempt is replaced by an unused temperature from the budget:
+ * retrying the temperature that just timed out is the least likely value to
+ * succeed, and serial retries add the full per-attempt timeout to the wall
+ * clock on every failure.
  *
  * Once the quota fills, every still-running attempt is aborted: their results
  * would be dropped anyway, and leaving them in flight burns wall clock and
@@ -24,7 +23,7 @@ export interface CollectVotesOptions<T> {
   need: number;
   /** Max attempts in flight. */
   parallel: number;
-  /** Distinct temperatures to draw from — also the attempt budget. */
+  /** Distinct temperatures to draw from; the count is also the attempt budget. */
   temps: number[];
   /** One attempt. Returns null (or throws) on failure. Aborted once `need` lands. */
   run: (temp: number, signal: AbortSignal) => Promise<T | null>;
@@ -60,7 +59,7 @@ export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<
       throwIfAborted(signal);
       const temp = queue.shift();
       if (temp === undefined) {
-        return; // budget exhausted
+        return;
       }
 
       let value: T | null = null;

@@ -1,6 +1,3 @@
-// Conversion Orchestrator - Plain function orchestrator
-// Runs the TTS conversion workflow as a single async function
-
 import {
   AppError,
   getErrorMessage,
@@ -26,7 +23,6 @@ import type { AudioMerger, MergerConfig } from './AudioMerger';
 import type { ChunkStore } from './ChunkStore';
 import { FailureLog } from './FailureLog';
 import type { FFmpegService } from './FFmpegService';
-// Import concrete service classes
 import type { ILogger } from './Logger';
 import type { LlmStageDeps, LlmStages } from './llm/stages';
 import { exportToProfile } from './llm/VoiceProfile';
@@ -53,9 +49,6 @@ import type { VoicePoolBuilder } from './VoicePoolBuilder';
 // Orchestrator Input Types
 // ============================================================================
 
-/**
- * Progress information from workflow stages
- */
 export interface WorkflowProgress {
   stage: string;
   current: number;
@@ -63,10 +56,7 @@ export interface WorkflowProgress {
   message: string;
 }
 
-/**
- * Input configuration snapshot -- read once at the start of run().
- * Replaces all signal .value reads.
- */
+/** Configuration snapshot, read once at the start of a Conversion. */
 export interface OrchestratorInput {
   // LLM config
   isLLMConfigured: boolean;
@@ -132,7 +122,7 @@ export interface ProgressReporter {
   setPhaseBaseline(count: number): void;
 }
 
-/** Voice review pause: pushes data, awaits user review, returns the result. */
+/** Review gate: the pause where the user confirms or edits the draft Voice map. */
 export interface ReviewGate {
   open(
     characters: LLMCharacter[],
@@ -141,7 +131,6 @@ export interface ReviewGate {
   ): Promise<{ voiceMap: Map<string, string>; profile: VoiceProfileFile | null }>;
 }
 
-/** Resume confirmation prompt. */
 export interface ResumeGate {
   confirm(info: ResumeInfo): Promise<boolean>;
 }
@@ -172,7 +161,7 @@ export interface ConversionPorts {
 }
 
 // ============================================================================
-// Helper Functions (previously private methods)
+// Helper Functions
 // ============================================================================
 
 function escapeRegex(str: string): string {
@@ -191,7 +180,7 @@ function applyDictionaryRules(text: string, rules: string[], caseSensitive: bool
         const replacement = regexMatch[2].replace(/\\r/g, '\r').replace(/\\n/g, '\n');
         result = result.replace(regex, replacement);
       } catch {
-        // Invalid regex - skip
+        // Invalid regex: skip the rule.
       }
       continue;
     }
@@ -209,7 +198,7 @@ function applyDictionaryRules(text: string, rules: string[], caseSensitive: bool
             const regex = new RegExp(escapeRegex(matchArr[0]), 'giu');
             result = result.replace(regex, matchArr[1]);
           } catch {
-            // Invalid regex - skip
+            // Invalid regex: skip the rule.
           }
         }
       }
@@ -224,7 +213,7 @@ function applyDictionaryRules(text: string, rules: string[], caseSensitive: bool
         const regex = new RegExp(`(^|\\s|\\p{P})${escaped}(?=\\p{P}|\\s|$)`, 'giu');
         result = result.replace(regex, `$1${matchArr[1]}`);
       } catch {
-        // Invalid regex - skip
+        // Invalid regex: skip the rule.
       }
     }
   }
@@ -368,7 +357,7 @@ async function saveVoiceProfile(
       };
 
       const bookFolder = await directoryHandle.getDirectoryHandle(bookName, { create: true });
-      // Copy in the book folder and next to it, so the profile survives
+      // Saved in the book folder and next to it, so the profile survives
       // if the user deletes the folder after listening.
       await writeJson(bookFolder, fileName);
       await writeJson(directoryHandle, fileName);
@@ -387,9 +376,8 @@ async function saveVoiceProfile(
 // ============================================================================
 
 /**
- * Run the full TTS conversion workflow.
- * This is a pure orchestrator function with no internal state.
- * Cancellation is controlled via the external AbortSignal.
+ * Pure orchestrator function with no internal state. Cancellation is controlled
+ * via the external AbortSignal.
  */
 export async function runConversion(
   services: ConversionOrchestratorServices,
@@ -415,7 +403,8 @@ export async function runConversion(
   }
 
   // ==================== RESUME CHECK ====================
-  // ChunkStore comes first: the check inspects/wipes the work folder through it.
+  // ChunkStore is created first: the resume check reads and wipes stored state
+  // through it.
   const chunkStore = services.chunkStoreFactory.create();
   const resumeInfo = await checkResumeState(chunkStore, directoryHandle, (msg) => logger.info(msg));
 
@@ -443,7 +432,7 @@ export async function runConversion(
       }
     }
   } else {
-    // Fresh start - clean any leftover _temp_work and IDB data
+    // Fresh start: clean any leftover _temp_work folder and IDB data
     if (await chunkStore.wipe(directoryHandle)) logger.info('Cleaned up _temp_work directory');
     await chunkStore.clearAll(directoryHandle);
   }
@@ -464,7 +453,6 @@ export async function runConversion(
   const fileNames =
     existingBook?.fileNames ?? ([[extractFilename(text), 0]] as Array<[string, number]>);
 
-  // Progress reporter helper
   const report = (stage: StageId, current: number, total: number, message: string, failed = 0) => {
     logger.info(message);
     ports.progress.report(stage, current, total, message, failed);
@@ -478,12 +466,11 @@ export async function runConversion(
     if (!skipLLMSteps) {
       checkCancelled(signal);
 
-      // Set initial LLM concurrency before starting LLM stage
       ports.progress.setConcurrency(input.llmThreads, 0);
       const setLlmConcurrency = (effective: number) => ports.progress.setConcurrency(effective, 0);
 
       // One stages record for the whole run (ADR 0015): per-stage configs in,
-      // per-call signals out — the caller's signal is the only cancellation
+      // per-call signals out. The caller's signal is the only cancellation
       // channel, so there is no abort bridge here.
       const stages = llmStagesFactory.create({
         extract: input.extractConfig,
@@ -564,7 +551,6 @@ export async function runConversion(
         `Assigned speakers to ${assignments.length} sentence(s)`,
       );
 
-      // Save pipeline state for resume
       const stateSaved = await savePipelineState(
         await chunkStore.ensureWorkFolder(directoryHandle).catch(() => null),
         {
@@ -663,7 +649,6 @@ export async function runConversion(
         'Dictionary processing complete',
       );
 
-      // Continue to TTS with assignments
       await runTTSStage(input, assignments, fileNames, signal, report, services, ports, chunkStore);
     } else {
       // ==================== RESUME MODE - SKIP LLM ====================
@@ -682,7 +667,7 @@ export async function runConversion(
             : (voiceMap!.get(a.speaker) ?? input.narratorVoice),
       }));
 
-      // Save voice profile (idempotent — safe to re-save on resume)
+      // Safe to re-save on resume: writing the profile is idempotent.
       await saveVoiceProfile(
         directoryHandle,
         fileNames,
@@ -730,7 +715,7 @@ export async function runConversion(
 }
 
 // ============================================================================
-// TTS Stage (extracted for reuse)
+// TTS Stage
 // ============================================================================
 
 async function runTTSStage(
@@ -785,7 +770,7 @@ async function runTTSStage(
   const failedTasks = new Set<number>();
 
   // Pre-scan for cached chunks using ChunkStore. Indices at or beyond the
-  // honest chunk count are stale residue from a previous Conversion — the
+  // honest chunk count are stale residue from a previous Conversion: the
   // merge iterates chunks.length exactly, so they would only lie.
   let staleDropped = 0;
   const existingIndices = chunkStore.getExistingIndices();
@@ -808,7 +793,6 @@ async function runTTSStage(
     );
   }
 
-  // Load previously failed chunks
   const previouslyFailed = await failureLog.load();
   let skippedCount = 0;
   for (const idx of previouslyFailed) {
@@ -896,7 +880,6 @@ async function runTTSStage(
     // routes the rejection to ports.run.cancel).
     const outcome = await workerPool.run(ttsTasks, { signal });
 
-    // Persist failed chunks
     if (outcome.failed.length > 0) {
       const totalFailed = await failureLog.record(outcome.failed);
       if (totalFailed !== null) {
@@ -936,7 +919,6 @@ async function runTTSStage(
 
   checkCancelled(signal);
 
-  // Prepare ChunkStore for reading
   await chunkStore.prepareForRead();
 
   const merger = audioMergerFactory.create({

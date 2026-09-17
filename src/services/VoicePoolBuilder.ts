@@ -1,26 +1,21 @@
 import { voices } from '../components/VoiceSelector/voices';
 import type { VoiceOption, VoicePool } from '../state/types';
 
-/**
- * Build options for voice pool
- */
 export interface VoicePoolOptions {
   /** Language/locale filter (e.g., 'en', 'ru') */
   language?: string;
   /** Include multilingual voices in addition to language match */
   includeMultilingual?: boolean;
-  /** Only include voices in this allowlist */
   enabledVoices?: string[];
 }
 
 /**
- * Deduplicate Multilingual variant pairs and sort by priority.
+ * Deduplicate Multilingual variant pairs and sort by priority: native
+ * voices first, Multilingual voices last.
  *
- * For pairs (e.g., AndrewNeural + AndrewMultilingualNeural in same locale):
- *   - If the voice's locale matches book language -> keep non-Multilingual
- *   - Otherwise -> keep Multilingual
- *
- * Returns voices sorted: non-Multilingual first, Multilingual last.
+ * For a pair (e.g., AndrewNeural and AndrewMultilingualNeural in one
+ * locale), the native voice wins when its locale matches the book
+ * language; otherwise keep the Multilingual voice.
  */
 export function deduplicateVariants(
   candidates: VoiceOption[],
@@ -28,8 +23,8 @@ export function deduplicateVariants(
 ): VoiceOption[] {
   const langPrefix = bookLanguage.split('-')[0];
 
-  // Group by locale + baseName to find pairs
-  // baseName: strip "Multilingual" -> "AndrewMultilingualNeural" becomes "AndrewNeural"
+  // Group by locale and base name to find pairs; the base name strips
+  // "Multilingual", so "AndrewMultilingualNeural" pairs with "AndrewNeural".
   const groups = new Map<string, { native?: VoiceOption; multilingual?: VoiceOption }>();
 
   for (const voice of candidates) {
@@ -47,20 +42,16 @@ export function deduplicateVariants(
     }
   }
 
-  // Resolve each group to a single voice
   const result: VoiceOption[] = [];
   for (const group of groups.values()) {
     if (group.native && group.multilingual) {
-      // Pair exists -- pick based on book language
       const isNativeLocale = group.native.locale.startsWith(langPrefix);
       result.push(isNativeLocale ? group.native : group.multilingual);
     } else {
-      // No pair -- keep whichever exists
       result.push((group.native ?? group.multilingual)!);
     }
   }
 
-  // Sort: non-Multilingual first, Multilingual last
   result.sort((a, b) => {
     const aMulti = a.name.includes('Multilingual') ? 1 : 0;
     const bMulti = b.name.includes('Multilingual') ? 1 : 0;
@@ -70,21 +61,13 @@ export function deduplicateVariants(
   return result;
 }
 
-/**
- * Builds a voice pool filtered by language, separated by gender
- * - If language specified, filters by locale prefix
- * - If includeMultilingual=true, also includes voices with 'Multilingual' in name
- * - If enabledVoices provided, only includes those voices
- */
 export function buildVoicePool(options: VoicePoolOptions = {}): VoicePool {
   const { language, includeMultilingual = false, enabledVoices } = options;
 
-  // Start with enabled voices or all voices
   const baseVoices = enabledVoices
     ? voices.filter((v) => enabledVoices.includes(v.fullValue))
     : voices;
 
-  // Filter by language
   let filtered = language
     ? baseVoices.filter((v) => {
         const matchesLang = v.locale.startsWith(language.split('-')[0]);
@@ -93,7 +76,6 @@ export function buildVoicePool(options: VoicePoolOptions = {}): VoicePool {
       })
     : baseVoices;
 
-  // Deduplicate Multilingual variant pairs when language is specified
   if (language) {
     filtered = deduplicateVariants(filtered, language);
   }
@@ -104,9 +86,6 @@ export function buildVoicePool(options: VoicePoolOptions = {}): VoicePool {
   };
 }
 
-/**
- * Get a random voice from the pool based on gender
- */
 export function getRandomVoice(
   gender: 'male' | 'female' | 'unknown',
   options: VoicePoolOptions = {},
@@ -123,7 +102,7 @@ export function getRandomVoice(
     candidates = [...pool.male, ...pool.female].filter((v) => !excludeVoices.has(v));
   }
 
-  // If all excluded, fall back to full pool
+  // Every candidate is excluded, so fall back to the full pool.
   if (candidates.length === 0) {
     candidates =
       gender === 'male'
@@ -137,8 +116,9 @@ export function getRandomVoice(
 }
 
 /**
- * VoicePoolBuilder class for DI
- * Delegates to buildVoicePool with includeMultilingual=true for LLM
+ * Injectable wrapper around buildVoicePool so callers receive it through
+ * DI. Fixes includeMultilingual=true so the LLM passes also see
+ * Multilingual voices.
  */
 export class VoicePoolBuilder {
   buildPool(locale: string, enabledVoices?: string[]): VoicePool {

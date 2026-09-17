@@ -1,9 +1,5 @@
-// MP3 Parser - Parses MP3 frame headers to calculate exact duration
-// Used by AudioMerger to accurately group audio files by duration
+// AudioMerger gets each Chunk's duration here to build merge groups.
 
-/**
- * MPEG Audio Version lookup table
- */
 const MPEG_VERSIONS = {
   0: 2.5, // MPEG Version 2.5
   1: null, // Reserved
@@ -11,9 +7,6 @@ const MPEG_VERSIONS = {
   3: 1, // MPEG Version 1
 } as const;
 
-/**
- * Layer description lookup table
- */
 const LAYERS = {
   0: null, // Reserved
   1: 3, // Layer III
@@ -69,9 +62,6 @@ const SAMPLES_PER_FRAME: Record<number, Record<number, number>> = {
   },
 };
 
-/**
- * Frame header information
- */
 interface FrameHeader {
   mpegVersion: number;
   layer: number;
@@ -84,10 +74,6 @@ interface FrameHeader {
   frameDurationMs: number;
 }
 
-/**
- * Find the sync word (0xFFE0 to 0xFFFF with appropriate bits)
- * Returns the offset of the frame header start, or -1 if not found
- */
 export function findSyncWord(buffer: Uint8Array, startOffset: number): number {
   for (let i = startOffset; i < buffer.length - 1; i++) {
     // Frame sync is 11 set bits (0xFF and first 3 bits of next byte)
@@ -98,10 +84,6 @@ export function findSyncWord(buffer: Uint8Array, startOffset: number): number {
   return -1;
 }
 
-/**
- * Parse a single MP3 frame header
- * Returns null if the header is invalid
- */
 function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | null {
   if (offset + 4 > buffer.length) {
     return null;
@@ -112,12 +94,10 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
   const byte3 = buffer[offset + 2];
   const byte4 = buffer[offset + 3];
 
-  // Validate sync word
   if (byte1 !== 0xff || (byte2 & 0xe0) !== 0xe0) {
     return null;
   }
 
-  // Extract header fields
   const versionBits = (byte2 >> 3) & 0x03;
   const layerBits = (byte2 >> 1) & 0x03;
   const bitrateBits = (byte3 >> 4) & 0x0f;
@@ -125,7 +105,6 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
   const paddingBit = (byte3 >> 1) & 0x01;
   const channelModeBits = (byte4 >> 6) & 0x03;
 
-  // Look up values
   const mpegVersion = MPEG_VERSIONS[versionBits as keyof typeof MPEG_VERSIONS];
   const layer = LAYERS[layerBits as keyof typeof LAYERS];
 
@@ -133,7 +112,7 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
     return null;
   }
 
-  // Get bitrate (using version 2 table for both v2 and v2.5)
+  // The MPEG 2 bitrate table also covers MPEG 2.5.
   const bitrateVersion = mpegVersion === 1 ? 1 : 2;
   const bitrateTable = BITRATE_TABLE[bitrateVersion]?.[layer];
   if (!bitrateTable) {
@@ -144,7 +123,6 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
     return null;
   }
 
-  // Get sample rate
   const sampleRateTable = SAMPLE_RATE_TABLE[mpegVersion];
   if (!sampleRateTable) {
     return null;
@@ -154,15 +132,13 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
     return null;
   }
 
-  // Get samples per frame
   const samplesVersion = mpegVersion === 1 ? 1 : 2;
   const samplesPerFrame = SAMPLES_PER_FRAME[samplesVersion]?.[layer];
   if (!samplesPerFrame) {
     return null;
   }
 
-  // Determine channel mode
-  // 00: Stereo, 01: Joint Stereo, 10: Dual channel, 11: Mono
+  // Channel mode bits: 00 stereo, 01 joint stereo, 10 dual channel, 11 mono
   let channelMode: 'stereo' | 'joint-stereo' | 'dual-channel' | 'mono';
   switch (channelModeBits) {
     case 0b00:
@@ -181,7 +157,7 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
       return null;
   }
 
-  // Calculate frame size
+  // Frame size formulas from the MPEG audio spec
   // Layer I: frame_size = (12 * bitrate / sample_rate + padding) * 4
   // Layer II/III stereo: frame_size = 144 * bitrate / sample_rate + padding
   // Layer II/III mono: frame_size = 72 * bitrate / sample_rate + padding
@@ -189,13 +165,11 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
   if (layer === 1) {
     frameSize = Math.floor((12 * bitrate * 1000) / sampleRate + (paddingBit ? 1 : 0)) * 4;
   } else {
-    // For mono, use 72; for stereo/joint/dual, use 144
     const channelCoefficient = channelMode === 'mono' ? 72 : 144;
     frameSize =
       Math.floor((channelCoefficient * bitrate * 1000) / sampleRate) + (paddingBit ? 1 : 0);
   }
 
-  // Calculate frame duration in milliseconds
   const frameDurationMs = (samplesPerFrame / sampleRate) * 1000;
 
   return {
@@ -211,38 +185,30 @@ function parseFrameHeader(buffer: Uint8Array, offset: number): FrameHeader | nul
   };
 }
 
-/**
- * Skip ID3v2 tag if present
- * Returns the offset after the ID3v2 tag, or 0 if no tag
- */
 export function skipID3v2Tag(buffer: Uint8Array): number {
-  // ID3v2 tag starts with "ID3"
   if (buffer.length < 10) {
     return 0;
   }
 
+  // ID3v2 tag starts with "ID3"
   if (buffer[0] !== 0x49 || buffer[1] !== 0x44 || buffer[2] !== 0x33) {
-    return 0; // No ID3v2 tag
+    return 0;
   }
 
-  // ID3v2 size is stored in 4 bytes (syncsafe integer)
-  // Each byte only uses 7 bits
+  // The size is a syncsafe integer: 4 bytes, 7 bits per byte.
   const size =
     ((buffer[6] & 0x7f) << 21) |
     ((buffer[7] & 0x7f) << 14) |
     ((buffer[8] & 0x7f) << 7) |
     (buffer[9] & 0x7f);
 
-  // Return offset after header (10 bytes) + tag size
   return 10 + size;
 }
 
 /**
- * Parse MP3 duration by analyzing frame headers
- *
- * Samples first N frames to estimate total duration.
- * This is faster than parsing every frame while still being accurate
- * for files with consistent bitrate (like Edge TTS output).
+ * Estimates duration by sampling frame headers instead of parsing every
+ * frame. Fast, and accurate for the constant-bitrate output Edge TTS
+ * produces.
  *
  * @param buffer MP3 data as Uint8Array
  * @param maxFramesToSample Maximum frames to analyze (default 100)
@@ -256,16 +222,13 @@ export function parseMP3Duration(
     return null;
   }
 
-  // Skip ID3v2 tag if present
   let offset = skipID3v2Tag(buffer);
 
-  // Find first frame
   offset = findSyncWord(buffer, offset);
   if (offset === -1) {
     return null;
   }
 
-  // Parse frames to calculate duration
   let totalDurationMs = 0;
   let frameCount = 0;
   let totalBytesAnalyzed = 0;
@@ -274,7 +237,6 @@ export function parseMP3Duration(
     const header = parseFrameHeader(buffer, offset);
 
     if (header === null) {
-      // Try to find next sync word
       offset = findSyncWord(buffer, offset + 1);
       if (offset === -1) break;
       continue;
@@ -290,15 +252,13 @@ export function parseMP3Duration(
     return null;
   }
 
-  // If we didn't parse the entire file, extrapolate
+  // The file continues past the sampled frames, so extrapolate from the
+  // sampled rate.
   if (offset < buffer.length && frameCount >= maxFramesToSample) {
-    // Calculate average duration per byte
     const msPerByte = totalDurationMs / totalBytesAnalyzed;
 
-    // Estimate remaining bytes (excluding any ID3v1 tag at end)
     const remainingBytes = buffer.length - offset;
 
-    // Add estimated duration for remaining bytes
     totalDurationMs += remainingBytes * msPerByte;
   }
 
@@ -306,9 +266,6 @@ export function parseMP3Duration(
 }
 
 /**
- * Get bitrate from MP3 header
- * Useful for quick validation or fallback calculations
- *
  * @param buffer MP3 data as Uint8Array
  * @returns Bitrate in kbps, or null if parsing fails
  */
@@ -317,10 +274,8 @@ export function getMP3Bitrate(buffer: Uint8Array): number | null {
     return null;
   }
 
-  // Skip ID3v2 tag if present
   let offset = skipID3v2Tag(buffer);
 
-  // Find first frame
   offset = findSyncWord(buffer, offset);
   if (offset === -1) {
     return null;

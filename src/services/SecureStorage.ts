@@ -25,7 +25,6 @@ async function getOrCreateKey(): Promise<CryptoKey> {
 
   const db = await openDB();
 
-  // Try to get existing key
   const tx = db.transaction(IndexedDBNames.keysStore, 'readonly');
   const existing = await requestToPromise<CryptoKey | undefined>(
     tx.objectStore(IndexedDBNames.keysStore).get(KEY_ID),
@@ -37,14 +36,12 @@ async function getOrCreateKey(): Promise<CryptoKey> {
     return existing;
   }
 
-  // Generate new non-extractable key
   const key = await crypto.subtle.generateKey(
     { name: 'AES-GCM', length: 256 },
-    false, // non-extractable - critical for security
+    false, // non-extractable: the key must never be readable as raw bytes
     ['encrypt', 'decrypt'],
   );
 
-  // Store in IndexedDB
   const putTx = db.transaction(IndexedDBNames.keysStore, 'readwrite');
   await requestToPromise(putTx.objectStore(IndexedDBNames.keysStore).put(key, KEY_ID));
 
@@ -62,7 +59,7 @@ export async function encryptValue(plaintext: string): Promise<string> {
 
   const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
 
-  // Combine IV + ciphertext and base64 encode
+  // Prepend the IV to the ciphertext; decryptValue slices the IV back off.
   const combined = new Uint8Array(iv.length + ciphertext.byteLength);
   combined.set(iv);
   combined.set(new Uint8Array(ciphertext), iv.length);
@@ -84,7 +81,7 @@ export async function decryptValue(encrypted: string, logger?: ILogger): Promise
 
     return new TextDecoder().decode(decrypted);
   } catch {
-    // Decryption failed - key changed or data corrupted
+    // A decryption failure means the key changed or the data is corrupt.
     const msg = 'Failed to decrypt value - key may have changed';
     if (logger) {
       logger.warn(msg);

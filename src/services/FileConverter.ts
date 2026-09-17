@@ -1,11 +1,8 @@
-// FileConverter Service - File format converters (FB2, EPUB, ZIP)
-// Migrated from texts_converter.js
-
 import JSZip from 'jszip';
 import type { ConvertedFile } from '../state/types';
 
 /**
- * Convert FB2 (FictionBook) format to plain text
+ * FB2 is FictionBook XML; this extracts the body text.
  */
 export function convertFb2ToTxt(fb2String: string): string {
   const parser = new DOMParser();
@@ -209,9 +206,6 @@ export async function convertEpubToTxt(epubBinary: ArrayBuffer | Blob | File): P
   return textContent.trim();
 }
 
-/**
- * Process a ZIP archive and extract text files
- */
 export async function convertZipToTxt(
   zipFile: File | Blob | ArrayBuffer,
 ): Promise<ConvertedFile[]> {
@@ -256,9 +250,6 @@ export async function convertZipToTxt(
   return results;
 }
 
-/**
- * Detect file type and convert to text
- */
 export async function convertFileToTxt(file: File): Promise<ConvertedFile[]> {
   const fileName = file.name.toLowerCase();
   const baseName = file.name.slice(0, file.name.lastIndexOf('.'));
@@ -282,7 +273,7 @@ export async function convertFileToTxt(file: File): Promise<ConvertedFile[]> {
     return convertZipToTxt(file);
   }
 
-  // Default: try to read as text
+  // Unknown extension: attempt to read it as plain text.
   const content = await file.text();
   return [{ filename: baseName, content }];
 }

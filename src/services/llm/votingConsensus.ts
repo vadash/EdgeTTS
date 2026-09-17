@@ -1,14 +1,14 @@
 import type { ILogger } from '../Logger';
 
 /**
- * Build consensus merge groups from multiple votes using Union-Find.
- * Pairs appearing in >=2 of 5 votes get merged.
- * Returns 0-based index groups.
+ * Merge Character identities across Merge votes (ADR 0008): a pair joins one
+ * group once two or more votes place it together, so a single vote merges
+ * nothing. Returns 0-based Character index groups with the elected "keep"
+ * index first.
  */
 export function buildMergeConsensus(votes: number[][][], logger?: ILogger): number[][] {
-  // Count how many votes have each pair in same group
   const pairCounts = new Map<string, number>();
-  // Track which index was "keep" (first in group) for each pair
+  // Per pair, the "keep" index (first in its group) each vote reported
   const keepVotes = new Map<string, number[]>();
 
   for (const vote of votes) {
@@ -17,12 +17,10 @@ export function buildMergeConsensus(votes: number[][][], logger?: ILogger): numb
       const keep = group[0];
       const sorted = [...group].sort((a, b) => a - b);
 
-      // Count all pairs in this group
       for (let i = 0; i < sorted.length; i++) {
         for (let j = i + 1; j < sorted.length; j++) {
           const key = `${sorted[i]},${sorted[j]}`;
           pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
-          // Track who was keep for this pair
           if (!keepVotes.has(key)) keepVotes.set(key, []);
           keepVotes.get(key)!.push(keep);
         }
@@ -30,7 +28,6 @@ export function buildMergeConsensus(votes: number[][][], logger?: ILogger): numb
     }
   }
 
-  // Build edges from pairs with >=2 votes (2 out of 5 is enough)
   const edges: [number, number][] = [];
   let pairsWithConsensus = 0;
   for (const [key, count] of pairCounts) {
@@ -45,7 +42,6 @@ export function buildMergeConsensus(votes: number[][][], logger?: ILogger): numb
     `[Merge] Consensus: ${pairCounts.size} unique pairs, ${pairsWithConsensus} with >=2 votes`,
   );
 
-  // Union-Find to build connected components
   const parent = new Map<number, number>();
   const find = (x: number): number => {
     if (!parent.has(x)) parent.set(x, x);
@@ -62,7 +58,6 @@ export function buildMergeConsensus(votes: number[][][], logger?: ILogger): numb
     union(a, b);
   }
 
-  // Group by root
   const groups = new Map<number, number[]>();
   for (const node of parent.keys()) {
     const root = find(node);
@@ -74,8 +69,6 @@ export function buildMergeConsensus(votes: number[][][], logger?: ILogger): numb
   const result: number[][] = [];
   for (const members of groups.values()) {
     if (members.length < 2) continue; // Skip singletons
-
-    // Count keep votes for members of this group
     const keepCounts = new Map<number, number>();
     const sorted = [...members].sort((a, b) => a - b);
     for (let i = 0; i < sorted.length; i++) {
@@ -90,7 +83,6 @@ export function buildMergeConsensus(votes: number[][][], logger?: ILogger): numb
       }
     }
 
-    // Pick most-voted keep, or smallest index
     let keepIdx = Math.min(...members);
     let maxVotes = 0;
     for (const [idx, count] of keepCounts) {
@@ -100,7 +92,6 @@ export function buildMergeConsensus(votes: number[][][], logger?: ILogger): numb
       }
     }
 
-    // Build group with keep first
     result.push([keepIdx, ...members.filter((m) => m !== keepIdx)]);
   }
 

@@ -1,6 +1,3 @@
-// ReusableEdgeTTSService - WebSocket-based TTS with connection reuse
-// Implements state machine for connection management
-
 import { defaultConfig } from '@/config';
 import { RetriableError } from '@/errors';
 import type { TTSConfig } from '../state/types';
@@ -12,7 +9,6 @@ import type { ILogger } from './Logger';
 const WIN_EPOCH = 11644473600;
 const S_TO_NS = 1e9;
 
-// Connection states
 export type ConnectionState = 'DISCONNECTED' | 'CONNECTING' | 'READY' | 'BUSY';
 
 // Keep-alive interval (30 seconds)
@@ -46,12 +42,10 @@ export class ReusableEdgeTTSService {
   private bytesDataSeparator: Uint8Array;
   private logger?: ILogger;
 
-  // Connection management
   private connectPromise: Promise<void> | null = null;
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
   private connectionId: string = '';
 
-  // Request state
   private currentRequestId: string = '';
   private audioChunks: Blob[] = [];
   private requestResolve: ((data: Uint8Array) => void) | null = null;
@@ -63,19 +57,11 @@ export class ReusableEdgeTTSService {
     this.logger = logger;
   }
 
-  /**
-   * Get current connection state
-   */
   getState(): ConnectionState {
     return this.state;
   }
 
-  /**
-   * Connect to the Edge TTS WebSocket API
-   * Returns a Promise that resolves when the connection is ready
-   */
   async connect(): Promise<void> {
-    // Already connected or connecting
     if (this.state === 'READY') {
       return;
     }
@@ -140,14 +126,9 @@ export class ReusableEdgeTTSService {
     });
   }
 
-  /**
-   * Send TTS request and receive audio data
-   * Returns a Promise that resolves with the audio Uint8Array
-   */
   async send(options: TTSSendOptions): Promise<Uint8Array> {
     const { text, config, requestId } = options;
 
-    // Ensure connected
     if (this.state === 'DISCONNECTED' || this.state === 'CONNECTING') {
       await this.connect();
     }
@@ -167,12 +148,10 @@ export class ReusableEdgeTTSService {
       this.requestResolve = resolve;
       this.requestReject = reject;
 
-      // Set request timeout
       this.requestTimeout = setTimeout(() => {
         this.rejectRequest(new RetriableError('Request timeout'));
       }, REQUEST_TIMEOUT);
 
-      // Send SSML
       const timestamp = this.dateToString();
       const ssml = this.makeSSML(text, config);
       const message = this.ssmlHeadersPlusData(this.currentRequestId, timestamp, ssml);
@@ -185,16 +164,10 @@ export class ReusableEdgeTTSService {
     });
   }
 
-  /**
-   * Disconnect and cleanup
-   */
   disconnect(): void {
     this.cleanup();
   }
 
-  /**
-   * Check if connection is available for use
-   */
   isReady(): boolean {
     return this.state === 'READY' && this.socket?.readyState === WebSocket.OPEN;
   }
@@ -273,16 +246,16 @@ export class ReusableEdgeTTSService {
 
     this.audioChunks = [];
 
-    // Reject the promise FIRST, before cleanup nulls requestReject
+    // Reject before cleanup nulls requestReject, or the caller never settles.
     if (this.requestReject) {
       this.requestReject(error);
       this.requestResolve = null;
       this.requestReject = null;
     }
 
-    // Close socket on error to ensure fresh connection on retry
-    // Request failures (timeout, send error) may leave the socket in
-    // an inconsistent state even if still technically open
+    // Close the socket on request failure so the next attempt gets a fresh
+    // connection. Timeouts and send errors can leave it inconsistent even
+    // while it stays open.
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.cleanup();
     } else {

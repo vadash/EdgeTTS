@@ -1,6 +1,3 @@
-// Resume state checking for TTS conversion
-// Checks for cached work to resume after interruption
-
 import type { LLMCharacter, SpeakerAssignment } from '@/state/types';
 import { withPermissionRetry } from '@/utils/retry/filesystem';
 
@@ -40,10 +37,10 @@ async function fileExists(dir: FileSystemDirectoryHandle, name: string): Promise
 }
 
 /**
- * Check if _temp_work has resumable state.
- * Resume = _temp_work directory exists with pipeline_state.json.
- * 1 folder = 1 book, no signature/hash comparison needed.
- * All _temp_work and chunk-format knowledge lives in ChunkStore.
+ * Check whether the Chunk store holds resumable state: the _temp_work
+ * directory exists and contains pipeline_state.json. One folder maps to
+ * one Book, so no signature or hash comparison is needed. All _temp_work
+ * and chunk-format knowledge lives in ChunkStore.
  */
 export async function checkResumeState(
   store: Pick<ChunkStore, 'snapshot' | 'peekWorkFolder' | 'wipe'>,
@@ -61,7 +58,6 @@ export async function checkResumeState(
 
   if (legacyOnly) {
     log?.('Resume check: legacy format detected, wiping for fresh start');
-    // Wipe temp directory
     await store.wipe(root);
     return null;
   }
@@ -81,10 +77,6 @@ export async function checkResumeState(
   };
 }
 
-/**
- * Read the pipeline state from the given work folder.
- * A null folder (no _temp_work) yields null.
- */
 export async function loadPipelineState(
   folder: FileSystemDirectoryHandle | null,
 ): Promise<PipelineState | null> {
@@ -95,9 +87,9 @@ export async function loadPipelineState(
 /**
  * Persist pipeline state for resume. Writes the same pipeline_state.json
  * that loadPipelineState reads. The caller resolves the work folder
- * (ChunkStore.ensureWorkFolder creates it when missing). A null folder
- * (folder resolution failed) skips the save and returns false.
- * Non-fatal: errors are swallowed so saving never breaks the pipeline.
+ * (ChunkStore.ensureWorkFolder creates it when missing); a null folder
+ * skips the save and returns false. Non-fatal: errors are swallowed so a
+ * failed save never breaks the Conversion.
  */
 export async function savePipelineState(
   folder: FileSystemDirectoryHandle | null,
@@ -115,7 +107,6 @@ export async function savePipelineState(
     });
     return true;
   } catch {
-    // Non-fatal
     return false;
   }
 }

@@ -6,11 +6,11 @@ const NETWORK_DOWN =
 
 /**
  * Classify one caught provider error for the rate-limit gate. Inspects only
- * the error itself — never its `cause` chain — because `LLMApiClient` calls
- * this at each transport catch site, where the raw SDK error (status +
+ * the error itself, never its `cause` chain, because `LLMApiClient` calls
+ * this at each transport catch site, where the raw SDK error (status and
  * headers) is in hand. Order of trust: HTTP status, retry-after headers,
- * then provider prose as a last resort (which keeps the sidecar's
- * `retry-after-ms` deadline alive).
+ * then provider prose as a last resort so the sidecar's `retry-after-ms`
+ * deadline stays alive.
  */
 export function classifyProviderError(error: unknown): {
   kind?: RetriableKind;

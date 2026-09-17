@@ -2,9 +2,9 @@ import { defaultConfig } from '@/config';
 import type { TextBlock } from '@/state/types';
 
 /**
- * Cached Intl.Segmenter instances (expensive to construct — cache per locale).
- * Sentence granularity; locale is passed from the splitter's public API.
- * Falls back to 'en' if the requested locale is not a valid BCP-47 tag.
+ * Intl.Segmenter instances are expensive to construct, so they are
+ * cached per locale. An invalid BCP-47 tag throws at construction, and
+ * the fallback then uses 'en'.
  */
 const segmenterCache = new Map<string, Intl.Segmenter>();
 function getSegmenter(locale: string): Intl.Segmenter {
@@ -21,20 +21,18 @@ function getSegmenter(locale: string): Intl.Segmenter {
 }
 
 /**
- * TextBlockSplitter - Splits text into sentences and blocks for LLM processing
- * Each line (\n) is split by sentence boundaries.
+ * Each input line is processed separately, so a sentence never spans
+ * two lines.
  */
 export class TextBlockSplitter {
-  /**
-   * Estimate token count for text (approximation: chars / 4)
-   */
   estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
   }
 
   /**
-   * Split text into sentences (one per line, then by sentence boundaries).
-   * Always splits into sentences to ensure proper LLM assignment and prevent TTS timeouts.
+   * Returns sentences, one per entry. Every line is split on sentence
+   * boundaries to keep units small for the LLM passes and to prevent TTS
+   * timeouts.
    */
   splitIntoParagraphs(text: string, language: string = 'en'): string[] {
     const paragraphs: string[] = [];
@@ -44,27 +42,24 @@ export class TextBlockSplitter {
       const trimmed = line.trim();
       if (!trimmed) continue;
 
-      // Always split by sentences to ensure proper LLM assignment and prevent TTS timeouts
       const sentences = this.splitParagraphIntoSentences(trimmed, language);
       paragraphs.push(...sentences);
     }
 
-    // Split long sentences (>300 chars) on structural delimiters and commas
+    // Safety net: no sentence may exceed 2000 chars.
     const split = this.splitLongSentences(paragraphs);
 
-    // Safety net: ensure no sentence exceeds 2000 chars, even if
-    // splitParagraphIntoSentences fails to find proper boundaries
     return this.forceSplitLongParagraphs(split);
   }
 
   /**
-   * Split a paragraph into sentences using Intl.Segmenter (sentence granularity).
-   * Abbreviations are handled per-locale natively — no hand-rolled list.
-   * Quote-aware: quoted speech is kept in one segment (over-long quotes are
-   * broken up later by splitLongSentences >300 chars).
+   * Splits a paragraph into sentences with Intl.Segmenter. Abbreviations
+   * are handled natively per locale, so no hand-rolled list is needed
+   * (docs/adr/0001-native-sentence-segmenter-for-split.md). Quoted
+   * speech stays in one segment; over-long quotes are broken up later by
+   * splitLongSentences.
    */
   private splitParagraphIntoSentences(paragraph: string, locale: string): string[] {
-    // Normalize line breaks within paragraph to spaces (same as the legacy parser)
     const text = paragraph.replace(/\n/g, ' ').replace(/\s+/g, ' ');
 
     const sentences: string[] = [];
@@ -78,8 +73,9 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Split sentences exceeding 300 chars on structural delimiters then commas.
-   * Targets stat blocks and long game-mechanics text that lacks sentence-ending punctuation.
+   * Splits over-long sentences on structural delimiters first, then on
+   * commas. Targets stat blocks and long game-mechanics text that lacks
+   * sentence-ending punctuation.
    */
   private splitLongSentences(sentences: string[]): string[] {
     const MAX_SENTENCE_CHARS = 300;
@@ -93,7 +89,6 @@ export class TextBlockSplitter {
         continue;
       }
 
-      // Strategy 1: split on structural separators (¯¯¯¯¯, _____)
       if (SEPARATOR_RE.test(sentence)) {
         SEPARATOR_RE.lastIndex = 0;
         const parts = sentence
@@ -101,7 +96,7 @@ export class TextBlockSplitter {
           .map((p) => p.trim())
           .filter((p) => p && this.isPronounceable(p));
         if (parts.length > 1) {
-          // Re-check each part — some may still be too long
+          // A part can still be over-long, so re-check each one.
           for (const part of parts) {
             if (part.length <= MAX_SENTENCE_CHARS) {
               result.push(part);
@@ -114,14 +109,14 @@ export class TextBlockSplitter {
         SEPARATOR_RE.lastIndex = 0;
       }
 
-      // Strategy 2: split on commas
       const commaSplit = this.splitOnCommas(sentence, MAX_SENTENCE_CHARS);
       if (commaSplit.length > 1) {
         result.push(...commaSplit);
         continue;
       }
 
-      // No good split point found — keep as-is (forceSplitLongParagraphs will catch >2000)
+      // No good split point: keep the sentence whole.
+      // forceSplitLongParagraphs handles the over-long case.
       result.push(sentence);
     }
 
@@ -152,9 +147,9 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Force-split paragraphs that exceed MAX_PARAGRAPH_CHARS (2000).
-   * This is a safety net for edge cases where splitParagraphIntoSentences fails.
-   * Splits at the last space or comma before the limit, with hard cut fallback.
+   * Safety net for over-long sentences that survived all earlier splits.
+   * Splits at the last space or comma before the limit; a hard cut is
+   * the fallback.
    */
   private forceSplitLongParagraphs(paragraphs: string[]): string[] {
     const MAX_PARAGRAPH_CHARS = 2000;
@@ -164,26 +159,24 @@ export class TextBlockSplitter {
       let remaining = paragraph;
 
       while (remaining.length > MAX_PARAGRAPH_CHARS) {
-        // Find the best split point (last space or comma before limit)
         const lastSpaceIndex = remaining.lastIndexOf(' ', MAX_PARAGRAPH_CHARS);
         const lastCommaIndex = remaining.lastIndexOf(',', MAX_PARAGRAPH_CHARS);
 
-        // Choose the split point that's later but >1500 (minimum chunk size)
+        // Take the later split point, but keep the head at least
+        // MIN_CHUNK_SIZE chars.
         let splitPoint = MAX_PARAGRAPH_CHARS;
         const MIN_CHUNK_SIZE = 500;
 
         if (lastCommaIndex > MIN_CHUNK_SIZE && lastCommaIndex > lastSpaceIndex) {
-          splitPoint = lastCommaIndex + 1; // Split after comma
+          splitPoint = lastCommaIndex + 1;
         } else if (lastSpaceIndex > MIN_CHUNK_SIZE) {
-          splitPoint = lastSpaceIndex + 1; // Split after space
+          splitPoint = lastSpaceIndex + 1;
         }
 
-        // Extract chunk and add to result
         result.push(remaining.slice(0, splitPoint).trim());
         remaining = remaining.slice(splitPoint).trim();
       }
 
-      // Add remaining part if any
       if (remaining) {
         result.push(remaining);
       }
@@ -192,16 +185,14 @@ export class TextBlockSplitter {
     return result;
   }
 
-  /**
-   * Check if text has pronounceable content
-   */
   private isPronounceable(text: string): boolean {
     return /[\p{L}\p{N}]/u.test(text);
   }
 
   /**
-   * Check if sentence contains dialogue symbols (simplified check for narration detection).
-   * Avoids importing hasSpeechSymbols from the LLM stages module (wrong dependency direction).
+   * Simplified dialogue-symbol check for narration detection. Kept
+   * local: the full speech-symbol logic belongs to the LLM stages, and
+   * importing it from there would point the dependency the wrong way.
    */
   private hasDialogueSymbols(text: string): boolean {
     // Straight quotes, guillemets, curly quotes, em dash (Russian dialogue)
@@ -215,19 +206,16 @@ export class TextBlockSplitter {
   private getBreakPriority(sentence: string): number {
     const trimmed = sentence.trim();
 
-    // Priority 1: Explicit scene dividers (entire line is separator characters)
     if (/^[-*_~=]{3,}$/.test(trimmed) || trimmed === '* * *' || trimmed === '<--->') {
       return 1;
     }
 
-    // Priority 2: Chapter/section headers (short lines, <50 chars)
     if (trimmed.length < 50 && trimmed.length > 0) {
       if (/^(Chapter|Глава|Book|Prologue|Epilogue|Пролог|Эпилог)\s*\d*\s*$/i.test(trimmed)) {
         return 2;
       }
     }
 
-    // Priority 3: Long narration (no dialogue symbols, >150 chars)
     if (trimmed.length > 150 && !this.hasDialogueSymbols(trimmed)) {
       return 3;
     }
@@ -236,7 +224,6 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Split sentences into blocks for LLM processing.
    * Prefers semantic scene breaks over arbitrary token-limit cuts.
    */
   splitIntoBlocks(sentences: string[], maxTokens: number): TextBlock[] {
@@ -251,12 +238,14 @@ export class TextBlockSplitter {
       const sentence = sentences[i];
       const tokens = this.estimateTokens(sentence);
 
-      // Semantic break: check when past warning threshold
+      // Semantic breaks are considered only past the warning threshold,
+      // near the natural block end.
       if (currentTokens > WARNING_THRESHOLD) {
         const priority = this.getBreakPriority(sentence);
 
         if (priority === 1) {
-          // Divider: push current block, drop this sentence and any consecutive dividers
+          // The divider sentence itself is dropped, and consecutive
+          // dividers collapse into one break.
           if (currentBlock.length > 0) {
             blocks.push({
               blockIndex: blockIndex++,
@@ -266,7 +255,6 @@ export class TextBlockSplitter {
           }
           currentBlock = [];
           currentTokens = 0;
-          // Skip this divider and any consecutive dividers
           while (i + 1 < sentences.length && this.getBreakPriority(sentences[i + 1]) === 1) {
             i++;
           }
@@ -275,7 +263,8 @@ export class TextBlockSplitter {
         }
 
         if (priority === 2) {
-          // Chapter header: push current block, this sentence starts next block
+          // A chapter header closes the block; the header sentence
+          // starts the next block.
           if (currentBlock.length > 0) {
             blocks.push({
               blockIndex: blockIndex++,
@@ -286,11 +275,13 @@ export class TextBlockSplitter {
           currentBlock = [];
           currentTokens = 0;
           sentenceStartIndex = i;
-          // Fall through: sentence will be added to the new block
+          // Fall through: the header sentence is added to the new block
+          // below.
         }
 
         if (priority === 3) {
-          // Long narration: include in current block, then push
+          // Long narration stays in the block; the block closes after
+          // it.
           currentBlock.push(sentence);
           currentTokens += tokens;
           blocks.push({
@@ -305,7 +296,7 @@ export class TextBlockSplitter {
         }
       }
 
-      // Hard cut: token limit (original behavior)
+      // Hard cut at the token limit.
       if (currentTokens + tokens > maxTokens && currentBlock.length > 0) {
         blocks.push({
           blockIndex: blockIndex++,
@@ -321,7 +312,6 @@ export class TextBlockSplitter {
       currentTokens += tokens;
     }
 
-    // Final block
     if (currentBlock.length > 0) {
       blocks.push({
         blockIndex: blockIndex++,
@@ -334,7 +324,7 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Create blocks for Extract (character extraction) - larger blocks
+   * Blocks for the Extract pass, which uses the larger block size.
    */
   createExtractBlocks(text: string, language: string = 'en'): TextBlock[] {
     const paragraphs = this.splitIntoParagraphs(text, language);
@@ -342,7 +332,7 @@ export class TextBlockSplitter {
   }
 
   /**
-   * Create blocks for Assign (speaker assignment) - smaller blocks
+   * Blocks for the Assign pass, which uses the smaller block size.
    */
   createAssignBlocks(text: string, language: string = 'en'): TextBlock[] {
     const paragraphs = this.splitIntoParagraphs(text, language);

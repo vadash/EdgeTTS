@@ -1,6 +1,3 @@
-// FFmpegService - Handles FFmpeg WASM loading and audio processing
-// Provides Opus encoding, silence removal, and normalization
-
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { defaultConfig } from '@/config';
 import { IndexedDBNames } from '@/config/storage';
@@ -15,11 +12,12 @@ const WASM_KEY = 'ffmpeg-core.wasm';
 
 /**
  * Shared FFmpeg core blob URLs, hoisted to module scope so that every
- * FFmpegService instance — including AudioMerger's pool workers — reuses
+ * FFmpegService instance (including AudioMerger's pool workers) reuses
  * the same Blob URLs instead of re-fetching `ffmpeg-core.js`/`.wasm` per
- * instance. Populated by the first successful load (any tier), reused by
- * subsequent loads. Reset to null only when the in-memory tier fails to
- * load (see tryLoadLocal), forcing a fresh fetch from the next tier.
+ * instance. Populated by the first successful load from any tier, then
+ * reused by subsequent loads. Reset to null only when the in-memory tier
+ * fails to load (see tryLoadLocal), which forces a fresh fetch from the
+ * next tier.
  */
 let sharedCachedCoreURL: string | null = null;
 let sharedCachedWasmURL: string | null = null;
@@ -46,7 +44,8 @@ export namespace FFmpegBlobCache {
       });
       db.close();
     } catch {
-      // IndexedDB may be unavailable (private browsing, quota) — non-fatal
+      // IndexedDB may be unavailable (private browsing, quota); caching
+      // stays best-effort.
     }
   }
 
@@ -86,7 +85,6 @@ export namespace FFmpegBlobCache {
 }
 
 /**
- * Fetches a URL and converts it to a Blob URL.
  * Unlike `toBlobURL` from `@ffmpeg/util`, this checks `resp.ok` so that
  * a 404 (e.g. from a stale GitHub Pages deployment) throws immediately
  * instead of feeding HTML garbage to the FFmpeg Web Worker.
@@ -110,7 +108,6 @@ async function safeToBlobURL(
 export type FFmpegProgressCallback = (message: string) => void;
 
 /**
- * FFmpegService
  * Container-managed singleton (no static getInstance)
  */
 export class FFmpegService {
@@ -131,7 +128,8 @@ export class FFmpegService {
   }
 
   /**
-   * Load FFmpeg WASM from local bundle (copied by Webpack)
+   * Load FFmpeg WASM: in-memory blob URLs first, then the IndexedDB cache,
+   * then the local bundle copied by Webpack.
    */
   async load(onProgress?: (message: string) => void): Promise<boolean> {
     if (this.loaded) return true;
@@ -246,7 +244,6 @@ export class FFmpegService {
       this.terminate();
     }
 
-    // Reload if needed (after termination or if not loaded)
     if (!this.ffmpeg || !this.loaded) {
       const loaded = await this.load(onProgress);
       if (!loaded) {
@@ -258,7 +255,6 @@ export class FFmpegService {
 
     // Safe to assert non-null: load() returning true guarantees ffmpeg is set
     const ffmpeg = this.ffmpeg!;
-    // Track files written to cleanup later
     const inputFiles: (string | null)[] = [];
 
     try {
@@ -284,7 +280,6 @@ export class FFmpegService {
         ]);
       }
 
-      // Write all input chunks to virtual filesystem
       if (onProgress) onProgress('Writing audio chunks to FFmpeg...');
       let actualFileIndex = 0;
 
@@ -295,12 +290,11 @@ export class FFmpegService {
           inputFiles.push(filename);
           actualFileIndex++;
         } else {
-          // Mark position as missing - will use silence
+          // Remember the gap position; the concat list inserts silence there.
           inputFiles.push(null);
         }
       }
 
-      // Create concat file list (with silence for gaps and missing chunks)
       const concatLines: string[] = [];
       const actualFiles = inputFiles.filter((f) => f !== null);
       let actualFileIdx = 0;
@@ -314,17 +308,14 @@ export class FFmpegService {
           }
           actualFileIdx++;
         } else {
-          // Missing chunk - insert silence placeholder
           concatLines.push(`file 'silence.mp3'`);
         }
       }
 
       await ffmpeg.writeFile('concat.txt', concatLines.join('\n'));
 
-      // Build filter chain
       const filters = buildFilterChain(audio);
 
-      // Build FFmpeg arguments
       const args = ['-f', 'concat', '-safe', '0', '-i', 'concat.txt'];
 
       if (filters) {
@@ -353,15 +344,14 @@ export class FFmpegService {
       if (onProgress) onProgress('Processing audio with FFmpeg...');
       await ffmpeg.exec(args);
 
-      // Read output
       const output = await ffmpeg.readFile('output.opus');
 
-      // Cleanup virtual filesystem (only actual files, not null placeholders)
       await this.cleanup(inputFiles.filter((f): f is string => f !== null));
 
       return output as Uint8Array;
     } catch (err) {
-      // Cleanup on error - be aggressive
+      // Clean the virtual filesystem on error so partial files do not leak
+      // into the next operation.
       const writtenFiles = inputFiles.filter((f): f is string => f !== null);
 
       try {
@@ -373,8 +363,9 @@ export class FFmpegService {
         this.logger?.warn(`FFmpeg cleanup failed during error handling: ${String(cleanupErr)}`);
       }
 
-      // Terminate the instance as it's likely corrupted or OOM
-      // This forces isAvailable() to return false, ensuring clean fallback to MP3
+      // Terminate the instance because it is likely corrupted or out of
+      // memory. isAvailable() then returns false, which gives callers a
+      // clean fallback to MP3.
       this.terminate();
 
       const errorMessage = getErrorMessage(err);
@@ -388,7 +379,6 @@ export class FFmpegService {
   private async cleanup(inputFiles: string[]): Promise<void> {
     if (!this.ffmpeg) return;
 
-    // 1. Delete input files
     for (const file of inputFiles) {
       try {
         await this.ffmpeg.deleteFile(file);
@@ -397,7 +387,6 @@ export class FFmpegService {
       }
     }
 
-    // 2. Delete common temp files
     const tempFiles = ['concat.txt', 'output.opus', 'silence.mp3'];
     for (const file of tempFiles) {
       try {
@@ -426,11 +415,11 @@ export class FFmpegService {
         try {
           await this.ffmpeg.deleteFile(file);
         } catch {
-          // Ignore — file may already be gone
+          // Ignore; the file may already be gone.
         }
       }
     } catch {
-      // listDir failed — fall back to known temp files
+      // If listDir fails, fall back to known temp files.
       for (const file of ['concat.txt', 'output.opus', 'silence.mp3']) {
         try {
           await this.ffmpeg.deleteFile(file);
@@ -455,6 +444,5 @@ export class FFmpegService {
   }
 }
 
-// Note: No longer exporting a singleton instance
-// Use DI container to get the singleton: container.get(ServiceTypes.FFmpegService)
+// Get the singleton from the DI container: container.get(ServiceTypes.FFmpegService)
 export default FFmpegService;

@@ -1,8 +1,7 @@
-// src/services/llm/stages.ts
 // Stage-aware LLM pipeline: a closure factory over per-stage configs (ADR 0015).
 // The returned record is the interface; the injected transport is the seam
-// (same ADR). Cancellation has one channel — the caller's signal on each
-// stage call — so there is no stored controller and no cancel().
+// (same ADR). Cancellation has one channel, the caller's signal on each stage
+// call, so there is no stored controller and no cancel().
 
 import { defaultConfig } from '@/config';
 import { buildAssignPrompt } from '@/config/prompts/assign/builder';
@@ -65,12 +64,11 @@ export type LLMClientConfig = LLMApiClientOptions;
 
 export interface LlmStageDeps {
   /** Per-stage raw configs; the module resolves its own adapter slices.
-   *  Connection triple required per stage, tuning optional (falls through to
-   *  the provider defaults exactly like the old single-stage options bag). */
+   *  Connection triple required per stage, tuning optional. */
   extract: NestedStageConfig;
   assign: NestedStageConfig;
   merge: NestedStageConfig;
-  /** Optional backup model — used when a stage exhausts maxRetries. */
+  /** Optional backup model, used when a stage exhausts maxRetries. */
   backup?: NestedStageConfig | null;
   narratorVoice: string;
   /** Max concurrent LLM requests; also the rate-limit gate ceiling. */
@@ -84,7 +82,7 @@ export interface LlmStageDeps {
   speakerCodeFactory?: () => string;
   /**
    * Transport seam (ADR 0015): routes one structured call through an arbitrary
-   * adapter. When present, no LLMApiClient (OpenAI SDK) is constructed — stage
+   * adapter. When present, no LLMApiClient (OpenAI SDK) is constructed. Stage
    * tests stub this with canned parsed responses instead of mocking the SDK.
    */
   transport?: <T>(config: LLMClientConfig, opts: StructuredCallOptions<T>) => Promise<T>;
@@ -125,9 +123,6 @@ function splitHalves(text: string): [string[], string[]] {
   return [lines.slice(0, mid), lines.slice(mid)];
 }
 
-/**
- * Build the extract/assign/merge stage record from its dependencies.
- */
 export function createLlmStages(deps: LlmStageDeps): LlmStages {
   const logger = deps.logger;
   const debugLogger = new DebugLogger(deps.directoryHandle, logger);
@@ -138,8 +133,8 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
    * Single resolution path for adapter configs: a nested stage config
    * (backup) falls back to its pass's stage config field-by-field, and shared
    * maxTokens/debugLogger/logger are applied uniformly. Callers pin
-   * per-request values by composing them into `config` after their spread —
-   * merge votes force non-streaming and carry the vote's own temperature.
+   * per-request values by composing them into `config` after their spread.
+   * Merge votes force non-streaming and carry the vote's own temperature.
    */
   const resolveClientConfig = (
     config: NestedStageConfig,
@@ -182,13 +177,9 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     return client;
   };
 
-  /** Prod OpenAI-SDK adapter — built only when no transport is injected. */
+  /** Prod OpenAI-SDK adapter, built only when no transport is injected. */
   const apiClient = transport ? undefined : clientFor(extractClientConfig);
 
-  /**
-   * Route one structured call: the injected transport when present, otherwise
-   * the LLMApiClient adapter for `config`.
-   */
   function call<T>(config: LLMClientConfig, opts: StructuredCallOptions<T>): Promise<T> {
     if (transport) return transport(config, opts);
     return clientFor(config).callStructured(opts);
@@ -237,13 +228,13 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
    * degrade (extract skips the block, assign falls back to narrator).
    *
    * When `backup` is provided, it replaces the default "replay identical callArgs"
-   * fallback — used by extract/assign to send two half-blocks to the backup model
-   * (2-way split) instead of the full 8k/4k-token block. Primary stays whole.
+   * fallback: extract/assign use it to send two half-blocks to the backup model
+   * (2-way split) instead of the full block. Primary stays whole.
    *
-   * ponytail: merge deliberately does NOT use this path — it never falls back to
-   * the backup model. The vote pool (`collectVotes`) replaces a failed attempt
-   * with a fresh temperature; `mergeConfig.maxRetries` sizes that replacement
-   * budget, not retries of the same call (see `mergeStage`).
+   * Merge deliberately does not use this path and never falls back to the backup
+   * model: the vote pool (`collectVotes`) replaces a failed attempt with a fresh
+   * temperature, and `mergeConfig.maxRetries` sizes that replacement budget, not
+   * retries of the same call (see `mergeStage`).
    */
   async function callWithStageBackup<T>(
     pass: 'extract' | 'assign',
@@ -258,15 +249,12 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     try {
       return await retryWith(primaryRetries, () => call(primaryConfig, callArgs), signal, onRetry);
     } catch (error) {
-      // Don't fall back if aborted, or no backup configured
       if (signal?.aborted || !backupConfig || !backupClientConfig) throw error;
 
       logger.warn(
         `[${pass}] Primary model exhausted ${primaryRetries} retries, falling back to backup model (${backupConfig.model})`,
       );
 
-      // Custom backup path (2-way split) when provided; otherwise replay the
-      // identical callArgs against the backup client.
       if (backup) return backup();
 
       return retryBackup(pass, 'retry', () => call(backupClientConfig, callArgs), signal);
@@ -277,9 +265,9 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
    * Backup-only 2-way split for extract: when the primary exhausts retries on a
    * full block, split the block in half and send each half to the backup model
    * separately, then concatenate the characters. A single-line block can't be
-   * split — the whole block is replayed. Primary is never split.
+   * split, so the whole block is replayed. Primary is never split.
    *
-   * ponytail: if either half exhausts the backup, the rejection propagates so
+   * If either half exhausts the backup, the rejection propagates so
    * extractBlock's per-block degrade handler skips the block (a character spans
    * multiple blocks, so one block's absence heals upstream).
    */
@@ -317,7 +305,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
    * half from [0], and offset its returned keys back by the first-half length
    * on merge. A single-line block replays whole. Primary is never split.
    *
-   * ponytail: if either half exhausts the backup, the rejection propagates so
+   * If either half exhausts the backup, the rejection propagates so
    * processAssignBlock's per-block degrade handler falls back to narrator for
    * every sentence in the block.
    */
@@ -353,12 +341,10 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       );
     };
 
-    // No second half (1-line block): replay whole block.
     if (secondLines.length === 0) {
       return callHalf(context.numberedParagraphs);
     }
 
-    // Renumber second half from [0]; offset its returned keys back on merge.
     const firstText = firstLines.join('\n');
     const secondRenumbered = renumberParagraphs(secondLines).join('\n');
 
@@ -371,9 +357,6 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     return { assignments: merged, reasoning: null };
   }
 
-  /**
-   * Extract characters from a single block
-   */
   async function extractBlock(
     block: TextBlock,
     index: number,
@@ -405,11 +388,10 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
         () => extractBackupSplit(blockText, signal),
       );
 
-      // Collect debug log for first block only
       const debugLog = index === 0 ? { messages: extractMessages, response } : undefined;
       return { characters: response.characters, debugLog };
     } catch (error) {
-      // Cancellation propagates — never swallow an abort.
+      // Cancellation propagates: never swallow an abort.
       if (signal?.aborted) throw error;
       // Character usually spans more than one block: skip a block that fails
       // main + backup rather than aborting the whole extract pass.
@@ -438,9 +420,8 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
   }
 
   /**
-   * Process a single block for Assign using structured outputs
-   * New format: sparse JSON object {"0": "A", "5": "B"}
-   * When useVoting is enabled: runs Assign -> QA sequential flow
+   * The model returns a sparse JSON object {"0": "A", "5": "B"}.
+   * When useVoting is enabled, the stage runs Assign and then the QA pass.
    */
   async function processAssignBlock(
     block: TextBlock,
@@ -459,7 +440,6 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     // Use 0-based indexing for LLM
     const numberedParagraphs = formatNumberedParagraphs(block.sentences);
 
-    // Build context
     const context: AssignContext = {
       characters,
       nameToCode,
@@ -479,7 +459,6 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     let relativeMap: Map<number, string>;
 
     try {
-      // Step 1: Always run the initial Assign call
       const draftResponse = await callWithStageBackup(
         'assign',
         assignBackupClientConfig,
@@ -503,12 +482,10 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
 
       const draftMap = parseAssignments(draftResponse.assignments, context.codeToName);
 
-      // Save first assign phase log (draft)
       if (isFirstBlock) {
         await debugLogger.savePhaseLog('assign_draft', { messages: assignMessages }, draftResponse);
       }
 
-      // Step 2: If useVoting is enabled, run QA pass
       if (deps.useVoting) {
         const qaMessages = buildQAPrompt(
           context.characters,
@@ -520,8 +497,8 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
         );
 
         try {
-          // QA retries the PRIMARY only — backup split never activates here. On
-          // exhaustion the catch below falls back to draft (DRY with voting-off).
+          // QA retries the primary only; the backup split never activates here. On
+          // exhaustion the catch below falls back to the draft (DRY with voting-off).
           const qaResponse = await retryWith(
             assignRetries,
             () =>
@@ -542,21 +519,19 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
 
           relativeMap = parseAssignments(qaResponse.assignments, context.codeToName);
 
-          // Save QA phase log
           if (isFirstBlock) {
             await debugLogger.savePhaseLog('assign_qa', { messages: qaMessages }, qaResponse);
           }
 
           logger.info(`[assign] Block at ${block.sentenceStartIndex} completed with QA correction`);
         } catch (qaError) {
-          // QA failed - fall back to draft results
+          // QA failed: fall back to the draft.
           logger.warn(
             `[assign] QA pass failed at ${block.sentenceStartIndex}, using draft: ${getErrorMessage(qaError)}`,
           );
           relativeMap = draftMap;
         }
       } else {
-        // No QA pass - use draft directly
         relativeMap = draftMap;
       }
     } catch {
@@ -589,10 +564,9 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
   }
 
   /**
-   * Single merge operation with specified temperature using structured outputs.
    * `signal` is the vote-pool controller: aborted once the quota fills, so this
-   * request stops mid-flight instead of running to a 4-min timeout nobody reads.
-   * One request per temperature — no same-temp retry, the vote pool replaces a
+   * request stops mid-flight instead of running to a timeout nobody reads.
+   * One request per temperature, no same-temp retry: the vote pool replaces a
    * failed attempt with a fresh unused temperature.
    */
   async function singleMerge(
@@ -607,7 +581,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     const mergeMessages = buildMergePrompt(characters, deps.merge.repeatPrompt ?? false);
 
     // Votes never stream, and each carries its own temperature as client-level
-    // config — spreadTemps' distinct temps are the voting design (ADR 0008),
+    // config: spreadTemps' distinct temps are the voting design (ADR 0008),
     // so each vote temperature resolves its own adapter config; `call`'s
     // per-config cache gives identical configs one shared client instance.
     try {
@@ -636,8 +610,6 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
   }
 
   /**
-   * LLM-based character merge using voting with consensus.
-   *
    * `need` votes fire concurrently at distinct temperatures, each with a
    * safety margin of replacement temps so a timed-out attempt is replaced by
    * a fresh temperature instead of retried at the same value. Consensus merges
@@ -646,15 +618,14 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
   async function mergeStage(characters: LLMCharacter[], p?: StageCall): Promise<LLMCharacter[]> {
     const { mergeVoteCount } = defaultConfig.llm;
 
-    // Skip if too few characters
     if (characters.length <= 1) {
       return characters;
     }
 
-    // ponytail: one request per temperature, no same-temp retry. The budget
-    // is need × (1 + maxRetries) — the merge stage's maxRetries setting now
-    // sizes how many replacement temperatures a dead attempt buys instead of
-    // how many times the same dead temperature is re-sent. Capped at 60 because
+    // One request per temperature, no same-temp retry. The budget is
+    // need × (1 + maxRetries): the merge stage's maxRetries setting sizes how
+    // many replacement temperatures a dead attempt buys instead of how many
+    // times the same dead temperature is re-sent. Capped at 60 because
     // spreadTemps collides above that on the 0.1-0.7 range.
     const maxRetries = deps.merge.maxRetries ?? defaultConfig.llm.maxMergeRetries;
     const budget = Math.min(60, mergeVoteCount * (1 + maxRetries));
@@ -699,11 +670,9 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       return characters;
     }
 
-    // Build consensus from all votes
     const consensusGroups = buildMergeConsensus(votes, logger);
     logger.info(`[Merge] Consensus: ${consensusGroups.length} merges from ${votes.length} votes`);
 
-    // Apply consensus to characters
     const result = applyMergeGroups(characters, consensusGroups);
     logger.info(`[Merge] Final: ${result.length} characters`);
 
@@ -716,7 +685,6 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       const signal = p?.signal;
       apiClient?.resetLogging();
 
-      // Map blocks to task thunks for parallel execution
       const tasks = blocks.map((block, i) => () => extractBlock(block, i, blocks.length, signal));
       const responses = await runWithConcurrency(tasks, {
         concurrency: deps.llmThreads,
@@ -725,13 +693,11 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
         onConcurrencyChange: deps.onConcurrencyChange,
       });
 
-      // Collect all characters
       const allCharacters: LLMCharacter[] = [];
       for (const response of responses) {
         allCharacters.push(...response.characters);
       }
 
-      // Save first extract phase log
       if (responses[0]?.debugLog) {
         await debugLogger.savePhaseLog(
           'extract',
@@ -740,7 +706,6 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
         );
       }
 
-      // Simple merge by canonicalName
       let merged = dedupeCharacters(allCharacters);
 
       // Pre-merge frequency culling (remove hallucinated/noise characters)
@@ -754,7 +719,6 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
         `[Extract] Culled ${beforeCull - merged.length}/${beforeCull} characters by frequency. Remaining: ${merged.length}`,
       );
 
-      // LLM merge if multiple blocks and characters
       if (blocks.length > 1 && merged.length > 1) {
         p?.onProgress?.(blocks.length, blocks.length, `Merging ${merged.length} characters...`);
         merged = await mergeStage(merged, p);
@@ -778,7 +742,6 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       // Build code mapping from characters (including variations)
       const { nameToCode, codeToName } = buildCodeMapping(characters, deps.speakerCodeFactory);
 
-      // Build task array for parallel processing
       const tasks = blocks.map((block, globalIndex) => {
         const blockNum = globalIndex + 1;
         return () => {
@@ -792,7 +755,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
             nameToCode,
             codeToName,
             overlapSentences,
-            globalIndex === 0, // isFirstBlock
+            globalIndex === 0,
             signal,
           )
             .then((result) => {
@@ -809,7 +772,6 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
         };
       });
 
-      // Run all tasks with concurrency control
       const results = await runWithConcurrency(tasks, {
         concurrency: deps.llmThreads,
         signal: signal ?? null,
@@ -817,7 +779,6 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
         onConcurrencyChange: deps.onConcurrencyChange,
       });
 
-      // Flatten and sort by sentence index
       const flatResults = results.flat();
       flatResults.sort((a, b) => a.sentenceIndex - b.sentenceIndex);
       return flatResults;
@@ -841,7 +802,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
 
 /** Connection-probe slice of LlmStageDeps: one stage config plus logging. */
 export interface LlmConnectionDeps {
-  /** Stage config to probe — connection triple required, tuning optional. */
+  /** Stage config to probe: connection triple required, tuning optional. */
   config: NestedStageConfig;
   /** Cross-stage CORS proxy fallback when the stage config omits its own. */
   corsMiddleware?: string;
@@ -851,7 +812,7 @@ export interface LlmConnectionDeps {
 }
 
 /**
- * Probe one stage's connection without building a stages record — the UI
+ * Probe one stage's connection without building a stages record; the UI
  * connection-test path (LLMTab) calls this directly per stage config.
  */
 export async function testLlmConnection(

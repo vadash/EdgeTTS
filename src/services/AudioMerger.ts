@@ -1,7 +1,3 @@
-// AudioMerger - Handles audio merging with duration-based grouping and FFmpeg processing
-// Reads audio chunks from disk to prevent OOM
-// Supports Opus encoding with silence removal and normalization
-
 import { defaultConfig } from '@/config';
 import { sanitizeFilename } from '@/utils/file';
 import { withPermissionRetry } from '@/utils/retry';
@@ -30,10 +26,8 @@ export interface MergeGroup {
 }
 
 /**
- * Chapter name owning `index` in the Book's chapter table, preserving the
- * historical boundary walk exactly: start at the first entry's name (or
- * 'audio' for an empty table), advance while the next boundary index has
- * been reached and is greater than 0.
+ * Chapter name owning `index` in the Book's chapter table. A boundary
+ * index of 0 never advances the walk.
  */
 export function filenameFor(fileNames: Array<[string, number]>, index: number): string {
   let current = fileNames[0]?.[0] ?? 'audio';
@@ -50,8 +44,8 @@ export function filenameFor(fileNames: Array<[string, number]>, index: number): 
 }
 
 /**
- * Single composer of a merge group's on-disk identity: the sanitized
- * chapter/folder name and the final saved file name.
+ * On-disk identity for one merge group. The 4-digit number keeps files
+ * in merge order when a chapter splits into several groups.
  */
 function generateGroupFilename(
   chapterName: string,
@@ -71,13 +65,14 @@ function generateGroupFilename(
 
 export interface MergerConfig {
   outputFormat: 'opus';
-  // Audio processing and encoding settings, carried as one object.
+  // Audio settings, carried as one object from the Conversion input.
   audio: AudioSettings;
-  // Parallel encoding pool: optional FFmpegService factory (DI). Absent
-  // factory => sequential behavior (pool is just the injected singleton).
+  // Optional FFmpegService factory for the parallel worker pool. With no
+  // factory the pool is only the injected singleton, so encoding runs
+  // sequentially.
   ffmpegFactory?: () => FFmpegService;
   // Availability source for the merge: the merger asks the Chunk store
-  // which chunk indices exist. The caller no longer passes audio state.
+  // which chunk indices exist.
   chunkStore: ChunkStore;
 }
 
@@ -85,14 +80,13 @@ export interface MergerConfig {
  * Hard ceiling on parallel merge workers. The bundled `@ffmpeg/core` is
  * single-threaded (1 core per instance); beyond 4 workers the main
  * thread's ChunkStore I/O and cross-core contention erase the gains.
- * Single place to raise the parallelism ceiling later.
  */
 const MAX_MERGE_CONCURRENCY = 4;
 
 /**
- * AudioMerger - Implements IAudioMerger interface
- * Reads audio chunks from disk to minimize RAM usage
- * Receives IFFmpegService via constructor for testability
+ * Merges stored chunks into audio files with FFmpeg. Chunks are read
+ * from disk when needed, so RAM usage stays low. Receives the
+ * FFmpegService via constructor for testability.
  */
 export class AudioMerger {
   private ffmpegService: FFmpegService;
@@ -107,7 +101,6 @@ export class AudioMerger {
     this.config = config;
     this.chunkStore = config.chunkStore;
 
-    // Duration settings from config
     const targetMinutes = defaultConfig.audio.targetDurationMinutes;
     const tolerancePercent = defaultConfig.audio.tolerancePercent;
 
@@ -117,26 +110,15 @@ export class AudioMerger {
   }
 
   /**
-   * Estimate duration from MP3 bytes.
-   *
-   * HEURISTIC: Assumes 96kbps constant bitrate audio (Edge TTS default output).
-   * At 96kbps: 96000 bits/sec = 12000 bytes/sec = 12 bytes/ms
-   *
-   * This is an approximation and may be inaccurate for:
-   * - Variable bitrate (VBR) audio
-   * - Audio with different sample rates
-   * - Heavily compressed or expanded audio
-   *
-   * This is now used only as a fallback when MP3 header parsing fails.
+   * Estimate duration from MP3 bytes. Edge TTS outputs 96 kbps constant
+   * bitrate, which is the basis of the bytes-per-millisecond constant in
+   * the config. Variable bitrate or resampled audio makes the estimate
+   * inaccurate.
    */
   private estimateDurationMsFallback(bytes: number): number {
     return Math.round(bytes / defaultConfig.audio.bytesPerMs);
   }
 
-  /**
-   * Get duration from MP3 file, with fallback to byte heuristic
-   * Reads file from disk and parses MP3 headers for accurate duration
-   */
   private async getDurationMs(index: number): Promise<number> {
     try {
       const audio = await this.chunkStore.readChunk(index);
@@ -146,18 +128,17 @@ export class AudioMerger {
         return parsedDuration;
       }
 
-      // Fallback to byte heuristic
       return this.estimateDurationMsFallback(audio.length);
     } catch {
-      // If we can't read the file, return 0
+      // An unreadable chunk gets duration 0, so grouping treats it like
+      // a missing chunk.
       return 0;
     }
   }
 
   /**
-   * Calculate merge groups based on duration and file boundaries
-   * Asks the Chunk store once which indices exist; missing chunks count as
-   * silence (duration 0).
+   * Asks the Chunk store once which chunk indices exist. Missing chunks
+   * count as silence with duration 0.
    */
   async calculateMergeGroups(
     chunkCount: number,
@@ -165,10 +146,9 @@ export class AudioMerger {
   ): Promise<MergeGroup[]> {
     if (chunkCount === 0) return [];
 
-    // Availability, fetched once for the whole calculation.
+    // Availability: one fetch covers the whole calculation.
     const available = this.chunkStore.getExistingIndices();
 
-    // Build merge groups based on duration
     let groupStart = 0;
     let groupDurationMs = 0;
     let mergeNumber = 1;
@@ -180,19 +160,17 @@ export class AudioMerger {
       const isFileBoundary = currentFile !== lastFilename;
       const isLastItem = i === chunkCount - 1;
 
-      // Get actual duration from MP3 headers (with fallback to byte heuristic)
       let chunkDurationMs = 0;
       if (available.has(i)) {
         chunkDurationMs = await this.getDurationMs(i);
       }
 
-      // Check if adding this chunk would exceed max duration
       const wouldExceedMax = groupDurationMs + chunkDurationMs > this.maxDurationMs;
-      // Check if current duration is acceptable to close group
       const canCloseGroup = groupDurationMs >= this.minDurationMs;
 
       if (isFileBoundary || isLastItem || (wouldExceedMax && canCloseGroup)) {
-        // Include current chunk if not a file boundary
+        // At a file boundary the current chunk starts the next group, so
+        // it is excluded here.
         const toIndex = isFileBoundary ? i - 1 : i;
         const finalDuration = isFileBoundary ? groupDurationMs : groupDurationMs + chunkDurationMs;
 
@@ -205,7 +183,6 @@ export class AudioMerger {
           });
         }
 
-        // Start new group
         if (isFileBoundary) {
           groupStart = i;
           groupDurationMs = chunkDurationMs;
@@ -236,9 +213,8 @@ export class AudioMerger {
   }
 
   /**
-   * Merge audio data for a group with FFmpeg processing (async)
-   * Reads chunks from disk one by one to minimize memory
-   * Missing chunks are replaced with silence placeholders
+   * Reads chunks from disk one by one to keep memory low. A null entry
+   * is a missing chunk and is replaced with silence.
    */
   private async mergeAudioGroupAsync(
     ffmpegService: FFmpegService,
@@ -249,7 +225,6 @@ export class AudioMerger {
     const chunks: (Uint8Array | null)[] = [];
     let missingCount = 0;
 
-    // Read chunks one by one from disk, null for missing
     for (let i = group.fromIndex; i <= group.toIndex; i++) {
       if (available.has(i)) {
         try {
@@ -260,22 +235,23 @@ export class AudioMerger {
           missingCount++;
         }
       } else {
-        chunks.push(null); // Missing chunk - will be replaced with silence
+        chunks.push(null);
         missingCount++;
       }
     }
 
-    // Warn about missing chunks
     if (missingCount > 0) {
       onProgress?.(`Warning: ${missingCount} missing chunk(s) replaced with silence`);
     }
 
-    // Check if ALL chunks are missing
+    // All chunks missing: return null so the caller skips the group and
+    // saves no file.
     if (chunks.every((c) => c === null)) return null;
 
     const processedAudio = await ffmpegService.processAudio(chunks, this.config.audio, onProgress);
 
-    // Create a new Uint8Array to ensure it's a standard ArrayBuffer (not SharedArrayBuffer)
+    // Copy into a new Uint8Array so the Blob gets a standard ArrayBuffer,
+    // not a SharedArrayBuffer.
     const outputArray = new Uint8Array(processedAudio);
 
     return {
@@ -299,16 +275,16 @@ export class AudioMerger {
       const folderHandle = await directoryHandle.getDirectoryHandle(folderName);
       const fileHandle = await folderHandle.getFileHandle(filename);
       const file = await fileHandle.getFile();
-      return file.size > 1024; // > 1KB indicates a complete file
+      return file.size > 1024;
     } catch {
       return false;
     }
   }
 
   /**
-   * Merge and save all audio immediately to disk
-   * Each file is saved as soon as it's merged to minimize RAM usage
-   * Returns the number of files saved
+   * Saves each file as soon as its group is merged, keeping RAM usage
+   * low and preserving files already written if the Conversion is
+   * interrupted.
    */
   async mergeAndSave(
     chunkCount: number,
@@ -316,7 +292,8 @@ export class AudioMerger {
     saveDirectoryHandle: FileSystemDirectoryHandle,
     onProgress?: (current: number, total: number, message: string) => void,
   ): Promise<number> {
-    // Check permissions upfront
+    // Request write permission upfront so the merge is never interrupted
+    // by a prompt.
     try {
       const permission = await saveDirectoryHandle.requestPermission({ mode: 'readwrite' });
       if (permission !== 'granted') {
@@ -331,10 +308,11 @@ export class AudioMerger {
 
     const groups = await this.calculateMergeGroups(chunkCount, fileNames);
 
-    // Availability, fetched once and shared by every group below.
+    // Availability: one fetch is shared by every group below.
     const available = this.chunkStore.getExistingIndices();
 
-    // Pre-pass (sequential, cheap): check existing files, collect groups that need processing.
+    // Sequential pre-pass: existing files are skipped here; the rest go
+    // to the worker pool.
     const pending: MergeGroup[] = [];
     let skippedCount = 0;
     for (let i = 0; i < groups.length; i++) {
@@ -352,10 +330,11 @@ export class AudioMerger {
       pending.push(group);
     }
 
-    // Build the worker pool. The injected singleton is always worker[0] (keeps its
-    // existing lifecycle/refresh rules). Extra workers come from the factory; they're
-    // terminated in `finally` after the merge. If no factory, pool is just the
-    // singleton => concurrency 1 (existing tests unaffected).
+    // Build the worker pool. The injected singleton is always worker[0]
+    // and is never terminated here; its lifecycle belongs to its owner.
+    // Extra workers come from the factory and are terminated in `finally`
+    // after the merge. No factory means the pool is only the singleton,
+    // so concurrency stays 1.
     const workerCount = Math.max(
       1,
       Math.min(this.config.audio.mergeConcurrency, MAX_MERGE_CONCURRENCY),
@@ -368,9 +347,10 @@ export class AudioMerger {
       }
     }
 
-    // Shared-index work queue: each worker pulls the next pending group off the front.
-    // The first rejection aborts Promise.all; in-flight groups on other workers may
-    // still complete and save — harmless because resume skips existing files.
+    // Shared-index work queue: each worker pulls the next pending group
+    // off the front. The first rejection aborts Promise.all, but
+    // in-flight groups on other workers may still complete and save.
+    // That is harmless because resume skips existing files.
     let nextIdx = 0;
     let completed = 0;
     let savedCount = 0;
@@ -393,7 +373,8 @@ export class AudioMerger {
             );
 
             if (merged) {
-              // Save immediately (preserves low-RAM save-as-you-go)
+              // Save immediately to keep the low-RAM save-as-you-go
+              // behavior.
               await this.saveToDirectory(merged, saveDirectoryHandle);
               onProgress?.(completed + 1, groups.length, `Saved ${merged.fileName}`);
               savedCount++;
@@ -403,12 +384,12 @@ export class AudioMerger {
         }),
       );
     } finally {
-      // Terminate every pool worker EXCEPT the injected singleton.
+      // Terminate every pool worker except the injected singleton.
       for (let w = 1; w < workers.length; w++) {
         try {
           workers[w].terminate();
         } catch {
-          // Ignore — best-effort cleanup
+          // Best-effort cleanup.
         }
       }
     }

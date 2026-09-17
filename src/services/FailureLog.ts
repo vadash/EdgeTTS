@@ -1,6 +1,6 @@
-// Failure log for permanently failed TTS chunks.
-// failed_chunks.json records chunk indices that exhausted retries so a
-// resumed conversion can skip them (ADR-0002, ADR-0013). Entries carry an
+// Failure log for permanently failed Chunks.
+// failed_chunks.json records Chunk indices that exhausted retries so a
+// resumed Conversion can skip them (ADR-0002, ADR-0013). Entries carry an
 // optional failure message (ADR-0018); legacy files holding bare index
 // arrays load unchanged.
 
@@ -10,7 +10,7 @@ import type { ILogger } from './Logger';
 
 const FAILED_CHUNKS_FILE = 'failed_chunks.json';
 
-/** A permanently failed chunk: index plus optional human-readable cause. */
+/** A permanently failed Chunk: index plus optional human-readable cause. */
 export interface FailureEntry {
   index: number;
   message?: string;
@@ -52,7 +52,7 @@ export class FailureLog {
   }
 
   /**
-   * Load the set of permanently failed chunk indices.
+   * Load the set of permanently failed Chunk indices.
    * Missing or corrupt failed_chunks.json -> empty set.
    */
   async load(): Promise<Set<number>> {
@@ -60,17 +60,16 @@ export class FailureLog {
       const entries = await withPermissionRetry(this.tempDir, () => this.readEntries());
       return new Set(entries.map((entry) => entry.index));
     } catch {
-      // No failed_chunks.json or corrupted — treat as empty set
       return new Set<number>();
     }
   }
 
   /**
-   * Persist failed chunk entries to the failure log: union with the existing
-   * set (by index; a re-recorded index keeps its latest message), written as a sorted
-   * JSON array. Resolves with the total set size after a successful write, or
-   * null when nothing was written (empty input or a write failure, which is
-   * warned instead of thrown). Never throws.
+   * Persist failed Chunk entries to the failure log: union with the
+   * existing set (by index; a re-recorded index keeps its latest message),
+   * written as a sorted JSON array. Resolves with the total set size after
+   * a successful write, or null when nothing was written (empty input or a
+   * write failure, which is warned instead of thrown). Never throws.
    */
   async record(entries: Iterable<FailureEntry>): Promise<number | null> {
     const additions = new Map<number, FailureEntry>();
@@ -81,8 +80,6 @@ export class FailureLog {
     let total: number | null = null;
     try {
       await withPermissionRetry(this.tempDir, async () => {
-        // Union by index: existing entries keep their messages, new ones win.
-        // A missing file starts a fresh union.
         let existing: FailureEntry[] = [];
         try {
           existing = await this.readEntries();

@@ -12,7 +12,7 @@ export interface StructuredCallOptions<T> {
   schema: z.ZodType<T>;
   schemaName: string;
   signal?: AbortSignal;
-  /** Which pipeline pass issued this call. Transport adapters ignore it. */
+  /** Which pipeline pass issued this call. LLMApiClient ignores it; stage tests assert on it. */
   stage?: LlmPassId;
 }
 
@@ -98,11 +98,6 @@ export function cleanSchemaForXGrammar(node: unknown): unknown {
   return out;
 }
 
-/**
- * Convert Zod schema to OpenAI Structured Outputs format.
- * Uses Zod 4's native toJSONSchema() method, then strips keywords that break
- * xgrammar-constrained upstreams (vLLM, NVIDIA NIM).
- */
 export function zodToJsonSchema<T>(schema: z.ZodType<T>, schemaName: string): JSONSchemaFormat {
   const raw = z.toJSONSchema(schema, { target: 'draft-7' });
   return {

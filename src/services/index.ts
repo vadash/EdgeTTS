@@ -1,5 +1,5 @@
 // Service Singletons and Factories
-// ES Modules handle singletons naturally - no DI container needed
+// ES modules handle singletons naturally, so no DI container is needed
 
 import type { LoggerStore } from '@/services/Logger';
 import type { MergerConfig } from './AudioMerger';
@@ -24,9 +24,6 @@ let textBlockSplitterInstance: TextBlockSplitter | null = null;
 let voicePoolBuilderInstance: VoicePoolBuilder | null = null;
 let ttsPreviewServiceInstance: ReusableEdgeTTSService | null = null;
 
-/**
- * Get or create the logger singleton
- */
 export function getLogger(logStore?: LoggerStore): Logger {
   if (!loggerInstance) {
     loggerInstance = createLogger(logStore);
@@ -34,16 +31,11 @@ export function getLogger(logStore?: LoggerStore): Logger {
   return loggerInstance;
 }
 
-/**
- * Reset the logger singleton (for testing)
- */
+/** Test-only reset. */
 export function resetLogger(): void {
   loggerInstance = null;
 }
 
-/**
- * Get or create the FFmpeg service singleton
- */
 export function getFFmpeg(): FFmpegService {
   if (!ffmpegInstance) {
     ffmpegInstance = new FFmpegService(getLogger());
@@ -51,16 +43,11 @@ export function getFFmpeg(): FFmpegService {
   return ffmpegInstance;
 }
 
-/**
- * Reset the FFmpeg service singleton (for testing)
- */
+/** Test-only reset. */
 export function resetFFmpeg(): void {
   ffmpegInstance = null;
 }
 
-/**
- * Get or create the text block splitter singleton
- */
 export function getTextBlockSplitter(): TextBlockSplitter {
   if (!textBlockSplitterInstance) {
     textBlockSplitterInstance = new TextBlockSplitter();
@@ -68,9 +55,6 @@ export function getTextBlockSplitter(): TextBlockSplitter {
   return textBlockSplitterInstance;
 }
 
-/**
- * Get or create the voice pool builder singleton
- */
 export function getVoicePoolBuilder(): VoicePoolBuilder {
   if (!voicePoolBuilderInstance) {
     voicePoolBuilderInstance = new VoicePoolBuilder();
@@ -78,10 +62,7 @@ export function getVoicePoolBuilder(): VoicePoolBuilder {
   return voicePoolBuilderInstance;
 }
 
-/**
- * Get or create the TTS preview service singleton
- * Used by UI components for voice preview playback
- */
+/** Used by UI components for voice preview playback. */
 export function getTTSPreviewService(): ReusableEdgeTTSService {
   if (!ttsPreviewServiceInstance) {
     ttsPreviewServiceInstance = new ReusableEdgeTTSService(getLogger());
@@ -93,16 +74,10 @@ export function getTTSPreviewService(): ReusableEdgeTTSService {
 // Factory Functions (create new instances each call)
 // ============================================================================
 
-/**
- * Create a new TTS worker pool for a conversion
- */
 export function createWorkerPool(options: WorkerPoolOptions): TTSWorkerPool {
   return TTSWorkerPool.create(options);
 }
 
-/**
- * Create a new audio merger for a conversion
- */
 export function createAudioMerger(config: MergerConfig): AudioMerger {
   return new AudioMerger(getFFmpeg(), {
     ...config,
@@ -116,9 +91,6 @@ export function createAudioMerger(config: MergerConfig): AudioMerger {
 
 import type { ConversionOrchestratorServices } from './ConversionOrchestrator';
 
-/**
- * Get the services bundle needed by ConversionOrchestrator
- */
 export function getOrchestratorServices(): ConversionOrchestratorServices {
   return {
     logger: getLogger(),

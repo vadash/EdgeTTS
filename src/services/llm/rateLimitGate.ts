@@ -13,8 +13,8 @@ import { CancellationError, RetriableError, throwIfAborted } from '@/errors';
  *  3. Resume single-file, then climb back one slot per clean call, stopping at
  *     the configured ceiling (`setCeiling`, i.e. the user's LLM threads).
  *
- * ponytail: one process-global gate, not keyed per provider/pool. A conversion
- * talks to a single upstream at a time; add a `Map<poolKey, state>` only if
+ * One process-global gate, not keyed per provider or pool: a Conversion talks
+ * to a single upstream at a time. Add a `Map<poolKey, state>` only if
  * multi-provider fan-out ever lands.
  */
 
@@ -36,9 +36,9 @@ let successStreak = 0;
 const listeners = new Set<(limit: number) => void>();
 
 /**
- * Declare the configured concurrency ceiling so recovery stops there instead of
- * climbing into headroom the caller will clamp away anyway — which logged
- * "raised to 19" while the queue was still pinned at the configured 15.
+ * Declare the configured concurrency ceiling so recovery stops there instead
+ * of climbing into headroom the caller will clamp away anyway; climbing that
+ * far logs "raised to 19" while the queue stays pinned at the configured 15.
  */
 export function setCeiling(next: number): void {
   const clipped = Math.max(1, Math.trunc(next));
@@ -85,8 +85,8 @@ export function resetRateLimitGate(): void {
 
 /**
  * Inspect a failure and trip the gate on a rate limit or a network outage.
- * Reads only the tags `LLMApiClient` attaches via `classifyProviderError` —
- * the gate never inspects messages or walks cause chains itself.
+ * Reads only the tags `LLMApiClient` attaches via `classifyProviderError`,
+ * so the gate never inspects messages or walks cause chains itself.
  */
 export function noteError(error: unknown, logger?: ILogger): void {
   if (!(error instanceof RetriableError)) return;
