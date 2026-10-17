@@ -1,13 +1,9 @@
 import { defaultConfig } from '@/config';
 import { RetriableError } from '@/errors';
 import type { TTSConfig } from '../state/types';
-import { sha256 } from '../utils/sha256';
+import { generateSecMsGecV2 } from '../utils/secMsGec';
 import { generateConnectionId } from '../utils/uuid';
 import type { ILogger } from './Logger';
-
-// Windows epoch for Sec-MS-GEC generation
-const WIN_EPOCH = 11644473600;
-const S_TO_NS = 1e9;
 
 export type ConnectionState = 'DISCONNECTED' | 'CONNECTING' | 'READY' | 'BUSY';
 
@@ -82,7 +78,7 @@ export class ReusableEdgeTTSService {
     return new Promise<void>((resolve, reject) => {
       this.state = 'CONNECTING';
 
-      const secMsGec = this.generateSecMsGec();
+      const secMsGec = generateSecMsGecV2(defaultConfig.edgeTtsApi.trustedClientToken);
       this.connectionId = generateConnectionId();
 
       const url = `${defaultConfig.edgeTtsApi.baseUrl}?TrustedClientToken=${defaultConfig.edgeTtsApi.trustedClientToken}&Sec-MS-GEC=${secMsGec}&Sec-MS-GEC-Version=${defaultConfig.edgeTtsApi.secMsGecVersion}&ConnectionId=${this.connectionId}`;
@@ -373,16 +369,6 @@ export class ReusableEdgeTTSService {
       'Path:ssml\r\n\r\n' +
       ssml
     );
-  }
-
-  private generateSecMsGec(): string {
-    let ticks = Date.now() / 1000;
-    ticks += WIN_EPOCH;
-    ticks -= ticks % 300;
-    ticks *= S_TO_NS / 100;
-
-    const strToHash = Math.floor(ticks) + defaultConfig.edgeTtsApi.trustedClientToken;
-    return sha256(strToHash).toUpperCase();
   }
 
   private findIndex(uint8Array: Uint8Array, separator: Uint8Array): number {

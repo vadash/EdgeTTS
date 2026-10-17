@@ -136,7 +136,7 @@ export const defaultConfig: AppConfig = {
   edgeTtsApi: {
     baseUrl: 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1',
     trustedClientToken: '6A5AA1D4EAFF4E9FB37E23D68491D6F4',
-    secMsGecVersion: '1-143.0.3650.75',
+    secMsGecVersion: '2-143.0.3650.75',
     audioFormat: 'audio-24khz-96kbitrate-mono-mp3',
   },
 };
