@@ -18,6 +18,11 @@ import { sanitizeWireSchema } from './wireSchema';
  */
 export const DEGENERATE_OUTPUT_CHARS_PER_TOKEN = 6;
 
+/** One wording for the degenerate bound so streaming and non-streaming aborts stay lockstep. */
+function degenerateAbortMessage(what: string): string {
+  return `Degenerate output: ${what} passed the maxTokens × ${DEGENERATE_OUTPUT_CHARS_PER_TOKEN} cap`;
+}
+
 type ChatCompletion = OpenAIType.Chat.Completions.ChatCompletion;
 type ChatCompletionChunk = OpenAIType.Chat.Completions.ChatCompletionChunk;
 type ChatCompletionCreateParamsNonStreaming =
@@ -67,6 +72,8 @@ function detectProvider(apiUrl: string, model: string): 'mistral' | 'openai' | '
 }
 
 function applyProviderFixes(requestBody: StructuredRequestBody, provider: string): void {
+  const responseFormat = requestBody.response_format as ResponseFormat | undefined;
+
   if (provider === 'mistral') {
     // Mistral requires top_p=1 when temperature=0 (greedy sampling)
     // Safest to just not send top_p at all
@@ -74,7 +81,6 @@ function applyProviderFixes(requestBody: StructuredRequestBody, provider: string
 
     // Mistral doesn't support OpenAI's json_schema format.
     // Use json_object mode instead (instructs model to return valid JSON).
-    const responseFormat = requestBody.response_format as ResponseFormat | undefined;
     if (responseFormat && responseFormat.type === 'json_schema') {
       requestBody.response_format = { type: 'json_object' };
     }
@@ -84,7 +90,6 @@ function applyProviderFixes(requestBody: StructuredRequestBody, provider: string
   // Every family that receives json_schema gets the wire-safe copy; free
   // aggregator routes ('unknown') dispatch to the weakest backends, so the
   // sanitized shape is what they must tolerate.
-  const responseFormat = requestBody.response_format as ResponseFormat | undefined;
   if (responseFormat?.type === 'json_schema' && responseFormat.json_schema.schema) {
     responseFormat.json_schema.schema = sanitizeWireSchema(responseFormat.json_schema.schema);
   }
@@ -108,6 +113,36 @@ function disableThinking(requestBody: StructuredRequestBody): void {
   });
 }
 
+/**
+ * The common wire fields every structured request carries, keyed exactly as
+ * they go on the wire. Both the client's request assembly and the stage-side
+ * phase-log dump build from this one shape, so these five fields cannot drift.
+ * Message transforms (e.g. the /no_think suffix) and provider-specific
+ * deletions (e.g. mistral dropping top_p) happen past this shape. The dump
+ * records the stage's Primary config; when the Backup split served the call,
+ * the fallback warn names the Backup model.
+ */
+export function wireRequestBase(
+  config: Pick<LLMApiClientOptions, 'model' | 'temperature' | 'topP' | 'maxTokens' | 'streaming'>,
+  messages: StructuredCallOptions['messages'],
+): {
+  model: string;
+  temperature: number | undefined;
+  top_p: number | undefined;
+  max_tokens: number | undefined;
+  stream: boolean;
+  messages: StructuredCallOptions['messages'];
+} {
+  return {
+    model: config.model,
+    temperature: config.temperature,
+    top_p: config.topP,
+    max_tokens: config.maxTokens,
+    stream: config.streaming ?? false,
+    messages,
+  };
+}
+
 export class LLMApiClient {
   private options: LLMApiClientOptions;
   private logger?: ILogger;
@@ -117,7 +152,7 @@ export class LLMApiClient {
 
   /**
    * Wrap a caught transport error as the retriable failure the retry helper
-   * expects (AGENTS.md). Unrecognized causes default to the transport class:
+   * expects (ADR-0020). Unrecognized causes default to the transport class:
    * only auth (401/403) is distinct here; slice-level routing reads the class.
    */
   private retriableFailure(message: string, error: unknown): RetriableError {
@@ -356,20 +391,9 @@ export class LLMApiClient {
       : undefined;
 
     const requestBody: StructuredRequestBody = {
-      model: this.options.model,
-      messages,
+      ...wireRequestBase(this.options, messages),
       response_format: zodToJsonSchema(schema, schemaName),
     };
-
-    if (this.options.maxTokens) {
-      requestBody.max_tokens = this.options.maxTokens;
-    }
-    if (this.options.temperature !== undefined) {
-      requestBody.temperature = this.options.temperature;
-    }
-    if (this.options.topP !== undefined) {
-      requestBody.top_p = this.options.topP;
-    }
     // Only add thinking/reasoning parameters when explicitly enabled.
     // When reasoning is null or undefined (OFF), actively suppress thinking:
     // models that reason by default otherwise burn the whole token budget on
@@ -417,13 +441,6 @@ export class LLMApiClient {
               if (delta?.content) {
                 accumulated += delta.content;
               }
-              // A runaway generation never parses, so abort the attempt now
-              // instead of waiting for the stream to end; break closes the
-              // stream through the iterator's return hook.
-              if (degenerateCap !== undefined && accumulated.length > degenerateCap) {
-                degenerate = true;
-                break;
-              }
               // Reasoning never joins the payload buffer: mixing chain-of-thought
               // into content is what makes schema parsing fail downstream.
               if (delta?.reasoning) {
@@ -431,6 +448,17 @@ export class LLMApiClient {
               }
               if (delta?.reasoning_content) {
                 reasoningAccumulated += delta.reasoning_content;
+              }
+              // The bound spans both channels: a runaway never parses whether it
+              // floods content or the reasoning channel the empty-content
+              // fallback would later read. Break closes the stream through the
+              // iterator's return hook.
+              if (
+                degenerateCap !== undefined &&
+                accumulated.length + reasoningAccumulated.length > degenerateCap
+              ) {
+                degenerate = true;
+                break;
               }
               if (chunk.choices[0]?.finish_reason) {
                 finishReason = chunk.choices[0].finish_reason;
@@ -443,11 +471,9 @@ export class LLMApiClient {
           if (degenerate) {
             // Kind stays unset on purpose: the gate must never read a
             // degenerate abort as rate-limit or network-down.
-            throw new RetriableError(
-              `Degenerate output: stream content passed the maxTokens × ${DEGENERATE_OUTPUT_CHARS_PER_TOKEN} cap; aborting the attempt`,
-              undefined,
-              { errorClass: 'transport' },
-            );
+            throw new RetriableError(degenerateAbortMessage('stream output'), undefined, {
+              errorClass: 'transport',
+            });
           }
 
           if (finishReason === 'content_filter') {
@@ -473,6 +499,11 @@ export class LLMApiClient {
 
           content = accumulated;
         } catch (error) {
+          // An already-classified failure (degenerate abort, content filter,
+          // empty response) carries its class and kind on the error: re-wrapping
+          // it here would strip the kind, so it passes through untouched. The
+          // gate-safety property is structural, not regex luck.
+          if (error instanceof RetriableError) throw error;
           throw this.retriableFailure(`LLM API call failed: ${(error as Error).message}`, error);
         }
       } else {
@@ -483,6 +514,9 @@ export class LLMApiClient {
             stream: false,
           } as unknown as ChatCompletionCreateParamsNonStreaming);
         } catch (error) {
+          // Already-classified failures pass through untouched (see the
+          // streaming path): re-wrapping would strip their kind.
+          if (error instanceof RetriableError) throw error;
           throw this.retriableFailure(`LLM API call failed: ${(error as Error).message}`, error);
         }
 
@@ -516,13 +550,12 @@ export class LLMApiClient {
           });
         }
 
-        // Post-hoc twin of the streaming abort: Merge votes never stream.
+        // Post-hoc twin of the streaming abort: non-streaming calls (extract/
+        // assign without streaming, not only merge votes) reach this path too.
         if (degenerateCap !== undefined && content.length > degenerateCap) {
-          throw new RetriableError(
-            `Degenerate output: response content passed the maxTokens × ${DEGENERATE_OUTPUT_CHARS_PER_TOKEN} cap`,
-            undefined,
-            { errorClass: 'transport' },
-          );
+          throw new RetriableError(degenerateAbortMessage('response output'), undefined, {
+            errorClass: 'transport',
+          });
         }
       }
     } catch (error) {

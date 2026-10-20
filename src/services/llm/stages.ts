@@ -13,7 +13,7 @@ import {
 import { buildExtractPrompt } from '@/config/prompts/extract/builder';
 import { buildMergePrompt } from '@/config/prompts/merge/builder';
 import { buildQAPrompt } from '@/config/prompts/qa/builder';
-import { getErrorMessage } from '@/errors';
+import { getErrorMessage, isFailureClass, isRetriableError } from '@/errors';
 import { withRetry } from '@/utils/retry';
 import type { LLMCharacter, SpeakerAssignment, StageConfig, TextBlock } from '@/state/types';
 import type { ILogger } from '../Logger';
@@ -26,7 +26,7 @@ import {
 } from './CharacterUtils';
 import { collectVotes, spreadTemps } from './collectVotes';
 import { DebugLogger } from './DebugLogger';
-import { LLMApiClient, type LLMApiClientOptions } from './LLMApiClient';
+import { LLMApiClient, type LLMApiClientOptions, wireRequestBase } from './LLMApiClient';
 import { runWithConcurrency } from './runWithConcurrency';
 import {
   type AssignResponse,
@@ -187,15 +187,17 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
 
   /**
    * withRetry under a stage's retry budget; the caller shapes the per-attempt
-   * log (block indices differ per call site).
+   * log (block indices differ per call site). `shouldRetry` prunes the ladder
+   * by error class (ADR 0020).
    */
   function retryWith<T>(
     budget: number,
     fn: () => Promise<T>,
     signal: AbortSignal | undefined,
     onRetry?: (attempt: number, error: unknown) => void,
+    shouldRetry?: (error: unknown) => boolean,
   ): Promise<T> {
-    return withRetry(fn, { maxRetries: budget, signal, onRetry });
+    return withRetry(fn, { maxRetries: budget, signal, onRetry, shouldRetry });
   }
 
   /**
@@ -214,6 +216,8 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       maxRetries: backupRetries,
       signal,
       onRetry: (attempt, err) => {
+        // withRetry only reports failures a retry follows, so attempt IS the
+        // retry number: labels run 1..N and the last reads N/N, never N+1/N.
         logger.warn(
           `[${pass}] Backup ${kind} ${attempt}/${backupRetries}: ${getErrorMessage(err)}`,
         );
@@ -246,14 +250,40 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     onRetry: (attempt: number, error: unknown) => void,
     backup?: () => Promise<T>,
   ): Promise<T> {
+    // Parse pruning only pays when the fallback exists: with no Backup profile
+    // configured there is no split path to go to, so the Primary keeps its
+    // full retry ladder (ADR 0020 routes to the split, not to an early degrade).
+    const canFallback = Boolean(backup && backupConfig && backupClientConfig);
     try {
-      return await retryWith(primaryRetries, () => call(primaryConfig, callArgs), signal, onRetry);
+      return await retryWith(
+        primaryRetries,
+        () => call(primaryConfig, callArgs),
+        signal,
+        onRetry,
+        // A parse failure reproduces on resend (ADR 0020), so with the split
+        // path available the ladder stops on the first one. The isRetriableError
+        // guard stays: shouldRetry replaces withRetry's default, and the repo
+        // rule is that only retriable errors ever retry.
+        canFallback
+          ? (error) => isRetriableError(error) && !isFailureClass(error, 'parse')
+          : undefined,
+      );
     } catch (error) {
       if (signal?.aborted || !backupConfig || !backupClientConfig) throw error;
 
-      logger.warn(
-        `[${pass}] Primary model exhausted ${primaryRetries} retries, falling back to backup model (${backupConfig.model})`,
-      );
+      if (isFailureClass(error, 'parse')) {
+        logger.warn(
+          `[${pass}] Primary parse failure, skipping remaining retries, falling back to backup model (${backupConfig.model})`,
+        );
+      } else if (isFailureClass(error, 'deterministic')) {
+        logger.warn(
+          `[${pass}] Primary request rejected by ${primaryConfig.apiUrl} (deterministic), skipping retries, falling back to backup model (${backupConfig.model})`,
+        );
+      } else {
+        logger.warn(
+          `[${pass}] Primary model exhausted ${primaryRetries} retries, falling back to backup model (${backupConfig.model})`,
+        );
+      }
 
       if (backup) return backup();
 
@@ -362,7 +392,13 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     index: number,
     total: number,
     signal: AbortSignal | undefined,
-  ): Promise<{ characters: LLMCharacter[]; debugLog?: { messages: object; response: object } }> {
+  ): Promise<{
+    characters: LLMCharacter[];
+    debugLog?: {
+      messages: StructuredCallOptions['messages'];
+      response: object;
+    };
+  }> {
     const blockText = block.sentences.join('\n');
 
     const extractMessages = buildExtractPrompt(blockText, deps.extract.repeatPrompt ?? false);
@@ -483,7 +519,11 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       const draftMap = parseAssignments(draftResponse.assignments, context.codeToName);
 
       if (isFirstBlock) {
-        await debugLogger.savePhaseLog('assign_draft', { messages: assignMessages }, draftResponse);
+        await debugLogger.savePhaseLog(
+          'assign_draft',
+          wireRequestBase(assignClientConfig, assignMessages),
+          draftResponse,
+        );
       }
 
       if (deps.useVoting) {
@@ -520,7 +560,11 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
           relativeMap = parseAssignments(qaResponse.assignments, context.codeToName);
 
           if (isFirstBlock) {
-            await debugLogger.savePhaseLog('assign_qa', { messages: qaMessages }, qaResponse);
+            await debugLogger.savePhaseLog(
+              'assign_qa',
+              wireRequestBase(assignClientConfig, qaMessages),
+              qaResponse,
+            );
           }
 
           logger.info(`[assign] Block at ${block.sentenceStartIndex} completed with QA correction`);
@@ -584,24 +628,33 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     // config: spreadTemps' distinct temps are the voting design (ADR 0008),
     // so each vote temperature resolves its own adapter config; `call`'s
     // per-config cache gives identical configs one shared client instance.
+    const voteConfig = resolveClientConfig(
+      { ...deps.merge, streaming: false, temperature },
+      deps.merge,
+    );
     try {
-      const response = await call(
-        resolveClientConfig({ ...deps.merge, streaming: false, temperature }, deps.merge),
-        {
-          messages: mergeMessages,
-          schema: MergeSchema,
-          schemaName: 'MergeSchema',
-          signal,
-          stage: 'merge',
-        },
-      );
+      const response = await call(voteConfig, {
+        messages: mergeMessages,
+        schema: MergeSchema,
+        schemaName: 'MergeSchema',
+        signal,
+        stage: 'merge',
+      });
 
       // Save first merge phase log
       // savePhaseLog self-dedups to the first call per phase (DebugLogger),
       // so a safe always-call here captures the first successful merge vote.
-      await debugLogger.savePhaseLog('merge', { messages: mergeMessages }, response);
+      await debugLogger.savePhaseLog('merge', wireRequestBase(voteConfig, mergeMessages), response);
       return response.merges;
     } catch (error) {
+      // Auth failures rethrow for the vote pool, which aborts after two
+      // auth-class failures (only a success resets the count) and reports one
+      // actionable warning (ADR 0020); every other failure stays a replaced
+      // vote. The compact warn keeps the class visible before any latch.
+      if (isFailureClass(error, 'auth')) {
+        logger.warn(`[Merge] Auth vote failure (temp=${temperature.toFixed(2)}, class=auth)`);
+        throw error;
+      }
       logger.warn(
         `[Merge] Vote failed (temp=${temperature.toFixed(2)}): ${getErrorMessage(error)}`,
       );
@@ -636,13 +689,22 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       `[Merge] Starting ${mergeVoteCount}-way voting merge with ${characters.length} characters (parallel ${Math.min(parallel, temps.length)})`,
     );
 
+    let authBurst = false;
     const votes = await collectVotes<number[][]>({
       need: mergeVoteCount,
       parallel,
       temps,
       signal: p?.signal,
       run: (temp, signal) => singleMerge(characters, temp, signal),
-      onSettled: (ok, temp, count) => {
+      onAuthBurst: (_error, collected) => {
+        authBurst = true;
+        // The latch only fires on auth-class failures, so the class is
+        // stated outright instead of read off the reported error.
+        logger.warn(
+          `[Merge] Vote pool aborted after two auth failures from ${deps.merge.apiUrl} (${deps.merge.model}): ${collected}/${mergeVoteCount} votes. Check this provider's API key; returning the original characters.`,
+        );
+      },
+      onSettled: (ok, temp, count, error) => {
         p?.onProgress?.(
           count,
           mergeVoteCount,
@@ -652,13 +714,17 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
           logger.info(
             `[Merge] Vote ${count}/${mergeVoteCount} succeeded (temp=${temp.toFixed(2)})`,
           );
-        } else {
+        } else if (!isFailureClass(error, 'auth')) {
           logger.warn(
             `[Merge] Vote failed (temp=${temp.toFixed(2)}), replacing with a fresh temperature`,
           );
         }
       },
     });
+
+    // The pool aborted on an auth burst: degrade honestly instead of merging
+    // on whatever partial votes happened to land first.
+    if (authBurst) return characters;
 
     // One surviving vote can only produce zero-merge consensus (the threshold
     // is 2), so a thin result is useless to merge AND built from the single
@@ -701,7 +767,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       if (responses[0]?.debugLog) {
         await debugLogger.savePhaseLog(
           'extract',
-          { messages: responses[0].debugLog.messages },
+          wireRequestBase(extractClientConfig, responses[0].debugLog.messages),
           responses[0].debugLog.response,
         );
       }

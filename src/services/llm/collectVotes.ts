@@ -11,12 +11,16 @@
  * would be dropped anyway, and leaving them in flight burns wall clock and
  * provider quota (which is what earns the next 429).
  *
+ * Two auth-class failures (401/403) abort the pool immediately: replacement
+ * temperatures cannot fix a rejected key (ADR 0020). Only a success resets
+ * the count, so timeouts interleaved between 403s cannot stall the latch.
+ *
  * The rate-limit gate is not wired in here on purpose: `LLMApiClient`
  * already calls `waitTurn` per request, so a 429 parks every in-flight
  * attempt for the provider's cooldown.
  */
 
-import { throwIfAborted } from '@/errors';
+import { isFailureClass, throwIfAborted } from '@/errors';
 
 export interface CollectVotesOptions<T> {
   /** Successful votes required. */
@@ -28,17 +32,25 @@ export interface CollectVotesOptions<T> {
   /** One attempt. Returns null (or throws) on failure. Aborted once `need` lands. */
   run: (temp: number, signal: AbortSignal) => Promise<T | null>;
   signal?: AbortSignal | null;
-  /** Called as each attempt settles, with the running success count. */
-  onSettled?: (ok: boolean, temp: number, collected: number) => void;
+  /**
+   * Called as each attempt settles, with the running success count and the
+   * thrown error when the attempt failed by throwing.
+   */
+  onSettled?: (ok: boolean, temp: number, collected: number, error?: unknown) => void;
+  /**
+   * Called once when two auth-class failures abort the pool (ADR 0020); only
+   * a success resets the count. `collected` is the vote count at that moment.
+   */
+  onAuthBurst?: (error: unknown, collected: number) => void;
 }
 
 /**
- * Runs attempts until `need` succeed, the temperature budget is exhausted, or
- * the signal aborts. Returns the successes in completion order (may be
- * shorter than `need` when the budget runs out).
+ * Runs attempts until `need` succeed, the temperature budget is exhausted, the
+ * signal aborts, or an auth burst aborts the pool. Returns the successes in
+ * completion order (may be shorter than `need` when the budget runs out).
  */
 export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<T[]> {
-  const { need, parallel, temps, run, signal, onSettled } = options;
+  const { need, parallel, temps, run, signal, onSettled, onAuthBurst } = options;
 
   if (need <= 0 || temps.length === 0) {
     return [];
@@ -54,8 +66,14 @@ export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<
   const relay = () => pool.abort();
   signal?.addEventListener('abort', relay, { once: true });
 
+  // Two auth-class failures abort the pool: replacement temperatures cannot
+  // spend their way out of a rejected key (ADR 0020). Only a success resets
+  // the count, so timeouts interleaved between 403s cannot stall the latch.
+  let authFailures = 0;
+  let burstLatched = false;
+
   const worker = async (): Promise<void> => {
-    while (results.length < need) {
+    while (results.length < need && !burstLatched) {
       throwIfAborted(signal);
       const temp = queue.shift();
       if (temp === undefined) {
@@ -63,10 +81,23 @@ export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<
       }
 
       let value: T | null = null;
+      let thrownError: unknown;
       try {
         value = await run(temp, pool.signal);
-      } catch {
+      } catch (error) {
         value = null; // the caller logs; the pool only cares ok/failed
+        thrownError = error;
+        if (isFailureClass(error, 'auth')) {
+          authFailures++;
+          if (authFailures >= 2 && !burstLatched) {
+            burstLatched = true;
+            pool.abort();
+            onAuthBurst?.(error, results.length);
+            return;
+          }
+        }
+        // A non-auth failure leaves the auth count alone: an outage mixed
+        // into a string of 403s is still a rejected key.
       }
 
       // A late arrival after the quota filled is dropped rather than pushed,
@@ -75,12 +106,17 @@ export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<
         return;
       }
       if (value !== null) {
+        authFailures = 0; // only a success proves the key works again
         results.push(value);
         if (results.length >= need) {
           pool.abort(); // stop the losers; their results are unusable now
         }
       }
-      onSettled?.(value !== null, temp, results.length);
+      // Workers aborted by the burst settle late; their settles must not
+      // surface as "replacing with a fresh temperature" after the pool died.
+      if (!burstLatched) {
+        onSettled?.(value !== null, temp, results.length, thrownError);
+      }
     }
   };
 

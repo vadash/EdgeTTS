@@ -82,8 +82,32 @@ describe('classifyProviderError', (t) => {
     ).toEqual({ errorClass: 'deterministic' });
   });
 
+  t('classifies a 400 naming response_format as deterministic', () => {
+    expect(
+      classifyProviderError({
+        status: 400,
+        message: "RESPONSE_FORMAT 'MergeSchema' is not supported by this model",
+      }),
+    ).toEqual({ errorClass: 'deterministic' });
+  });
+
+  t(
+    'classifies an invalid-schema 400 without the exact historical wording as deterministic',
+    () => {
+      expect(
+        classifyProviderError({
+          status: 400,
+          message: '400 Invalid Schema: payloads must match the JSON Schema draft',
+        }),
+      ).toEqual({ errorClass: 'deterministic' });
+    },
+  );
+
   t('keeps other 400s unclassified', () => {
     expect(classifyProviderError({ status: 400, message: '400 Bad Request' })).toEqual({});
+    expect(
+      classifyProviderError({ status: 400, message: '400 max_tokens is too large: 1000000' }),
+    ).toEqual({});
   });
 
   t('returns nothing for unrelated errors', () => {

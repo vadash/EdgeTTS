@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CancellationError } from '@/errors';
+import { CancellationError, RetriableError } from '@/errors';
 
 import { collectVotes, spreadTemps } from './collectVotes';
 
@@ -87,6 +87,50 @@ describe('collectVotes', () => {
     const results = await collectVotes({ need: 0, parallel: 2, temps: [0, 1], run });
     expect(results).toEqual([]);
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it('aborts after two auth failures even when a non-auth failure sits between them', async () => {
+    const attempts: number[] = [];
+    const onAuthBurst = vi.fn();
+    const pending = collectVotes<number>({
+      need: 1,
+      parallel: 1,
+      temps: [1, 2, 3, 4, 5, 6],
+      run: async (temp) => {
+        attempts.push(temp);
+        if (attempts.length === 2) {
+          // A timeout between the 403s must not reset the auth count.
+          throw new RetriableError('timeout', undefined, { errorClass: 'transport' });
+        }
+        throw new RetriableError('403', undefined, { errorClass: 'auth' });
+      },
+      onAuthBurst,
+    });
+    await pending;
+
+    expect(attempts).toEqual([1, 2, 3]);
+    expect(onAuthBurst).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets the auth count only on success: a single auth failure does not abort', async () => {
+    const attempts: number[] = [];
+    const onAuthBurst = vi.fn();
+    const results = await collectVotes<number>({
+      need: 2,
+      parallel: 1,
+      temps: [1, 2, 3],
+      run: async (temp) => {
+        attempts.push(temp);
+        if (attempts.length === 1) {
+          throw new RetriableError('403', undefined, { errorClass: 'auth' });
+        }
+        return temp;
+      },
+      onAuthBurst,
+    });
+
+    expect(results).toEqual([2, 3]);
+    expect(onAuthBurst).not.toHaveBeenCalled();
   });
 
   it('aborts surplus attempts once the quota fills', async () => {

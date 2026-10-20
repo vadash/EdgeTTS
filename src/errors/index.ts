@@ -183,6 +183,14 @@ export function isRetriableError(error: unknown): boolean {
   return error instanceof RetriableError || error instanceof ZodError;
 }
 
+/**
+ * Type guard for a RetriableError carrying a given recovery class (ADR-0020).
+ * Call sites route on this instead of re-deriving the class from prose.
+ */
+export function isFailureClass(error: unknown, cls: FailureClass): error is RetriableError {
+  return error instanceof RetriableError && error.errorClass === cls;
+}
+
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
 }

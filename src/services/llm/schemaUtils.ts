@@ -7,7 +7,7 @@ import { z } from 'zod';
  */
 export type LlmPassId = 'extract' | 'assign' | 'qa' | 'merge' | 'test';
 
-export interface StructuredCallOptions<T> {
+export interface StructuredCallOptions<T = unknown> {
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
   schema: z.ZodType<T>;
   schemaName: string;
@@ -25,7 +25,7 @@ export type JSONSchemaFormat = {
   };
 };
 
-type JsonSchemaNode = Record<string, unknown>;
+export type JsonSchemaNode = Record<string, unknown>;
 
 /**
  * If `value` is an `anyOf`/`oneOf` array containing a `{type:"null"}` branch,

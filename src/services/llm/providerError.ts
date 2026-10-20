@@ -11,8 +11,9 @@ const NETWORK_DOWN =
  * raw SDK error (status and headers) is in hand. Order of trust: HTTP status,
  * retry-after headers, then provider prose as a last resort so the sidecar's
  * `retry-after-ms` deadline stays alive. Everything recognized here is
- * transport-retriable except 401/403; unrecognized errors default to the
- * transport class at the client wrap sites.
+ * transport-retriable except 401/403 (auth) and schema-rejecting 400s
+ * (deterministic); unrecognized errors default to the transport class at the
+ * client wrap sites.
  */
 export function classifyProviderError(error: unknown): {
   kind?: RetriableKind;
@@ -38,11 +39,12 @@ export function classifyProviderError(error: unknown): {
   // A 400 naming the response_format schema means the provider rejected the
   // wire schema itself (ADR-0020): resending the identical request cannot
   // succeed, so the class is deterministic and no retry budget is spent.
-  // Other 400s stay unclassified (transport at the wrap site).
+  // Matched conservatively: the schema name or the response_format mention;
+  // other 400s stay unclassified (transport at the wrap site).
   if (
     candidate?.status === 400 &&
     typeof candidate.message === 'string' &&
-    /invalid schema for response_format/i.test(candidate.message)
+    (/invalid schema/i.test(candidate.message) || /response_format/i.test(candidate.message))
   ) {
     return { errorClass: 'deterministic' };
   }

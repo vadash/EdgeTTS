@@ -706,8 +706,12 @@ describe('LLMApiClient.callStructured', () => {
       });
 
       const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs).not.toHaveProperty('temperature');
-      expect(callArgs).not.toHaveProperty('top_p');
+      // Wire contract: unset tuning must not reach the provider. Undefined
+      // keys are dropped by JSON serialization, so the wire body omits them.
+      expect(callArgs.temperature).toBeUndefined();
+      expect(callArgs.top_p).toBeUndefined();
+      expect(JSON.parse(JSON.stringify(callArgs))).not.toHaveProperty('temperature');
+      expect(JSON.parse(JSON.stringify(callArgs))).not.toHaveProperty('top_p');
     });
   });
 
@@ -904,6 +908,38 @@ describe('LLMApiClient.callStructured', () => {
       expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
     });
 
+    it('aborts a reasoning-only flood once the combined stream crosses the cap', async () => {
+      let delivered = 0;
+      const stream = {
+        [Symbol.asyncIterator]: () => ({
+          next: async () => {
+            delivered += 1;
+            return {
+              value: {
+                choices: [{ delta: { reasoning: 'x'.repeat(20) }, finish_reason: null }],
+              },
+              done: false,
+            };
+          },
+        }),
+      };
+      // Ten chunks would total 200 reasoning chars; the bound (10 × 6 = 60)
+      // spans content + reasoning, so the attempt must abort at chunk 4
+      // instead of draining the flood into the reasoning fallback.
+      mockCreate.mockResolvedValue(stream);
+
+      const client = buildClient({ streaming: true, maxTokens: 10 });
+      const error = await rejectionOf(
+        client.callStructured({ messages, schema: TestSchema, schemaName: 'TestSchema' }),
+      );
+
+      expect(error).toBeInstanceOf(RetriableError);
+      expect(error.errorClass).toBe('transport');
+      expect(error.message).toContain('Degenerate output');
+      expect(delivered).toBe(4);
+      expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
+    });
+
     it('throws the same transport-class failure for an oversized non-streaming response', async () => {
       mockCreate.mockResolvedValue({
         choices: [{ message: { content: 'y'.repeat(100), refusal: null } }],
@@ -953,6 +989,45 @@ describe('LLMApiClient.callStructured', () => {
       expect(error).toBeInstanceOf(RetriableError);
       expect(error.message).toContain('JSON parse failed');
       expect(error.errorClass).toBe('parse');
+      // The parse failure is a data-quality failure: the debug dump keys off
+      // the kind, so the rethrow must not strip it.
+      expect(error.kind).toBe('data');
+    });
+
+    it('rethrows the degenerate abort untouched: transport class, no re-wrap prefix', async () => {
+      const stream = chunkStream(
+        Array.from({ length: 12 }, () => ({
+          choices: [{ delta: { content: 'x'.repeat(20) }, finish_reason: null }],
+        })),
+      );
+      mockCreate.mockResolvedValue(stream);
+
+      const client = buildClient({ streaming: true, maxTokens: 10 });
+      const error = await rejectionOf(
+        client.callStructured({ messages, schema: TestSchema, schemaName: 'TestSchema' }),
+      );
+
+      expect(error).toBeInstanceOf(RetriableError);
+      expect(error.errorClass).toBe('transport');
+      expect(error.kind).toBeUndefined();
+      // Already-classified errors leave the catch blocks as they entered:
+      // the gate-safety property holds structurally, not via regex luck.
+      expect(error.message).toMatch(/^Degenerate output/);
+    });
+
+    it('keeps kind data on a streaming empty response', async () => {
+      mockCreate.mockResolvedValue(
+        chunkStream([{ choices: [{ delta: {}, finish_reason: 'stop' }] }]),
+      );
+
+      const client = buildClient({ streaming: true, maxTokens: 10 });
+      const error = await rejectionOf(
+        client.callStructured({ messages, schema: TestSchema, schemaName: 'TestSchema' }),
+      );
+
+      expect(error).toBeInstanceOf(RetriableError);
+      expect(error.errorClass).toBe('transport');
+      expect(error.kind).toBe('data');
     });
 
     it('leaves a normal-size stream and the rate-limit gate untouched', async () => {
@@ -1010,7 +1085,10 @@ describe('LLMApiClient.callStructured', () => {
 
       const schema = sentSchema(0);
       const assignments = schema.properties as Record<string, Record<string, unknown>>;
-      expect(assignments.assignments.additionalProperties).toBe(false);
+      // The Assign assignments map is a dynamic-key record: no
+      // additionalProperties survives (an enforcing consumer must reject the
+      // schema rather than coerce the record to {}).
+      expect(assignments.assignments).not.toHaveProperty('additionalProperties');
       expect(schema.required).toEqual(Object.keys(schema.properties as object));
     });
 
