@@ -10,5 +10,6 @@ Extract and Assign retry the primary model to the per-stage limit, then fall bac
 - Merge never falls back to the backup model: one request per temperature, and the max-retries setting sizes the temperature budget rather than a per-attempt retry loop (see [ADR-0008](0008-character-merge-voting.md)).
 - With voting on, Assign produces a draft pass and then a QA pass corrects it. A failed QA falls back to the draft: the draft is always usable.
 - QA retries the primary model only. It never uses the backup model.
+- Failures are routed by class, not retried uniformly: parse failures go straight to the Backup split, deterministic schema rejections consume no retry, and auth bursts abort the Merge vote pool (see [ADR-0020](0020-error-class-aware-failure-routing.md)).
 
 Absorbs the former ADR-0009 (assign draft and QA pass) and ADR-0011 (degrade on exhaustion); their numbers are retired.

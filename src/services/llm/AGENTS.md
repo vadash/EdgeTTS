@@ -25,3 +25,5 @@ Read the ADR before changing the governed area:
 - Pass failure policy: fallback, degrade, QA → `../../../docs/adr/0010-llm-pass-failure-policy.md`
 - Rate-limit handling, concurrency, backoff → `../../../docs/adr/0012-process-global-rate-limit-gate.md`
 - Stage tests, transport seam → `../../../docs/adr/0015-llm-stages-closure-factory.md`
+- Failure routing by error class, degenerate-stream abort → `../../../docs/adr/0020-error-class-aware-failure-routing.md`
+- Wire-schema sanitization → `../../../docs/adr/0021-wire-schema-sanitization.md`
