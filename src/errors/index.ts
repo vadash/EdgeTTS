@@ -150,20 +150,29 @@ export function insufficientVoicesError(maleCount: number, femaleCount: number):
  */
 export type RetriableKind = 'rate-limit' | 'network-down' | 'data';
 
+/**
+ * Coarse recovery class for LLM pass failures (ADR-0020): transport keeps the
+ * retry ladder, parse jumps to the backup split, deterministic spends no
+ * retry, auth fails the Merge vote pool fast.
+ */
+export type FailureClass = 'transport' | 'auth' | 'deterministic' | 'parse';
+
 /** The caller should retry with a new connection. */
 export class RetriableError extends Error {
   public readonly kind?: RetriableKind;
   public readonly retryAfterMs?: number;
+  public readonly errorClass?: FailureClass;
 
   constructor(
     message: string,
     public readonly cause?: Error,
-    info?: { kind?: RetriableKind; retryAfterMs?: number },
+    info?: { kind?: RetriableKind; retryAfterMs?: number; errorClass?: FailureClass },
   ) {
     super(message);
     this.name = 'RetriableError';
     this.kind = info?.kind;
     this.retryAfterMs = info?.retryAfterMs;
+    this.errorClass = info?.errorClass;
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, RetriableError);
     }

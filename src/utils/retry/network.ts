@@ -1,7 +1,7 @@
 import { getCooldownRemainingMs } from '@/services/llm/rateLimitGate';
 
 import pRetry from 'p-retry';
-import { CancellationError, isRetriableError, throwIfAborted } from '@/errors';
+import { CancellationError, isRetriableError, RetriableError, throwIfAborted } from '@/errors';
 
 export interface RetryOptions {
   maxRetries?: number;
@@ -54,6 +54,13 @@ export async function withRetry<T>(
         signal,
         onFailedAttempt: (context) => {
           const actualError = context.error;
+
+          // A deterministic failure means the provider rejected the request
+          // itself (ADR-0020), so resending the identical request cannot
+          // succeed; no retry budget is spent regardless of shouldRetry.
+          if (actualError instanceof RetriableError && actualError.errorClass === 'deterministic') {
+            throw actualError;
+          }
 
           if (shouldRetry && !shouldRetry(actualError)) {
             // A throw here makes p-retry stop retrying.

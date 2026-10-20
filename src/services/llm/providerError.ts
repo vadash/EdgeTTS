@@ -1,20 +1,23 @@
-import type { RetriableKind } from '@/errors';
+import type { FailureClass, RetriableKind } from '@/errors';
 
 /** Transport-level failure wording: outage, DNS, refused/blocked connection, gateway down. */
 const NETWORK_DOWN =
   /\b50[234]\b|failed to execute http request|failed to fetch|fetch failed|networkerror|network error|load failed|internet disconnected/i;
 
 /**
- * Classify one caught provider error for the rate-limit gate. Inspects only
- * the error itself, never its `cause` chain, because `LLMApiClient` calls
- * this at each transport catch site, where the raw SDK error (status and
- * headers) is in hand. Order of trust: HTTP status, retry-after headers,
- * then provider prose as a last resort so the sidecar's `retry-after-ms`
- * deadline stays alive.
+ * Classify one caught provider error for the rate-limit gate and the ADR-0020
+ * recovery class. Inspects only the error itself, never its `cause` chain,
+ * because `LLMApiClient` calls this at each transport catch site, where the
+ * raw SDK error (status and headers) is in hand. Order of trust: HTTP status,
+ * retry-after headers, then provider prose as a last resort so the sidecar's
+ * `retry-after-ms` deadline stays alive. Everything recognized here is
+ * transport-retriable except 401/403; unrecognized errors default to the
+ * transport class at the client wrap sites.
  */
 export function classifyProviderError(error: unknown): {
   kind?: RetriableKind;
   retryAfterMs?: number;
+  errorClass?: FailureClass;
 } {
   const candidate = error as {
     status?: unknown;
@@ -22,10 +25,14 @@ export function classifyProviderError(error: unknown): {
     message?: string;
   };
 
-  if (candidate?.status === 429) return { kind: 'rate-limit' };
+  if (candidate?.status === 429) return { kind: 'rate-limit', errorClass: 'transport' };
 
   if (candidate?.status === 502 || candidate?.status === 503 || candidate?.status === 504) {
-    return { kind: 'network-down' };
+    return { kind: 'network-down', errorClass: 'transport' };
+  }
+
+  if (candidate?.status === 401 || candidate?.status === 403) {
+    return { errorClass: 'auth' };
   }
 
   const readHeader = (name: string): string | null => {
@@ -40,22 +47,26 @@ export function classifyProviderError(error: unknown): {
 
   const headerMs = Number(readHeader('retry-after-ms'));
   if (Number.isFinite(headerMs) && headerMs > 0) {
-    return { kind: 'rate-limit', retryAfterMs: headerMs };
+    return { kind: 'rate-limit', retryAfterMs: headerMs, errorClass: 'transport' };
   }
 
   const headerSeconds = Number(readHeader('retry-after'));
   if (Number.isFinite(headerSeconds) && headerSeconds > 0) {
-    return { kind: 'rate-limit', retryAfterMs: headerSeconds * 1000 };
+    return { kind: 'rate-limit', retryAfterMs: headerSeconds * 1000, errorClass: 'transport' };
   }
 
   const message = typeof candidate?.message === 'string' ? candidate.message : '';
   if (!message) return {};
 
-  if (NETWORK_DOWN.test(message)) return { kind: 'network-down' };
+  if (NETWORK_DOWN.test(message)) return { kind: 'network-down', errorClass: 'transport' };
 
   if (/\b429\b|rate[-_ ]?limit/i.test(message)) {
     const ms = /retry[-_ ]?after[-_ ]?ms["'\s]*[=:]\s*["']?(\d+)/i.exec(message);
-    return { kind: 'rate-limit', retryAfterMs: ms ? Number(ms[1]) : undefined };
+    return {
+      kind: 'rate-limit',
+      retryAfterMs: ms ? Number(ms[1]) : undefined,
+      errorClass: 'transport',
+    };
   }
 
   return {};

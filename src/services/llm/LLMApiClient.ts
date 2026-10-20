@@ -9,6 +9,14 @@ import { classifyProviderError } from './providerError';
 import { noteError, noteSuccess, waitTurn } from './rateLimitGate';
 import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
 
+/**
+ * Degenerate-output bound: accumulated content beyond maxTokens × this
+ * multiplier chars is a runaway generation (e.g. duplicated chain-of-thought)
+ * that will never parse, so the attempt aborts as transport-retriable instead
+ * of reading the whole flood. Tunable, not a user setting.
+ */
+export const DEGENERATE_OUTPUT_CHARS_PER_TOKEN = 6;
+
 type ChatCompletion = OpenAIType.Chat.Completions.ChatCompletion;
 type ChatCompletionChunk = OpenAIType.Chat.Completions.ChatCompletionChunk;
 type ChatCompletionCreateParamsNonStreaming =
@@ -96,6 +104,20 @@ export class LLMApiClient {
   private client: OpenAI;
   public debugLogger?: DebugLogger;
   private provider: string;
+
+  /**
+   * Wrap a caught transport error as the retriable failure the retry helper
+   * expects (AGENTS.md). Unrecognized causes default to the transport class:
+   * only auth (401/403) is distinct here; slice-level routing reads the class.
+   */
+  private retriableFailure(message: string, error: unknown): RetriableError {
+    const { kind, retryAfterMs, errorClass } = classifyProviderError(error);
+    return new RetriableError(message, error instanceof Error ? error : undefined, {
+      kind,
+      retryAfterMs,
+      errorClass: errorClass ?? 'transport',
+    });
+  }
 
   constructor(options: LLMApiClientOptions) {
     this.options = options;
@@ -317,6 +339,12 @@ export class LLMApiClient {
   }: StructuredCallOptions<T>): Promise<T> {
     const useStreaming = this.options.streaming ?? false;
 
+    // No max_tokens in the request means no local budget, so the provider
+    // owns the output cap and the degenerate check is skipped.
+    const degenerateCap = this.options.maxTokens
+      ? this.options.maxTokens * DEGENERATE_OUTPUT_CHARS_PER_TOKEN
+      : undefined;
+
     const requestBody: StructuredRequestBody = {
       model: this.options.model,
       messages,
@@ -369,6 +397,7 @@ export class LLMApiClient {
           let accumulated = '';
           let reasoningAccumulated = '';
           let finishReason: string | null = null;
+          let degenerate = false;
 
           try {
             for await (const chunk of stream) {
@@ -377,6 +406,13 @@ export class LLMApiClient {
                 | undefined;
               if (delta?.content) {
                 accumulated += delta.content;
+              }
+              // A runaway generation never parses, so abort the attempt now
+              // instead of waiting for the stream to end; break closes the
+              // stream through the iterator's return hook.
+              if (degenerateCap !== undefined && accumulated.length > degenerateCap) {
+                degenerate = true;
+                break;
               }
               // Reasoning never joins the payload buffer: mixing chain-of-thought
               // into content is what makes schema parsing fail downstream.
@@ -391,16 +427,23 @@ export class LLMApiClient {
               }
             }
           } catch (error) {
+            throw this.retriableFailure(`Streaming failed: ${(error as Error).message}`, error);
+          }
+
+          if (degenerate) {
+            // Kind stays unset on purpose: the gate must never read a
+            // degenerate abort as rate-limit or network-down.
             throw new RetriableError(
-              `Streaming failed: ${(error as Error).message}`,
-              error as Error,
-              classifyProviderError(error),
+              `Degenerate output: stream content passed the maxTokens × ${DEGENERATE_OUTPUT_CHARS_PER_TOKEN} cap; aborting the attempt`,
+              undefined,
+              { errorClass: 'transport' },
             );
           }
 
           if (finishReason === 'content_filter') {
             throw new RetriableError('Response refused by content filter', undefined, {
               kind: 'data',
+              errorClass: 'transport',
             });
           }
 
@@ -412,16 +455,15 @@ export class LLMApiClient {
           }
 
           if (!accumulated) {
-            throw new RetriableError('Empty response from LLM', undefined, { kind: 'data' });
+            throw new RetriableError('Empty response from LLM', undefined, {
+              kind: 'data',
+              errorClass: 'transport',
+            });
           }
 
           content = accumulated;
         } catch (error) {
-          throw new RetriableError(
-            `LLM API call failed: ${(error as Error).message}`,
-            error as Error,
-            classifyProviderError(error),
-          );
+          throw this.retriableFailure(`LLM API call failed: ${(error as Error).message}`, error);
         }
       } else {
         let response: ChatCompletion;
@@ -431,11 +473,7 @@ export class LLMApiClient {
             stream: false,
           } as unknown as ChatCompletionCreateParamsNonStreaming);
         } catch (error) {
-          throw new RetriableError(
-            `LLM API call failed: ${(error as Error).message}`,
-            error as Error,
-            classifyProviderError(error),
-          );
+          throw this.retriableFailure(`LLM API call failed: ${(error as Error).message}`, error);
         }
 
         const message = response.choices[0]?.message as
@@ -450,6 +488,7 @@ export class LLMApiClient {
         if (message?.refusal) {
           throw new RetriableError(`LLM refused: ${message.refusal}`, undefined, {
             kind: 'data',
+            errorClass: 'transport',
           });
         }
 
@@ -461,7 +500,19 @@ export class LLMApiClient {
         } else if (message?.content) {
           content = message.content;
         } else {
-          throw new RetriableError('Empty response from LLM', undefined, { kind: 'data' });
+          throw new RetriableError('Empty response from LLM', undefined, {
+            kind: 'data',
+            errorClass: 'transport',
+          });
+        }
+
+        // Post-hoc twin of the streaming abort: Merge votes never stream.
+        if (degenerateCap !== undefined && content.length > degenerateCap) {
+          throw new RetriableError(
+            `Degenerate output: response content passed the maxTokens × ${DEGENERATE_OUTPUT_CHARS_PER_TOKEN} cap`,
+            undefined,
+            { errorClass: 'transport' },
+          );
         }
       }
     } catch (error) {
@@ -478,8 +529,11 @@ export class LLMApiClient {
     try {
       const result = safeParseJSON(content, { schema });
       if (!result.success) {
+        // Class `parse` (ADR-0020); kind stays `data` so the payload still
+        // lands in the debug log.
         throw new RetriableError(`JSON parse failed: ${result.error!.message}`, undefined, {
           kind: 'data',
+          errorClass: 'parse',
         });
       }
       return result.data!;

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { LLMApiClient } from './LLMApiClient';
+import { RetriableError } from '@/errors';
+import { type LLMApiClientOptions, LLMApiClient } from './LLMApiClient';
 import { getLimit, resetRateLimitGate } from './rateLimitGate';
 
 const mockCreate = vi.fn();
@@ -832,6 +833,143 @@ describe('LLMApiClient.callStructured', () => {
           schemaName: 'TestSchema',
         }),
       ).rejects.toThrow('Empty response from LLM');
+    });
+  });
+
+  describe('error classes and degenerate output', () => {
+    const TestSchema = z.object({ value: z.string() });
+    const messages = [{ role: 'user' as const, content: 'test' }];
+
+    function buildClient(overrides: Partial<LLMApiClientOptions> = {}) {
+      return new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        logger: mockLogger,
+        ...overrides,
+      });
+    }
+
+    function chunkStream(chunks: unknown[]) {
+      return {
+        [Symbol.asyncIterator]: () => {
+          let i = 0;
+          return {
+            next: async () =>
+              i < chunks.length
+                ? { value: chunks[i++], done: false }
+                : { value: undefined, done: true },
+          };
+        },
+      };
+    }
+
+    async function rejectionOf(promise: Promise<unknown>): Promise<RetriableError> {
+      return (await promise.then(
+        () => null,
+        (error) => error,
+      )) as RetriableError;
+    }
+
+    it('aborts a degenerate stream once content crosses maxTokens×6 chars', async () => {
+      let delivered = 0;
+      const stream = {
+        [Symbol.asyncIterator]: () => ({
+          next: async () => {
+            delivered += 1;
+            return {
+              value: {
+                choices: [{ delta: { content: 'x'.repeat(20) }, finish_reason: null }],
+              },
+              done: false,
+            };
+          },
+        }),
+      };
+      // Six chunks would total 120 chars; the bound (10 × 6 = 60) must abort
+      // the attempt at chunk 4, without consuming the tail of the stream.
+      mockCreate.mockResolvedValue(stream);
+
+      const client = buildClient({ streaming: true, maxTokens: 10 });
+      const error = await rejectionOf(
+        client.callStructured({ messages, schema: TestSchema, schemaName: 'TestSchema' }),
+      );
+
+      expect(error).toBeInstanceOf(RetriableError);
+      expect(error.errorClass).toBe('transport');
+      expect(error.message).toContain('Degenerate output');
+      expect(delivered).toBe(4);
+      // The abort is not a rate-limit or outage: the gate stays pristine.
+      expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
+    });
+
+    it('throws the same transport-class failure for an oversized non-streaming response', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: 'y'.repeat(100), refusal: null } }],
+      });
+
+      const client = buildClient({ maxTokens: 10 });
+      const error = await rejectionOf(
+        client.callStructured({ messages, schema: TestSchema, schemaName: 'TestSchema' }),
+      );
+
+      expect(error).toBeInstanceOf(RetriableError);
+      expect(error.errorClass).toBe('transport');
+      expect(error.message).toContain('Degenerate output');
+      expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
+    });
+
+    it('surfaces 401 and 403 as auth-class failures', async () => {
+      for (const status of [401, 403]) {
+        mockCreate.mockRejectedValueOnce({ status, message: `HTTP ${status}` });
+
+        const client = buildClient();
+        const error = await rejectionOf(
+          client.callStructured({
+            messages,
+            schema: TestSchema,
+            schemaName: 'TestSchema',
+          }),
+        );
+
+        expect(error).toBeInstanceOf(RetriableError);
+        expect(error.errorClass).toBe('auth');
+        // Auth failures never park the gate.
+        expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
+      }
+    });
+
+    it('surfaces a JSON parse failure as parse-class at the propagating boundary', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: 'not json at all', refusal: null } }],
+      });
+
+      const client = buildClient();
+      const error = await rejectionOf(
+        client.callStructured({ messages, schema: TestSchema, schemaName: 'TestSchema' }),
+      );
+
+      expect(error).toBeInstanceOf(RetriableError);
+      expect(error.message).toContain('JSON parse failed');
+      expect(error.errorClass).toBe('parse');
+    });
+
+    it('leaves a normal-size stream and the rate-limit gate untouched', async () => {
+      const chunks = [
+        { choices: [{ delta: { content: '{"val' }, finish_reason: null }] },
+        { choices: [{ delta: { content: 'ue":"fine"}' }, finish_reason: 'stop' }] },
+      ];
+      mockCreate.mockResolvedValue(chunkStream(chunks));
+
+      const client = buildClient({ streaming: true, maxTokens: 10 });
+      const result = await client.callStructured({
+        messages,
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      expect(result).toEqual({ value: 'fine' });
+      expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
     });
   });
 });
