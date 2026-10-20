@@ -122,6 +122,14 @@ The parked wait until the provider deadline passes.
 **Climb**:
 Concurrency growing one slot per clean call, up to the configured ceiling.
 
+**Reasoning mode**:
+The per-stage request toggle that enables a model's thinking (`enable_thinking`, `reasoning_effort`) or actively disables it. When on, Temperature and Top-P are disabled.
+_Avoid_: reasoning (unqualified)
+
+**Reasoning field**:
+The JSON field every LLM pass schema requires, holding terse drafts of at most five words per step. Prompted inside the response, not a thinking channel; a model that streams prose instead has ignored it.
+_Avoid_: reasoning (unqualified), chain of thought
+
 ### Storage
 
 **Chunk store**:
