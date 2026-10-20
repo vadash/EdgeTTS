@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { RetriableError } from '@/errors';
-import { type LLMApiClientOptions, LLMApiClient } from './LLMApiClient';
+import { LLMApiClient, type LLMApiClientOptions } from './LLMApiClient';
 import { getLimit, resetRateLimitGate } from './rateLimitGate';
+import { AssignSchema } from './schemas';
 
 const mockCreate = vi.fn();
 vi.mock('openai', () => ({
@@ -970,6 +971,106 @@ describe('LLMApiClient.callStructured', () => {
 
       expect(result).toEqual({ value: 'fine' });
       expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
+    });
+  });
+
+  describe('wire-schema sanitization', () => {
+    const messages = [{ role: 'user' as const, content: 'test' }];
+
+    function buildClient(overrides: Partial<LLMApiClientOptions> = {}) {
+      return new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        logger: mockLogger,
+        ...overrides,
+      });
+    }
+
+    function sentSchema(callIndex: number): Record<string, unknown> {
+      const body = mockCreate.mock.calls[callIndex][0] as {
+        response_format: { json_schema: { schema: Record<string, unknown> } };
+      };
+      return body.response_format.json_schema.schema;
+    }
+
+    it('sends a sanitized wire copy for an openai-family route', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          { message: { content: '{"reasoning":null,"assignments":{"0":"A"}}', refusal: null } },
+        ],
+      });
+
+      const client = buildClient();
+      await client.callStructured({
+        messages,
+        schema: AssignSchema,
+        schemaName: 'AssignSchema',
+      });
+
+      const schema = sentSchema(0);
+      const assignments = schema.properties as Record<string, Record<string, unknown>>;
+      expect(assignments.assignments.additionalProperties).toBe(false);
+      expect(schema.required).toEqual(Object.keys(schema.properties as object));
+    });
+
+    it('sanitizes unknown-family routes too (free aggregators)', async () => {
+      mockCreate.mockResolvedValue({
+        choices: [{ message: { content: '{"value":"ok"}', refusal: null } }],
+      });
+
+      const client = buildClient({ apiUrl: 'https://router.example.com/v1' });
+      await client.callStructured({
+        messages,
+        schema: z.object({ value: z.string() }),
+        schemaName: 'TestSchema',
+      });
+
+      const schema = sentSchema(0);
+      expect(schema.required).toEqual(['value']);
+    });
+
+    it('surfaces a schema-rejecting 400 as a deterministic failure', async () => {
+      mockCreate.mockRejectedValueOnce({
+        status: 400,
+        message:
+          "400 Invalid schema for response_format 'AssignSchema': In context=(), 'required' is required to be supplied and to be an array including every key in properties. Extra required key 'assignments' supplied.",
+      });
+
+      const client = buildClient();
+      const error = await client
+        .callStructured({
+          messages,
+          schema: AssignSchema,
+          schemaName: 'AssignSchema',
+        })
+        .then(
+          () => null,
+          (e) => e,
+        );
+
+      expect(error).toBeInstanceOf(RetriableError);
+      expect(error.errorClass).toBe('deterministic');
+      expect(getLimit()).toBe(Number.POSITIVE_INFINITY);
+    });
+
+    it('keeps other 400s transport-class', async () => {
+      mockCreate.mockRejectedValueOnce({ status: 400, message: '400 Bad Request' });
+
+      const client = buildClient();
+      const error = await client
+        .callStructured({
+          messages,
+          schema: z.object({ value: z.string() }),
+          schemaName: 'TestSchema',
+        })
+        .then(
+          () => null,
+          (e) => e,
+        );
+
+      expect(error).toBeInstanceOf(RetriableError);
+      expect(error.errorClass).toBe('transport');
     });
   });
 });

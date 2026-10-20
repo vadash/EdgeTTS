@@ -72,6 +72,20 @@ describe('classifyProviderError', (t) => {
     });
   });
 
+  t('classifies a schema-rejecting 400 as deterministic', () => {
+    expect(
+      classifyProviderError({
+        status: 400,
+        message:
+          "400 Invalid schema for response_format 'AssignSchema': In context=(), 'required' is required to be supplied and to be an array including every key in properties.",
+      }),
+    ).toEqual({ errorClass: 'deterministic' });
+  });
+
+  t('keeps other 400s unclassified', () => {
+    expect(classifyProviderError({ status: 400, message: '400 Bad Request' })).toEqual({});
+  });
+
   t('returns nothing for unrelated errors', () => {
     expect(classifyProviderError(new Error('Request timed out.'))).toEqual({});
     expect(classifyProviderError(undefined)).toEqual({});

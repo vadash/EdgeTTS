@@ -35,6 +35,18 @@ export function classifyProviderError(error: unknown): {
     return { errorClass: 'auth' };
   }
 
+  // A 400 naming the response_format schema means the provider rejected the
+  // wire schema itself (ADR-0020): resending the identical request cannot
+  // succeed, so the class is deterministic and no retry budget is spent.
+  // Other 400s stay unclassified (transport at the wrap site).
+  if (
+    candidate?.status === 400 &&
+    typeof candidate.message === 'string' &&
+    /invalid schema for response_format/i.test(candidate.message)
+  ) {
+    return { errorClass: 'deterministic' };
+  }
+
   const readHeader = (name: string): string | null => {
     const headers = candidate?.headers;
     if (!headers) return null;

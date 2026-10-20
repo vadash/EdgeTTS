@@ -8,6 +8,7 @@ import type { DebugLogger } from './DebugLogger';
 import { classifyProviderError } from './providerError';
 import { noteError, noteSuccess, waitTurn } from './rateLimitGate';
 import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
+import { sanitizeWireSchema } from './wireSchema';
 
 /**
  * Degenerate-output bound: accumulated content beyond maxTokens × this
@@ -77,6 +78,15 @@ function applyProviderFixes(requestBody: StructuredRequestBody, provider: string
     if (responseFormat && responseFormat.type === 'json_schema') {
       requestBody.response_format = { type: 'json_object' };
     }
+    return;
+  }
+
+  // Every family that receives json_schema gets the wire-safe copy; free
+  // aggregator routes ('unknown') dispatch to the weakest backends, so the
+  // sanitized shape is what they must tolerate.
+  const responseFormat = requestBody.response_format as ResponseFormat | undefined;
+  if (responseFormat?.type === 'json_schema' && responseFormat.json_schema.schema) {
+    responseFormat.json_schema.schema = sanitizeWireSchema(responseFormat.json_schema.schema);
   }
 }
 
