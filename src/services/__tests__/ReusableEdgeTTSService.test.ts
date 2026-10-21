@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ReusableEdgeTTSService } from '../ReusableEdgeTTSService';
 import type { TTSConfig } from '@/state/types';
 
@@ -104,6 +104,67 @@ describe('ReusableEdgeTTSService', () => {
       const result = makeSSML('Line 1\nLine 2\nLine 3', defaultConfig);
 
       expect(result).toContain("'>\nLine 1\nLine 2\nLine 3</prosody>");
+    });
+  });
+
+  describe('handleClose error detail', () => {
+    // Regression: the server aborts cold-cache syntheses with a bare close
+    // (1006/1007); retry logs must carry the close code, not a generic
+    // message. See docs/adr/0019.
+    const closeEvent = (code: number, reason = '') =>
+      ({ code, reason, wasClean: false }) as CloseEvent;
+
+    type CloseHandler = (event: CloseEvent, connectReject?: (error: Error) => void) => void;
+    const handleCloseOf = (service: ReusableEdgeTTSService): CloseHandler => {
+      // Test seam: handleClose is private; the cast keeps the real signature.
+      const exposed = service as unknown as { handleClose: CloseHandler };
+      return exposed.handleClose.bind(service);
+    };
+
+    it('includes close code when closed during connection', () => {
+      const service = new ReusableEdgeTTSService();
+      // Production precondition: connectReject is wired only while CONNECTING.
+      const internals = service as unknown as { state: string };
+      internals.state = 'CONNECTING';
+      const reject = vi.fn();
+      handleCloseOf(service)(closeEvent(1006), reject);
+
+      expect(reject).toHaveBeenCalledTimes(1);
+      expect(reject.mock.calls[0]?.[0]?.message).toBe(
+        'WebSocket closed during connection (code 1006)',
+      );
+    });
+
+    it('includes close reason when the server provides one', () => {
+      const service = new ReusableEdgeTTSService();
+      // Production precondition: connectReject is wired only while CONNECTING.
+      const internals = service as unknown as { state: string };
+      internals.state = 'CONNECTING';
+      const reject = vi.fn();
+      handleCloseOf(service)(closeEvent(1007, 'bad payload'), reject);
+
+      expect(reject.mock.calls[0]?.[0]?.message).toBe(
+        'WebSocket closed during connection (code 1007: bad payload)',
+      );
+    });
+
+    it('includes close code when closed during a request', () => {
+      const service = new ReusableEdgeTTSService();
+      const requestReject = vi.fn();
+      const internals = service as unknown as {
+        state: string;
+        requestReject: ((error: Error) => void) | null;
+      };
+      internals.state = 'BUSY';
+      internals.requestReject = requestReject;
+
+      handleCloseOf(service)(closeEvent(1006));
+
+      expect(requestReject).toHaveBeenCalledTimes(1);
+      expect(requestReject.mock.calls[0]?.[0]?.message).toBe(
+        'WebSocket closed during request (code 1006)',
+      );
+      expect(internals.state).toBe('DISCONNECTED');
     });
   });
 });

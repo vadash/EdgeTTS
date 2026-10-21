@@ -196,15 +196,22 @@ export class ReusableEdgeTTSService {
   private handleClose(event: CloseEvent, connectReject?: (error: Error) => void): void {
     this.logger?.debug?.(`WebSocket closed: code=${event.code}, reason=${event.reason}`);
 
+    // The server aborts cold-cache syntheses with a bare close (observed
+    // 1006/1007, 2026-10); surface the code so retry logs carry the cause
+    // instead of a generic message. See docs/adr/0019.
+    const detail = event.reason
+      ? ` (code ${event.code}: ${event.reason})`
+      : ` (code ${event.code})`;
+
     const wasConnecting = this.state === 'CONNECTING';
     const wasBusy = this.state === 'BUSY';
 
     this.stopKeepAlive();
 
     if (wasConnecting && connectReject) {
-      connectReject(new RetriableError('WebSocket closed during connection'));
+      connectReject(new RetriableError(`WebSocket closed during connection${detail}`));
     } else if (wasBusy && this.requestReject) {
-      this.rejectRequest(new RetriableError('WebSocket closed during request'));
+      this.rejectRequest(new RetriableError(`WebSocket closed during request${detail}`));
     }
 
     this.state = 'DISCONNECTED';
