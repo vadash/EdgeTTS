@@ -18,6 +18,7 @@ import {
 } from '@/stores/ConversionStore';
 import { isConfigured, llm } from '@/stores/LLMStore';
 import { settings } from '@/stores/SettingsStore';
+import { selectOutputDirectory } from '@/utils/directoryPicker';
 
 export interface UseTTSConversionResult {
   startConversion: (text: string, existingBook?: ProcessedBook | null) => Promise<void>;
@@ -167,40 +168,16 @@ export function useTTSConversion(): UseTTSConversionResult {
   }, [stores.logs]);
 
   const selectDirectory = useCallback(async (): Promise<boolean> => {
-    const currentHandle = stores.data.directoryHandle.value;
-
-    // Directory handle permissions do not survive a page reload, so request
-    // readwrite again before reusing the handle.
-    if (currentHandle) {
-      try {
-        const permission = await currentHandle.requestPermission({ mode: 'readwrite' });
-        if (permission === 'granted') {
-          stores.logs.info(`Saving to: ${currentHandle.name}`);
-          return true;
-        }
-      } catch {
-        stores.data.setDirectoryHandle(null);
-      }
-    }
-
-    if (!window.showDirectoryPicker) {
-      stores.logs.error('Directory picker not supported. Please use Chrome, Edge, or Opera.');
-      return false;
-    }
-
-    try {
-      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-      stores.data.setDirectoryHandle(handle);
-      stores.logs.info(`Saving to: ${handle.name}`);
-      return true;
-    } catch (err) {
-      if ((err as Error).name === 'AbortError') {
-        stores.logs.error('Directory selection required. Please select a folder to save files.');
-      } else {
-        stores.logs.error(`Directory selection failed: ${(err as Error).message}`);
-      }
-      return false;
-    }
+    return selectOutputDirectory({
+      isSecureContext: window.isSecureContext,
+      // Web IDL methods need their receiver: an unbound reference throws
+      // "Illegal invocation" when the helper calls it.
+      showDirectoryPicker: window.showDirectoryPicker?.bind(window),
+      getHandle: () => stores.data.directoryHandle.value,
+      setHandle: (handle) => stores.data.setDirectoryHandle(handle),
+      logInfo: (message) => stores.logs.info(message),
+      logError: (message) => stores.logs.error(message),
+    });
   }, [stores.data, stores.logs]);
 
   return {
