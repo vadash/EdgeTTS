@@ -285,10 +285,11 @@ export class LLMApiClient {
           stream: false,
         });
 
-        const message = response.choices[0]?.message;
-        // Reasoning-first models expose text on a sibling field the SDK types don't declare
-        const ext = message as unknown as { reasoning?: string };
-        const content = message?.content || ext?.reasoning;
+        const message = response.choices[0]?.message as
+          | { content?: string | null; reasoning?: string; reasoning_content?: string }
+          | undefined;
+        // Reasoning-first models and proxies expose text on sibling fields the SDK types don't declare
+        const content = message?.content || message?.reasoning || message?.reasoning_content;
         if (!content) {
           return { success: false, error: 'Empty response from model' };
         }
@@ -308,10 +309,11 @@ export class LLMApiClient {
 
       for await (const chunk of stream) {
         model = chunk.model || model;
-        const delta = chunk.choices[0]?.delta;
+        const delta = chunk.choices[0]?.delta as
+          | { content?: string | null; reasoning?: string; reasoning_content?: string }
+          | undefined;
         // Streaming variant of the same vendor reasoning extension
-        const deltaExt = delta as unknown as { reasoning?: string };
-        content += delta?.content || deltaExt?.reasoning || '';
+        content += delta?.content || delta?.reasoning || delta?.reasoning_content || '';
       }
 
       if (!content) {

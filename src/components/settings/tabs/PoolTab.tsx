@@ -3,6 +3,7 @@ import { Text } from 'preact-i18n';
 import { Button, Callout } from '@/components/common';
 import { getLogger } from '@/services';
 import { testLlmConnection } from '@/services/llm';
+import type { LLMApiClientOptions } from '@/services/llm/LLMApiClient';
 import type { PoolEntry } from '@/services/llm/pool';
 import type { StageConfig } from '@/state/types';
 import { useLLM } from '@/stores';
@@ -23,27 +24,41 @@ export function PoolTab() {
   const [testingAll, setTestingAll] = useState(false);
 
   // Per-entry test is advisory: it uses the entry's resolved model and never
-  // blocks saving. Connection triple falls back to the Extract stage.
-  const configFor = (entry: PoolEntry): StageConfig => {
-    const hasThinkingKey =
+  // blocks saving. Connection triple falls back to the Extract stage. Thinking
+  // keys ride alongside so the probe runs under the entry's conditions.
+  const configFor = (
+    entry: PoolEntry,
+  ): { config: StageConfig; thinking?: LLMApiClientOptions['thinking'] } => {
+    const thinking =
       entry.enable_thinking !== undefined ||
       entry.chat_template_kwargs !== undefined ||
-      entry.reasoning_effort !== undefined;
+      entry.reasoning_effort !== undefined
+        ? {
+            enable_thinking: entry.enable_thinking,
+            chat_template_kwargs: entry.chat_template_kwargs,
+            reasoning_effort: entry.reasoning_effort,
+          }
+        : undefined;
     return {
-      ...llm.extract.value,
-      apiUrl: entry.url,
-      apiKey: entry.key,
-      model: entry.model ?? llm.extract.value.model,
-      temperature: entry.temperature ?? llm.extract.value.temperature,
-      // Entry thinking keys replace the stage reasoning toggle outright.
-      reasoning: hasThinkingKey ? null : llm.extract.value.reasoning,
+      config: {
+        ...llm.extract.value,
+        apiUrl: entry.url,
+        apiKey: entry.key,
+        model: entry.model ?? llm.extract.value.model,
+        temperature: entry.temperature ?? llm.extract.value.temperature,
+        // Without entry thinking keys the stage toggle decides; with them the
+        // client sends them verbatim and skips the toggle.
+        reasoning: thinking ? null : llm.extract.value.reasoning,
+      },
+      thinking,
     };
   };
 
   const testEntry = async (index: number, entry: PoolEntry) => {
     setTests((prev) => ({ ...prev, [index]: { testing: true, result: null } }));
+    const { config, thinking } = configFor(entry);
     const result = await testLlmConnection(
-      { config: configFor(entry), logger },
+      { config, thinking, logger },
       llm.extract.value.streaming,
     );
     setTests((prev) => ({ ...prev, [index]: { testing: false, result } }));

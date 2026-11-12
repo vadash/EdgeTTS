@@ -988,6 +988,8 @@ export interface LlmConnectionDeps {
   logger: ILogger;
   /** The transport seam has no SDK client to probe (ADR 0015). */
   transport?: LlmStageDeps['transport'];
+  /** Pool entry thinking keys: forwarded verbatim so the probe runs under the entry's conditions. */
+  thinking?: LLMApiClientOptions['thinking'];
 }
 
 /**
@@ -1010,6 +1012,7 @@ export async function testLlmConnection(
     maxTokens: defaultConfig.llm.maxTokens,
     corsMiddleware: deps.config.corsMiddleware ?? deps.corsMiddleware,
     logger: deps.logger,
+    thinking: deps.thinking,
   });
   return client.testConnection(streaming);
 }
