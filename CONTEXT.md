@@ -109,6 +109,14 @@ The user's chosen LLM for a stage.
 **Backup model**:
 The fallback LLM a stage uses after the Primary model exhausts its retries.
 
+**Connection pool**:
+The pasted JSONL list of LLM endpoint credentials that replaces the per-stage connection triple when non-empty.
+_Avoid_: pool (unqualified), key list, endpoint list
+
+**Pool entry**:
+One line of the Connection pool: a single endpoint credential with its own tuning overrides.
+_Avoid_: connection, line
+
 **Rate-limit gate**:
 The process-global governor of provider concurrency.
 _Avoid_: limiter, throttle
