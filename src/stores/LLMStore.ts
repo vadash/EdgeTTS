@@ -131,7 +131,7 @@ export const poolActive = computed(() => llm.value.poolRaw.trim().length > 0 && 
 
 export const isConfigured = computed(
   () =>
-    (llm.value.poolRaw.trim().length > 0 && poolValid.value) ||
+    poolActive.value ||
     llm.value.extract.apiKey.length > 0 ||
     llm.value.merge.apiKey.length > 0 ||
     llm.value.assign.apiKey.length > 0,

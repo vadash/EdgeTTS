@@ -1,3 +1,5 @@
+import type { ReasoningLevel } from '@/state/types';
+
 /**
  * Connection pool parsing (ADR-0022). One non-blank line is one Pool entry in
  * JSONL form. Unknown fields fail the parse because the allowlist is closed;
@@ -6,7 +8,11 @@
  */
 
 /** `reasoning_effort` levels accepted from a Pool entry; any other string fails the parse. */
-export type ReasoningEffort = 'low' | 'medium' | 'high';
+export const REASONING_EFFORTS = ['low', 'medium', 'high'] as const satisfies readonly Exclude<
+  ReasoningLevel,
+  'auto'
+>[];
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 /** The one vendor template keyword the pool forwards; other kwargs stay rejected. */
 export interface ThinkingTemplateKwargs {
@@ -50,8 +56,6 @@ const ALLOWED_FIELDS = {
   reasoning_effort: true,
   type: true,
 } as const;
-
-const REASONING_EFFORTS: readonly ReasoningEffort[] = ['low', 'medium', 'high'];
 
 function fail(line: number, reason: string): never {
   throw new PoolParseError(line, reason);
