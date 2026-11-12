@@ -4,6 +4,30 @@ import type { FailureClass, RetriableKind } from '@/errors';
 const NETWORK_DOWN =
   /\b50[234]\b|failed to execute http request|failed to fetch|fetch failed|networkerror|network error|load failed|internet disconnected/i;
 
+function readHeader(
+  headers: Headers | Record<string, string> | undefined,
+  name: string,
+): string | null {
+  if (!headers) return null;
+  if (typeof (headers as Headers).get === 'function') {
+    return (headers as Headers).get(name);
+  }
+  const record = headers as Record<string, string>;
+  return record[name] ?? record[name.toLowerCase()] ?? null;
+}
+
+/** Retry-After deadline in milliseconds, preferring the sidecar's ms header. */
+function readRetryAfterMs(
+  headers: Headers | Record<string, string> | undefined,
+): number | undefined {
+  const headerMs = Number(readHeader(headers, 'retry-after-ms'));
+  if (Number.isFinite(headerMs) && headerMs > 0) return headerMs;
+
+  const headerSeconds = Number(readHeader(headers, 'retry-after'));
+  if (Number.isFinite(headerSeconds) && headerSeconds > 0) return headerSeconds * 1000;
+  return undefined;
+}
+
 /**
  * Classify one caught provider error for the rate-limit gate and the ADR-0020
  * recovery class. Inspects only the error itself, never its `cause` chain,
@@ -26,7 +50,14 @@ export function classifyProviderError(error: unknown): {
     message?: string;
   };
 
-  if (candidate?.status === 429) return { kind: 'rate-limit', errorClass: 'transport' };
+  if (candidate?.status === 429) {
+    const retryAfterMs = readRetryAfterMs(candidate.headers);
+    return {
+      kind: 'rate-limit',
+      ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
+      errorClass: 'transport',
+    };
+  }
 
   if (candidate?.status === 502 || candidate?.status === 503 || candidate?.status === 504) {
     return { kind: 'network-down', errorClass: 'transport' };
@@ -49,24 +80,9 @@ export function classifyProviderError(error: unknown): {
     return { errorClass: 'deterministic' };
   }
 
-  const readHeader = (name: string): string | null => {
-    const headers = candidate?.headers;
-    if (!headers) return null;
-    if (typeof (headers as Headers).get === 'function') {
-      return (headers as Headers).get(name);
-    }
-    const record = headers as Record<string, string>;
-    return record[name] ?? record[name.toLowerCase()] ?? null;
-  };
-
-  const headerMs = Number(readHeader('retry-after-ms'));
-  if (Number.isFinite(headerMs) && headerMs > 0) {
-    return { kind: 'rate-limit', retryAfterMs: headerMs, errorClass: 'transport' };
-  }
-
-  const headerSeconds = Number(readHeader('retry-after'));
-  if (Number.isFinite(headerSeconds) && headerSeconds > 0) {
-    return { kind: 'rate-limit', retryAfterMs: headerSeconds * 1000, errorClass: 'transport' };
+  const retryAfterMs = readRetryAfterMs(candidate?.headers);
+  if (retryAfterMs !== undefined) {
+    return { kind: 'rate-limit', retryAfterMs, errorClass: 'transport' };
   }
 
   const message = typeof candidate?.message === 'string' ? candidate.message : '';

@@ -42,6 +42,11 @@ export interface CollectVotesOptions<T> {
    * a success resets the count. `collected` is the vote count at that moment.
    */
   onAuthBurst?: (error: unknown, collected: number) => void;
+  /**
+   * Failures that must escape the vote pool instead of being replaced by a
+   * fresh temperature. Pool exhaustion fails the Conversion (ADR-0022).
+   */
+  isFatal?: (error: unknown) => boolean;
 }
 
 /**
@@ -50,7 +55,7 @@ export interface CollectVotesOptions<T> {
  * completion order (may be shorter than `need` when the budget runs out).
  */
 export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<T[]> {
-  const { need, parallel, temps, run, signal, onSettled, onAuthBurst } = options;
+  const { need, parallel, temps, run, signal, onSettled, onAuthBurst, isFatal } = options;
 
   if (need <= 0 || temps.length === 0) {
     return [];
@@ -85,6 +90,10 @@ export async function collectVotes<T>(options: CollectVotesOptions<T>): Promise<
       try {
         value = await run(temp, pool.signal);
       } catch (error) {
+        if (isFatal?.(error)) {
+          pool.abort();
+          throw error;
+        }
         value = null; // the caller logs; the pool only cares ok/failed
         thrownError = error;
         if (isFailureClass(error, 'auth')) {

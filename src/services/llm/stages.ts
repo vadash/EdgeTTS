@@ -5,17 +5,17 @@
 
 import { defaultConfig } from '@/config';
 import { buildAssignPrompt } from '@/config/prompts/assign/builder';
+import { buildExtractPrompt } from '@/config/prompts/extract/builder';
+import { buildMergePrompt } from '@/config/prompts/merge/builder';
+import { buildQAPrompt } from '@/config/prompts/qa/builder';
 import {
   formatNumberedParagraphs,
   renumberParagraphs,
   shiftAssignmentKey,
 } from '@/config/prompts/shared/numbering';
-import { buildExtractPrompt } from '@/config/prompts/extract/builder';
-import { buildMergePrompt } from '@/config/prompts/merge/builder';
-import { buildQAPrompt } from '@/config/prompts/qa/builder';
-import { getErrorMessage, isFailureClass, isRetriableError } from '@/errors';
-import { withRetry } from '@/utils/retry';
+import { getErrorMessage, isFailureClass, isRetriableError, RetriableError } from '@/errors';
 import type { LLMCharacter, SpeakerAssignment, StageConfig, TextBlock } from '@/state/types';
+import { withRetry } from '@/utils/retry';
 import type { ILogger } from '../Logger';
 import {
   type AssignContext,
@@ -27,6 +27,8 @@ import {
 import { collectVotes, spreadTemps } from './collectVotes';
 import { DebugLogger } from './DebugLogger';
 import { LLMApiClient, type LLMApiClientOptions, wireRequestBase } from './LLMApiClient';
+import type { PoolEntry } from './pool';
+import { createPoolDraw, PoolExhaustedError, type PoolSlot } from './poolDraw';
 import { runWithConcurrency } from './runWithConcurrency';
 import {
   type AssignResponse,
@@ -35,7 +37,7 @@ import {
   ExtractSchema,
   MergeSchema,
 } from './schemas';
-import type { StructuredCallOptions } from './schemaUtils';
+import type { LlmPassId, StructuredCallOptions } from './schemaUtils';
 import { buildMergeConsensus } from './votingConsensus';
 
 export type ProgressCallback = (current: number, total: number, message?: string) => void;
@@ -70,6 +72,11 @@ export interface LlmStageDeps {
   merge: NestedStageConfig;
   /** Optional backup model, used when a stage exhausts maxRetries. */
   backup?: NestedStageConfig | null;
+  /**
+   * Parsed Connection pool (ADR-0022). When non-empty it replaces the
+   * per-stage apiUrl/apiKey/model for every pass; empty keeps stage behavior.
+   */
+  pool?: PoolEntry[] | null;
   narratorVoice: string;
   /** Max concurrent LLM requests; also the rate-limit gate ceiling. */
   llmThreads: number;
@@ -128,6 +135,10 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
   const debugLogger = new DebugLogger(deps.directoryHandle, logger);
   const transport = deps.transport;
   const backupConfig = deps.backup ?? null;
+  // One draw per Conversion: the shuffle freezes here and the park/eject
+  // state lives for the whole run (ADR-0022).
+  const pool = deps.pool && deps.pool.length > 0 ? createPoolDraw(deps.pool) : null;
+  const lastPoolCall = new Map<LlmPassId, { slot: PoolSlot; config: LLMClientConfig }>();
 
   /**
    * Single resolution path for adapter configs: a nested stage config
@@ -177,12 +188,93 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     return client;
   };
 
-  /** Prod OpenAI-SDK adapter, built only when no transport is injected. */
-  const apiClient = transport ? undefined : clientFor(extractClientConfig);
+  const poolEntryLabel = (slot: PoolSlot): string =>
+    slot.entry.name?.trim() || `slot ${slot.slot + 1}`;
 
-  function call<T>(config: LLMClientConfig, opts: StructuredCallOptions<T>): Promise<T> {
+  /** Stage fields give way to the entry's connection triple and tuning. */
+  const withPoolEntry = (config: LLMClientConfig, slot: PoolSlot): LLMClientConfig => {
+    const entry = slot.entry;
+    const hasThinkingKey =
+      entry.enable_thinking !== undefined ||
+      entry.chat_template_kwargs !== undefined ||
+      entry.reasoning_effort !== undefined;
+    return {
+      ...config,
+      apiUrl: entry.url,
+      apiKey: entry.key,
+      // A pool entry without a model uses the Extract stage model as the
+      // pool-wide default, matching the settings Test advice. Falling back to
+      // the current pass would leak the Backup model into a pool request.
+      model: entry.model ?? deps.extract.model,
+      temperature: entry.temperature ?? config.temperature,
+      maxTokens: entry.max_output_tokens ?? config.maxTokens,
+      ...(hasThinkingKey
+        ? {
+            thinking: {
+              enable_thinking: entry.enable_thinking,
+              reasoning_effort: entry.reasoning_effort,
+              chat_template_kwargs: entry.chat_template_kwargs,
+            },
+          }
+        : {}),
+    };
+  };
+
+  const estimatePromptTokens = (messages: StructuredCallOptions['messages']): number => {
+    const chars = messages.reduce((total, message) => total + message.content.length, 0);
+    return Math.ceil(chars / 4);
+  };
+
+  /** Phase logs name the serving slot, never the key that served it. */
+  const phaseLogBody = (
+    config: LLMClientConfig,
+    messages: StructuredCallOptions['messages'],
+    stage: LlmPassId,
+  ) => {
+    const served = pool ? lastPoolCall.get(stage) : undefined;
+    const base = wireRequestBase(served?.config ?? config, messages);
+    return served
+      ? { ...base, pool: { name: poolEntryLabel(served.slot), slot: served.slot.slot + 1 } }
+      : base;
+  };
+
+  function dispatch<T>(config: LLMClientConfig, opts: StructuredCallOptions<T>): Promise<T> {
     if (transport) return transport(config, opts);
     return clientFor(config).callStructured(opts);
+  }
+
+  /**
+   * Every attempt draws a fresh slot. A 429 parks that slot for the provider
+   * deadline, 401/403 ejects it for the Conversion, and the next attempt
+   * draws again. No draw means no stage-triple fallback.
+   */
+  async function call<T>(config: LLMClientConfig, opts: StructuredCallOptions<T>): Promise<T> {
+    if (!pool) return dispatch(config, opts);
+
+    const slot = pool.draw();
+    const pooledConfig = withPoolEntry(config, slot);
+    const inputLimit = slot.entry.max_input_tokens;
+    if (inputLimit !== undefined) {
+      const estimated = estimatePromptTokens(opts.messages);
+      if (estimated > inputLimit) {
+        logger.warn(
+          `[pool] Entry "${poolEntryLabel(slot)}" max_input_tokens ${inputLimit} is below the estimated prompt (${estimated} tokens); sending anyway`,
+        );
+      }
+    }
+
+    try {
+      const result = await dispatch(pooledConfig, opts);
+      if (opts.stage) lastPoolCall.set(opts.stage, { slot, config: pooledConfig });
+      return result;
+    } catch (error) {
+      if (isFailureClass(error, 'auth')) {
+        pool.eject(slot);
+      } else if (error instanceof RetriableError && error.kind === 'rate-limit') {
+        pool.park(slot, error.retryAfterMs);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -269,6 +361,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
           : undefined,
       );
     } catch (error) {
+      if (error instanceof PoolExhaustedError) throw error;
       if (signal?.aborted || !backupConfig || !backupClientConfig) throw error;
 
       if (isFailureClass(error, 'parse')) {
@@ -427,8 +520,8 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       const debugLog = index === 0 ? { messages: extractMessages, response } : undefined;
       return { characters: response.characters, debugLog };
     } catch (error) {
-      // Cancellation propagates: never swallow an abort.
-      if (signal?.aborted) throw error;
+      // Cancellation and pool exhaustion propagate: never degrade either.
+      if (signal?.aborted || error instanceof PoolExhaustedError) throw error;
       // Character usually spans more than one block: skip a block that fails
       // main + backup rather than aborting the whole extract pass.
       logger.warn(`[Extract] Block ${index + 1}/${total} failed after all retries, skipping`);
@@ -521,7 +614,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       if (isFirstBlock) {
         await debugLogger.savePhaseLog(
           'assign_draft',
-          wireRequestBase(assignClientConfig, assignMessages),
+          phaseLogBody(assignClientConfig, assignMessages, 'assign'),
           draftResponse,
         );
       }
@@ -562,13 +655,14 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
           if (isFirstBlock) {
             await debugLogger.savePhaseLog(
               'assign_qa',
-              wireRequestBase(assignClientConfig, qaMessages),
+              phaseLogBody(assignClientConfig, qaMessages, 'qa'),
               qaResponse,
             );
           }
 
           logger.info(`[assign] Block at ${block.sentenceStartIndex} completed with QA correction`);
         } catch (qaError) {
+          if (qaError instanceof PoolExhaustedError) throw qaError;
           // QA failed: fall back to the draft.
           logger.warn(
             `[assign] QA pass failed at ${block.sentenceStartIndex}, using draft: ${getErrorMessage(qaError)}`,
@@ -578,7 +672,8 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       } else {
         relativeMap = draftMap;
       }
-    } catch {
+    } catch (error) {
+      if (error instanceof PoolExhaustedError) throw error;
       logger.warn(
         `[assign] Block at ${block.sentenceStartIndex} failed after all retries, using default voice for ${block.sentences.length} sentences`,
       );
@@ -644,9 +739,14 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       // Save first merge phase log
       // savePhaseLog self-dedups to the first call per phase (DebugLogger),
       // so a safe always-call here captures the first successful merge vote.
-      await debugLogger.savePhaseLog('merge', wireRequestBase(voteConfig, mergeMessages), response);
+      await debugLogger.savePhaseLog(
+        'merge',
+        phaseLogBody(voteConfig, mergeMessages, 'merge'),
+        response,
+      );
       return response.merges;
     } catch (error) {
+      if (error instanceof PoolExhaustedError) throw error;
       // Auth failures rethrow for the vote pool, which aborts after two
       // auth-class failures (only a success resets the count) and reports one
       // actionable warning (ADR 0020); every other failure stays a replaced
@@ -696,6 +796,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       temps,
       signal: p?.signal,
       run: (temp, signal) => singleMerge(characters, temp, signal),
+      isFatal: (error) => error instanceof PoolExhaustedError,
       onAuthBurst: (_error, collected) => {
         authBurst = true;
         // The latch only fires on auth-class failures, so the class is
@@ -749,7 +850,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     async extract(blocks: TextBlock[], p?: StageCall): Promise<LLMCharacter[]> {
       logger.info(`[Extract] Starting (${blocks.length} blocks)`);
       const signal = p?.signal;
-      apiClient?.resetLogging();
+      if (!transport) debugLogger.resetLogging();
 
       const tasks = blocks.map((block, i) => () => extractBlock(block, i, blocks.length, signal));
       const responses = await runWithConcurrency(tasks, {
@@ -767,7 +868,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       if (responses[0]?.debugLog) {
         await debugLogger.savePhaseLog(
           'extract',
-          wireRequestBase(extractClientConfig, responses[0].debugLog.messages),
+          phaseLogBody(extractClientConfig, responses[0].debugLog.messages, 'extract'),
           responses[0].debugLog.response,
         );
       }

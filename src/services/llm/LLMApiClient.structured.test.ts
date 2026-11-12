@@ -660,6 +660,67 @@ describe('LLMApiClient.callStructured', () => {
     });
   });
 
+  describe('pool entry thinking override', () => {
+    const TestSchema = z.object({ value: z.string() });
+    const mockResponse = {
+      choices: [{ message: { content: '{"value":"ok"}', refusal: null } }],
+    };
+
+    beforeEach(() => {
+      mockCreate.mockResolvedValue(mockResponse);
+    });
+
+    it('sends entry chat_template_kwargs and skips the stage reasoning toggle', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        reasoning: 'high',
+        thinking: { chat_template_kwargs: { enable_thinking: false } },
+        logger: mockLogger,
+      });
+
+      await client.callStructured({
+        messages: [
+          { role: 'system' as const, content: 'Extract speakers.' },
+          { role: 'user' as const, content: 'John said hi.' },
+        ],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.chat_template_kwargs).toEqual({ enable_thinking: false });
+      expect(callArgs.enable_thinking).toBeUndefined();
+      expect(callArgs.reasoning_effort).toBeUndefined();
+      expect(callArgs.messages[0].content).not.toMatch(/\/no_think/);
+      expect(callArgs.messages[1].content).not.toMatch(/\/no_think/);
+    });
+
+    it('sends entry enable_thinking and reasoning_effort verbatim', async () => {
+      const client = new LLMApiClient({
+        apiKey: 'test-key',
+        apiUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+        reasoning: null,
+        thinking: { enable_thinking: true, reasoning_effort: 'high' },
+        logger: mockLogger,
+      });
+
+      await client.callStructured({
+        messages: [{ role: 'user' as const, content: 'test' }],
+        schema: TestSchema,
+        schemaName: 'TestSchema',
+      });
+
+      const callArgs = mockCreate.mock.calls[0][0];
+      expect(callArgs.enable_thinking).toBe(true);
+      expect(callArgs.reasoning_effort).toBe('high');
+      expect(callArgs.chat_template_kwargs).toBeUndefined();
+      expect(callArgs.messages[0].content).not.toMatch(/\/no_think/);
+    });
+  });
+
   describe('sampling parameters', () => {
     const TestSchema = z.object({ value: z.string() });
     const mockResponse = {

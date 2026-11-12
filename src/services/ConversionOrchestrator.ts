@@ -24,6 +24,7 @@ import type { ChunkStore } from './ChunkStore';
 import { FailureLog } from './FailureLog';
 import type { FFmpegService } from './FFmpegService';
 import type { ILogger } from './Logger';
+import type { PoolEntry } from './llm/pool';
 import type { LlmStageDeps, LlmStages } from './llm/stages';
 import { exportToProfile } from './llm/VoiceProfile';
 import {
@@ -64,6 +65,8 @@ export interface OrchestratorInput {
   mergeConfig: StageConfig;
   assignConfig: StageConfig;
   backupConfig: StageConfig;
+  /** Parsed Connection pool; non-empty replaces every stage connection triple. */
+  pool?: PoolEntry[];
   useVoting: boolean;
 
   // Settings
@@ -477,6 +480,7 @@ export async function runConversion(
         assign: input.assignConfig,
         merge: input.mergeConfig,
         backup: { ...input.backupConfig },
+        pool: input.pool ?? [],
         narratorVoice: input.narratorVoice,
         llmThreads: input.llmThreads,
         useVoting: input.useVoting,

@@ -10,6 +10,16 @@ describe('classifyProviderError', (t) => {
     });
   });
 
+  t('reads the provider deadline from a 429 response header', () => {
+    expect(
+      classifyProviderError({
+        status: 429,
+        headers: new Headers({ 'retry-after-ms': '12000' }),
+        message: 'Too many requests',
+      }),
+    ).toEqual({ kind: 'rate-limit', retryAfterMs: 12_000, errorClass: 'transport' });
+  });
+
   t('classifies a gateway 503 status as network-down', () => {
     expect(classifyProviderError({ status: 503, message: 'Service Unavailable' })).toEqual({
       kind: 'network-down',

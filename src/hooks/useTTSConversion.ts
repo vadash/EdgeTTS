@@ -16,7 +16,7 @@ import {
   setError,
   updateProgress,
 } from '@/stores/ConversionStore';
-import { isConfigured, llm } from '@/stores/LLMStore';
+import { isConfigured, llm, poolEntries } from '@/stores/LLMStore';
 import { settings } from '@/stores/SettingsStore';
 import { selectOutputDirectory } from '@/utils/directoryPicker';
 
@@ -40,6 +40,7 @@ function buildInput(stores: Stores, text: string): OrchestratorInput {
     mergeConfig: { ...l.merge },
     assignConfig: { ...l.assign },
     backupConfig: { ...l.backup },
+    pool: poolEntries.value,
     useVoting: l.useVoting,
 
     narratorVoice: s.narratorVoice,

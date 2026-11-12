@@ -31,10 +31,14 @@ type ChatCompletionCreateParamsStreaming =
   OpenAIType.Chat.Completions.ChatCompletionCreateParamsStreaming;
 
 /** Request body: OpenAI params plus OpenAI-compatible vendor extensions (thinking/reasoning). */
-type StructuredRequestBody = Omit<ChatCompletionCreateParamsNonStreaming, 'stream'> & {
+type StructuredRequestBody = Omit<
+  ChatCompletionCreateParamsNonStreaming,
+  'stream' | 'reasoning_effort'
+> & {
   enable_thinking?: boolean;
-  reasoning_effort?: 'high' | 'medium' | 'low';
-  chat_template_kwargs?: { enable_thinking: boolean };
+  /** Pool entries pass the provider's string verbatim, so the SDK union is too narrow. */
+  reasoning_effort?: string;
+  chat_template_kwargs?: Record<string, unknown>;
 };
 
 type ResponseFormat =
@@ -62,6 +66,16 @@ export interface LLMApiClientOptions {
   corsMiddleware?: string;
   debugLogger?: DebugLogger;
   logger?: ILogger;
+  /**
+   * Pool entry thinking keys. When present they replace the stage reasoning
+   * toggle outright: the client sends these keys verbatim and skips the
+   * disableThinking() kwarg and /no_think fallback.
+   */
+  thinking?: {
+    enable_thinking?: boolean;
+    reasoning_effort?: string;
+    chat_template_kwargs?: Record<string, unknown>;
+  };
 }
 
 function detectProvider(apiUrl: string, model: string): 'mistral' | 'openai' | 'unknown' {
@@ -398,7 +412,20 @@ export class LLMApiClient {
     // When reasoning is null or undefined (OFF), actively suppress thinking:
     // models that reason by default otherwise burn the whole token budget on
     // prose and never emit the JSON payload.
-    if (this.options.reasoning != null) {
+    // A pool entry's thinking keys win outright, so the stage toggle and the
+    // /no_think fallback never rewrite the entry's intent.
+    const thinking = this.options.thinking;
+    if (thinking) {
+      if (thinking.enable_thinking !== undefined) {
+        requestBody.enable_thinking = thinking.enable_thinking;
+      }
+      if (thinking.reasoning_effort !== undefined) {
+        requestBody.reasoning_effort = thinking.reasoning_effort;
+      }
+      if (thinking.chat_template_kwargs !== undefined) {
+        requestBody.chat_template_kwargs = thinking.chat_template_kwargs;
+      }
+    } else if (this.options.reasoning != null) {
       requestBody.enable_thinking = true;
       // OpenAI-compatible APIs use reasoning_effort for level specification
       if (this.options.reasoning !== 'auto') {
