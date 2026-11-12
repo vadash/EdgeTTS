@@ -12,6 +12,15 @@ import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
 import { sanitizeWireSchema } from './wireSchema';
 
 /**
+ * The SDK appends `/chat/completions` to the base, so a pasted full endpoint
+ * would double it (`.../chat/completions/chat/completions` → provider 404).
+ * Strip one trailing copy; a plain base passes through unchanged.
+ */
+export function normalizeApiUrl(url: string): string {
+  return url.replace(/\/+$/, '').replace(/\/chat\/completions$/i, '');
+}
+
+/**
  * Degenerate-output bound: accumulated content beyond maxTokens × this
  * multiplier chars is a runaway generation (e.g. duplicated chain-of-thought)
  * that will never parse, so the attempt aborts as transport-retriable instead
@@ -187,7 +196,7 @@ export class LLMApiClient {
     // new Headers(init?.headers) copies ALL existing headers (including Authorization
     // set by the OpenAI SDK), so no manual per-header copy is needed.
     const corsMiddleware = options.corsMiddleware?.trim() || '';
-    const apiBase = options.apiUrl.replace(/\/+$/, '');
+    const apiBase = normalizeApiUrl(options.apiUrl);
 
     const customFetch: typeof fetch = async (url, init) => {
       let fetchUrl = url as string | URL;
@@ -252,7 +261,7 @@ export class LLMApiClient {
 
     this.client = new OpenAI({
       apiKey: options.apiKey,
-      baseURL: options.apiUrl,
+      baseURL: normalizeApiUrl(options.apiUrl),
       dangerouslyAllowBrowser: true,
       maxRetries: 0, // We handle retries ourselves
       timeout: 240000, // 4 minutes: large prompts on slow local models exceed 3 minutes
