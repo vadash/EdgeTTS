@@ -132,7 +132,7 @@ export function LLMTab() {
         testing={stageState.testing}
         testResult={stageState.result}
         onCopySettings={() => handleCopySettings(stage)}
-        poolActive={llm.poolEntries.value.length > 0}
+        poolActive={llm.poolActive.value}
       />
     );
   };

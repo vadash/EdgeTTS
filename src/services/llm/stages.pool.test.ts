@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// The global setup mock flattens p-retry to a single attempt; these tests
-// observe the retry ladder and park/eject routing, so they need the real one.
+// The global setup mock flattens p-retry to one attempt, which hides the retry
+// ladder this file asserts. Fake timers keep the real retry delay off the wall
+// clock, so this file opts back into p-retry and advances timers explicitly.
 vi.unmock('p-retry');
 
 import { RetriableError } from '@/errors';
@@ -42,6 +43,7 @@ const EXTRACT_OK = {
   ],
 };
 const MERGE_OK = { reasoning: 'ok', merges: [[0, 1]] };
+const ASSIGN_OK = { reasoning: 'ok', assignments: {} };
 const characters: LLMCharacter[] = [
   { canonicalName: 'Undertaker', variations: ['Undertaker'], gender: 'male' },
   { canonicalName: 'Adele', variations: ['Adele'], gender: 'female' },
@@ -230,6 +232,9 @@ describe('LlmStages - Connection pool draw', () => {
       return EXTRACT_OK;
     });
     const service = serviceWithPool([poolEntry('a'), poolEntry('b')], transport, {
+      extract: { ...STAGE, model: 'extract-model' },
+      assign: { ...STAGE, model: 'assign-model' },
+      merge: { ...STAGE, model: 'merge-model' },
       backup: {
         apiKey: 'backup-key',
         apiUrl: 'https://backup.example.com/v1',
@@ -242,7 +247,38 @@ describe('LlmStages - Connection pool draw', () => {
 
     expect(calls.length).toBeGreaterThanOrEqual(3);
     expect(calls.some((call) => call.config.model === 'backup-model')).toBe(false);
+    expect(calls.every((call) => call.config.model === 'extract-model')).toBe(true);
     expect(calls.every((call) => ['key-a', 'key-b'].includes(call.config.apiKey))).toBe(true);
+  });
+
+  it('falls back to the Merge stage model for an entry without a model', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const { transport, calls } = captureTransport(() => MERGE_OK);
+    const service = serviceWithPool([poolEntry('a')], transport, {
+      extract: { ...STAGE, model: 'extract-model' },
+      assign: { ...STAGE, model: 'assign-model' },
+      merge: { ...STAGE, model: 'merge-model' },
+    });
+
+    await service.merge(characters);
+
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((call) => call.config.model === 'merge-model')).toBe(true);
+  });
+
+  it('falls back to the Assign stage model for an entry without a model', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.999);
+    const { transport, calls } = captureTransport(() => ASSIGN_OK);
+    const service = serviceWithPool([poolEntry('a')], transport, {
+      extract: { ...STAGE, model: 'extract-model' },
+      assign: { ...STAGE, model: 'assign-model' },
+      merge: { ...STAGE, model: 'merge-model' },
+    });
+
+    await service.assign(block(['Undertaker here.']), new Map(), characters);
+
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((call) => call.config.model === 'assign-model')).toBe(true);
   });
 
   it('overrides every merge vote temperature with the entry temperature', async () => {

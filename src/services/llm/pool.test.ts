@@ -113,6 +113,16 @@ describe('parsePoolTextarea', () => {
     ).toThrowError('Line 1: unknown field "typo"');
   });
 
+  it('rejects inherited prototype names because they are not own allowlist keys', () => {
+    const base = { url: 'https://a.example/v1', key: 'key-a' };
+
+    for (const field of ['constructor', 'toString', '__proto__']) {
+      expect(() => parsePoolTextarea(line({ ...base, [field]: true }))).toThrowError(
+        `Line 1: unknown field "${field}"`,
+      );
+    }
+  });
+
   it('validates optional field types', () => {
     const base = { url: 'https://a.example/v1', key: 'key-a' };
 
@@ -140,6 +150,15 @@ describe('parsePoolTextarea', () => {
     expect(() => parsePoolTextarea(line({ ...base, reasoning_effort: 2 }))).toThrowError(
       'Line 1: reasoning_effort must be a string',
     );
+    expect(() => parsePoolTextarea(line({ ...base, reasoning_effort: 'extreme' }))).toThrowError(
+      'Line 1: reasoning_effort must be one of low, medium, high',
+    );
+    expect(() =>
+      parsePoolTextarea(line({ ...base, chat_template_kwargs: { thinking_budget: 1024 } })),
+    ).toThrowError('Line 1: chat_template_kwargs supports only enable_thinking: boolean');
+    expect(() =>
+      parsePoolTextarea(line({ ...base, chat_template_kwargs: { enable_thinking: 'no' } })),
+    ).toThrowError('Line 1: chat_template_kwargs supports only enable_thinking: boolean');
   });
 
   it('keeps the first failing line when the pool starts invalid', () => {

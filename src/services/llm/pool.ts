@@ -5,6 +5,14 @@
  * OpenAI-compatible).
  */
 
+/** `reasoning_effort` levels accepted from a Pool entry; any other string fails the parse. */
+export type ReasoningEffort = 'low' | 'medium' | 'high';
+
+/** The one vendor template keyword the pool forwards; other kwargs stay rejected. */
+export interface ThinkingTemplateKwargs {
+  enable_thinking?: boolean;
+}
+
 /** One line of the Connection pool with the wire field names used by the JSONL. */
 export interface PoolEntry {
   url: string;
@@ -14,9 +22,9 @@ export interface PoolEntry {
   temperature?: number;
   max_output_tokens?: number;
   max_input_tokens?: number;
-  chat_template_kwargs?: Record<string, unknown>;
+  chat_template_kwargs?: ThinkingTemplateKwargs;
   enable_thinking?: boolean;
-  reasoning_effort?: string;
+  reasoning_effort?: ReasoningEffort;
 }
 
 export class PoolParseError extends Error {
@@ -42,6 +50,8 @@ const ALLOWED_FIELDS = {
   reasoning_effort: true,
   type: true,
 } as const;
+
+const REASONING_EFFORTS: readonly ReasoningEffort[] = ['low', 'medium', 'high'];
 
 function fail(line: number, reason: string): never {
   throw new PoolParseError(line, reason);
@@ -73,7 +83,7 @@ export function parsePoolTextarea(raw: string): PoolEntry[] {
     if (!isPlainObject(parsed)) fail(line, 'entry must be a JSON object');
 
     for (const field of Object.keys(parsed)) {
-      if (!(field in ALLOWED_FIELDS)) fail(line, `unknown field "${field}"`);
+      if (!Object.hasOwn(ALLOWED_FIELDS, field)) fail(line, `unknown field "${field}"`);
     }
 
     const { url, key } = parsed;
@@ -105,8 +115,15 @@ export function parsePoolTextarea(raw: string): PoolEntry[] {
       }
     }
 
-    if (parsed.chat_template_kwargs !== undefined && !isPlainObject(parsed.chat_template_kwargs)) {
-      fail(line, 'chat_template_kwargs must be an object');
+    if (parsed.chat_template_kwargs !== undefined) {
+      if (!isPlainObject(parsed.chat_template_kwargs)) {
+        fail(line, 'chat_template_kwargs must be an object');
+      }
+      const kwargs = parsed.chat_template_kwargs;
+      const valid = Object.entries(kwargs).every(
+        ([key, value]) => key === 'enable_thinking' && typeof value === 'boolean',
+      );
+      if (!valid) fail(line, 'chat_template_kwargs supports only enable_thinking: boolean');
     }
 
     if (parsed.enable_thinking !== undefined && typeof parsed.enable_thinking !== 'boolean') {
@@ -115,6 +132,12 @@ export function parsePoolTextarea(raw: string): PoolEntry[] {
 
     if (parsed.reasoning_effort !== undefined && typeof parsed.reasoning_effort !== 'string') {
       fail(line, 'reasoning_effort must be a string');
+    }
+    if (
+      parsed.reasoning_effort !== undefined &&
+      !REASONING_EFFORTS.includes(parsed.reasoning_effort as ReasoningEffort)
+    ) {
+      fail(line, 'reasoning_effort must be one of low, medium, high');
     }
 
     const entry: PoolEntry = { url, key };
@@ -128,13 +151,13 @@ export function parsePoolTextarea(raw: string): PoolEntry[] {
       entry.max_input_tokens = parsed.max_input_tokens as number;
     }
     if (parsed.chat_template_kwargs !== undefined) {
-      entry.chat_template_kwargs = parsed.chat_template_kwargs as Record<string, unknown>;
+      entry.chat_template_kwargs = parsed.chat_template_kwargs as ThinkingTemplateKwargs;
     }
     if (parsed.enable_thinking !== undefined) {
       entry.enable_thinking = parsed.enable_thinking as boolean;
     }
     if (parsed.reasoning_effort !== undefined) {
-      entry.reasoning_effort = parsed.reasoning_effort as string;
+      entry.reasoning_effort = parsed.reasoning_effort as ReasoningEffort;
     }
 
     entries.push(entry);

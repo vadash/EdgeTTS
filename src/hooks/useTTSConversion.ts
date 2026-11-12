@@ -16,7 +16,7 @@ import {
   setError,
   updateProgress,
 } from '@/stores/ConversionStore';
-import { isConfigured, llm, poolEntries } from '@/stores/LLMStore';
+import { isConfigured, llm, poolEntries, poolError } from '@/stores/LLMStore';
 import { settings } from '@/stores/SettingsStore';
 import { selectOutputDirectory } from '@/utils/directoryPicker';
 
@@ -78,6 +78,17 @@ export function useTTSConversion(): UseTTSConversionResult {
       }
 
       patchState({ tabBlocked: false });
+
+      // An invalid Connection pool fails before any work starts: falling
+      // through with no entries would send requests on an empty stage key.
+      const poolFailure = poolError.value;
+      if (poolFailure) {
+        const message = `Connection pool is invalid: ${poolFailure}. Fix the Pool tab before converting.`;
+        stores.conversion.setError(message, 'LLM_POOL_INVALID');
+        stores.llm.setError(message);
+        stores.logs.error(message);
+        return;
+      }
 
       const input = buildInput(stores, text);
 

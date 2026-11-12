@@ -16,8 +16,6 @@ export interface PoolSlot {
   entry: PoolEntry;
   /** 0-based position in the frozen shuffled order. */
   slot: number;
-  /** 0-based source line position, so duplicate entries stay distinguishable. */
-  line: number;
 }
 
 /** Every pool slot is parked or ejected; the pass must fail (ADR-0022). */
@@ -32,7 +30,6 @@ export class PoolExhaustedError extends Error {
 
 interface PoolState {
   entry: PoolEntry;
-  line: number;
   parkedUntil: number;
   ejected: boolean;
 }
@@ -52,9 +49,8 @@ export interface PoolDraw {
  * so tests can freeze the order without mocking globals.
  */
 export function createPoolDraw(entries: PoolEntry[], random: () => number = Math.random): PoolDraw {
-  const states: PoolState[] = entries.map((entry, line) => ({
+  const states: PoolState[] = entries.map((entry) => ({
     entry,
-    line,
     parkedUntil: 0,
     ejected: false,
   }));
@@ -69,7 +65,6 @@ export function createPoolDraw(entries: PoolEntry[], random: () => number = Math
   const slotAt = (position: number): PoolSlot => ({
     entry: states[position].entry,
     slot: position,
-    line: states[position].line,
   });
 
   return {

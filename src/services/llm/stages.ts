@@ -137,7 +137,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
   const backupConfig = deps.backup ?? null;
   // One draw per Conversion: the shuffle freezes here and the park/eject
   // state lives for the whole run (ADR-0022).
-  const pool = deps.pool && deps.pool.length > 0 ? createPoolDraw(deps.pool) : null;
+  const connectionPool = deps.pool && deps.pool.length > 0 ? createPoolDraw(deps.pool) : null;
   const lastPoolCall = new Map<LlmPassId, { slot: PoolSlot; config: LLMClientConfig }>();
 
   /**
@@ -167,6 +167,14 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
   /** Resolved adapter configs per pass; `call` routes these. */
   const extractClientConfig = resolveClientConfig(deps.extract);
   const assignClientConfig = resolveClientConfig(deps.assign);
+  /** Primary stage model per pass; a Pool entry that omits `model` inherits it. */
+  const passStageModels: Record<LlmPassId, string> = {
+    extract: deps.extract.model,
+    assign: deps.assign.model,
+    qa: deps.assign.model,
+    merge: deps.merge.model,
+    test: deps.extract.model,
+  };
   const extractRetries = deps.extract.maxRetries ?? DEFAULT_MAX_RETRIES;
   const assignRetries = deps.assign.maxRetries ?? DEFAULT_MAX_RETRIES;
   const extractBackupClientConfig = backupConfig
@@ -192,7 +200,11 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     slot.entry.name?.trim() || `slot ${slot.slot + 1}`;
 
   /** Stage fields give way to the entry's connection triple and tuning. */
-  const withPoolEntry = (config: LLMClientConfig, slot: PoolSlot): LLMClientConfig => {
+  const withPoolEntry = (
+    config: LLMClientConfig,
+    slot: PoolSlot,
+    stage: LlmPassId | undefined,
+  ): LLMClientConfig => {
     const entry = slot.entry;
     const hasThinkingKey =
       entry.enable_thinking !== undefined ||
@@ -202,10 +214,10 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       ...config,
       apiUrl: entry.url,
       apiKey: entry.key,
-      // A pool entry without a model uses the Extract stage model as the
-      // pool-wide default, matching the settings Test advice. Falling back to
-      // the current pass would leak the Backup model into a pool request.
-      model: entry.model ?? deps.extract.model,
+      // A Pool entry without a model keeps the current pass's Primary stage
+      // model. Nothing here reads config.model, so a Backup fallback can never
+      // leak its model into a Connection pool request.
+      model: entry.model ?? (stage ? passStageModels[stage] : deps.extract.model),
       temperature: entry.temperature ?? config.temperature,
       maxTokens: entry.max_output_tokens ?? config.maxTokens,
       ...(hasThinkingKey
@@ -231,7 +243,7 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
     messages: StructuredCallOptions['messages'],
     stage: LlmPassId,
   ) => {
-    const served = pool ? lastPoolCall.get(stage) : undefined;
+    const served = connectionPool ? lastPoolCall.get(stage) : undefined;
     const base = wireRequestBase(served?.config ?? config, messages);
     return served
       ? { ...base, pool: { name: poolEntryLabel(served.slot), slot: served.slot.slot + 1 } }
@@ -249,16 +261,16 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
    * draws again. No draw means no stage-triple fallback.
    */
   async function call<T>(config: LLMClientConfig, opts: StructuredCallOptions<T>): Promise<T> {
-    if (!pool) return dispatch(config, opts);
+    if (!connectionPool) return dispatch(config, opts);
 
-    const slot = pool.draw();
-    const pooledConfig = withPoolEntry(config, slot);
+    const slot = connectionPool.draw();
+    const pooledConfig = withPoolEntry(config, slot, opts.stage);
     const inputLimit = slot.entry.max_input_tokens;
     if (inputLimit !== undefined) {
       const estimated = estimatePromptTokens(opts.messages);
       if (estimated > inputLimit) {
         logger.warn(
-          `[pool] Entry "${poolEntryLabel(slot)}" max_input_tokens ${inputLimit} is below the estimated prompt (${estimated} tokens); sending anyway`,
+          `[Connection pool] Entry "${poolEntryLabel(slot)}" max_input_tokens ${inputLimit} is below the estimated prompt (${estimated} tokens); sending anyway`,
         );
       }
     }
@@ -269,9 +281,9 @@ export function createLlmStages(deps: LlmStageDeps): LlmStages {
       return result;
     } catch (error) {
       if (isFailureClass(error, 'auth')) {
-        pool.eject(slot);
+        connectionPool.eject(slot);
       } else if (error instanceof RetriableError && error.kind === 'rate-limit') {
-        pool.park(slot, error.retryAfterMs);
+        connectionPool.park(slot, error.retryAfterMs);
       }
       throw error;
     }

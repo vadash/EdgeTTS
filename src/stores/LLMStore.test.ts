@@ -6,7 +6,10 @@ import {
   isProcessing,
   llm,
   loadSettings,
+  poolActive,
   poolEntries,
+  poolError,
+  poolValid,
   resetLLMStore,
   resetProcessingState,
   setBlockProgress,
@@ -176,6 +179,38 @@ describe('LLMStore', () => {
       setPoolRaw('{not json');
 
       expect(poolEntries.value).toEqual([]);
+    });
+
+    it('reports the first invalid line and never counts the draft as configured', () => {
+      setPoolRaw(`${raw}\n{not json`);
+
+      expect(poolValid.value).toBe(false);
+      expect(poolError.value).toBe('Line 3: invalid JSON');
+      expect(isConfigured.value).toBe(false);
+      expect(poolActive.value).toBe(false);
+    });
+
+    it('treats an empty textarea as a valid, inactive pool', () => {
+      expect(poolValid.value).toBe(true);
+      expect(poolError.value).toBeNull();
+      expect(poolActive.value).toBe(false);
+      expect(isConfigured.value).toBe(false);
+    });
+
+    it('activates a valid non-empty pool', () => {
+      setPoolRaw(raw);
+
+      expect(poolValid.value).toBe(true);
+      expect(poolError.value).toBeNull();
+      expect(poolActive.value).toBe(true);
+    });
+
+    it('keeps a stage key configured when the pool draft is invalid', () => {
+      setStageField('extract', 'apiKey', 'sk-test-key');
+      setPoolRaw('{not json');
+
+      expect(isConfigured.value).toBe(true);
+      expect(poolActive.value).toBe(false);
     });
 
     it('persists the pool as one encrypted blob and restores it on load', async () => {

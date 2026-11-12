@@ -3,7 +3,7 @@ import { StorageKeys } from '@/config/storage';
 import type { LoggerStore } from '@/services/Logger';
 import { decryptValue, encryptValue } from '@/services/SecureStorage';
 import { saveJSON } from './persistence';
-import { parsePoolTextarea, type PoolEntry } from '@/services/llm/pool';
+import { parsePoolTextarea, PoolParseError, type PoolEntry } from '@/services/llm/pool';
 import type { LLMCharacter, SpeakerAssignment, StageConfig, VoiceProfileFile } from '@/state/types';
 
 // ============================================================================
@@ -104,14 +104,26 @@ export const backup = computed(() => llm.value.backup);
 export const useVoting = computed(() => llm.value.useVoting);
 export const poolRaw = computed(() => llm.value.poolRaw);
 
-/** Parsed Connection pool; an invalid textarea yields no slots until fixed. */
-export const poolEntries = computed<PoolEntry[]>(() => {
+/** One parse per textarea change, shared by the validity and entry views. */
+const poolParse = computed<{ entries: PoolEntry[]; error: string | null }>(() => {
   try {
-    return parsePoolTextarea(llm.value.poolRaw);
-  } catch {
-    return [];
+    return { entries: parsePoolTextarea(llm.value.poolRaw), error: null };
+  } catch (e) {
+    return { entries: [], error: e instanceof PoolParseError ? e.message : String(e) };
   }
 });
+
+/** Parsed Connection pool; an invalid textarea yields no slots until fixed. */
+export const poolEntries = computed<PoolEntry[]>(() => poolParse.value.entries);
+
+/** First `Line N` reason when the textarea draft is invalid; null when it parses. */
+export const poolError = computed<string | null>(() => poolParse.value.error);
+
+/** An empty textarea is valid; it just keeps the per-stage behavior. */
+export const poolValid = computed(() => poolParse.value.error === null);
+
+/** True when a valid, non-empty Connection pool will serve the Conversion. */
+export const poolActive = computed(() => llm.value.poolRaw.trim().length > 0 && poolValid.value);
 
 // ============================================================================
 // Computed Properties
@@ -119,7 +131,7 @@ export const poolEntries = computed<PoolEntry[]>(() => {
 
 export const isConfigured = computed(
   () =>
-    llm.value.poolRaw.trim().length > 0 ||
+    (llm.value.poolRaw.trim().length > 0 && poolValid.value) ||
     llm.value.extract.apiKey.length > 0 ||
     llm.value.merge.apiKey.length > 0 ||
     llm.value.assign.apiKey.length > 0,
@@ -148,15 +160,6 @@ export const characterLineCounts = computed(() => {
 let _savePending = false;
 let saveTimer: number | null = null;
 
-function isPoolRawValid(raw: string): boolean {
-  try {
-    parsePoolTextarea(raw);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function saveSettings(): Promise<void> {
   if (saveTimer) {
     clearTimeout(saveTimer);
@@ -166,7 +169,6 @@ async function saveSettings(): Promise<void> {
   _savePending = true;
 
   try {
-    const poolRawValid = isPoolRawValid(llm.value.poolRaw);
     const [extractKey, mergeKey, assignKey, backupKey, poolBlob] = await Promise.all([
       encryptValue(llm.value.extract.apiKey),
       encryptValue(llm.value.merge.apiKey),
@@ -175,7 +177,7 @@ async function saveSettings(): Promise<void> {
       // The whole textarea is one blob: per-entry `key` fields never reach
       // localStorage as plain text, and the raw string round-trips exactly.
       // An invalid line keeps the last valid blob on disk.
-      poolRawValid ? encryptValue(llm.value.poolRaw) : Promise.resolve(null),
+      poolValid.value ? encryptValue(llm.value.poolRaw) : Promise.resolve(null),
     ]);
 
     const settings: LLMSettings = {
@@ -280,7 +282,7 @@ export function setStageConfig(stage: LLMStage, config: StageConfig): void {
   scheduleSave();
 }
 
-/** Replaces the Connection pool textarea exactly as typed; parsing stays advisory. */
+/** Replaces the Connection pool textarea exactly as typed; validity is derived, never stored. */
 export function setPoolRaw(raw: string): void {
   patchState({ poolRaw: raw });
   scheduleSave();

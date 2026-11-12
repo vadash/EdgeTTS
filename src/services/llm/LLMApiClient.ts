@@ -5,6 +5,7 @@ import { RetriableError } from '@/errors';
 import { safeParseJSON } from '@/utils/text';
 import type { ILogger } from '../Logger';
 import type { DebugLogger } from './DebugLogger';
+import type { ReasoningEffort, ThinkingTemplateKwargs } from './pool';
 import { classifyProviderError } from './providerError';
 import { noteError, noteSuccess, waitTurn } from './rateLimitGate';
 import { type StructuredCallOptions, zodToJsonSchema } from './schemaUtils';
@@ -36,9 +37,8 @@ type StructuredRequestBody = Omit<
   'stream' | 'reasoning_effort'
 > & {
   enable_thinking?: boolean;
-  /** Pool entries pass the provider's string verbatim, so the SDK union is too narrow. */
-  reasoning_effort?: string;
-  chat_template_kwargs?: Record<string, unknown>;
+  reasoning_effort?: ReasoningEffort;
+  chat_template_kwargs?: ThinkingTemplateKwargs;
 };
 
 type ResponseFormat =
@@ -73,8 +73,8 @@ export interface LLMApiClientOptions {
    */
   thinking?: {
     enable_thinking?: boolean;
-    reasoning_effort?: string;
-    chat_template_kwargs?: Record<string, unknown>;
+    reasoning_effort?: ReasoningEffort;
+    chat_template_kwargs?: ThinkingTemplateKwargs;
   };
 }
 

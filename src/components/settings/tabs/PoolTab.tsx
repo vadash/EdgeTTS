@@ -3,7 +3,7 @@ import { Text } from 'preact-i18n';
 import { Button, Callout } from '@/components/common';
 import { getLogger } from '@/services';
 import { testLlmConnection } from '@/services/llm';
-import { parsePoolTextarea, PoolParseError, type PoolEntry } from '@/services/llm/pool';
+import type { PoolEntry } from '@/services/llm/pool';
 import type { StageConfig } from '@/state/types';
 import { useLLM } from '@/stores';
 import type { TestResult } from './StageConfigForm';
@@ -21,32 +21,22 @@ export function PoolTab() {
   const logger = getLogger();
   const [tests, setTests] = useState<Record<number, EntryTestState>>({});
   const [testingAll, setTestingAll] = useState(false);
-  const raw = llm.poolRaw.value;
-
-  let entries: PoolEntry[] = [];
-  let parseError: string | null = null;
-  try {
-    entries = parsePoolTextarea(raw);
-  } catch (e) {
-    parseError = e instanceof PoolParseError ? e.message : String(e);
-  }
 
   // Per-entry test is advisory: it uses the entry's resolved model and never
   // blocks saving. Connection triple falls back to the Extract stage.
   const configFor = (entry: PoolEntry): StageConfig => {
-    const base = llm.extract.value;
     const hasThinkingKey =
       entry.enable_thinking !== undefined ||
       entry.chat_template_kwargs !== undefined ||
       entry.reasoning_effort !== undefined;
     return {
-      ...base,
+      ...llm.extract.value,
       apiUrl: entry.url,
       apiKey: entry.key,
-      model: entry.model ?? base.model,
-      temperature: entry.temperature ?? base.temperature,
+      model: entry.model ?? llm.extract.value.model,
+      temperature: entry.temperature ?? llm.extract.value.temperature,
       // Entry thinking keys replace the stage reasoning toggle outright.
-      reasoning: hasThinkingKey ? null : base.reasoning,
+      reasoning: hasThinkingKey ? null : llm.extract.value.reasoning,
     };
   };
 
@@ -62,7 +52,7 @@ export function PoolTab() {
   const testAll = async () => {
     setTestingAll(true);
     try {
-      for (const [index, entry] of entries.entries()) {
+      for (const [index, entry] of llm.poolEntries.value.entries()) {
         await testEntry(index, entry);
       }
     } finally {
@@ -94,24 +84,31 @@ export function PoolTab() {
         className="input-field font-mono text-xs min-h-[16rem]"
         rows={16}
         spellcheck={false}
-        value={raw}
+        value={llm.poolRaw.value}
         placeholder={exampleLine}
         onInput={(e) => handleInput((e.target as HTMLTextAreaElement).value)}
       />
 
-      {parseError ? (
-        <Callout tone="error">{parseError}</Callout>
+      {llm.poolError.value ? (
+        <Callout tone="error">{llm.poolError.value}</Callout>
       ) : (
-        <p className="text-xs text-gray-400">
-          <Text id="llm.pool.slotCount" fields={{ count: entries.length }}>
-            {'Pool entries: {{count}}'}
-          </Text>
-          {entries.length === 0 &&
-            ' — empty pool keeps the per-stage API URL, key, and model behavior.'}
-        </p>
+        <>
+          <p className="text-xs text-gray-400">
+            <Text id="llm.pool.slotCount" fields={{ count: llm.poolEntries.value.length }}>
+              {'Pool entries: {{count}}'}
+            </Text>
+          </p>
+          {llm.poolEntries.value.length === 0 && (
+            <p className="text-xs text-gray-400">
+              <Text id="llm.pool.emptyHint">
+                Empty pool keeps the per-stage API URL, key, and model behavior.
+              </Text>
+            </p>
+          )}
+        </>
       )}
 
-      {entries.length > 0 && (
+      {llm.poolEntries.value.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={testAll} disabled={testingAll}>
@@ -128,7 +125,7 @@ export function PoolTab() {
             </span>
           </div>
 
-          {entries.map((entry, index) => {
+          {llm.poolEntries.value.map((entry, index) => {
             const state = tests[index];
             return (
               <div
