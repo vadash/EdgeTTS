@@ -7,6 +7,7 @@ import { useLLM } from '@/stores';
 import { STAGE_COPY_FIELDS, type StageConfig } from '@/state/types';
 import type { LLMStage } from '@/stores/LLMStore';
 import { LLMHelp } from './LLMHelp';
+import { PoolTab } from './PoolTab';
 import { StageConfigForm, type TestResult } from './StageConfigForm';
 
 interface StageInfo {
@@ -131,6 +132,7 @@ export function LLMTab() {
         testing={stageState.testing}
         testResult={stageState.result}
         onCopySettings={() => handleCopySettings(stage)}
+        poolActive={llm.poolEntries.value.length > 0}
       />
     );
   };
@@ -191,8 +193,8 @@ export function LLMTab() {
         </div>
       </div>
 
-      {/* Stage Tabs */}
-      <Tabs tabs={stages} defaultTab="extract">
+      {/* Stage Tabs + Pool */}
+      <Tabs tabs={[...stages, { id: 'pool', label: 'Pool', icon: '🔌' }]} defaultTab="extract">
         {(activeTab) => (
           <>
             {stages.map((s) => (
@@ -200,6 +202,9 @@ export function LLMTab() {
                 {renderStageForm(s.id)}
               </TabPanel>
             ))}
+            <TabPanel id="pool" activeTab={activeTab}>
+              <PoolTab />
+            </TabPanel>
           </>
         )}
       </Tabs>

@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { StorageKeys } from '@/config/storage';
 import {
   characterLineCounts,
   isConfigured,
   isProcessing,
   llm,
+  loadSettings,
+  poolEntries,
   resetLLMStore,
   resetProcessingState,
   setBlockProgress,
   setCharacters,
   setError,
+  setPoolRaw,
   setProcessingStatus,
   setSpeakerAssignments,
   setStageConfig,
@@ -16,14 +20,13 @@ import {
   setVoiceMap,
 } from './LLMStore';
 
+// Opaque reversible blobs so a persistence test can prove no key material is
+// stored as plain text while loadSettings still round-trips.
 vi.mock('@/services/SecureStorage', () => ({
-  encryptValue: vi.fn((value: string) => Promise.resolve(`encrypted:${value}`)),
-  decryptValue: vi.fn((value: string) => {
-    if (value.startsWith('encrypted:')) {
-      return Promise.resolve(value.replace('encrypted:', ''));
-    }
-    return Promise.resolve(value);
-  }),
+  encryptValue: vi.fn((value: string) => Promise.resolve(value ? `enc:${btoa(value)}` : '')),
+  decryptValue: vi.fn((value: string) =>
+    Promise.resolve(value.startsWith('enc:') ? atob(value.slice(4)) : value),
+  ),
 }));
 
 describe('LLMStore', () => {
@@ -143,6 +146,78 @@ describe('LLMStore', () => {
         expect(counts.has('narrator')).toBe(false);
         expect(counts.get('John')).toBe(1);
       });
+    });
+  });
+
+  describe('connection pool', () => {
+    const raw = [
+      JSON.stringify({ url: 'https://a.example/v1', key: 'secret-a', name: 'a' }),
+      JSON.stringify({ url: 'https://a.example/v1', key: 'secret-a', name: 'a' }),
+    ].join('\n');
+
+    it('starts empty and counts a non-empty pool as configured', () => {
+      expect(llm.value.poolRaw).toBe('');
+      expect(isConfigured.value).toBe(false);
+
+      setPoolRaw(raw);
+
+      expect(isConfigured.value).toBe(true);
+    });
+
+    it('exposes parsed pool entries in source order, duplicates kept', () => {
+      setPoolRaw(raw);
+
+      expect(poolEntries.value).toHaveLength(2);
+      expect(poolEntries.value.map((e) => e.name)).toEqual(['a', 'a']);
+      expect(poolEntries.value[0].url).toBe('https://a.example/v1');
+    });
+
+    it('exposes no entries while the textarea has an invalid line', () => {
+      setPoolRaw('{not json');
+
+      expect(poolEntries.value).toEqual([]);
+    });
+
+    it('persists the pool as one encrypted blob and restores it on load', async () => {
+      const logStore = {
+        error: vi.fn(),
+      } as unknown as Parameters<typeof loadSettings>[0];
+
+      vi.useFakeTimers();
+      try {
+        setPoolRaw(raw);
+        await vi.advanceTimersByTimeAsync(150);
+      } finally {
+        vi.useRealTimers();
+      }
+
+      const stored = localStorage.getItem(StorageKeys.llmPool);
+      expect(stored).toBeTruthy();
+      expect(stored).not.toContain('secret-a');
+
+      resetLLMStore();
+      expect(llm.value.poolRaw).toBe('');
+
+      await loadSettings(logStore);
+
+      expect(llm.value.poolRaw).toBe(raw);
+      expect(poolEntries.value).toHaveLength(2);
+    });
+
+    it('keeps the last valid blob when the textarea holds an invalid line', async () => {
+      vi.useFakeTimers();
+      try {
+        setPoolRaw(raw);
+        await vi.advanceTimersByTimeAsync(150);
+        const validBlob = localStorage.getItem(StorageKeys.llmPool);
+
+        setPoolRaw(`${raw}\n{not json`);
+        await vi.advanceTimersByTimeAsync(150);
+
+        expect(localStorage.getItem(StorageKeys.llmPool)).toBe(validBlob);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

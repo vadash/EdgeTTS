@@ -56,6 +56,8 @@ interface StageConfigFormProps {
   testing?: boolean;
   testResult?: TestResult | null;
   onCopySettings?: () => void;
+  /** Non-empty Connection pool replaces this stage's URL, key, and model. */
+  poolActive?: boolean;
 }
 
 export function StageConfigForm({
@@ -69,6 +71,7 @@ export function StageConfigForm({
   testing,
   testResult,
   onCopySettings,
+  poolActive,
 }: StageConfigFormProps) {
   const isReasoningEnabled = !!config.reasoning;
   const corsErrorDetected = useRef(false);
@@ -114,13 +117,23 @@ export function StageConfigForm({
           <input
             id={f.id}
             type={f.type}
-            className="input-field"
+            className={`input-field ${poolActive ? 'disabled:opacity-50 disabled:cursor-not-allowed' : ''}`.trim()}
             value={config[f.field]}
             onInput={(e) => onChange(f.field, (e.target as HTMLInputElement).value)}
             placeholder={f.placeholder}
+            disabled={poolActive}
           />
         </div>
       ))}
+
+      {poolActive && (
+        <p className="text-xs text-yellow-500">
+          <Text id="llm.pool.activeHint">
+            The Connection pool replaces this stage's API key, URL, and model. Tuning fields below
+            stay editable as fallbacks.
+          </Text>
+        </p>
+      )}
 
       {/* Advanced Settings */}
       <div className="space-y-4 pt-2 border-t border-gray-700">

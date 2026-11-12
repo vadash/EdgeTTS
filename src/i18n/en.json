@@ -111,7 +111,19 @@
     "promptRepetitionDesc": "Duplicates user prompt for improved LLM accuracy. Adds ~20-30% processing time.",
     "mergeAttempts": "Extra Vote Attempts",
     "mergeAttemptsHint": "Merge always collects 5 votes. This buys replacement attempts for failed votes: budget = 5 × (1 + value). 0 = no replacements.",
-    "maxRetriesHint": "Attempts after the first. 0 = one try, then the backup model takes over."
+    "maxRetriesHint": "Attempts after the first. 0 = one try, then the backup model takes over.",
+    "pool": {
+      "title": "Connection Pool",
+      "description": "One JSON object per line: url and key are required; name, model, temperature, and thinking keys are optional. A non-empty pool replaces every stage's API URL, key, and model. Empty keeps per-stage settings.",
+      "slotCount": "Pool entries: {{count}}",
+      "testAll": "Test all",
+      "testingAll": "Testing all...",
+      "testAdvisory": "Tests are advisory only; failed entries still save.",
+      "test": "Test",
+      "testing": "Testing...",
+      "testSuccess": "Connection successful",
+      "activeHint": "The Connection pool replaces this stage's API key, URL, and model. Tuning fields below stay editable as fallbacks."
+    }
   },
   "files": {
     "dictionary": "Dictionary",

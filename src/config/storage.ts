@@ -9,6 +9,8 @@ export const StorageKeys = {
   settings: 'edgetts_settings',
   /** LLM configuration (enabled, apiUrl, model). The API key is stored separately, encrypted. */
   llmSettings: 'edgetts_llm_settings',
+  /** Connection pool textarea (ADR-0022), stored as one SecureStorage ciphertext blob. */
+  llmPool: 'edgetts_llm_pool',
   /** UI language preference (en/ru) */
   language: 'edgetts_language',
   encryptedApiKey: 'llm_api_key_encrypted',

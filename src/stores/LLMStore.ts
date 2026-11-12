@@ -3,6 +3,7 @@ import { StorageKeys } from '@/config/storage';
 import type { LoggerStore } from '@/services/Logger';
 import { decryptValue, encryptValue } from '@/services/SecureStorage';
 import { saveJSON } from './persistence';
+import { parsePoolTextarea, type PoolEntry } from '@/services/llm/pool';
 import type { LLMCharacter, SpeakerAssignment, StageConfig, VoiceProfileFile } from '@/state/types';
 
 // ============================================================================
@@ -27,6 +28,8 @@ interface LLMState {
   merge: StageConfig;
   assign: StageConfig;
   backup: StageConfig;
+  /** Connection pool textarea exactly as typed; encrypted as one blob on save. */
+  poolRaw: string;
 
   // Processing state (not persisted)
   processingStatus: LLMProcessingStatus;
@@ -58,12 +61,13 @@ const defaultStageConfig: StageConfig = {
   maxRetries: 3,
 };
 
-const defaultPersistedState: LLMSettings = {
+const defaultPersistedState: LLMSettings & Pick<LLMState, 'poolRaw'> = {
   useVoting: false,
   extract: { ...defaultStageConfig },
   merge: { ...defaultStageConfig },
   assign: { ...defaultStageConfig },
   backup: { ...defaultStageConfig },
+  poolRaw: '',
 };
 
 const defaultTransientState = {
@@ -98,6 +102,16 @@ export const merge = computed(() => llm.value.merge);
 export const assign = computed(() => llm.value.assign);
 export const backup = computed(() => llm.value.backup);
 export const useVoting = computed(() => llm.value.useVoting);
+export const poolRaw = computed(() => llm.value.poolRaw);
+
+/** Parsed Connection pool; an invalid textarea yields no slots until fixed. */
+export const poolEntries = computed<PoolEntry[]>(() => {
+  try {
+    return parsePoolTextarea(llm.value.poolRaw);
+  } catch {
+    return [];
+  }
+});
 
 // ============================================================================
 // Computed Properties
@@ -105,6 +119,7 @@ export const useVoting = computed(() => llm.value.useVoting);
 
 export const isConfigured = computed(
   () =>
+    llm.value.poolRaw.trim().length > 0 ||
     llm.value.extract.apiKey.length > 0 ||
     llm.value.merge.apiKey.length > 0 ||
     llm.value.assign.apiKey.length > 0,
@@ -133,6 +148,15 @@ export const characterLineCounts = computed(() => {
 let _savePending = false;
 let saveTimer: number | null = null;
 
+function isPoolRawValid(raw: string): boolean {
+  try {
+    parsePoolTextarea(raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function saveSettings(): Promise<void> {
   if (saveTimer) {
     clearTimeout(saveTimer);
@@ -142,11 +166,16 @@ async function saveSettings(): Promise<void> {
   _savePending = true;
 
   try {
-    const [extractKey, mergeKey, assignKey, backupKey] = await Promise.all([
+    const poolRawValid = isPoolRawValid(llm.value.poolRaw);
+    const [extractKey, mergeKey, assignKey, backupKey, poolBlob] = await Promise.all([
       encryptValue(llm.value.extract.apiKey),
       encryptValue(llm.value.merge.apiKey),
       encryptValue(llm.value.assign.apiKey),
       encryptValue(llm.value.backup.apiKey),
+      // The whole textarea is one blob: per-entry `key` fields never reach
+      // localStorage as plain text, and the raw string round-trips exactly.
+      // An invalid line keeps the last valid blob on disk.
+      poolRawValid ? encryptValue(llm.value.poolRaw) : Promise.resolve(null),
     ]);
 
     const settings: LLMSettings = {
@@ -157,50 +186,58 @@ async function saveSettings(): Promise<void> {
       backup: { ...llm.value.backup, apiKey: backupKey },
     };
     saveJSON(StorageKeys.llmSettings, settings);
+    if (poolBlob !== null) localStorage.setItem(StorageKeys.llmPool, poolBlob);
   } finally {
     _savePending = false;
   }
 }
 
 function scheduleSave(): void {
-  if (!saveTimer) {
-    saveTimer = window.setTimeout(() => {
-      saveSettings();
-      saveTimer = null;
-    }, 100);
-  }
+  // Debounce from the latest write, so a burst of textarea input saves once
+  // with the final text instead of on the first keystroke's deadline.
+  clearTimeout(saveTimer ?? undefined);
+  saveTimer = window.setTimeout(() => {
+    saveTimer = null;
+    saveSettings();
+  }, 100);
 }
 
 export async function loadSettings(logStore: LoggerStore): Promise<void> {
   try {
     const saved = localStorage.getItem(StorageKeys.llmSettings);
-    if (!saved) return;
+    if (saved) {
+      const settings: LLMSettings = JSON.parse(saved);
 
-    const settings: LLMSettings = JSON.parse(saved);
-
-    llm.value = {
-      ...llm.value,
-      useVoting: settings.useVoting ?? defaultPersistedState.useVoting,
-    };
-
-    for (const stage of ['extract', 'merge', 'assign', 'backup'] as const) {
-      const persisted = settings[stage];
-      if (!persisted) continue;
-
-      // Same semantics as a per-field `persisted[key] ?? default` merge: JSON null
-      // resets a field to its default, unknown keys are dropped, and apiKey is
-      // decrypted separately instead of merged.
-      const config: StageConfig = {
-        ...defaultStageConfig,
-        ...Object.fromEntries(
-          (Object.keys(defaultStageConfig) as (keyof StageConfig)[])
-            .map((key) => [key, persisted[key]] as const)
-            .filter(([, value]) => value != null),
-        ),
+      llm.value = {
+        ...llm.value,
+        useVoting: settings.useVoting ?? defaultPersistedState.useVoting,
       };
-      config.apiKey = await decryptValue(persisted.apiKey ?? '', logStore);
 
-      llm.value = { ...llm.value, [stage]: config };
+      for (const stage of ['extract', 'merge', 'assign', 'backup'] as const) {
+        const persisted = settings[stage];
+        if (!persisted) continue;
+
+        // Same semantics as a per-field `persisted[key] ?? default` merge: JSON null
+        // resets a field to its default, unknown keys are dropped, and apiKey is
+        // decrypted separately instead of merged.
+        const config: StageConfig = {
+          ...defaultStageConfig,
+          ...Object.fromEntries(
+            (Object.keys(defaultStageConfig) as (keyof StageConfig)[])
+              .map((key) => [key, persisted[key]] as const)
+              .filter(([, value]) => value != null),
+          ),
+        };
+        config.apiKey = await decryptValue(persisted.apiKey ?? '', logStore);
+
+        llm.value = { ...llm.value, [stage]: config };
+      }
+    }
+
+    // The pool blob loads even when the stage settings key is absent.
+    const poolBlob = localStorage.getItem(StorageKeys.llmPool);
+    if (poolBlob) {
+      llm.value = { ...llm.value, poolRaw: await decryptValue(poolBlob, logStore) };
     }
   } catch (e) {
     logStore.error(
@@ -240,6 +277,12 @@ export function setStageField<K extends keyof StageConfig>(
 
 export function setStageConfig(stage: LLMStage, config: StageConfig): void {
   patchState({ [stage]: { ...config } });
+  scheduleSave();
+}
+
+/** Replaces the Connection pool textarea exactly as typed; parsing stays advisory. */
+export function setPoolRaw(raw: string): void {
+  patchState({ poolRaw: raw });
   scheduleSave();
 }
 
